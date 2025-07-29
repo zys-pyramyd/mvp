@@ -413,16 +413,16 @@ function App() {
                   <input
                     type="text"
                     placeholder="First Name"
-                    value={authForm.firstName}
-                    onChange={(e) => setAuthForm(prev => ({...prev, firstName: e.target.value}))}
+                    value={authForm.first_name}
+                    onChange={(e) => setAuthForm(prev => ({...prev, first_name: e.target.value}))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     required
                   />
                   <input
                     type="text"
                     placeholder="Last Name"
-                    value={authForm.lastName}
-                    onChange={(e) => setAuthForm(prev => ({...prev, lastName: e.target.value}))}
+                    value={authForm.last_name}
+                    onChange={(e) => setAuthForm(prev => ({...prev, last_name: e.target.value}))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     required
                   />
