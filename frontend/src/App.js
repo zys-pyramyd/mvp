@@ -43,8 +43,8 @@ function App() {
   
   // Auth form states
   const [authForm, setAuthForm] = useState({
-    firstName: '',
-    lastName: '',
+    first_name: '',
+    last_name: '',
     username: '',
     email: '',
     password: '',
