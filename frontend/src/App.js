@@ -143,8 +143,8 @@ function App() {
         }
         
         setAuthForm({
-          firstName: '',
-          lastName: '',
+          first_name: '',
+          last_name: '',
           username: '',
           email: '',
           password: '',
