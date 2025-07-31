@@ -864,10 +864,16 @@ function App() {
                     Agent
                   </button>
                   <button
-                    onClick={() => handleRoleSelection('supplier')}
+                    onClick={() => handleRoleSelection('supplier_farm_inputs')}
                     className="w-full text-left px-3 py-2 rounded border hover:bg-gray-50"
                   >
-                    Supplier
+                    Farm Input Supplier
+                  </button>
+                  <button
+                    onClick={() => handleRoleSelection('supplier_food_produce')}
+                    className="w-full text-left px-3 py-2 rounded border hover:bg-gray-50"
+                  >
+                    Food Produce Supplier
                   </button>
                   <button
                     onClick={() => handleRoleSelection('processor')}
