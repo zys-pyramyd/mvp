@@ -30,7 +30,9 @@ const ProfileIcon = () => (
 
 function App() {
   const [user, setUser] = useState(null);
-  const [currentPlatform, setCurrentPlatform] = useState('pyhub');
+  // Initialize with main page (formerly PyExpress) as default
+  const [currentPlatform, setCurrentPlatform] = useState('main');
+  const [showBuyFromFarm, setShowBuyFromFarm] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('login');
   const [showRoleSelection, setShowRoleSelection] = useState(false);
