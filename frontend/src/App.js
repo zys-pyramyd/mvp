@@ -375,7 +375,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
@@ -383,36 +383,42 @@ function App() {
               <img 
                 src="https://customer-assets.emergentagent.com/job_pyramyd-agritech/artifacts/ml8alcyl_image.png" 
                 alt="Pyramyd" 
-                className="h-8 w-auto"
+                className="h-8 w-auto sm:h-10"
               />
             </div>
 
-            {/* Platform Toggle */}
-            <div className="flex items-center bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setCurrentPlatform('pyhub')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  currentPlatform === 'pyhub'
-                    ? 'bg-emerald-600 text-white'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                PyHub
-              </button>
-              <button
-                onClick={() => setCurrentPlatform('pyexpress')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  currentPlatform === 'pyexpress'
-                    ? 'bg-emerald-600 text-white'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                PyExpress
-              </button>
-            </div>
+            {/* Platform Toggle - Only for Agents */}
+            {user && canSwitchPlatforms(user.role) ? (
+              <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setCurrentPlatform('pyhub')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    currentPlatform === 'pyhub'
+                      ? 'bg-emerald-600 text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  PyHub
+                </button>
+                <button
+                  onClick={() => setCurrentPlatform('pyexpress')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    currentPlatform === 'pyexpress'
+                      ? 'bg-emerald-600 text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  PyExpress
+                </button>
+              </div>
+            ) : (
+              <div className="text-lg font-semibold text-emerald-600">
+                {currentPlatform === 'pyhub' ? 'PyHub' : 'PyExpress'}
+              </div>
+            )}
 
-            {/* Right side actions */}
-            <div className="flex items-center space-x-4">
+            {/* Right side navigation icons */}
+            <div className="flex items-center space-x-2 sm:space-x-3">
               {/* Order Tracking */}
               {user && (
                 <button
@@ -420,7 +426,7 @@ function App() {
                     setShowOrderTracking(true);
                     fetchOrders();
                   }}
-                  className="relative p-2 text-gray-600 hover:text-emerald-600 transition-colors"
+                  className="nav-button icon-button p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg"
                   title="Track Orders"
                 >
                   <TruckIcon />
@@ -431,12 +437,12 @@ function App() {
               {user && (
                 <button
                   onClick={() => setShowMessaging(true)}
-                  className="relative p-2 text-gray-600 hover:text-emerald-600 transition-colors"
+                  className="nav-button icon-button relative p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg"
                   title="Messages"
                 >
                   <MessageIcon />
                   {messages.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
                       {messages.length}
                     </span>
                   )}
@@ -446,36 +452,36 @@ function App() {
               {/* Cart */}
               <button
                 onClick={() => setShowCart(true)}
-                className="relative p-2 text-gray-600 hover:text-emerald-600 transition-colors"
+                className="nav-button icon-button relative p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg"
                 title="Shopping Cart"
               >
                 <AddToCartIcon />
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
                     {cartItemCount}
                   </span>
                 )}
               </button>
 
-              {/* User Menu */}
+              {/* User Menu or Sign In */}
               {user ? (
                 <div className="relative">
                   <button
                     onClick={() => setShowProfileMenu(!showProfileMenu)}
-                    className="flex items-center space-x-2 p-2 text-gray-600 hover:text-emerald-600 transition-colors"
+                    className="nav-button icon-button flex items-center space-x-1 p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg"
                     title="Profile Menu"
                   >
                     <ProfileIcon />
-                    <span className="text-sm text-gray-700">
+                    <span className="hidden sm:block text-sm font-medium">
                       {user.first_name}
                     </span>
                   </button>
 
                   {/* Profile Dropdown */}
                   {showProfileMenu && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                    <div className="profile-dropdown absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                       <div className="py-1">
-                        <div className="px-4 py-2 border-b border-gray-100">
+                        <div className="px-4 py-3 border-b border-gray-100">
                           <p className="text-sm font-medium text-gray-900">{user.first_name} {user.last_name}</p>
                           <p className="text-xs text-gray-500">{user.role?.replace('_', ' ').toUpperCase()}</p>
                         </div>
@@ -526,7 +532,7 @@ function App() {
               ) : (
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
                 >
                   Sign In
                 </button>
