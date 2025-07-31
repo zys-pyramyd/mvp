@@ -378,36 +378,13 @@ function App() {
   };
 
   const getUserPlatformAccess = (userRole) => {
-    if (!userRole) return ['pyhub', 'pyexpress']; // Default for non-authenticated users
-    
-    switch (userRole) {
-      case 'agent':
-        return ['pyhub', 'pyexpress']; // Only agents can access both platforms
-      case 'farmer':
-        return ['pyhub']; // Farmers restricted to PyHub only
-      case 'supplier_farm_inputs':
-        return ['pyhub']; // Farm input suppliers (fertilizer, seeds, etc.) restricted to PyHub
-      case 'supplier_food_produce':
-        return ['pyexpress']; // Food produce suppliers restricted to PyExpress
-      case 'processor':
-        return ['pyexpress']; // Processors on PyExpress
-      case 'general_buyer':
-      case 'retailer':
-      case 'hotel':
-      case 'restaurant':
-      case 'cafe':
-        return ['pyexpress']; // Buyers default to PyExpress
-      case 'storage_owner':
-      case 'logistics_business':
-      case 'super_agent':
-        return ['pyhub']; // Service providers on PyHub
-      default:
-        return ['pyhub', 'pyexpress'];
-    }
+    // All users can access both main page and buy from farm
+    return ['main', 'buy_from_farm'];
   };
 
   const canSwitchPlatforms = (userRole) => {
-    return userRole === 'agent'; // Only agents can switch platforms
+    // All users can switch between main page and buy from farm
+    return true;
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0);
