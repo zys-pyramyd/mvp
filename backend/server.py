@@ -51,7 +51,8 @@ class UserRole(str, Enum):
     SUPER_AGENT = "super_agent"
     STORAGE_OWNER = "storage_owner"
     LOGISTICS_BUSINESS = "logistics_business"
-    SUPPLIER = "supplier"
+    SUPPLIER_FARM_INPUTS = "supplier_farm_inputs"  # New: Farm input suppliers (PyHub only)
+    SUPPLIER_FOOD_PRODUCE = "supplier_food_produce"  # New: Food produce suppliers (PyExpress only)
     PROCESSOR = "processor"
     GENERAL_BUYER = "general_buyer"
     RETAILER = "retailer"
