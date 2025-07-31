@@ -333,15 +333,18 @@ function App() {
       alert('An error occurred. Please try again.');
     }
   };
+
+  const handleAuth = async (e) => {
     e.preventDefault();
     
     try {
-      const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
-      const body = authMode === 'login' 
-        ? { email: authForm.email, password: authForm.password }
-        : authForm;
+      // Handle login
+      const body = { 
+        email_or_phone: authForm.email_or_phone, 
+        password: authForm.password 
+      };
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -355,17 +358,15 @@ function App() {
         setUser(data.user);
         setShowAuthModal(false);
         
-        if (!data.user.role) {
-          setShowRoleSelection(true);
-        }
-        
         setAuthForm({
           first_name: '',
           last_name: '',
           username: '',
-          email: '',
+          email_or_phone: '',
           password: '',
-          phone: ''
+          phone: '',
+          gender: '',
+          date_of_birth: ''
         });
       } else {
         const error = await response.json();
