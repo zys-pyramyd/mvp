@@ -165,6 +165,16 @@ function App() {
   ];
 
   useEffect(() => {
+    // Enforce platform restrictions based on user role
+    if (user && user.role) {
+      const allowedPlatforms = getUserPlatformAccess(user.role);
+      if (!allowedPlatforms.includes(currentPlatform)) {
+        setCurrentPlatform(allowedPlatforms[0]); // Set to the first allowed platform
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
     // Check for saved token
     const token = localStorage.getItem('token');
     if (token) {
@@ -174,16 +184,6 @@ function App() {
     fetchProducts();
     fetchCategories();
   }, [currentPlatform, selectedCategory, searchTerm]);
-
-  useEffect(() => {
-    // Enforce platform restrictions based on user role
-    if (user && user.role) {
-      const allowedPlatforms = getUserPlatformAccess(user.role);
-      if (!allowedPlatforms.includes(currentPlatform)) {
-        setCurrentPlatform(allowedPlatforms[0]); // Set to the first allowed platform
-      }
-    }
-  }, [user]);
 
   const fetchUserProfile = async (token) => {
     try {
