@@ -268,12 +268,64 @@ async def login(login_data: UserLogin):
     }
 
 @app.post("/api/auth/complete-registration")
-async def complete_registration(registration_data: CompleteRegistration, current_user: dict = Depends(get_current_user)):
-    # This endpoint will handle the complete registration process
-    # Implementation details would be added based on requirements
+async def complete_registration(registration_data: CompleteRegistration):
+    # Check if user exists
+    if db.users.find_one({"$or": [
+        {"email_or_phone": registration_data.email_or_phone}, 
+        {"username": registration_data.username}
+    ]}):
+        raise HTTPException(status_code=400, detail="User already exists")
+    
+    # Determine user role based on registration path
+    user_role = None
+    if registration_data.user_path == 'buyer':
+        if registration_data.buyer_type == 'skip':
+            user_role = 'general_buyer'
+        else:
+            user_role = registration_data.buyer_type
+    elif registration_data.user_path == 'partner':
+        if registration_data.partner_type == 'business':
+            user_role = registration_data.business_category
+        else:
+            user_role = registration_data.partner_type
+    
+    # Create user with complete information
+    user = User(
+        first_name=registration_data.first_name,
+        last_name=registration_data.last_name,
+        username=registration_data.username,
+        email=registration_data.email_or_phone,  # Store as email for compatibility
+        phone=registration_data.phone,
+        role=user_role
+    )
+    
+    # Create user document with additional fields
+    user_dict = user.dict()
+    user_dict['password'] = hash_password(registration_data.password)
+    user_dict['gender'] = registration_data.gender
+    user_dict['date_of_birth'] = registration_data.date_of_birth
+    user_dict['user_path'] = registration_data.user_path
+    user_dict['business_info'] = registration_data.business_info or {}
+    user_dict['verification_info'] = registration_data.verification_info or {}
+    user_dict['is_verified'] = False  # Will be updated after verification process
+    
+    db.users.insert_one(user_dict)
+    
+    # Generate token
+    token = create_token(user.id)
+    
     return {
         "message": "Registration completed successfully",
-        "user_path": registration_data.user_path
+        "token": token,
+        "user": {
+            "id": user.id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "username": user.username,
+            "email": user.email,
+            "role": user_role,
+            "user_path": registration_data.user_path
+        }
     }
 
 @app.get("/api/user/profile")
