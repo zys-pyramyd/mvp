@@ -112,6 +112,35 @@ body {
   box-shadow: 0 4px 15px rgba(20, 153, 17, 0.3);
 }
 
+/* Navigation icons styling */
+.nav-button svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.icon-button {
+  min-width: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ensure icons are visible on all screen sizes */
+@media (max-width: 640px) {
+  .nav-button svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .icon-button {
+    min-width: 36px;
+    min-height: 36px;
+    padding: 6px;
+  }
+}
+
 /* Mobile-first responsive design improvements */
 @media (max-width: 640px) {
   .cart-sidebar {
