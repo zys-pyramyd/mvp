@@ -405,35 +405,29 @@ function App() {
               />
             </div>
 
-            {/* Platform Toggle - Only for Agents */}
-            {user && canSwitchPlatforms(user.role) ? (
-              <div className="flex items-center bg-gray-100 rounded-lg p-1">
-                <button
-                  onClick={() => setCurrentPlatform('pyhub')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    currentPlatform === 'pyhub'
-                      ? 'bg-emerald-600 text-white'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  PyHub
-                </button>
-                <button
-                  onClick={() => setCurrentPlatform('pyexpress')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    currentPlatform === 'pyexpress'
-                      ? 'bg-emerald-600 text-white'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  PyExpress
-                </button>
-              </div>
-            ) : (
-              <div className="text-lg font-semibold text-emerald-600">
-                {currentPlatform === 'pyhub' ? 'PyHub' : 'PyExpress'}
-              </div>
-            )}
+            {/* Platform Navigation - All users can access both */}
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setCurrentPlatform('main')}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  currentPlatform === 'main'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Main
+              </button>
+              <button
+                onClick={() => setCurrentPlatform('buy_from_farm')}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  currentPlatform === 'buy_from_farm'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Buy from Farm
+              </button>
+            </div>
 
             {/* Right side navigation icons */}
             <div className="flex items-center space-x-2 sm:space-x-3">
