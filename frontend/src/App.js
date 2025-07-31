@@ -1541,6 +1541,7 @@ function App() {
               </>
             )}
 
+      {/* Messaging Modal */}
 
       {/* Cart Sidebar */}
       {showCart && (
