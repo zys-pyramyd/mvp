@@ -634,6 +634,191 @@ async def agent_purchase(
         "commission_type": purchase_option.commission_type
     }
 
+@app.get("/api/users/search")
+async def search_users(username: str, current_user: dict = Depends(get_current_user)):
+    """Search users by username for group buying"""
+    if not username:
+        return []
+    
+    users = list(db.users.find({
+        "username": {"$regex": username, "$options": "i"},
+        "role": {"$in": ["general_buyer", "retailer", "hotel", "restaurant", "cafe"]}
+    }).limit(10))
+    
+    # Clean up response and add NIN verification status
+    for user in users:
+        user.pop('_id', None)
+        user.pop('password', None)
+        # Check if user has NIN for group buying eligibility
+        user['is_nin_verified'] = bool(user.get('verification_info', {}).get('nin'))
+    
+    return users
+
+@app.post("/api/group-buying/recommendations")
+async def get_price_recommendations(
+    request: GroupBuyingRequest, 
+    current_user: dict = Depends(get_current_user)
+):
+    """Get price recommendations for group buying based on matching farms"""
+    if current_user.get('role') != 'agent':
+        raise HTTPException(status_code=403, detail="Only agents can access group buying")
+    
+    # Find matching products/farms
+    query = {
+        "$or": [
+            {"title": {"$regex": request.produce, "$options": "i"}},
+            {"description": {"$regex": request.produce, "$options": "i"}}
+        ],
+        "category": request.category,
+        "quantity_available": {"$gte": 1}  # At least some stock
+    }
+    
+    if request.location:
+        query["location"] = {"$regex": request.location, "$options": "i"}
+    
+    matching_products = list(db.products.find(query))
+    
+    recommendations = []
+    for product in matching_products:
+        # Calculate match percentage based on available quantity
+        match_percentage = min(100, (product['quantity_available'] / request.quantity) * 100)
+        
+        # Calculate distance (mock calculation - in real app, use geolocation)
+        distance = 5 + (hash(product['location']) % 50)  # Mock 5-55km distance
+        
+        rec = {
+            "farm_id": product['seller_id'],
+            "farm_name": product.get('farm_name', product['seller_name']),
+            "location": product['location'],
+            "price_per_unit": product['price_per_unit'],
+            "available_quantity": product['quantity_available'],
+            "match_percentage": int(match_percentage),
+            "distance": distance,
+            "product_id": product['id']
+        }
+        recommendations.append(rec)
+    
+    # Sort by match percentage and distance
+    recommendations.sort(key=lambda x: (-x['match_percentage'], x['distance']))
+    
+    return {"recommendations": recommendations[:5]}  # Return top 5 matches
+
+@app.post("/api/group-buying/create-order")
+async def create_group_order(
+    order_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a group buying order"""
+    if current_user.get('role') != 'agent':
+        raise HTTPException(status_code=403, detail="Only agents can create group orders")
+    
+    # Calculate commission
+    total_amount = order_data['selectedPrice']['price_per_unit'] * order_data['quantity']
+    
+    if order_data['commissionType'] == 'pyramyd':
+        agent_commission = total_amount * 0.05  # 5% commission
+    else:
+        agent_commission = 0  # Will be collected after delivery
+    
+    # Create group order
+    group_order = GroupOrder(
+        agent_id=current_user['id'],
+        produce=order_data['produce'],
+        category=order_data['category'],
+        location=order_data['location'],
+        total_quantity=order_data['quantity'],
+        buyers=order_data['buyers'],
+        selected_farm=order_data['selectedPrice'],
+        commission_type=order_data['commissionType'],
+        total_amount=total_amount,
+        agent_commission=agent_commission
+    )
+    
+    # Save to database
+    order_dict = group_order.dict()
+    db.group_orders.insert_one(order_dict)
+    
+    # Update product quantity (real-time stock management)
+    db.products.update_one(
+        {"id": order_data['selectedPrice']['product_id']},
+        {"$inc": {"quantity_available": -order_data['quantity']}}
+    )
+    
+    return {
+        "message": "Group order created successfully",
+        "order_id": group_order.id,
+        "total_amount": total_amount,
+        "agent_commission": agent_commission
+    }
+
+@app.post("/api/outsource-order")
+async def create_outsourced_order(
+    produce: str,
+    category: str,
+    quantity: int,
+    expected_price: float,
+    location: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create an outsourced order for agents to bid on"""
+    allowed_roles = ['agent', 'processor', 'supplier']
+    if current_user.get('role') not in allowed_roles:
+        raise HTTPException(status_code=403, detail="Only agents, processors, and suppliers can outsource orders")
+    
+    outsourced_order = OutsourcedOrder(
+        requester_id=current_user['id'],
+        produce=produce,
+        category=category,
+        quantity=quantity,
+        expected_price=expected_price,
+        location=location
+    )
+    
+    order_dict = outsourced_order.dict()
+    db.outsourced_orders.insert_one(order_dict)
+    
+    return {
+        "message": "Order outsourced successfully",
+        "order_id": outsourced_order.id,
+        "status": "open"
+    }
+
+@app.get("/api/outsourced-orders")
+async def get_outsourced_orders(current_user: dict = Depends(get_current_user)):
+    """Get available outsourced orders for agents to accept"""
+    if current_user.get('role') != 'agent':
+        raise HTTPException(status_code=403, detail="Only agents can view outsourced orders")
+    
+    orders = list(db.outsourced_orders.find({"status": "open"}).sort("created_at", -1))
+    
+    # Clean up response
+    for order in orders:
+        order.pop('_id', None)
+    
+    return orders
+
+@app.post("/api/outsourced-orders/{order_id}/accept")
+async def accept_outsourced_order(order_id: str, current_user: dict = Depends(get_current_user)):
+    """Accept an outsourced order"""
+    if current_user.get('role') != 'agent':
+        raise HTTPException(status_code=403, detail="Only agents can accept outsourced orders")
+    
+    # Update order status
+    result = db.outsourced_orders.update_one(
+        {"id": order_id, "status": "open"},
+        {
+            "$set": {
+                "status": "accepted",
+                "accepting_agent_id": current_user['id']
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Order not found or already accepted")
+    
+    return {"message": "Order accepted successfully"}
+
 @app.get("/api/categories")
 async def get_categories():
     return [{"value": cat.value, "label": cat.value.replace("_", " ").title()} for cat in ProductCategory]
