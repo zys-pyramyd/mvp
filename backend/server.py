@@ -532,6 +532,10 @@ async def agent_purchase(
         "commission_type": purchase_option.commission_type
     }
 
+@app.get("/api/categories")
+async def get_categories():
+    return [{"value": cat.value, "label": cat.value.replace("_", " ").title()} for cat in ProductCategory]
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
