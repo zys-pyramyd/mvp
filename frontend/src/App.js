@@ -503,14 +503,14 @@ function App() {
             {/* Platform Navigation - All users can access both */}
             <div className="flex items-center bg-gray-100 rounded-lg p-1">
               <button
-                onClick={() => setCurrentPlatform('main')}
+                onClick={() => setCurrentPlatform('home')}
                 className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  currentPlatform === 'main'
+                  currentPlatform === 'home'
                     ? 'bg-emerald-600 text-white'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                Main
+                Home
               </button>
               <button
                 onClick={() => setCurrentPlatform('buy_from_farm')}
