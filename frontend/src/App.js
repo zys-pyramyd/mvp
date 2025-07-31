@@ -1517,6 +1517,9 @@ function App() {
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
 
       {/* Messaging Modal */}
 
