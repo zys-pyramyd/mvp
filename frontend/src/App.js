@@ -369,6 +369,9 @@ function App() {
     return userRole === 'agent'; // Only agents can switch platforms
   };
 
+  const cartTotal = cart.reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0);
+  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
