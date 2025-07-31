@@ -712,94 +712,176 @@ function App() {
         )}
       </main>
 
-      {/* Auth Modal */}
+      {/* Enhanced Registration Modal */}
       {showAuthModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">
-                {authMode === 'login' ? 'Sign In' : 'Sign Up'}
-              </h2>
-              <button
-                onClick={() => setShowAuthModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ×
-              </button>
-            </div>
+            {/* Login Form */}
+            {authMode === 'login' && (
+              <>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold">Sign In</h2>
+                  <button
+                    onClick={() => setShowAuthModal(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
 
-            <form onSubmit={handleAuth} className="space-y-4">
-              {authMode === 'register' && (
-                <>
+                <form onSubmit={handleAuth} className="space-y-4">
                   <input
                     type="text"
-                    placeholder="First Name"
-                    value={authForm.first_name}
-                    onChange={(e) => setAuthForm(prev => ({...prev, first_name: e.target.value}))}
+                    placeholder="Email or Phone"
+                    value={authForm.email_or_phone}
+                    onChange={(e) => setAuthForm(prev => ({...prev, email_or_phone: e.target.value}))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     required
                   />
+                  
                   <input
-                    type="text"
-                    placeholder="Last Name"
-                    value={authForm.last_name}
-                    onChange={(e) => setAuthForm(prev => ({...prev, last_name: e.target.value}))}
+                    type="password"
+                    placeholder="Password"
+                    value={authForm.password}
+                    onChange={(e) => setAuthForm(prev => ({...prev, password: e.target.value}))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     required
                   />
-                  <input
-                    type="text"
-                    placeholder="Username"
-                    value={authForm.username}
-                    onChange={(e) => setAuthForm(prev => ({...prev, username: e.target.value}))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    required
-                  />
-                  <input
-                    type="tel"
-                    placeholder="Phone (optional)"
-                    value={authForm.phone}
-                    onChange={(e) => setAuthForm(prev => ({...prev, phone: e.target.value}))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  />
-                </>
-              )}
-              
-              <input
-                type="email"
-                placeholder="Email"
-                value={authForm.email}
-                onChange={(e) => setAuthForm(prev => ({...prev, email: e.target.value}))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                required
-              />
-              
-              <input
-                type="password"
-                placeholder="Password"
-                value={authForm.password}
-                onChange={(e) => setAuthForm(prev => ({...prev, password: e.target.value}))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                required
-              />
 
-              <button
-                type="submit"
-                className="w-full bg-emerald-600 text-white py-2 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-              >
-                {authMode === 'login' ? 'Sign In' : 'Sign Up'}
-              </button>
-            </form>
+                  <button
+                    type="submit"
+                    className="w-full bg-emerald-600 text-white py-2 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+                  >
+                    Sign In
+                  </button>
+                </form>
 
-            <p className="mt-4 text-center text-sm text-gray-600">
-              {authMode === 'login' ? "Don't have an account? " : "Already have an account? "}
-              <button
-                onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
-                className="text-emerald-600 hover:text-emerald-700 font-medium"
-              >
-                {authMode === 'login' ? 'Sign Up' : 'Sign In'}
-              </button>
-            </p>
+                <p className="mt-4 text-center text-sm text-gray-600">
+                  Don't have an account? 
+                  <button
+                    onClick={() => setAuthMode('register')}
+                    className="text-emerald-600 hover:text-emerald-700 font-medium ml-1"
+                  >
+                    Sign Up
+                  </button>
+                </p>
+              </>
+            )}
+
+            {/* Registration Flow */}
+            {authMode === 'register' && (
+              <>
+                {registrationStep === 'basic' && (
+                  <>
+                    <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-xl font-bold">Create Account</h2>
+                      <button
+                        onClick={() => setShowAuthModal(false)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleBasicRegistration} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          placeholder="First Name"
+                          value={authForm.first_name}
+                          onChange={(e) => setAuthForm(prev => ({...prev, first_name: e.target.value}))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          required
+                        />
+                        <input
+                          type="text"
+                          placeholder="Last Name"
+                          value={authForm.last_name}
+                          onChange={(e) => setAuthForm(prev => ({...prev, last_name: e.target.value}))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          required
+                        />
+                      </div>
+                      
+                      <input
+                        type="text"
+                        placeholder="Username (unique)"
+                        value={authForm.username}
+                        onChange={(e) => setAuthForm(prev => ({...prev, username: e.target.value}))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        required
+                      />
+                      
+                      <input
+                        type="text"
+                        placeholder="Email or Phone Number"
+                        value={authForm.email_or_phone}
+                        onChange={(e) => setAuthForm(prev => ({...prev, email_or_phone: e.target.value}))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        required
+                      />
+                      
+                      <input
+                        type="tel"
+                        placeholder="Phone Number (optional)"
+                        value={authForm.phone}
+                        onChange={(e) => setAuthForm(prev => ({...prev, phone: e.target.value}))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <select
+                          value={authForm.gender}
+                          onChange={(e) => setAuthForm(prev => ({...prev, gender: e.target.value}))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          required
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                          <option value="other">Other</option>
+                        </select>
+                        
+                        <input
+                          type="date"
+                          placeholder="Date of Birth"
+                          value={authForm.date_of_birth}
+                          onChange={(e) => setAuthForm(prev => ({...prev, date_of_birth: e.target.value}))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          required
+                        />
+                      </div>
+                      
+                      <input
+                        type="password"
+                        placeholder="Password"
+                        value={authForm.password}
+                        onChange={(e) => setAuthForm(prev => ({...prev, password: e.target.value}))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        required
+                      />
+
+                      <button
+                        type="submit"
+                        className="w-full bg-emerald-600 text-white py-2 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
+                      >
+                        Continue
+                      </button>
+                    </form>
+
+                    <p className="mt-4 text-center text-sm text-gray-600">
+                      Already have an account? 
+                      <button
+                        onClick={() => setAuthMode('login')}
+                        className="text-emerald-600 hover:text-emerald-700 font-medium ml-1"
+                      >
+                        Sign In
+                      </button>
+                    </p>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
