@@ -522,6 +522,39 @@ class AgentPurchaseOption(BaseModel):
     customer_id: str
     delivery_address: str
 
+class GroupBuyingRequest(BaseModel):
+    produce: str
+    category: str
+    quantity: int
+    location: str
+
+class GroupOrder(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    agent_id: str
+    produce: str
+    category: str
+    location: str
+    total_quantity: int
+    buyers: List[dict]
+    selected_farm: dict
+    commission_type: str  # "pyramyd" or "after_delivery"
+    total_amount: float
+    agent_commission: float
+    status: str = "pending"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class OutsourcedOrder(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    requester_id: str  # Agent or Processor who outsourced
+    produce: str
+    category: str
+    quantity: int
+    expected_price: float
+    location: str
+    status: str = "open"  # "open", "accepted", "completed", "cancelled"
+    accepting_agent_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
 @app.post("/api/agent/purchase")
 async def agent_purchase(
     items: List[CartItem], 
