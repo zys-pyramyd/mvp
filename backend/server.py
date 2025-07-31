@@ -158,6 +158,9 @@ class Order(BaseModel):
     total_amount: float
     status: OrderStatus = OrderStatus.PENDING
     delivery_address: str
+    agent_id: Optional[str] = None  # If purchased by agent
+    agent_commission_type: Optional[str] = None  # "percentage" or "collect_after_delivery"
+    agent_commission_amount: Optional[float] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 # Helper functions
