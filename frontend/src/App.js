@@ -468,6 +468,114 @@ function App() {
     }
   };
 
+  // Group Buying Functions
+  const searchBuyers = async (username) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/users/search?username=${username}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setFoundBuyers(data);
+      }
+    } catch (error) {
+      console.error('Error searching buyers:', error);
+    }
+  };
+
+  const addBuyerToGroup = (buyer, quantity) => {
+    const existingBuyer = groupBuyingData.buyers.find(b => b.id === buyer.id);
+    if (!existingBuyer) {
+      setGroupBuyingData(prev => ({
+        ...prev,
+        buyers: [...prev.buyers, { ...buyer, quantity }],
+        quantity: prev.quantity + quantity
+      }));
+    }
+  };
+
+  const removeBuyerFromGroup = (buyerId) => {
+    const buyer = groupBuyingData.buyers.find(b => b.id === buyerId);
+    if (buyer) {
+      setGroupBuyingData(prev => ({
+        ...prev,
+        buyers: prev.buyers.filter(b => b.id !== buyerId),
+        quantity: prev.quantity - buyer.quantity
+      }));
+    }
+  };
+
+  const fetchPriceRecommendations = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/group-buying/recommendations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          produce: groupBuyingData.produce,
+          category: groupBuyingData.category,
+          quantity: groupBuyingData.quantity,
+          location: groupBuyingData.location
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setGroupBuyingData(prev => ({
+          ...prev,
+          recommendations: data.recommendations
+        }));
+        setGroupBuyingStep('recommendations');
+      }
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+    }
+  };
+
+  const createGroupOrder = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/group-buying/create-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...groupBuyingData,
+          agent_id: user.id
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        alert('Group order created successfully!');
+        setShowGroupBuying(false);
+        // Reset group buying data
+        setGroupBuyingData({
+          produce: '',
+          category: '',
+          quantity: 0,
+          location: '',
+          buyers: [],
+          recommendations: [],
+          selectedPrice: null,
+          commissionType: 'pyramyd'
+        });
+        setGroupBuyingStep('search');
+      }
+    } catch (error) {
+      console.error('Error creating group order:', error);
+    }
+  };
+
   const getUserPlatformAccess = (userRole) => {
     // All users can access both home page and buy from farm
     return ['home', 'buy_from_farm'];
