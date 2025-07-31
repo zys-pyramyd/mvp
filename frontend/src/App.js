@@ -49,6 +49,8 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [showOrderTracking, setShowOrderTracking] = useState(false);
+  const [orders, setOrders] = useState([]);
+  
   // Group buying state
   const [showGroupBuying, setShowGroupBuying] = useState(false);
   const [groupBuyingStep, setGroupBuyingStep] = useState('search'); // 'search', 'buyers', 'recommendations', 'commission'
