@@ -445,9 +445,89 @@ async def get_orders(current_user: dict = Depends(get_current_user)):
     
     return orders
 
-@app.get("/api/categories")
-async def get_categories():
-    return [{"value": cat.value, "label": cat.value.replace("_", " ").title()} for cat in ProductCategory]
+class AgentPurchaseOption(BaseModel):
+    commission_type: str  # "percentage" or "collect_after_delivery"
+    customer_id: str
+    delivery_address: str
+
+@app.post("/api/agent/purchase")
+async def agent_purchase(
+    items: List[CartItem], 
+    purchase_option: AgentPurchaseOption,
+    current_user: dict = Depends(get_current_user)
+):
+    """Agent purchasing on behalf of customers with commission options"""
+    if current_user.get('role') != 'agent':
+        raise HTTPException(status_code=403, detail="Only agents can use this endpoint")
+    
+    if not items:
+        raise HTTPException(status_code=400, detail="No items in order")
+    
+    order_items = []
+    total_amount = 0.0
+    seller_id = None
+    seller_name = None
+    
+    for item in items:
+        product = db.products.find_one({"id": item.product_id})
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
+        
+        if item.quantity > product['quantity_available']:
+            raise HTTPException(status_code=400, detail=f"Insufficient quantity for {product['title']}")
+        
+        item_total = product['price_per_unit'] * item.quantity
+        total_amount += item_total
+        
+        order_items.append({
+            "product_id": product['id'],
+            "title": product['title'],
+            "price_per_unit": product['price_per_unit'],
+            "quantity": item.quantity,
+            "total": item_total
+        })
+        
+        if seller_id is None:
+            seller_id = product['seller_id']
+            seller_name = product['seller_name']
+        elif seller_id != product['seller_id']:
+            raise HTTPException(status_code=400, detail="All items must be from the same seller")
+    
+    # Calculate agent commission
+    commission_rate = AGENT_COMMISSION_RATES['purchase']  # 5%
+    commission_amount = total_amount * commission_rate
+    
+    # Create order with agent commission details
+    order = Order(
+        buyer_id=purchase_option.customer_id,
+        buyer_name="Customer (via Agent)",
+        seller_id=seller_id,
+        seller_name=seller_name,
+        items=order_items,
+        total_amount=total_amount,
+        delivery_address=purchase_option.delivery_address,
+        agent_id=current_user['id'],
+        agent_commission_type=purchase_option.commission_type,
+        agent_commission_amount=commission_amount
+    )
+    
+    order_dict = order.dict()
+    db.orders.insert_one(order_dict)
+    
+    # Update product quantities
+    for item in items:
+        db.products.update_one(
+            {"id": item.product_id},
+            {"$inc": {"quantity_available": -item.quantity}}
+        )
+    
+    return {
+        "message": "Agent purchase successful",
+        "order_id": order.id,
+        "total_amount": total_amount,
+        "commission_amount": commission_amount,
+        "commission_type": purchase_option.commission_type
+    }
 
 if __name__ == "__main__":
     import uvicorn
