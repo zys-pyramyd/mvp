@@ -513,27 +513,59 @@ function App() {
           </p>
         </div>
 
-        {/* Search and Filters */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-            />
-          </div>
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-          >
-            <option value="">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat.value} value={cat.value}>{cat.label}</option>
+        {/* Categories - Swipeable Cards */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">Shop by Category</h3>
+          <div className="flex overflow-x-auto space-x-4 pb-4 scrollbar-hide">
+            {/* All Categories Card */}
+            <div
+              onClick={() => setSelectedCategory('')}
+              className={`flex-shrink-0 cursor-pointer transition-all duration-200 ${
+                selectedCategory === '' ? 'transform scale-105' : 'hover:transform hover:scale-105'
+              }`}
+            >
+              <div className="w-24 h-24 rounded-xl overflow-hidden mb-2 bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                <span className="text-white text-xs font-medium">All</span>
+              </div>
+              <p className="text-xs text-center text-gray-700 font-medium">All Categories</p>
+            </div>
+
+            {/* Category Cards */}
+            {categoryData.map(category => (
+              <div
+                key={category.value}
+                onClick={() => setSelectedCategory(category.value)}
+                className={`flex-shrink-0 cursor-pointer transition-all duration-200 ${
+                  selectedCategory === category.value ? 'transform scale-105' : 'hover:transform hover:scale-105'
+                }`}
+              >
+                <div className={`w-24 h-24 rounded-xl overflow-hidden mb-2 border-2 transition-colors ${
+                  selectedCategory === category.value ? 'border-emerald-500' : 'border-gray-200'
+                }`}>
+                  <img
+                    src={category.image}
+                    alt={category.label}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" fill="%23f3f4f6"><rect width="96" height="96" fill="%23f3f4f6"/><text x="48" y="48" text-anchor="middle" dy="0.3em" font-family="Arial" font-size="12" fill="%236b7280">' + category.label + '</text></svg>';
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-center text-gray-700 font-medium">{category.label}</p>
+              </div>
             ))}
-          </select>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="mb-6">
+          <input
+            type="text"
+            placeholder="Search products..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+          />
         </div>
 
         {/* Products Grid */}
