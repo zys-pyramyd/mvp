@@ -49,7 +49,21 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [showOrderTracking, setShowOrderTracking] = useState(false);
-  const [orders, setOrders] = useState([]);
+  // Group buying state
+  const [showGroupBuying, setShowGroupBuying] = useState(false);
+  const [groupBuyingStep, setGroupBuyingStep] = useState('search'); // 'search', 'buyers', 'recommendations', 'commission'
+  const [groupBuyingData, setGroupBuyingData] = useState({
+    produce: '',
+    category: '',
+    quantity: 0,
+    location: '',
+    buyers: [],
+    recommendations: [],
+    selectedPrice: null,
+    commissionType: 'pyramyd' // 'pyramyd' (5%) or 'after_delivery'
+  });
+  const [buyerSearch, setBuyerSearch] = useState('');
+  const [foundBuyers, setFoundBuyers] = useState([]);
   
   // Auth form states - Updated structure
   const [authForm, setAuthForm] = useState({
