@@ -977,12 +977,267 @@ function App() {
                       </button>
                     </p>
                   </>
+                {/* Role Path Selection Step */}
+                {registrationStep === 'role_path' && (
+                  <>
+                    <div className="flex justify-between items-center mb-6">
+                      <h2 className="text-2xl font-bold text-center w-full text-emerald-600">Welcome to Pyramyd!</h2>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-emerald-50 to-blue-50 p-6 rounded-2xl">
+                      <p className="text-gray-600 mb-6 text-center">
+                        Choose how you'd like to use the platform:
+                      </p>
+
+                      <div className="grid grid-cols-1 gap-6">
+                        {/* Buyer Path */}
+                        <div className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-emerald-300 transition-colors cursor-pointer">
+                          <div className="text-center">
+                            <div className="text-4xl mb-3">🛒</div>
+                            <h3 className="text-lg font-semibold mb-2 text-gray-800">Explore as a Buyer</h3>
+                            <p className="text-sm text-gray-600 mb-4">Find fresh produce for your needs!</p>
+                            <button
+                              onClick={() => handleRolePath('buyer')}
+                              className="w-full bg-blue-600 text-white py-3 px-4 rounded-full hover:bg-blue-700 transition-colors font-medium"
+                            >
+                              Continue as Buyer
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Partner Path */}
+                        <div className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-emerald-300 transition-colors cursor-pointer">
+                          <div className="text-center">
+                            <div className="text-4xl mb-3">🤝</div>
+                            <h3 className="text-lg font-semibold mb-2 text-gray-800">Register as a Partner</h3>
+                            <p className="text-sm text-gray-600 mb-4">Grow your business with Pyramyd!</p>
+                            <button
+                              onClick={() => handleRolePath('partner')}
+                              className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
+                            >
+                              Continue as Partner
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
                 )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
+
+                {/* Buyer Type Selection Step */}
+                {registrationStep === 'buyer_type' && (
+                  <>
+                    <div className="flex justify-between items-center mb-6">
+                      <button
+                        onClick={() => setRegistrationStep('role_path')}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        ← Back
+                      </button>
+                      <h2 className="text-xl font-bold text-emerald-600">Select Your Business Type</h2>
+                      <div></div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-2xl">
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => handleBuyerTypeSelection('retailer')}
+                          className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
+                        >
+                          <div className="font-medium">Retailer</div>
+                          <div className="text-sm text-gray-600">Buy and sell to end consumers</div>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleBuyerTypeSelection('hotel')}
+                          className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
+                        >
+                          <div className="font-medium">Hotel</div>
+                          <div className="text-sm text-gray-600">Hospitality business</div>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleBuyerTypeSelection('cafe')}
+                          className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
+                        >
+                          <div className="font-medium">Cafe</div>
+                          <div className="text-sm text-gray-600">Coffee shop or cafe business</div>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleBuyerTypeSelection('restaurant')}
+                          className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
+                        >
+                          <div className="font-medium">Restaurant</div>
+                          <div className="text-sm text-gray-600">Food service business</div>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleBuyerTypeSelection('others')}
+                          className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
+                        >
+                          <div className="font-medium">Others</div>
+                          <div className="text-sm text-gray-600">Specify your business type</div>
+                        </button>
+                      </div>
+                      
+                      <div className="mt-6 flex justify-end">
+                        <button
+                          onClick={() => handleBuyerTypeSelection('skip')}
+                          className="text-gray-500 hover:text-gray-700 text-sm font-medium px-4 py-2 rounded-full border border-gray-300 hover:border-gray-400 transition-colors"
+                        >
+                          Skip (if you're not a business)
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Business Info Step */}
+                {registrationStep === 'business_info' && (
+                  <>
+                    <div className="flex justify-between items-center mb-6">
+                      <button
+                        onClick={() => setRegistrationStep('buyer_type')}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        ← Back
+                      </button>
+                      <h2 className="text-xl font-bold text-emerald-600">Business Information</h2>
+                      <div></div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-emerald-50 to-green-50 p-6 rounded-2xl">
+                      <form onSubmit={(e) => { e.preventDefault(); completeRegistration(); }} className="space-y-4">
+                        {selectedBuyerType === 'others' && (
+                          <input
+                            type="text"
+                            placeholder="Specify your business type"
+                            value={businessInfo.business_type}
+                            onChange={(e) => setBusinessInfo(prev => ({...prev, business_type: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            required
+                          />
+                        )}
+                        
+                        <input
+                          type="text"
+                          placeholder="Business Name"
+                          value={businessInfo.business_name}
+                          onChange={(e) => setBusinessInfo(prev => ({...prev, business_name: e.target.value}))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          required
+                        />
+                        
+                        <input
+                          type="text"
+                          placeholder="Business Address"
+                          value={businessInfo.business_address}
+                          onChange={(e) => setBusinessInfo(prev => ({...prev, business_address: e.target.value}))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          required
+                        />
+                        
+                        <div className="grid grid-cols-3 gap-3">
+                          <input
+                            type="text"
+                            placeholder="City"
+                            value={businessInfo.city}
+                            onChange={(e) => setBusinessInfo(prev => ({...prev, city: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            required
+                          />
+                          <input
+                            type="text"
+                            placeholder="State"
+                            value={businessInfo.state}
+                            onChange={(e) => setBusinessInfo(prev => ({...prev, state: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            required
+                          />
+                          <input
+                            type="text"
+                            placeholder="Country"
+                            value={businessInfo.country}
+                            onChange={(e) => setBusinessInfo(prev => ({...prev, country: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            required
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
+                        >
+                          Complete Registration
+                        </button>
+                      </form>
+                    </div>
+                  </>
+                )}
+
+                {/* Home Address Step (for skip option) */}
+                {registrationStep === 'home_address' && (
+                  <>
+                    <div className="flex justify-between items-center mb-6">
+                      <button
+                        onClick={() => setRegistrationStep('buyer_type')}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        ← Back
+                      </button>
+                      <h2 className="text-xl font-bold text-emerald-600">Your Address</h2>
+                      <div></div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl">
+                      <form onSubmit={(e) => { e.preventDefault(); completeRegistration(); }} className="space-y-4">
+                        <input
+                          type="text"
+                          placeholder="Home Address"
+                          value={businessInfo.home_address}
+                          onChange={(e) => setBusinessInfo(prev => ({...prev, home_address: e.target.value}))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          required
+                        />
+                        
+                        <div className="grid grid-cols-3 gap-3">
+                          <input
+                            type="text"
+                            placeholder="City"
+                            value={businessInfo.city}
+                            onChange={(e) => setBusinessInfo(prev => ({...prev, city: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            required
+                          />
+                          <input
+                            type="text"
+                            placeholder="State"
+                            value={businessInfo.state}
+                            onChange={(e) => setBusinessInfo(prev => ({...prev, state: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            required
+                          />
+                          <input
+                            type="text"
+                            placeholder="Country"
+                            value={businessInfo.country}
+                            onChange={(e) => setBusinessInfo(prev => ({...prev, country: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            required
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
+                        >
+                          Complete Registration
+                        </button>
+                      </form>
+                    </div>
+                  </>
+                )}
 
       {/* Role Selection Modal */}
       {showRoleSelection && (
