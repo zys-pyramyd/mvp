@@ -112,10 +112,63 @@ body {
   box-shadow: 0 4px 15px rgba(20, 153, 17, 0.3);
 }
 
-/* Responsive improvements */
+/* Mobile-first responsive design improvements */
 @media (max-width: 640px) {
   .cart-sidebar {
     width: 100% !important;
+  }
+  
+  /* Ensure icons are properly sized on mobile */
+  .nav-button {
+    padding: 8px;
+  }
+  
+  .nav-button svg {
+    width: 20px;
+    height: 20px;
+  }
+  
+  /* Logo sizing for mobile */
+  .logo-mobile {
+    height: 32px;
+  }
+  
+  /* Category cards mobile optimization */
+  .category-card-mobile {
+    min-width: 80px;
+    flex-shrink: 0;
+  }
+  
+  /* Header spacing mobile */
+  .header-mobile {
+    padding: 0 12px;
+  }
+  
+  /* Search bar mobile */
+  .search-mobile {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  /* Tablet responsive adjustments */
+  .nav-button {
+    padding: 10px;
+  }
+  
+  .logo-tablet {
+    height: 36px;
+  }
+}
+
+@media (min-width: 1025px) {
+  /* Desktop responsive adjustments */
+  .nav-button {
+    padding: 12px;
+  }
+  
+  .logo-desktop {
+    height: 40px;
   }
 }
 
