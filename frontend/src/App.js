@@ -559,12 +559,12 @@ function App() {
         {/* Platform Description */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {currentPlatform === 'pyhub' ? 'PyHub - Farm Direct' : 'PyExpress - Quick Delivery'}
+            {currentPlatform === 'buy_from_farm' ? 'PyHub - Buy from Farm' : 'Pyramyd Marketplace'}
           </h1>
           <p className="text-gray-600">
-            {currentPlatform === 'pyhub' 
-              ? 'Connect directly with farmers and agents for fresh produce from the source'
-              : 'Fast delivery of quality produce from suppliers and processors'
+            {currentPlatform === 'buy_from_farm' 
+              ? 'Buy fresh produce directly from farms and get the best quality at source prices'
+              : 'Your comprehensive agricultural marketplace connecting farmers, suppliers, and buyers'
             }
           </p>
         </div>
