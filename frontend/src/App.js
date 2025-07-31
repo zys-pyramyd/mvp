@@ -238,7 +238,101 @@ function App() {
     }
   };
 
-  const handleAuth = async (e) => {
+  const handleBasicRegistration = async (e) => {
+    e.preventDefault();
+    // Just move to role path selection after basic form
+    setRegistrationStep('role_path');
+  };
+
+  const handleRolePath = (path) => {
+    setSelectedUserPath(path);
+    if (path === 'buyer') {
+      setRegistrationStep('buyer_type');
+    } else {
+      setRegistrationStep('partner_type');
+    }
+  };
+
+  const handleBuyerTypeSelection = (type) => {
+    setSelectedBuyerType(type);
+    if (type === 'others') {
+      // Will need custom business type input
+      setRegistrationStep('business_info');
+    } else if (type === 'skip') {
+      // Just collect home address
+      setRegistrationStep('home_address');
+    } else {
+      setRegistrationStep('business_info');
+    }
+  };
+
+  const handlePartnerTypeSelection = (type) => {
+    setPartnerType(type);
+    if (type === 'business') {
+      setRegistrationStep('business_category');
+    } else {
+      setRegistrationStep('verification');
+    }
+  };
+
+  const handleBusinessCategory = (category) => {
+    setBusinessCategory(category);
+    setRegistrationStep('verification');
+  };
+
+  const completeRegistration = async () => {
+    try {
+      // Submit complete registration to backend
+      const registrationData = {
+        ...authForm,
+        user_path: selectedUserPath,
+        buyer_type: selectedBuyerType,
+        business_info: businessInfo,
+        partner_type: partnerType,
+        business_category: businessCategory,
+        verification_info: verificationInfo
+      };
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/complete-registration`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(registrationData)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('token', data.token);
+        setUser(data.user);
+        setShowAuthModal(false);
+        
+        // Reset registration flow
+        setRegistrationStep('basic');
+        setSelectedUserPath('');
+        setSelectedBuyerType('');
+        setPartnerType('');
+        setBusinessCategory('');
+        
+        setAuthForm({
+          first_name: '',
+          last_name: '',
+          username: '',
+          email_or_phone: '',
+          password: '',
+          phone: '',
+          gender: '',
+          date_of_birth: ''
+        });
+      } else {
+        const error = await response.json();
+        alert(error.detail);
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      alert('An error occurred. Please try again.');
+    }
+  };
     e.preventDefault();
     
     try {
