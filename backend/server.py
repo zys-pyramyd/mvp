@@ -311,21 +311,47 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
         raise HTTPException(status_code=400, detail="Please select a role first")
     
     # Check if user can create products
-    allowed_roles = ['farmer', 'agent', 'supplier', 'processor']
+    allowed_roles = ['farmer', 'agent', 'supplier_farm_inputs', 'supplier_food_produce', 'processor']
     if current_user.get('role') not in allowed_roles:
         raise HTTPException(status_code=403, detail="Not authorized to create products")
+    
+    # Determine platform based on user role and product category
+    user_role = current_user.get('role')
+    product_platform = product_data.platform
+    
+    # Enforce platform restrictions
+    if user_role == 'farmer':
+        product_platform = 'pyhub'
+    elif user_role == 'supplier_farm_inputs':
+        product_platform = 'pyhub'
+        # Validate that the product category is appropriate for farm inputs
+        farm_input_categories = ['fertilizer', 'herbicides', 'pesticides', 'seeds']
+        if product_data.category.value not in farm_input_categories:
+            raise HTTPException(status_code=400, detail="Farm input suppliers can only list farm input products")
+    elif user_role == 'supplier_food_produce':
+        product_platform = 'pyexpress'
+        # Validate that the product category is appropriate for food produce
+        food_categories = ['sea_food', 'grain', 'legumes', 'vegetables', 'spices', 'fruits', 'fish', 'meat', 'packaged_goods']
+        if product_data.category.value not in food_categories:
+            raise HTTPException(status_code=400, detail="Food produce suppliers can only list food products")
+    elif user_role == 'processor':
+        product_platform = 'pyexpress'
     
     # Create product
     product = Product(
         seller_id=current_user['id'],
         seller_name=current_user['username'],
-        **product_data.dict()
+        platform=product_platform,
+        **{k: v for k, v in product_data.dict().items() if k != 'platform'}
     )
     
     # Apply service charges based on role
     if current_user.get('role') == 'farmer':
         # 30% markup for farmers on PyHub
         product.price_per_unit = product_data.price_per_unit * 1.30
+    elif current_user.get('role') in ['supplier_food_produce', 'processor']:
+        # 10% service charge deduction for PyExpress suppliers
+        product.price_per_unit = product_data.price_per_unit * 0.90
     
     product_dict = product.dict()
     db.products.insert_one(product_dict)
