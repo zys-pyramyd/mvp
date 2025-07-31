@@ -189,8 +189,166 @@ body {
   }
 }
 
-/* Print styles */
-@media print {
-  .no-print { display: none !important; }
-  body { background: white !important; }
+/* Custom scrollbar for horizontal scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
+}
+
+/* Enhanced category card animations */
+.category-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.category-card:hover {
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 0 8px 25px rgba(20, 153, 17, 0.15);
+}
+
+/* Messaging modal animations */
+.message-slide-in {
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Profile dropdown animation */
+.profile-dropdown {
+  animation: dropDown 0.2s ease-out;
+}
+
+@keyframes dropDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Enhanced button hover effects */
+.nav-button {
+  transition: all 0.2s ease;
+}
+
+.nav-button:hover {
+  transform: translateY(-1px);
+}
+
+/* Category selection glow effect */
+.category-selected {
+  box-shadow: 0 0 0 3px rgba(20, 153, 17, 0.3);
+}
+
+/* Message status indicators */
+.message-status {
+  position: relative;
+}
+
+.message-status::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+/* Order status color schemes */
+.status-pending { 
+  background: #fef3c7; 
+  color: #92400e; 
+}
+
+.status-confirmed { 
+  background: #dbeafe; 
+  color: #1e40af; 
+}
+
+.status-in-transit { 
+  background: #e0e7ff; 
+  color: #5b21b6; 
+}
+
+.status-delivered { 
+  background: #d1fae5; 
+  color: #065f46; 
+}
+
+.status-cancelled { 
+  background: #fee2e2; 
+  color: #991b1b; 
+}
+
+/* Loading skeleton for category cards */
+.category-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+/* Enhanced modal backdrop blur */
+.modal-backdrop-blur {
+  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* Swipe gesture indicators */
+.swipe-indicator {
+  position: relative;
+}
+
+.swipe-indicator::after {
+  content: '→';
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6b7280;
+  font-size: 18px;
+  opacity: 0.5;
+  animation: pulse 2s infinite;
+}
+
+/* Icon hover animations */
+.icon-button {
+  transition: all 0.2s ease;
+}
+
+.icon-button:hover {
+  transform: scale(1.1);
+  color: #149911;
+}
+
+/* Card hover lift effect */
+.product-card-enhanced {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.product-card-enhanced:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(20, 153, 17, 0.1);
+}
+
+/* Better focus styles for accessibility */
+.focus-enhanced:focus {
+  box-shadow: 0 0 0 3px rgba(20, 153, 17, 0.3);
+  outline: none;
 }
