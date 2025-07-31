@@ -216,7 +216,10 @@ function App() {
 
   const fetchProducts = async () => {
     try {
-      let url = `${API_BASE_URL}/api/products?platform=${currentPlatform}`;
+      // Map the frontend platforms to backend platforms
+      const platformParam = currentPlatform === 'buy_from_farm' ? 'pyhub' : 'pyexpress';
+      
+      let url = `${API_BASE_URL}/api/products?platform=${platformParam}`;
       if (selectedCategory) url += `&category=${selectedCategory}`;
       if (searchTerm) url += `&search=${searchTerm}`;
       
