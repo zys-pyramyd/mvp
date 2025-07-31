@@ -144,6 +144,16 @@ function App() {
     fetchCategories();
   }, [currentPlatform, selectedCategory, searchTerm]);
 
+  useEffect(() => {
+    // Enforce platform restrictions based on user role
+    if (user && user.role) {
+      const allowedPlatforms = getUserPlatformAccess(user.role);
+      if (!allowedPlatforms.includes(currentPlatform)) {
+        setCurrentPlatform(allowedPlatforms[0]); // Set to the first allowed platform
+      }
+    }
+  }, [user]);
+
   const fetchUserProfile = async (token) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/user/profile`, {
