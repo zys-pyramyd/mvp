@@ -473,8 +473,8 @@ function App() {
   };
 
   const getUserPlatformAccess = (userRole) => {
-    // All users can access both main page and buy from farm
-    return ['main', 'buy_from_farm'];
+    // All users can access both home page and buy from farm
+    return ['home', 'buy_from_farm'];
   };
 
   const canSwitchPlatforms = (userRole) => {
