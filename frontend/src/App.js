@@ -344,12 +344,12 @@ function App() {
         return ['pyhub', 'pyexpress']; // Only agents can access both platforms
       case 'farmer':
         return ['pyhub']; // Farmers restricted to PyHub only
-      case 'supplier':
+      case 'supplier_farm_inputs':
+        return ['pyhub']; // Farm input suppliers (fertilizer, seeds, etc.) restricted to PyHub
+      case 'supplier_food_produce':
+        return ['pyexpress']; // Food produce suppliers restricted to PyExpress
       case 'processor':
-        // Need to determine if they're farm input suppliers or food produce suppliers
-        // For now, default to PyExpress (food produce suppliers)
-        // Farm input suppliers should be restricted to PyHub
-        return ['pyexpress']; 
+        return ['pyexpress']; // Processors on PyExpress
       case 'general_buyer':
       case 'retailer':
       case 'hotel':
