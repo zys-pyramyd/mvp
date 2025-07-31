@@ -528,8 +528,8 @@ function App() {
             </div>
 
             {/* Right side navigation icons */}
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              {/* Order Tracking */}
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              {/* Order Tracking / Find Drivers */}
               {user && (
                 <button
                   onClick={() => {
@@ -537,7 +537,7 @@ function App() {
                     fetchOrders();
                   }}
                   className="nav-button icon-button p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg"
-                  title="Track Orders"
+                  title="Track Orders / Find Drivers"
                 >
                   <TruckIcon />
                 </button>
@@ -573,7 +573,7 @@ function App() {
                 )}
               </button>
 
-              {/* User Menu or Sign In */}
+              {/* Profile Menu or Sign In */}
               {user ? (
                 <div className="relative">
                   <button
@@ -642,7 +642,7 @@ function App() {
               ) : (
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+                  className="bg-emerald-600 text-white px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
                 >
                   Sign In
                 </button>
