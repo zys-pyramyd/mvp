@@ -247,11 +247,24 @@ async def register(user_data: UserRegister):
 
 @app.post("/api/auth/login")
 async def login(login_data: UserLogin):
-    user = db.users.find_one({"email": login_data.email})
+    # Find user by email or phone
+    user = db.users.find_one({
+        "$or": [
+            {"email": login_data.email_or_phone},
+            {"phone": login_data.email_or_phone},
+            {"email_or_phone": login_data.email_or_phone}  # For backward compatibility
+        ]
+    })
+    
     if not user or not verify_password(login_data.password, user['password']):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     token = create_token(user['id'])
+    
+    # Determine default platform based on role
+    platform = "home"  # Default to home page
+    if user.get('role') in ['farmer', 'agent', 'driver', 'storage_owner']:
+        platform = "buy_from_farm"
     
     return {
         "message": "Login successful",
@@ -261,9 +274,9 @@ async def login(login_data: UserLogin):
             "first_name": user['first_name'],
             "last_name": user['last_name'],
             "username": user['username'],
-            "email": user['email'],
+            "email": user.get('email', user.get('email_or_phone')),
             "role": user.get('role'),
-            "platform": "pyhub" if user.get('role') in ['farmer', 'agent', 'storage_owner', 'logistics_business', 'super_agent'] else "pyexpress"
+            "platform": platform
         }
     }
 
