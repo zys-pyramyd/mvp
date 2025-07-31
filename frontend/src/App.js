@@ -41,6 +41,14 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
+  // New state for enhanced features
+  const [showMessaging, setShowMessaging] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [showOrderTracking, setShowOrderTracking] = useState(false);
+  const [orders, setOrders] = useState([]);
+  
   // Auth form states
   const [authForm, setAuthForm] = useState({
     first_name: '',
@@ -50,6 +58,75 @@ function App() {
     password: '',
     phone: ''
   });
+
+  // Category data with images
+  const categoryData = [
+    { 
+      value: 'sea_food', 
+      label: 'Sea Food', 
+      image: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzd8MHwxfHNlYXJjaHwxfHxzZWFmb29kfGVufDB8fHx8MTc1Mzk1MzU5NHww&ixlib=rb-4.1.0&q=85' 
+    },
+    { 
+      value: 'grain', 
+      label: 'Grain', 
+      image: 'https://images.unsplash.com/photo-1499529112087-3cb3b73cec95?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwzfHxhZ3JpY3VsdHVyYWwlMjBwcm9kdWN0c3xlbnwwfHx8fDE3NTM5NTM1ODd8MA&ixlib=rb-4.1.0&q=85' 
+    },
+    { 
+      value: 'legumes', 
+      label: 'Legumes', 
+      image: 'https://images.unsplash.com/photo-1709236550338-e2bcc3beee70?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxhZ3JpY3VsdHVyYWwlMjBwcm9kdWN0c3xlbnwwfHx8fDE3NTM5NTM1ODd8MA&ixlib=rb-4.1.0&q=85' 
+    },
+    { 
+      value: 'vegetables', 
+      label: 'Vegetables', 
+      image: 'https://images.unsplash.com/photo-1529313780224-1a12b68bed16?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHw0fHxhZ3JpY3VsdHVyYWwlMjBwcm9kdWN0c3xlbnwwfHx8fDE3NTM5NTM1ODd8MA&ixlib=rb-4.1.0&q=85' 
+    },
+    { 
+      value: 'spices', 
+      label: 'Spices', 
+      image: 'https://images.unsplash.com/photo-1506368249639-73a05d6f6488?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHwxfHxzcGljZXN8ZW58MHx8fHwxNzUzOTUzNjAwfDA&ixlib=rb-4.1.0&q=85' 
+    },
+    { 
+      value: 'cash_crop', 
+      label: 'Cash Crop', 
+      image: 'https://images.unsplash.com/photo-1502395809857-fd80069897d0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxjb3R0b258ZW58MHx8fHwxNzUzOTUzNjM4fDA&ixlib=rb-4.1.0&q=85' 
+    },
+    { 
+      value: 'fertilizer', 
+      label: 'Fertilizer', 
+      image: 'https://images.unsplash.com/photo-1655130944329-b3a63166f6b5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwxfHxmZXJ0aWxpemVyfGVufDB8fHx8MTc1Mzk1MzYwOHww&ixlib=rb-4.1.0&q=85' 
+    },
+    { 
+      value: 'herbicides', 
+      label: 'Herbicides', 
+      image: 'https://images.unsplash.com/photo-1581578017093-cd30fce4eeb7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwzfHxmZXJ0aWxpemVyfGVufDB8fHx8MTc1Mzk1MzYwOHww&ixlib=rb-4.1.0&q=85' 
+    },
+    { 
+      value: 'pesticides', 
+      label: 'Pesticides', 
+      image: 'https://images.unsplash.com/photo-1581578017093-cd30fce4eeb7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwzfHxmZXJ0aWxpemVyfGVufDB8fHx8MTc1Mzk1MzYwOHww&ixlib=rb-4.1.0&q=85' 
+    },
+    { 
+      value: 'seeds', 
+      label: 'Seeds', 
+      image: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NjZ8MHwxfHNlYXJjaHwxfHxzZWVkc3xlbnwwfHx8fDE3NTM5NTM2MTZ8MA&ixlib=rb-4.1.0&q=85' 
+    },
+    { 
+      value: 'fish', 
+      label: 'Fish', 
+      image: 'https://images.pexels.com/photos/725992/pexels-photo-725992.jpeg' 
+    },
+    { 
+      value: 'meat', 
+      label: 'Meat', 
+      image: 'https://images.unsplash.com/photo-1551028150-64b9f398f678?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHwxfHxtZWF0fGVufDB8fHx8MTc1Mzk1MzYyMnww&ixlib=rb-4.1.0&q=85' 
+    },
+    { 
+      value: 'packaged_goods', 
+      label: 'Packaged Goods', 
+      image: 'https://images.unsplash.com/photo-1741522226997-a34b5a45c648?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwxfHxwYWNrYWdlZCUyMGZvb2R8ZW58MHx8fHwxNzUzOTUzNjQ0fDA&ixlib=rb-4.1.0&q=85' 
+    }
+  ];
 
   useEffect(() => {
     // Check for saved token
