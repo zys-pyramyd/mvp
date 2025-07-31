@@ -18,6 +18,14 @@ PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_dummy_payst
 TWILIO_SID = os.environ.get('TWILIO_ACCOUNT_SID', 'dummy_twilio_sid')
 TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'dummy_twilio_token')
 
+# Commission structure for agents (updated rates)
+AGENT_COMMISSION_RATES = {
+    'purchase': 0.05,  # 5% commission for agent purchases
+    'sale': 0.04,      # 4% commission for agent sales
+    'onboarding': 0.075, # 7.5% farmer onboarding incentive (first sale only)
+    'verification': 0.02  # 2% farmer verification fee
+}
+
 app = FastAPI(title="Pyramyd API", version="1.0.0")
 
 # CORS middleware
