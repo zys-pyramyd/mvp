@@ -107,9 +107,21 @@ class User(BaseModel):
     wallet_balance: float = 0.0
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class RoleSelection(BaseModel):
-    role: UserRole
-    is_buyer: bool = False
+class CompleteRegistration(BaseModel):
+    first_name: str
+    last_name: str
+    username: str
+    email_or_phone: str
+    password: str
+    phone: Optional[str] = None
+    gender: str
+    date_of_birth: str
+    user_path: str  # 'buyer' or 'partner'
+    buyer_type: Optional[str] = None
+    business_info: Optional[dict] = None
+    partner_type: Optional[str] = None
+    business_category: Optional[str] = None
+    verification_info: Optional[dict] = None
 
 class Product(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -255,21 +267,13 @@ async def login(login_data: UserLogin):
         }
     }
 
-@app.post("/api/auth/select-role")
-async def select_role(role_data: RoleSelection, current_user: dict = Depends(get_current_user)):
-    # Update user role
-    db.users.update_one(
-        {'id': current_user['id']},
-        {'$set': {'role': role_data.role.value}}
-    )
-    
-    # Determine default platform
-    platform = "pyhub" if role_data.role in [UserRole.FARMER, UserRole.AGENT, UserRole.STORAGE_OWNER, UserRole.LOGISTICS_BUSINESS, UserRole.SUPER_AGENT] else "pyexpress"
-    
+@app.post("/api/auth/complete-registration")
+async def complete_registration(registration_data: CompleteRegistration, current_user: dict = Depends(get_current_user)):
+    # This endpoint will handle the complete registration process
+    # Implementation details would be added based on requirements
     return {
-        "message": "Role selected successfully",
-        "role": role_data.role.value,
-        "platform": platform
+        "message": "Registration completed successfully",
+        "user_path": registration_data.user_path
     }
 
 @app.get("/api/user/profile")
