@@ -375,12 +375,43 @@ function App() {
 
             {/* Right side actions */}
             <div className="flex items-center space-x-4">
+              {/* Order Tracking */}
+              {user && (
+                <button
+                  onClick={() => {
+                    setShowOrderTracking(true);
+                    fetchOrders();
+                  }}
+                  className="relative p-2 text-gray-600 hover:text-emerald-600 transition-colors"
+                  title="Track Orders"
+                >
+                  <TruckIcon />
+                </button>
+              )}
+
+              {/* Messaging */}
+              {user && (
+                <button
+                  onClick={() => setShowMessaging(true)}
+                  className="relative p-2 text-gray-600 hover:text-emerald-600 transition-colors"
+                  title="Messages"
+                >
+                  <MessageIcon />
+                  {messages.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {messages.length}
+                    </span>
+                  )}
+                </button>
+              )}
+
               {/* Cart */}
               <button
                 onClick={() => setShowCart(true)}
                 className="relative p-2 text-gray-600 hover:text-emerald-600 transition-colors"
+                title="Shopping Cart"
               >
-                <CartIcon />
+                <AddToCartIcon />
                 {cartItemCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                     {cartItemCount}
@@ -390,16 +421,69 @@ function App() {
 
               {/* User Menu */}
               {user ? (
-                <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-700">
-                    Welcome, {user.first_name}
-                  </span>
+                <div className="relative">
                   <button
-                    onClick={logout}
-                    className="text-sm text-gray-600 hover:text-gray-900"
+                    onClick={() => setShowProfileMenu(!showProfileMenu)}
+                    className="flex items-center space-x-2 p-2 text-gray-600 hover:text-emerald-600 transition-colors"
+                    title="Profile Menu"
                   >
-                    Logout
+                    <ProfileIcon />
+                    <span className="text-sm text-gray-700">
+                      {user.first_name}
+                    </span>
                   </button>
+
+                  {/* Profile Dropdown */}
+                  {showProfileMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                      <div className="py-1">
+                        <div className="px-4 py-2 border-b border-gray-100">
+                          <p className="text-sm font-medium text-gray-900">{user.first_name} {user.last_name}</p>
+                          <p className="text-xs text-gray-500">{user.role?.replace('_', ' ').toUpperCase()}</p>
+                        </div>
+                        
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            // Add profile management functionality here
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Manage Profile
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            fetchOrders();
+                            setShowOrderTracking(true);
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          My Orders
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            // Add wallet functionality here
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          My Wallet
+                        </button>
+                        
+                        <div className="border-t border-gray-100">
+                          <button
+                            onClick={logout}
+                            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
+                          >
+                            Logout
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <button
