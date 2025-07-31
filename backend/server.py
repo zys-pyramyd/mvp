@@ -92,7 +92,7 @@ class UserRegister(BaseModel):
     phone: Optional[str] = None
 
 class UserLogin(BaseModel):
-    email: str
+    email_or_phone: str
     password: str
 
 class User(BaseModel):
