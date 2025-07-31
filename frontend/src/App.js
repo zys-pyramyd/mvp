@@ -49,14 +49,38 @@ function App() {
   const [showOrderTracking, setShowOrderTracking] = useState(false);
   const [orders, setOrders] = useState([]);
   
-  // Auth form states
+  // Auth form states - Updated structure
   const [authForm, setAuthForm] = useState({
     first_name: '',
     last_name: '',
     username: '',
-    email: '',
+    email_or_phone: '', // Can be email or phone
     password: '',
-    phone: ''
+    phone: '', // Optional additional phone
+    gender: '',
+    date_of_birth: ''
+  });
+
+  // Registration flow states
+  const [registrationStep, setRegistrationStep] = useState('basic'); // 'basic', 'role_path', 'buyer_type', 'business_info', 'partner_type', 'verification'
+  const [selectedUserPath, setSelectedUserPath] = useState(''); // 'buyer' or 'partner'
+  const [selectedBuyerType, setSelectedBuyerType] = useState('');
+  const [businessInfo, setBusinessInfo] = useState({
+    business_name: '',
+    business_address: '',
+    city: '',
+    state: '',
+    country: '',
+    home_address: '' // For non-business users
+  });
+  const [partnerType, setPartnerType] = useState('');
+  const [businessCategory, setBusinessCategory] = useState(''); // For business partners
+  const [verificationInfo, setVerificationInfo] = useState({
+    nin: '',
+    cac_number: '',
+    photo: '',
+    farm_photo: '',
+    farm_info: ''
   });
 
   // Category data with images
