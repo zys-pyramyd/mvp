@@ -1241,6 +1241,306 @@ function App() {
                   </>
                 )}
 
+                {/* Partner Type Selection Step */}
+                {registrationStep === 'partner_type' && (
+                  <>
+                    <div className="flex justify-between items-center mb-6">
+                      <button
+                        onClick={() => setRegistrationStep('role_path')}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        ← Back
+                      </button>
+                      <h2 className="text-xl font-bold text-emerald-600">Select Your Role</h2>
+                      <div></div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-2xl">
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => handlePartnerTypeSelection('agent')}
+                          className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
+                        >
+                          <div className="font-medium">Agent</div>
+                          <div className="text-sm text-gray-600">Field agent facilitating transactions</div>
+                        </button>
+                        
+                        <button
+                          onClick={() => handlePartnerTypeSelection('farmer')}
+                          className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
+                        >
+                          <div className="font-medium">Farmer</div>
+                          <div className="text-sm text-gray-600">Individual farmer growing produce</div>
+                        </button>
+                        
+                        <button
+                          onClick={() => handlePartnerTypeSelection('driver')}
+                          className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
+                        >
+                          <div className="font-medium">Driver</div>
+                          <div className="text-sm text-gray-600">Delivery driver for transport services</div>
+                        </button>
+                        
+                        <button
+                          onClick={() => handlePartnerTypeSelection('storage_owner')}
+                          className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
+                        >
+                          <div className="font-medium">Storage Owner</div>
+                          <div className="text-sm text-gray-600">Provide storage facilities</div>
+                        </button>
+                        
+                        <button
+                          onClick={() => handlePartnerTypeSelection('business')}
+                          className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
+                        >
+                          <div className="font-medium">Business</div>
+                          <div className="text-sm text-gray-600">Supplier, Processor, or Logistics Business</div>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Business Category Selection Step */}
+                {registrationStep === 'business_category' && (
+                  <>
+                    <div className="flex justify-between items-center mb-6">
+                      <button
+                        onClick={() => setRegistrationStep('partner_type')}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        ← Back
+                      </button>
+                      <h2 className="text-xl font-bold text-emerald-600">Business Category</h2>
+                      <div></div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-2xl">
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => handleBusinessCategory('supplier')}
+                          className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
+                        >
+                          <div className="font-medium">Supplier</div>
+                          <div className="text-sm text-gray-600">Supply agricultural products</div>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleBusinessCategory('processor')}
+                          className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
+                        >
+                          <div className="font-medium">Processor</div>
+                          <div className="text-sm text-gray-600">Process raw materials into finished goods</div>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleBusinessCategory('logistics_business')}
+                          className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
+                        >
+                          <div className="font-medium">Logistics Business</div>
+                          <div className="text-sm text-gray-600">Transport and logistics services</div>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Verification Step */}
+                {registrationStep === 'verification' && (
+                  <>
+                    <div className="flex justify-between items-center mb-6">
+                      <button
+                        onClick={() => setRegistrationStep(partnerType === 'business' ? 'business_category' : 'partner_type')}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        ← Back
+                      </button>
+                      <h2 className="text-xl font-bold text-emerald-600">Verification Requirements</h2>
+                      <div></div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-2xl">
+                      <form onSubmit={(e) => { e.preventDefault(); completeRegistration(); }} className="space-y-4">
+                        {/* Different verification based on role */}
+                        {(partnerType === 'agent' || partnerType === 'driver') && (
+                          <>
+                            <div className="mb-4 p-3 bg-blue-100 rounded-lg">
+                              <p className="text-sm text-blue-800 font-medium">Required: NIN and Photo for verification</p>
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="National Identification Number (NIN)"
+                              value={verificationInfo.nin}
+                              onChange={(e) => setVerificationInfo(prev => ({...prev, nin: e.target.value}))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              required
+                            />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              placeholder="Upload your photo"
+                              onChange={(e) => setVerificationInfo(prev => ({...prev, photo: e.target.files[0]?.name || ''}))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              required
+                            />
+                          </>
+                        )}
+
+                        {partnerType === 'farmer' && (
+                          <>
+                            <div className="mb-4 p-3 bg-green-100 rounded-lg">
+                              <p className="text-sm text-green-800 font-medium">Required: Photo, NIN, Farm Photo, and Farm Information</p>
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="National Identification Number (NIN)"
+                              value={verificationInfo.nin}
+                              onChange={(e) => setVerificationInfo(prev => ({...prev, nin: e.target.value}))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              required
+                            />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              placeholder="Upload your photo"
+                              onChange={(e) => setVerificationInfo(prev => ({...prev, photo: e.target.files[0]?.name || ''}))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              required
+                            />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              placeholder="Upload farm photo"
+                              onChange={(e) => setVerificationInfo(prev => ({...prev, farm_photo: e.target.files[0]?.name || ''}))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              required
+                            />
+                            <textarea
+                              placeholder="Farm Information (location, size, crops grown, etc.)"
+                              value={verificationInfo.farm_info}
+                              onChange={(e) => setVerificationInfo(prev => ({...prev, farm_info: e.target.value}))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              rows="3"
+                              required
+                            />
+                          </>
+                        )}
+
+                        {(businessCategory === 'processor' || businessCategory === 'logistics_business' || (partnerType === 'business' && businessCategory)) && (
+                          <>
+                            <div className="mb-4 p-3 bg-purple-100 rounded-lg">
+                              <p className="text-sm text-purple-800 font-medium">Required: CAC Number, Business Name, and Address</p>
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="CAC Registration Number"
+                              value={verificationInfo.cac_number}
+                              onChange={(e) => setVerificationInfo(prev => ({...prev, cac_number: e.target.value}))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              required
+                            />
+                            <input
+                              type="text"
+                              placeholder="Business Name"
+                              value={businessInfo.business_name}
+                              onChange={(e) => setBusinessInfo(prev => ({...prev, business_name: e.target.value}))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              required
+                            />
+                            <input
+                              type="text"
+                              placeholder="Business Address"
+                              value={businessInfo.business_address}
+                              onChange={(e) => setBusinessInfo(prev => ({...prev, business_address: e.target.value}))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              required
+                            />
+                          </>
+                        )}
+
+                        {businessCategory === 'supplier' && (
+                          <>
+                            <div className="mb-4 p-3 bg-orange-100 rounded-lg">
+                              <p className="text-sm text-orange-800 font-medium">Suppliers can submit either NIN or CAC Number</p>
+                            </div>
+                            <div className="space-y-3">
+                              <label className="flex items-center">
+                                <input
+                                  type="radio"
+                                  name="supplier_verification"
+                                  value="nin"
+                                  onChange={(e) => setVerificationInfo(prev => ({...prev, verification_type: e.target.value}))}
+                                  className="mr-2"
+                                />
+                                Use NIN (Individual/Unregistered Business)
+                              </label>
+                              <label className="flex items-center">
+                                <input
+                                  type="radio"
+                                  name="supplier_verification"
+                                  value="cac"
+                                  onChange={(e) => setVerificationInfo(prev => ({...prev, verification_type: e.target.value}))}
+                                  className="mr-2"
+                                />
+                                Use CAC (Registered Business)
+                              </label>
+                            </div>
+                            
+                            {verificationInfo.verification_type === 'nin' && (
+                              <input
+                                type="text"
+                                placeholder="National Identification Number (NIN)"
+                                value={verificationInfo.nin}
+                                onChange={(e) => setVerificationInfo(prev => ({...prev, nin: e.target.value}))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                required
+                              />
+                            )}
+                            
+                            {verificationInfo.verification_type === 'cac' && (
+                              <>
+                                <input
+                                  type="text"
+                                  placeholder="CAC Registration Number"
+                                  value={verificationInfo.cac_number}
+                                  onChange={(e) => setVerificationInfo(prev => ({...prev, cac_number: e.target.value}))}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                  required
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Business Name"
+                                  value={businessInfo.business_name}
+                                  onChange={(e) => setBusinessInfo(prev => ({...prev, business_name: e.target.value}))}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                  required
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Business Address"
+                                  value={businessInfo.business_address}
+                                  onChange={(e) => setBusinessInfo(prev => ({...prev, business_address: e.target.value}))}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                  required
+                                />
+                              </>
+                            )}
+                          </>
+                        )}
+
+                        <button
+                          type="submit"
+                          className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
+                        >
+                          Complete Registration
+                        </button>
+                      </form>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
       {/* Role Selection Modal */}
       {showRoleSelection && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
