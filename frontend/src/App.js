@@ -603,13 +603,50 @@ function App() {
 
         {/* Search Bar */}
         <div className="mb-6">
-          <input
-            type="text"
-            placeholder="Search products..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+            />
+            <button className="absolute right-3 top-3 text-emerald-600 hover:text-emerald-700">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Advertisement Slider */}
+        <div className="mb-6">
+          <div className="relative bg-gradient-to-r from-emerald-100 to-emerald-50 rounded-xl p-6 overflow-hidden">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                Slice Show about the app
+              </h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Connect directly with farmers and suppliers for the freshest produce
+              </p>
+              
+              {/* Pagination dots */}
+              <div className="flex justify-center space-x-2">
+                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+              </div>
+            </div>
+            
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 opacity-10">
+              <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            </div>
+          </div>
         </div>
 
         {/* Products Grid */}
