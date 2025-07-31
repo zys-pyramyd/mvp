@@ -294,6 +294,41 @@ function App() {
     localStorage.removeItem('token');
     setUser(null);
     setCart([]);
+    setShowProfileMenu(false);
+  };
+
+  const sendMessage = () => {
+    if (newMessage.trim()) {
+      const message = {
+        id: Date.now(),
+        text: newMessage,
+        sender: user?.username || 'You',
+        timestamp: new Date().toLocaleTimeString(),
+        isOwn: true
+      };
+      setMessages([...messages, message]);
+      setNewMessage('');
+    }
+  };
+
+  const fetchOrders = async () => {
+    if (!user) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/orders`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setOrders(data);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    }
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0);
