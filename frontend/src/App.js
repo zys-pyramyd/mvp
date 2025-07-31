@@ -896,6 +896,128 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Messaging Modal */}
+      {showMessaging && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+          <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-lg">
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold">Messages</h2>
+                <button
+                  onClick={() => setShowMessaging(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 p-4 h-96 overflow-y-auto">
+              {messages.length === 0 ? (
+                <p className="text-gray-500 text-center">No messages yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {messages.map(message => (
+                    <div key={message.id} className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-xs p-3 rounded-lg ${
+                        message.isOwn 
+                          ? 'bg-emerald-600 text-white' 
+                          : 'bg-gray-200 text-gray-900'
+                      }`}>
+                        <p className="text-sm">{message.text}</p>
+                        <p className="text-xs mt-1 opacity-75">{message.timestamp}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-gray-200">
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type a message..."
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                />
+                <button
+                  onClick={sendMessage}
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Tracking Modal */}
+      {showOrderTracking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-96 overflow-hidden">
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold">Order Tracking</h2>
+                <button
+                  onClick={() => setShowOrderTracking(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 overflow-y-auto max-h-80">
+              {orders.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No orders found</p>
+              ) : (
+                <div className="space-y-4">
+                  {orders.map(order => (
+                    <div key={order.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="font-semibold text-gray-900">Order #{order.id.slice(-8)}</h3>
+                          <p className="text-sm text-gray-600">
+                            {new Date(order.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                          order.status === 'in_transit' ? 'bg-blue-100 text-blue-800' :
+                          order.status === 'confirmed' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {order.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                      </div>
+                      
+                      <div className="text-sm text-gray-600 mb-2">
+                        <p><strong>Total:</strong> ₦{order.total_amount.toLocaleString()}</p>
+                        <p><strong>Items:</strong> {order.items.length} item(s)</p>
+                        <p><strong>Delivery:</strong> {order.delivery_address}</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        {order.items.map((item, index) => (
+                          <div key={index} className="flex justify-between text-sm">
+                            <span>{item.title} × {item.quantity}</span>
+                            <span>₦{item.total.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
