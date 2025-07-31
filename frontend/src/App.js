@@ -336,8 +336,38 @@ function App() {
     }
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0);
-  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const getUserPlatformAccess = (userRole) => {
+    if (!userRole) return ['pyhub', 'pyexpress']; // Default for non-authenticated users
+    
+    switch (userRole) {
+      case 'agent':
+        return ['pyhub', 'pyexpress']; // Only agents can access both platforms
+      case 'farmer':
+        return ['pyhub']; // Farmers restricted to PyHub only
+      case 'supplier':
+      case 'processor':
+        // Need to determine if they're farm input suppliers or food produce suppliers
+        // For now, default to PyExpress (food produce suppliers)
+        // Farm input suppliers should be restricted to PyHub
+        return ['pyexpress']; 
+      case 'general_buyer':
+      case 'retailer':
+      case 'hotel':
+      case 'restaurant':
+      case 'cafe':
+        return ['pyexpress']; // Buyers default to PyExpress
+      case 'storage_owner':
+      case 'logistics_business':
+      case 'super_agent':
+        return ['pyhub']; // Service providers on PyHub
+      default:
+        return ['pyhub', 'pyexpress'];
+    }
+  };
+
+  const canSwitchPlatforms = (userRole) => {
+    return userRole === 'agent'; // Only agents can switch platforms
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
