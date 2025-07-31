@@ -977,6 +977,8 @@ function App() {
                       </button>
                     </p>
                   </>
+                )}
+
                 {/* Role Path Selection Step */}
                 {registrationStep === 'role_path' && (
                   <>
