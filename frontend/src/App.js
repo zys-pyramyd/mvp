@@ -936,17 +936,70 @@ function App() {
     }
   };
 
-  const startConversation = (targetUser) => {
-    const conversation = {
-      id: `conv_${user.username}_${targetUser.username}`,
-      participants: [user.username, targetUser.username],
-      name: targetUser.first_name + ' ' + targetUser.last_name,
-      avatar: targetUser.username.charAt(0).toUpperCase()
+  const addEnhancedToCart = (product, quantity, unit, specification, deliveryMethod) => {
+    const cartItem = {
+      product: product,
+      quantity: quantity,
+      unit: unit,
+      unit_specification: specification,
+      delivery_method: deliveryMethod,
+      id: Date.now()
     };
     
-    setSelectedConversation(conversation);
-    setFoundUsers([]);
-    setUsernameSearch('');
+    setCart(prevCart => [...prevCart, cartItem]);
+    
+    const quantityDisplay = `${quantity} ${unit}${specification ? ` (${specification})` : ''}`;
+    const deliveryDisplay = deliveryMethod === 'offline' ? 'Offline Delivery' : 'Platform Driver';
+    
+    alert(`Added to cart: ${quantityDisplay} of ${product.product_name || product.crop_type}\nDelivery: ${deliveryDisplay}`);
+  };
+
+  const updateOrderStatus = async (orderId, status, deliveryStatus = null) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          order_id: orderId,
+          status: status,
+          delivery_status: deliveryStatus
+        })
+      });
+
+      if (response.ok) {
+        alert(`Order status updated to: ${status}${deliveryStatus ? ` (${deliveryStatus})` : ''}`);
+        // Refresh orders if orders view is open
+        fetchMyOrders('seller');
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.detail}`);
+      }
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      alert('Error updating order status');
+    }
+  };
+
+  const fetchMyOrders = async (orderType = 'buyer') => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/orders/my-orders?order_type=${orderType}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setOrders(data.orders || []);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    }
   };
 
   const sendMessage = () => {
