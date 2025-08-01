@@ -844,7 +844,7 @@ async def search_users_messaging(username: str, current_user: dict = Depends(get
 @app.post("/api/messages/send")
 async def send_message(
     message_data: dict,
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """Send a message to another user"""
     try:
@@ -878,6 +878,8 @@ async def send_message(
         
         return {"message": "Message sent successfully", "message_id": message["id"]}
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error sending message: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send message")
