@@ -1389,6 +1389,20 @@ function App() {
                           </button>
                         )}
                         
+                        {/* Seller Dashboard - For sellers to manage orders */}
+                        {user.role && ['agent', 'farmer', 'supplier', 'processor'].includes(user.role) && (
+                          <button
+                            onClick={() => {
+                              setShowProfileMenu(false);
+                              fetchMyOrders('seller');
+                              setShowOrderTracking(true);
+                            }}
+                            className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-50 font-medium"
+                          >
+                            📊 Seller Dashboard
+                          </button>
+                        )}
+                        
                         {/* Request Delivery - For sellers */}
                         {user.role && ['agent', 'farmer', 'supplier', 'processor'].includes(user.role) && (
                           <button
