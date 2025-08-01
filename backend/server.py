@@ -821,6 +821,142 @@ async def accept_outsourced_order(order_id: str, current_user: dict = Depends(ge
     
     return {"message": "Order accepted successfully"}
 
+@app.get("/api/users/search")
+async def search_users(username: str, current_user: User = Depends(get_current_user)):
+    """Search users by username for messaging"""
+    if len(username) < 2:
+        raise HTTPException(status_code=400, detail="Search term must be at least 2 characters")
+    
+    # Search for users with username containing the search term
+    users = list(users_collection.find({
+        "username": {"$regex": username, "$options": "i"},
+        "username": {"$ne": current_user["username"]}  # Exclude current user
+    }, {"password": 0}))  # Exclude password field
+    
+    # Convert ObjectId to string for JSON serialization
+    for user in users:
+        user["_id"] = str(user["_id"])
+    
+    return users[:10]  # Limit to 10 results
+
+@app.post("/api/messages/send")
+async def send_message(
+    message_data: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """Send a message to another user"""
+    try:
+        # Validate message data
+        if not message_data.get("recipient_username"):
+            raise HTTPException(status_code=400, detail="Recipient username is required")
+        
+        if not message_data.get("content") and not message_data.get("audio_data"):
+            raise HTTPException(status_code=400, detail="Message content or audio data is required")
+        
+        # Check if recipient exists
+        recipient = users_collection.find_one({"username": message_data["recipient_username"]})
+        if not recipient:
+            raise HTTPException(status_code=404, detail="Recipient not found")
+        
+        # Create message document
+        message = {
+            "id": str(uuid.uuid4()),
+            "sender_username": current_user["username"],
+            "recipient_username": message_data["recipient_username"],
+            "conversation_id": message_data.get("conversation_id"),
+            "type": message_data.get("type", "text"),
+            "content": message_data.get("content"),
+            "audio_data": message_data.get("audio_data"),
+            "timestamp": datetime.utcnow(),
+            "read": False
+        }
+        
+        # Store message in database
+        messages_collection.insert_one(message)
+        
+        return {"message": "Message sent successfully", "message_id": message["id"]}
+        
+    except Exception as e:
+        print(f"Error sending message: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send message")
+
+@app.get("/api/messages/conversations")
+async def get_conversations(current_user: User = Depends(get_current_user)):
+    """Get user's conversations"""
+    try:
+        # Get all messages where user is sender or recipient
+        messages = list(messages_collection.find({
+            "$or": [
+                {"sender_username": current_user["username"]},
+                {"recipient_username": current_user["username"]}
+            ]
+        }).sort("timestamp", -1))
+        
+        # Group by conversation_id and get latest message for each
+        conversations = {}
+        for message in messages:
+            conv_id = message.get("conversation_id")
+            if conv_id and conv_id not in conversations:
+                # Get the other participant
+                other_user = message["recipient_username"] if message["sender_username"] == current_user["username"] else message["sender_username"]
+                other_user_data = users_collection.find_one({"username": other_user}, {"password": 0})
+                
+                if other_user_data:
+                    conversations[conv_id] = {
+                        "id": conv_id,
+                        "participants": [current_user["username"], other_user],
+                        "other_user": {
+                            "username": other_user_data["username"],
+                            "first_name": other_user_data.get("first_name", ""),
+                            "last_name": other_user_data.get("last_name", "")
+                        },
+                        "last_message": message,
+                        "timestamp": message["timestamp"]
+                    }
+        
+        return list(conversations.values())
+        
+    except Exception as e:
+        print(f"Error getting conversations: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get conversations")
+
+@app.get("/api/messages/{conversation_id}")
+async def get_messages(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get messages for a specific conversation"""
+    try:
+        # Get all messages for this conversation
+        messages = list(messages_collection.find({
+            "conversation_id": conversation_id,
+            "$or": [
+                {"sender_username": current_user["username"]},
+                {"recipient_username": current_user["username"]}
+            ]
+        }).sort("timestamp", 1))
+        
+        # Convert ObjectId to string and format for frontend
+        for message in messages:
+            message["_id"] = str(message["_id"])
+            message["timestamp"] = message["timestamp"].isoformat()
+        
+        # Mark messages as read
+        messages_collection.update_many(
+            {
+                "conversation_id": conversation_id,
+                "recipient_username": current_user["username"],
+                "read": False
+            },
+            {"$set": {"read": True}}
+        )
+        
+        return messages
+        
+    except Exception as e:
+        print(f"Error getting messages: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get messages")
+
 @app.get("/api/categories")
 async def get_categories():
     return [{"value": cat.value, "label": cat.value.replace("_", " ").title()} for cat in ProductCategory]
