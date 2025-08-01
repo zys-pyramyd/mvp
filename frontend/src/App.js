@@ -106,18 +106,27 @@ function App() {
   const [trackingData, setTrackingData] = useState(null);
   const [multipleDestinations, setMultipleDestinations] = useState(['']);
   
-  const [enhancedDeliveryForm, setEnhancedDeliveryForm] = useState({
-    order_id: '',
-    order_type: 'regular',
-    pickup_address: '',
-    delivery_addresses: [''],
-    total_quantity: '',
-    quantity_unit: 'kg',
-    product_details: '',
-    weight_kg: '',
-    special_instructions: '',
-    estimated_price: '',
-    preferred_driver_username: ''
+  // Checkout and cart management state
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState('review'); // 'review', 'address', 'payment'
+  const [shippingAddress, setShippingAddress] = useState({
+    full_name: '',
+    phone: '',
+    email: '',
+    address_line_1: '',
+    address_line_2: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: 'Nigeria',
+    delivery_instructions: ''
+  });
+  const [deliveryFees, setDeliveryFees] = useState({});
+  const [orderSummary, setOrderSummary] = useState({
+    subtotal: 0,
+    delivery_total: 0,
+    total: 0,
+    item_count: 0
   });
   const [preOrderForm, setPreOrderForm] = useState({
     product_name: '',
