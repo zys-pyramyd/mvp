@@ -665,17 +665,89 @@ function App() {
     }
   };
 
-  const startConversation = (targetUser) => {
-    const conversation = {
-      id: `conv_${user.username}_${targetUser.username}`,
-      participants: [user.username, targetUser.username],
-      name: targetUser.first_name + ' ' + targetUser.last_name,
-      avatar: targetUser.username.charAt(0).toUpperCase()
-    };
-    
-    setSelectedConversation(conversation);
-    setFoundUsers([]);
-    setUsernameSearch('');
+  // Driver system functions
+  const fetchAvailableDeliveries = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/delivery/available`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableDeliveries(data.delivery_requests || []);
+      }
+    } catch (error) {
+      console.error('Error fetching deliveries:', error);
+    }
+  };
+
+  const updateDriverStatus = async (status) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/drivers/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
+      });
+      
+      if (response.ok) {
+        setDriverStatus(status);
+        if (status === 'online') {
+          fetchAvailableDeliveries();
+        }
+      }
+    } catch (error) {
+      console.error('Error updating driver status:', error);
+    }
+  };
+
+  const acceptDelivery = async (requestId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/delivery/${requestId}/accept`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        alert(`Delivery accepted! OTP: ${result.delivery_otp}\nPickup: ${result.pickup_address}\nDelivery: ${result.delivery_address}`);
+        fetchAvailableDeliveries();
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.detail}`);
+      }
+    } catch (error) {
+      console.error('Error accepting delivery:', error);
+      alert('Error accepting delivery');
+    }
+  };
+
+  const fetchMyDrivers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/logistics/my-drivers`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setMyDrivers(data.drivers || []);
+        setMyVehicles(data.vehicles || []);
+      }
+    } catch (error) {
+      console.error('Error fetching drivers:', error);
+    }
   };
 
   const sendMessage = () => {
