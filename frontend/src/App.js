@@ -834,6 +834,29 @@ function App() {
                           My Wallet
                         </button>
                         
+                        {/* Show "Become an Agent" for non-agents */}
+                        {user.role !== 'agent' && (
+                          <button
+                            onClick={() => {
+                              setShowProfileMenu(false);
+                              handleSlideAction('agent_register');
+                            }}
+                            className="block w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-gray-50 font-medium"
+                          >
+                            Become an Agent
+                          </button>
+                        )}
+                        
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            window.open('https://hilorgx.com', '_blank');
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Report an Issue
+                        </button>
+                        
                         <div className="border-t border-gray-100">
                           <button
                             onClick={logout}
