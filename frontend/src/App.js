@@ -1109,6 +1109,47 @@ function App() {
                           My Wallet
                         </button>
                         
+                        {/* Driver Portal - For independent drivers */}
+                        {user.role === 'driver' && (
+                          <button
+                            onClick={() => {
+                              setShowProfileMenu(false);
+                              setShowDriverPortal(true);
+                              fetchAvailableDeliveries();
+                            }}
+                            className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-50 font-medium"
+                          >
+                            🚛 Driver Portal
+                          </button>
+                        )}
+                        
+                        {/* Logistics Dashboard - For logistics businesses */}
+                        {user.partner_type === 'business' && user.business_category === 'logistics_business' && (
+                          <button
+                            onClick={() => {
+                              setShowProfileMenu(false);
+                              setShowLogisticsDashboard(true);
+                              fetchMyDrivers();
+                            }}
+                            className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-50 font-medium"
+                          >
+                            📋 Logistics Dashboard
+                          </button>
+                        )}
+                        
+                        {/* Request Delivery - For sellers */}
+                        {user.role && ['agent', 'farmer', 'supplier', 'processor'].includes(user.role) && (
+                          <button
+                            onClick={() => {
+                              setShowProfileMenu(false);
+                              setShowCreateDeliveryRequest(true);
+                            }}
+                            className="block w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-gray-50 font-medium"
+                          >
+                            🚚 Request Delivery
+                          </button>
+                        )}
+                        
                         {/* Show "Become an Agent" for non-agents */}
                         {user.role !== 'agent' && (
                           <button
