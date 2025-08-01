@@ -69,6 +69,14 @@ class OrderStatus(str, Enum):
     DELIVERED = "delivered"
     CANCELLED = "cancelled"
 
+class PreOrderStatus(str, Enum):
+    DRAFT = "draft"
+    PUBLISHED = "published" 
+    PARTIAL_PAID = "partial_paid"
+    AWAITING_DELIVERY = "awaiting_delivery"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
 class ProductCategory(str, Enum):
     SEA_FOOD = "sea_food"
     GRAIN = "grain"
@@ -83,6 +91,75 @@ class ProductCategory(str, Enum):
     FISH = "fish"
     MEAT = "meat"
     PACKAGED_GOODS = "packaged_goods"
+    FEEDS = "feeds"
+    FRUITS = "fruits"
+
+class PreOrder(BaseModel):
+    id: Optional[str] = None
+    seller_username: str
+    seller_type: str  # farmer, supplier, processor
+    business_name: str
+    farm_name: Optional[str] = None
+    agent_username: Optional[str] = None  # If published by agent
+    product_name: str
+    product_category: ProductCategory
+    description: str
+    total_stock: int
+    available_stock: int
+    unit: str  # kg, pieces, tons, etc.
+    price_per_unit: float
+    partial_payment_percentage: float  # 0.1 to 0.9 (10% to 90%)
+    location: str
+    delivery_date: datetime  # When product will be available
+    images: List[str] = []
+    status: PreOrderStatus = PreOrderStatus.DRAFT
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    orders_count: int = 0  # Number of pre-orders placed
+    total_ordered_quantity: int = 0
+
+class PreOrderCreate(BaseModel):
+    product_name: str
+    product_category: ProductCategory
+    description: str
+    total_stock: int
+    unit: str
+    price_per_unit: float
+    partial_payment_percentage: float
+    location: str
+    delivery_date: datetime
+    business_name: str
+    farm_name: Optional[str] = None
+    images: List[str] = []
+    
+    @validator('partial_payment_percentage')
+    def validate_percentage(cls, v):
+        if not 0.1 <= v <= 0.9:
+            raise ValueError('Partial payment percentage must be between 10% and 90%')
+        return v
+    
+    @validator('total_stock')
+    def validate_stock(cls, v):
+        if v <= 0:
+            raise ValueError('Total stock must be greater than 0')
+        return v
+    
+    @validator('price_per_unit')
+    def validate_price(cls, v):
+        if v <= 0:
+            raise ValueError('Price per unit must be greater than 0')
+        return v
+
+class PreOrderFilter(BaseModel):
+    category: Optional[ProductCategory] = None
+    location: Optional[str] = None
+    min_price: Optional[float] = None
+    max_price: Optional[float] = None
+    delivery_date_from: Optional[datetime] = None
+    delivery_date_to: Optional[datetime] = None
+    only_preorders: Optional[bool] = None
+    search_term: Optional[str] = None
+    seller_type: Optional[str] = None  # farmer, supplier, processor
 
 # Pydantic models
 class UserRegister(BaseModel):
