@@ -394,7 +394,8 @@ class PyramydAPITester:
             self.log_test("Agent Purchase", False, "No product available for testing agent purchase")
             return False
 
-        purchase_data = {
+        # Prepare the request data according to the API structure
+        request_data = {
             "items": [
                 {
                     "product_id": product_id,
@@ -406,16 +407,6 @@ class PyramydAPITester:
                 "customer_id": "test_customer_123",
                 "delivery_address": "Test Customer Address"
             }
-        }
-
-        # Split the data for the endpoint
-        items = purchase_data["items"]
-        purchase_option = purchase_data["purchase_option"]
-        
-        # Make request with proper structure
-        request_data = {
-            "items": items,
-            **purchase_option
         }
 
         success, response = self.make_request('POST', '/api/agent/purchase', request_data, 200, use_auth=True)
