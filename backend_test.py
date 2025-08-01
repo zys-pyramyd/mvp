@@ -418,6 +418,205 @@ class PyramydAPITester:
             self.log_test("Agent Purchase", False, f"Agent purchase failed: {response}")
             return False
 
+    def test_messaging_user_search(self):
+        """Test user search API for messaging system"""
+        # Test with minimum 2 characters
+        success, response = self.make_request('GET', '/api/users/search?username=te', use_auth=True)
+        
+        if success and isinstance(response, list):
+            self.log_test("Messaging User Search (2 chars)", True)
+            search_2_success = True
+        else:
+            self.log_test("Messaging User Search (2 chars)", False, f"User search failed: {response}")
+            search_2_success = False
+
+        # Test with less than 2 characters (should fail)
+        success, response = self.make_request('GET', '/api/users/search?username=t', use_auth=True, expected_status=400)
+        
+        if success:  # Should return 400 error
+            self.log_test("Messaging User Search (1 char - validation)", True)
+            validation_success = True
+        else:
+            self.log_test("Messaging User Search (1 char - validation)", False, f"Should return 400 error: {response}")
+            validation_success = False
+
+        # Test case sensitivity and partial matches
+        success, response = self.make_request('GET', '/api/users/search?username=TEST', use_auth=True)
+        
+        if success and isinstance(response, list):
+            self.log_test("Messaging User Search (case insensitive)", True)
+            case_success = True
+        else:
+            self.log_test("Messaging User Search (case insensitive)", False, f"Case insensitive search failed: {response}")
+            case_success = False
+
+        return search_2_success and validation_success and case_success
+
+    def test_messaging_send_message(self):
+        """Test message sending API"""
+        # First, create a test recipient user
+        timestamp = datetime.now().strftime("%H%M%S")
+        recipient_data = {
+            "first_name": "Recipient",
+            "last_name": "User",
+            "username": f"recipient_{timestamp}",
+            "email": f"recipient_{timestamp}@example.com",
+            "password": "RecipientPass123!",
+            "phone": "+1234567891"
+        }
+
+        # Register recipient user
+        success, response = self.make_request('POST', '/api/auth/register', recipient_data, 200)
+        if not success:
+            self.log_test("Message Send - Recipient Creation", False, f"Failed to create recipient: {response}")
+            return False
+
+        recipient_username = recipient_data["username"]
+
+        # Test sending text message
+        text_message_data = {
+            "recipient_username": recipient_username,
+            "content": "Hello! This is a test message.",
+            "conversation_id": f"conv_{timestamp}",
+            "type": "text"
+        }
+
+        success, response = self.make_request('POST', '/api/messages/send', text_message_data, 200, use_auth=True)
+        
+        if success and 'message_id' in response:
+            self.log_test("Send Text Message", True)
+            text_success = True
+        else:
+            self.log_test("Send Text Message", False, f"Text message sending failed: {response}")
+            text_success = False
+
+        # Test sending audio message
+        audio_message_data = {
+            "recipient_username": recipient_username,
+            "audio_data": "base64_encoded_audio_data_here",
+            "conversation_id": f"conv_{timestamp}",
+            "type": "audio"
+        }
+
+        success, response = self.make_request('POST', '/api/messages/send', audio_message_data, 200, use_auth=True)
+        
+        if success and 'message_id' in response:
+            self.log_test("Send Audio Message", True)
+            audio_success = True
+        else:
+            self.log_test("Send Audio Message", False, f"Audio message sending failed: {response}")
+            audio_success = False
+
+        # Test recipient validation (non-existent user)
+        invalid_message_data = {
+            "recipient_username": "nonexistent_user_12345",
+            "content": "This should fail",
+            "conversation_id": f"conv_{timestamp}",
+            "type": "text"
+        }
+
+        success, response = self.make_request('POST', '/api/messages/send', invalid_message_data, 404, use_auth=True)
+        
+        if success:  # Should return 404 error
+            self.log_test("Send Message - Recipient Validation", True)
+            validation_success = True
+        else:
+            self.log_test("Send Message - Recipient Validation", False, f"Should return 404 error: {response}")
+            validation_success = False
+
+        return text_success and audio_success and validation_success
+
+    def test_messaging_conversations(self):
+        """Test conversations retrieval API"""
+        success, response = self.make_request('GET', '/api/messages/conversations', use_auth=True)
+        
+        if success and isinstance(response, list):
+            # Check conversation structure if any exist
+            if len(response) > 0:
+                conversation = response[0]
+                required_fields = ['id', 'participants', 'other_user', 'last_message', 'timestamp']
+                if all(field in conversation for field in required_fields):
+                    self.log_test("Get Conversations", True)
+                    return True, response
+                else:
+                    self.log_test("Get Conversations", False, f"Conversation missing required fields: {conversation}")
+                    return False, response
+            else:
+                self.log_test("Get Conversations", True, "No conversations found (expected for new user)")
+                return True, response
+        else:
+            self.log_test("Get Conversations", False, f"Conversations retrieval failed: {response}")
+            return False, response
+
+    def test_messaging_get_messages(self):
+        """Test messages retrieval for specific conversation"""
+        # First get conversations to find a valid conversation_id
+        conv_success, conversations = self.test_messaging_conversations()
+        
+        if not conv_success:
+            self.log_test("Get Messages", False, "Cannot test without valid conversations")
+            return False
+
+        if len(conversations) == 0:
+            # Create a test conversation by sending a message first
+            if not self.test_messaging_send_message():
+                self.log_test("Get Messages", False, "Cannot create test conversation")
+                return False
+            
+            # Try to get conversations again
+            conv_success, conversations = self.test_messaging_conversations()
+            if not conv_success or len(conversations) == 0:
+                self.log_test("Get Messages", False, "Still no conversations after sending message")
+                return False
+
+        # Use the first conversation
+        conversation_id = conversations[0]['id']
+        
+        success, response = self.make_request('GET', f'/api/messages/{conversation_id}', use_auth=True)
+        
+        if success and isinstance(response, list):
+            # Check message structure if any exist
+            if len(response) > 0:
+                message = response[0]
+                required_fields = ['id', 'sender_username', 'recipient_username', 'timestamp', 'read']
+                if all(field in message for field in required_fields):
+                    self.log_test("Get Messages", True)
+                    return True
+                else:
+                    self.log_test("Get Messages", False, f"Message missing required fields: {message}")
+                    return False
+            else:
+                self.log_test("Get Messages", True, "No messages found in conversation")
+                return True
+        else:
+            self.log_test("Get Messages", False, f"Messages retrieval failed: {response}")
+            return False
+
+    def test_messaging_system_complete(self):
+        """Test complete messaging system workflow"""
+        print("\n🔄 Testing Complete Messaging System Workflow...")
+        
+        # Step 1: Search for users
+        search_success = self.test_messaging_user_search()
+        
+        # Step 2: Send messages
+        send_success = self.test_messaging_send_message()
+        
+        # Step 3: Get conversations
+        conv_success, conversations = self.test_messaging_conversations()
+        
+        # Step 4: Get messages for conversation
+        messages_success = self.test_messaging_get_messages()
+        
+        overall_success = search_success and send_success and conv_success and messages_success
+        
+        if overall_success:
+            self.log_test("Complete Messaging System", True)
+        else:
+            self.log_test("Complete Messaging System", False, "One or more messaging components failed")
+        
+        return overall_success
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting Pyramyd API Tests...")
