@@ -5,7 +5,7 @@ from typing import Optional, List
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from pymongo import MongoClient
 import bcrypt
 import jwt
