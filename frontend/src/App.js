@@ -2043,13 +2043,13 @@ function App() {
         </div>
       )}
 
-      {/* Pre-order Modal - TODO: Implement */}
+      {/* Create Pre-order Modal */}
       {showCreatePreOrder && (
         <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto">
-            <div className="p-4 border-b border-gray-200">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold">Create Pre-order</h2>
+                <h2 className="text-xl font-semibold text-gray-900">Create Pre-order</h2>
                 <button
                   onClick={() => setShowCreatePreOrder(false)}
                   className="text-gray-500 hover:text-gray-700"
@@ -2058,8 +2058,240 @@ function App() {
                 </button>
               </div>
             </div>
-            <div className="p-4">
-              <p className="text-gray-600">Pre-order functionality coming soon!</p>
+            
+            <div className="p-6">
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  const token = localStorage.getItem('token');
+                  const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/preorders/create`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                      ...preOrderForm,
+                      total_stock: parseInt(preOrderForm.total_stock),
+                      price_per_unit: parseFloat(preOrderForm.price_per_unit),
+                      delivery_date: new Date(preOrderForm.delivery_date).toISOString()
+                    })
+                  });
+
+                  if (response.ok) {
+                    const result = await response.json();
+                    alert('Pre-order created successfully! You can publish it from your dashboard.');
+                    setShowCreatePreOrder(false);
+                    setPreOrderForm({
+                      product_name: '',
+                      product_category: 'vegetables',
+                      description: '',
+                      total_stock: '',
+                      unit: 'kg',
+                      price_per_unit: '',
+                      partial_payment_percentage: 0.3,
+                      location: '',
+                      delivery_date: '',
+                      business_name: '',
+                      farm_name: '',
+                      images: []
+                    });
+                  } else {
+                    const error = await response.json();
+                    alert(`Error: ${error.detail || 'Failed to create pre-order'}`);
+                  }
+                } catch (error) {
+                  console.error('Error creating pre-order:', error);
+                  alert('Error creating pre-order. Please try again.');
+                }
+              }}>
+                <div className="space-y-4">
+                  {/* Product Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={preOrderForm.product_name}
+                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, product_name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        placeholder="e.g., Organic Tomatoes"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                      <select
+                        required
+                        value={preOrderForm.product_category}
+                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, product_category: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="vegetables">Vegetables</option>
+                        <option value="fruits">Fruits</option>
+                        <option value="grains">Grains</option>
+                        <option value="legumes">Legumes</option>
+                        <option value="spices">Spices</option>
+                        <option value="feeds">Feeds</option>
+                        <option value="fertilizer">Fertilizer</option>
+                        <option value="seeds">Seeds</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                    <textarea
+                      required
+                      value={preOrderForm.description}
+                      onChange={(e) => setPreOrderForm(prev => ({ ...prev, description: e.target.value }))}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                      placeholder="Describe your product, quality, farming methods, etc."
+                    />
+                  </div>
+
+                  {/* Stock and Pricing */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Total Stock *</label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        value={preOrderForm.total_stock}
+                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, total_stock: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        placeholder="e.g., 1000"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Unit *</label>
+                      <select
+                        required
+                        value={preOrderForm.unit}
+                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, unit: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="kg">Kilogram (kg)</option>
+                        <option value="g">Gram (g)</option>
+                        <option value="ton">Ton</option>
+                        <option value="pieces">Pieces</option>
+                        <option value="liters">Liters</option>
+                        <option value="bags">Bags</option>
+                        <option value="crates">Crates</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Price per Unit (₦) *</label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        step="0.01"
+                        value={preOrderForm.price_per_unit}
+                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, price_per_unit: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        placeholder="e.g., 500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Partial Payment */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Partial Payment Required ({Math.round(preOrderForm.partial_payment_percentage * 100)}%)
+                    </label>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="0.9"
+                      step="0.05"
+                      value={preOrderForm.partial_payment_percentage}
+                      onChange={(e) => setPreOrderForm(prev => ({ ...prev, partial_payment_percentage: parseFloat(e.target.value) }))}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>10%</span>
+                      <span>90%</span>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Buyers will pay {Math.round(preOrderForm.partial_payment_percentage * 100)}% upfront, remaining on delivery
+                    </p>
+                  </div>
+
+                  {/* Location and Business Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Location *</label>
+                      <input
+                        type="text"
+                        required
+                        value={preOrderForm.location}
+                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, location: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        placeholder="e.g., Lagos, Nigeria"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Date *</label>
+                      <input
+                        type="datetime-local"
+                        required
+                        value={preOrderForm.delivery_date}
+                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, delivery_date: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Business Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={preOrderForm.business_name}
+                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, business_name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        placeholder="e.g., Green Valley Farms"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Farm Name (optional)</label>
+                      <input
+                        type="text"
+                        value={preOrderForm.farm_name}
+                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, farm_name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        placeholder="e.g., Green Valley Farm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreatePreOrder(false)}
+                      className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
+                    >
+                      Create Pre-order
+                    </button>
+                  </div>
+                </div>
+              </form>
             </div>
           </div>
         </div>
