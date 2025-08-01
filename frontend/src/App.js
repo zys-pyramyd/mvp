@@ -308,18 +308,42 @@ function App() {
 
   const fetchProducts = async () => {
     try {
-      // Map the frontend platforms to backend platforms
-      const platformParam = currentPlatform === 'buy_from_farm' ? 'pyhub' : 'pyexpress';
+      const platform = currentPlatform === 'buy_from_farm' ? 'buy_from_farm' : 'home';
+      let url = `${process.env.REACT_APP_BACKEND_URL}/api/products?platform=${platform}`;
       
-      let url = `${API_BASE_URL}/api/products?platform=${platformParam}`;
-      if (selectedCategory) url += `&category=${selectedCategory}`;
-      if (searchTerm) url += `&search=${searchTerm}`;
+      if (selectedCategory) {
+        url += `&category=${selectedCategory}`;
+      }
+      if (searchTerm) {
+        url += `&search_term=${searchTerm}`;
+      }
       
       const response = await fetch(url);
-      const data = await response.json();
-      setProducts(data);
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Handle new API response format with both products and preorders
+        let allProducts = [];
+        if (data.products && Array.isArray(data.products)) {
+          allProducts = [...allProducts, ...data.products];
+        }
+        if (data.preorders && Array.isArray(data.preorders)) {
+          allProducts = [...allProducts, ...data.preorders];
+        }
+        
+        // Fallback for legacy API response
+        if (Array.isArray(data)) {
+          allProducts = data;
+        }
+        
+        setProducts(allProducts);
+      } else {
+        console.error('Failed to fetch products');
+        setProducts([]); // Set empty array on error
+      }
     } catch (error) {
       console.error('Error fetching products:', error);
+      setProducts([]); // Set empty array on error
     }
   };
 
