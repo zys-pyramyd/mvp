@@ -73,8 +73,45 @@ class PreOrderE2ETester:
             print(f"   Request failed: {str(e)}")
             return False, {"error": str(e)}
 
+    def test_create_agent_user(self):
+        """Create a new agent user for testing"""
+        print("👤 Creating Test Agent User...")
+        
+        timestamp = datetime.now().strftime("%H%M%S")
+        registration_data = {
+            "first_name": "Test",
+            "last_name": "Agent",
+            "username": f"testagent_e2e_{timestamp}",
+            "email_or_phone": f"testagent_e2e_{timestamp}@pyramyd.com",
+            "password": "TestAgent123!",
+            "phone": "+2348123456789",
+            "gender": "male",
+            "date_of_birth": "1990-01-01",
+            "user_path": "partner",
+            "partner_type": "agent",
+            "business_info": {
+                "business_name": "Test Agent Business E2E",
+                "business_address": "Test Address, Lagos, Nigeria"
+            },
+            "verification_info": {
+                "nin": "12345678901"
+            }
+        }
+
+        success, response = self.make_request('POST', '/api/auth/complete-registration', registration_data, 200)
+        
+        if success and 'token' in response and 'user' in response:
+            self.token = response['token']
+            self.user_id = response['user']['id']
+            user_role = response['user'].get('role', 'unknown')
+            self.log_test("Create Test Agent User", True, f"Created agent user with role: {user_role}")
+            return True, response['user']
+        else:
+            self.log_test("Create Test Agent User", False, f"Registration failed: {response}")
+            return False, None
+
     def test_login_existing_user(self):
-        """Test login with existing testagent@pyramyd.com user"""
+        """Test login with existing testagent@pyramyd.com user or create new agent"""
         print("🔐 Testing Login with Existing Test Agent User...")
         
         login_data = {
@@ -88,11 +125,20 @@ class PreOrderE2ETester:
             self.token = response['token']
             self.user_id = response['user']['id']
             user_role = response['user'].get('role', 'unknown')
-            self.log_test("Login with Test Agent User", True, f"Logged in as {user_role}")
-            return True, response['user']
+            
+            # Check if user has proper role for pre-order creation
+            allowed_roles = ['farmer', 'supplier', 'processor', 'agent']
+            if user_role in allowed_roles:
+                self.log_test("Login with Test Agent User", True, f"Logged in as {user_role}")
+                return True, response['user']
+            else:
+                self.log_test("Login with Test Agent User", False, f"User role '{user_role}' not allowed for pre-orders")
+                # Try to create a new agent user instead
+                return self.test_create_agent_user()
         else:
             self.log_test("Login with Test Agent User", False, f"Login failed: {response}")
-            return False, None
+            # Try to create a new agent user instead
+            return self.test_create_agent_user()
 
     def test_create_preorder(self):
         """Test creating a new pre-order"""
