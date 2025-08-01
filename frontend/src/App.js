@@ -711,61 +711,54 @@ function App() {
 
             {/* Right side navigation icons */}
             <div className="flex items-center space-x-1 sm:space-x-2">
-              {/* Group Buying - Only for Agents */}
-              {user && user.role === 'agent' && (
-                <button
-                  onClick={() => setShowGroupBuying(true)}
-                  className="nav-button icon-button p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg"
-                  title="Group Buying"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </button>
-              )}
-
-              {/* Order Tracking / Find Drivers */}
-              {user && (
-                <button
-                  onClick={() => {
-                    setShowOrderTracking(true);
-                    fetchOrders();
-                  }}
-                  className="nav-button icon-button p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg"
-                  title="Track Orders / Find Drivers"
-                >
-                  <TruckIcon />
-                </button>
-              )}
-
-              {/* Messaging */}
-              {user && (
-                <button
-                  onClick={() => setShowMessaging(true)}
-                  className="nav-button icon-button relative p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg"
-                  title="Messages"
-                >
-                  <MessageIcon />
-                  {messages.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                      {messages.length}
-                    </span>
-                  )}
-                </button>
-              )}
-
               {/* Cart */}
               <button
                 onClick={() => setShowCart(true)}
-                className="nav-button icon-button relative p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg"
+                className="nav-button icon-button relative p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
                 title="Shopping Cart"
               >
                 <AddToCartIcon />
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold">
                     {cartItemCount}
                   </span>
                 )}
+              </button>
+
+              {/* Messaging - Always visible */}
+              <button
+                onClick={() => {
+                  if (!user) {
+                    setShowAuthModal(true);
+                  } else {
+                    setShowMessaging(true);
+                  }
+                }}
+                className="nav-button icon-button relative p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                title="Messages"
+              >
+                <MessageIcon />
+                {user && messages.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold">
+                    {messages.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Order Tracking - Always visible */}
+              <button
+                onClick={() => {
+                  if (!user) {
+                    setShowAuthModal(true);
+                  } else {
+                    setShowOrderTracking(true);
+                    fetchOrders();
+                  }
+                }}
+                className="nav-button icon-button p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                title="Track Orders / Find Drivers"
+              >
+                <TruckIcon />
               </button>
 
               {/* Profile Menu or Sign In */}
