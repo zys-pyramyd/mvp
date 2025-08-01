@@ -58,21 +58,33 @@ function App() {
   const [orders, setOrders] = useState([]);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   
-  // Group buying state
-  const [showGroupBuying, setShowGroupBuying] = useState(false);
-  const [groupBuyingStep, setGroupBuyingStep] = useState('search'); // 'search', 'buyers', 'recommendations', 'commission'
-  const [groupBuyingData, setGroupBuyingData] = useState({
-    produce: '',
+  // Pre-order and filtering state
+  const [showCreatePreOrder, setShowCreatePreOrder] = useState(false);
+  const [showPreOrderDetails, setShowPreOrderDetails] = useState(false);
+  const [selectedPreOrder, setSelectedPreOrder] = useState(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [filters, setFilters] = useState({
     category: '',
-    quantity: 0,
     location: '',
-    buyers: [],
-    recommendations: [],
-    selectedPrice: null,
-    commissionType: 'pyramyd' // 'pyramyd' (5%) or 'after_delivery'
+    min_price: '',
+    max_price: '',
+    only_preorders: false,
+    seller_type: ''
   });
-  const [buyerSearch, setBuyerSearch] = useState('');
-  const [foundBuyers, setFoundBuyers] = useState([]);
+  const [preOrderForm, setPreOrderForm] = useState({
+    product_name: '',
+    product_category: 'vegetables',
+    description: '',
+    total_stock: '',
+    unit: 'kg',
+    price_per_unit: '',
+    partial_payment_percentage: 0.3,
+    location: '',
+    delivery_date: '',
+    business_name: '',
+    farm_name: '',
+    images: []
+  });
   
   // Slide state
   const [currentSlide, setCurrentSlide] = useState(0);
