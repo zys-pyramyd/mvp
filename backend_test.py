@@ -1212,6 +1212,20 @@ class PyramydAPITester:
         # Test 22: Complete Messaging System Workflow
         self.test_messaging_system_complete()
 
+        # Test 23-30: Pre-order System Tests
+        print("\n📦 Testing Pre-order System...")
+        self.test_preorder_creation()
+        self.test_preorder_publishing()
+        self.test_advanced_product_filtering()
+        self.test_preorder_listing()
+        self.test_preorder_details()
+        self.test_place_preorder()
+        self.test_user_preorders()
+        self.test_user_preorder_orders()
+        
+        # Test 31: Complete Pre-order System Workflow
+        self.test_preorder_system_complete()
+
         return True
 
     def print_summary(self):
