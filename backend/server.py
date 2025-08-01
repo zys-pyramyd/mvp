@@ -136,7 +136,9 @@ class DeliveryRequest(BaseModel):
     order_type: str  # "regular" or "preorder"
     requester_username: str  # Agent, farmer, or supplier requesting delivery
     pickup_location: dict  # {"lat": float, "lng": float, "address": str}
-    delivery_location: dict
+    delivery_locations: List[dict] = []  # Multiple destinations support
+    total_quantity: float
+    quantity_unit: str  # "kg", "pieces", etc.
     distance_km: float
     estimated_price: float
     negotiated_price: Optional[float] = None
@@ -144,11 +146,49 @@ class DeliveryRequest(BaseModel):
     weight_kg: Optional[float] = None
     special_instructions: Optional[str] = None
     assigned_driver_id: Optional[str] = None
+    preferred_driver_id: Optional[str] = None  # For driver search and selection
     status: DeliveryStatus = DeliveryStatus.PENDING
     delivery_otp: Optional[str] = None
+    chat_messages: List[dict] = []  # Messaging between requester and driver
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+
+class DeliveryMessage(BaseModel):
+    id: Optional[str] = None
+    delivery_request_id: str
+    sender_username: str
+    sender_type: str  # "requester" or "driver"
+    message_type: str  # "text", "location", "image"
+    content: str
+    location_data: Optional[dict] = None  # For location sharing
+    timestamp: Optional[datetime] = None
+
+class DeliveryRequestCreate(BaseModel):
+    order_id: str
+    order_type: str
+    pickup_address: str
+    pickup_coordinates: Optional[dict] = None  # {"lat": float, "lng": float}
+    delivery_addresses: List[str]  # Multiple delivery addresses
+    delivery_coordinates: Optional[List[dict]] = []  # Coordinates for each delivery address
+    total_quantity: float
+    quantity_unit: str
+    product_details: str
+    weight_kg: Optional[float] = None
+    special_instructions: Optional[str] = None
+    estimated_price: float
+    preferred_driver_username: Optional[str] = None  # For driver selection
+
+class DriverSearchResult(BaseModel):
+    driver_id: str
+    driver_name: str
+    driver_username: str
+    rating: float
+    total_deliveries: int
+    current_location: Optional[dict] = None
+    vehicle_info: dict
+    status: DriverStatus
+    distance_km: Optional[float] = None  # Distance from pickup location
 
 class DriverCreate(BaseModel):
     driver_name: str
