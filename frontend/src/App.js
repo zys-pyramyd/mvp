@@ -881,19 +881,26 @@ function App() {
 
         {/* Auto-changing Slides */}
         <div className="mb-6">
-          <div className="relative bg-gradient-to-r from-emerald-100 to-emerald-50 rounded-xl p-6 overflow-hidden">
+          <div className={`relative bg-gradient-to-r ${slideContent[currentSlide].bgGradient} rounded-xl p-6 overflow-hidden transition-all duration-500`}>
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                Slide Shows
-              </h3>
-              <div className="min-h-[80px] flex items-center justify-center">
+              <div className="min-h-[100px] flex flex-col items-center justify-center">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-3">
                     {slideContent[currentSlide].title}
                   </h2>
-                  <p className="text-gray-600 text-sm">
+                  <p className="text-gray-600 text-sm mb-4">
                     {slideContent[currentSlide].description}
                   </p>
+                  
+                  {/* CTA Button */}
+                  {slideContent[currentSlide].cta && (
+                    <button
+                      onClick={() => handleSlideAction(slideContent[currentSlide].cta.action)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md hover:shadow-lg transform hover:scale-105 duration-200"
+                    >
+                      {slideContent[currentSlide].cta.text}
+                    </button>
+                  )}
                 </div>
               </div>
               
