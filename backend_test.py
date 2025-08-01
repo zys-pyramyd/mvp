@@ -438,17 +438,26 @@ class PyramydAPITester:
 
         # Test 2: Existing User Login (Priority test from test_result.md)
         existing_login_success = self.test_existing_user_login()
-        if not existing_login_success:
-            print("⚠️  Existing user login failed - continuing with new user registration")
+        
+        # Test 3: Complete Registration (Agent) for group buying tests
+        if existing_login_success:
+            print("ℹ️  Using existing user - testing complete registration for agent role")
+        
+        agent_reg_success, agent_data = self.test_complete_registration()
+        if agent_reg_success:
+            print("✅ Agent registration successful - using agent account for group buying tests")
+        elif not existing_login_success:
+            print("❌ Both existing login and agent registration failed - stopping tests")
+            return False
 
-        # Test 3: User Registration (if existing login failed)
-        if not existing_login_success:
+        # Test 4: User Registration (fallback if needed)
+        if not existing_login_success and not agent_reg_success:
             reg_success, user_data = self.test_user_registration()
             if not reg_success:
                 print("❌ Registration failed - stopping tests")
                 return False
 
-            # Test 4: User Login with new user
+            # Test 5: User Login with new user
             if not self.test_user_login(user_data):
                 print("❌ Login failed - stopping tests")
                 return False
