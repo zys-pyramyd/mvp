@@ -195,6 +195,102 @@ backend:
         agent: "testing"
         comment: "✅ MESSAGES RETRIEVAL API WORKING: /api/messages/{conversation_id} endpoint fully functional: 1) Retrieves messages for specific conversations 2) Proper message ordering by timestamp (ascending) 3) Automatically marks messages as read when retrieved 4) Includes all message fields (id, sender, recipient, content, timestamp, read status) 5) Clean JSON serialization without ObjectId issues. All messaging system components working correctly."
 
+  - task: "Pre-order Creation API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PRE-ORDER CREATION API WORKING: /api/preorders/create endpoint fully functional with comprehensive validation: 1) Valid pre-order creation working correctly 2) Partial payment percentage validation (10-90%) enforcing business rules 3) Positive stock validation preventing invalid inventory 4) Positive price validation ensuring valid pricing 5) Role authorization properly restricting access to farmers, suppliers, processors, and agents only. All validation scenarios tested and working as expected."
+
+  - task: "Pre-order Publishing API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PRE-ORDER PUBLISHING API WORKING: /api/preorders/{preorder_id}/publish endpoint fully functional: 1) Successfully publishes draft pre-orders to make them available for buyers 2) Ownership validation ensures only creators can publish their pre-orders 3) Status validation prevents publishing already published pre-orders 4) Proper error handling for non-existent pre-orders. Publishing workflow complete and secure."
+
+  - task: "Advanced Product Filtering API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ ADVANCED PRODUCT FILTERING API WORKING: /api/products endpoint enhanced with comprehensive filtering capabilities: 1) Category filtering working correctly 2) Location-based filtering with case-insensitive search 3) Price range filtering (min_price, max_price) functional 4) Search functionality across multiple fields (product name, description, business name, farm name) 5) only_preorders parameter properly filters to show only pre-orders 6) Pagination working with proper page/limit/total_pages response 7) Returns both regular products and pre-orders in structured format. All filtering combinations tested and working."
+
+  - task: "Pre-order Listing API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PRE-ORDER LISTING API WORKING: /api/preorders endpoint fully functional with comprehensive filtering: 1) Basic listing returns published pre-orders with proper structure 2) Category filtering working correctly 3) Location filtering with case-insensitive search 4) Price range filtering functional 5) Search functionality across product name, description, business name, farm name 6) Seller type filtering (farmer, supplier, processor) working 7) Pagination with proper page/limit/total_pages response. All filtering options tested and operational."
+
+  - task: "Pre-order Details API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PRE-ORDER DETAILS API WORKING: /api/preorders/{preorder_id} endpoint fully functional: 1) Successfully retrieves detailed information for specific pre-orders 2) Returns all required fields (id, seller_username, product_name, price_per_unit, total_stock, available_stock, status, delivery_date) 3) Proper error handling for non-existent pre-orders (404 response) 4) Clean JSON serialization with proper datetime formatting. Pre-order details retrieval working perfectly."
+
+  - task: "Place Pre-order API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PLACE PRE-ORDER API WORKING: /api/preorders/{preorder_id}/order endpoint fully functional: 1) Successfully places orders on published pre-orders 2) Stock validation prevents ordering more than available quantity 3) Amount calculations working correctly (total_amount, partial_amount based on percentage, remaining_amount) 4) Proper validation for invalid quantities (zero/negative) 5) Updates pre-order stock and order counts automatically 6) Error handling for non-existent pre-orders. Complete pre-order purchasing workflow operational."
+
+  - task: "User Pre-orders API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ USER PRE-ORDERS API WORKING: /api/my-preorders endpoint fully functional: 1) Successfully retrieves current user's created pre-orders 2) Returns proper structure with required fields (id, seller_username, product_name, status, created_at) 3) Sorted by creation date (newest first) 4) Clean JSON serialization with proper datetime formatting. User pre-order management working correctly."
+
+  - task: "User Pre-order Orders API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ USER PRE-ORDER ORDERS API WORKING: /api/my-preorder-orders endpoint fully functional: 1) Successfully retrieves current user's pre-order purchases 2) Returns proper structure with required fields (id, preorder_id, buyer_username, quantity, total_amount, status) 3) Sorted by creation date (newest first) 4) Clean JSON serialization with proper datetime formatting. User pre-order purchase history working correctly."
+
 frontend:
   - task: "JSX Syntax Error Fix"
     implemented: true
