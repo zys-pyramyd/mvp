@@ -498,18 +498,96 @@ function App() {
     setShowProfileMenu(false);
   };
 
-  const sendMessage = () => {
-    if (newMessage.trim()) {
-      const message = {
-        id: Date.now(),
-        text: newMessage,
-        sender: user?.username || 'You',
-        timestamp: new Date().toLocaleTimeString(),
-        isOwn: true
+  // Audio recording functions
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+      
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        stream.getTracks().forEach(track => track.stop());
       };
-      setMessages([...messages, message]);
-      setNewMessage('');
+      
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      alert('Unable to access microphone. Please check permissions.');
     }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+      setMediaRecorder(null);
+    }
+  };
+
+  const sendAudioMessage = async () => {
+    if (audioBlob && selectedConversation) {
+      // Convert audio blob to base64
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64Audio = reader.result;
+        const audioMessage = {
+          id: Date.now(),
+          type: 'audio',
+          content: base64Audio,
+          sender: user.username,
+          timestamp: new Date().toISOString(),
+          conversation_id: selectedConversation.id
+        };
+        
+        setMessages(prev => [...prev, audioMessage]);
+        setAudioBlob(null);
+        
+        // Here you would send to backend
+        // sendMessageToBackend(audioMessage);
+      };
+      reader.readAsDataURL(audioBlob);
+    }
+  };
+
+  // Username search function
+  const searchUsers = async (searchTerm) => {
+    if (searchTerm.length < 2) {
+      setFoundUsers([]);
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/search?username=${searchTerm}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const users = await response.json();
+        setFoundUsers(users);
+      }
+    } catch (error) {
+      console.error('Error searching users:', error);
+    }
+  };
+
+  const startConversation = (targetUser) => {
+    const conversation = {
+      id: `conv_${user.username}_${targetUser.username}`,
+      participants: [user.username, targetUser.username],
+      name: targetUser.first_name + ' ' + targetUser.last_name,
+      avatar: targetUser.username.charAt(0).toUpperCase()
+    };
+    
+    setSelectedConversation(conversation);
+    setFoundUsers([]);
+    setUsernameSearch('');
   };
 
   const fetchOrders = async () => {
