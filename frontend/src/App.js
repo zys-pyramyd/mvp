@@ -230,6 +230,15 @@ function App() {
     fetchCategories();
   }, [currentPlatform, selectedCategory, searchTerm]);
 
+  // Auto-change slides every 5 seconds
+  useEffect(() => {
+    const slideInterval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slideContent.length);
+    }, 5000);
+
+    return () => clearInterval(slideInterval);
+  }, [slideContent.length]);
+
   const fetchUserProfile = async (token) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/user/profile`, {
