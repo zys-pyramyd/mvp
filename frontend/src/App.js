@@ -1002,6 +1002,19 @@ function App() {
     }
   };
 
+  const startConversation = (targetUser) => {
+    const conversation = {
+      id: `conv_${user.username}_${targetUser.username}`,
+      participants: [user.username, targetUser.username],
+      name: targetUser.first_name + ' ' + targetUser.last_name,
+      avatar: targetUser.username.charAt(0).toUpperCase()
+    };
+    
+    setSelectedConversation(conversation);
+    setFoundUsers([]);
+    setUsernameSearch('');
+  };
+
   const sendMessage = () => {
     if (newMessage.trim() && selectedConversation) {
       const message = {
