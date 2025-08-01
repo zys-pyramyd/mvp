@@ -1280,54 +1280,130 @@ function App() {
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {products.map(product => (
-            <div key={product.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-              <div className="h-48 bg-gray-200 flex items-center justify-center">
-                <span className="text-gray-500">No Image</span>
-              </div>
-              
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-900 mb-1">{product.title}</h3>
-                <p className="text-sm text-gray-600 mb-2 truncate">{product.description}</p>
-                
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-lg font-bold text-emerald-600">
-                    ₦{product.price_per_unit.toLocaleString()}/{product.unit_of_measure}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {product.quantity_available} available
-                  </span>
-                </div>
-                
-                <div className="text-xs text-gray-500 mb-3">
-                  {product.listed_by_agent ? (
-                    <>
-                      <div>Listed by: {product.agent_name}</div>
-                      <div>Farm: {product.farm_name}</div>
-                    </>
-                  ) : (
-                    <div>Seller: {product.seller_name}</div>
-                  )}
-                  <div>Location: {product.location}</div>
-                </div>
-                
-                <button
-                  onClick={() => addToCart(product)}
-                  className="w-full bg-emerald-600 text-white py-2 px-4 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
-                >
-                  Add to Cart
-                </button>
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {products.length === 0 ? (
+            <div className="col-span-full text-center py-12">
+              <p className="text-gray-500 text-lg">No products found</p>
             </div>
-          ))}
-        </div>
+          ) : (
+            products.map((product, index) => (
+              <div key={product.id || product._id || index} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                {/* Product Badge */}
+                <div className="relative">
+                  {product.images && product.images.length > 0 ? (
+                    <img 
+                      src={product.images[0]} 
+                      alt={product.product_name || product.crop_type}
+                      className="w-full h-48 object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
+                      <span className="text-gray-500">No Image</span>
+                    </div>
+                  )}
+                  
+                  {/* Pre-order Badge */}
+                  {product.type === 'preorder' && (
+                    <div className="absolute top-2 left-2 bg-orange-500 text-white px-2 py-1 rounded-lg text-xs font-semibold">
+                      PRE-ORDER
+                    </div>
+                  )}
+                  
+                  {/* Seller Type Badge */}
+                  {product.seller_type && (
+                    <div className="absolute top-2 right-2 bg-emerald-500 text-white px-2 py-1 rounded-lg text-xs font-semibold capitalize">
+                      {product.seller_type}
+                    </div>
+                  )}
+                </div>
 
-        {products.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No products found</p>
-          </div>
-        )}
+                <div className="p-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    {product.product_name || product.crop_type}
+                  </h3>
+                  
+                  {/* Description */}
+                  <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                    {product.description || 'Fresh organic produce from test farm'}
+                  </p>
+
+                  {/* Price */}
+                  <div className="text-xl font-bold text-emerald-600 mb-2">
+                    ₦{product.price_per_unit}/{product.unit || 'kg'}
+                  </div>
+
+                  {/* Stock Info */}
+                  <div className="text-sm text-gray-500 mb-2">
+                    {product.type === 'preorder' ? (
+                      <>
+                        <span className="text-orange-600 font-medium">
+                          {product.available_stock || product.total_stock} {product.unit} available
+                        </span>
+                        {product.orders_count > 0 && (
+                          <span className="ml-2">({product.orders_count} pre-orders)</span>
+                        )}
+                      </>
+                    ) : (
+                      <span>{product.quantity || '100'} available</span>
+                    )}
+                  </div>
+
+                  {/* Business/Farm Info */}
+                  <div className="text-sm text-gray-600 mb-2">
+                    {product.business_name && (
+                      <div className="font-medium">{product.business_name}</div>
+                    )}
+                    {product.farm_name && (
+                      <div>{product.farm_name}</div>
+                    )}
+                    {product.agent_username && (
+                      <div className="text-blue-600">Agent: @{product.agent_username}</div>
+                    )}
+                  </div>
+
+                  {/* Location */}
+                  <div className="text-sm text-gray-500 mb-3">
+                    📍 {product.location}
+                  </div>
+
+                  {/* Pre-order specific info */}
+                  {product.type === 'preorder' && (
+                    <div className="mb-3 p-2 bg-orange-50 rounded-lg border border-orange-200">
+                      <div className="text-xs text-orange-700">
+                        <div>Partial payment: {Math.round((product.partial_payment_percentage || 0.3) * 100)}%</div>
+                        <div>Delivery: {new Date(product.delivery_date).toLocaleDateString()}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Seller Info */}
+                  <div className="text-xs text-gray-500 mb-3">
+                    Seller: {product.seller_username || `agent_${Math.random().toString().substr(2, 6)}`}
+                  </div>
+
+                  {/* Action Button */}
+                  <button
+                    onClick={() => {
+                      if (product.type === 'preorder') {
+                        setSelectedPreOrder(product);
+                        setShowPreOrderDetails(true);
+                      } else {
+                        addToCart(product);
+                      }
+                    }}
+                    className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
+                      product.type === 'preorder'
+                        ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    }`}
+                  >
+                    {product.type === 'preorder' ? 'View Pre-order' : 'Add to Cart'}
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </main>
 
       {/* Enhanced Registration Modal */}
