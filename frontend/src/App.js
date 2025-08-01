@@ -71,6 +71,37 @@ function App() {
     only_preorders: false,
     seller_type: ''
   });
+  // Driver system state
+  const [showDriverPortal, setShowDriverPortal] = useState(false);
+  const [showLogisticsDashboard, setShowLogisticsDashboard] = useState(false);
+  const [showAddDriver, setShowAddDriver] = useState(false);
+  const [showCreateDeliveryRequest, setShowCreateDeliveryRequest] = useState(false);
+  const [driverStatus, setDriverStatus] = useState('offline');
+  const [availableDeliveries, setAvailableDeliveries] = useState([]);
+  const [myDrivers, setMyDrivers] = useState([]);
+  const [myVehicles, setMyVehicles] = useState([]);
+  const [newDriverForm, setNewDriverForm] = useState({
+    driver_name: '',
+    phone_number: '',
+    email: '',
+    profile_picture: '',
+    driver_license: '',
+    vehicle_type: 'motorcycle',
+    plate_number: '',
+    make_model: '',
+    color: '',
+    year: ''
+  });
+  const [deliveryRequestForm, setDeliveryRequestForm] = useState({
+    order_id: '',
+    order_type: 'regular',
+    pickup_address: '',
+    delivery_address: '',
+    product_details: '',
+    weight_kg: '',
+    special_instructions: '',
+    estimated_price: ''
+  });
   const [preOrderForm, setPreOrderForm] = useState({
     product_name: '',
     product_category: 'vegetables',
