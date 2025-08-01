@@ -404,45 +404,63 @@ class PyramydAPITester:
             print("❌ Health check failed - stopping tests")
             return False
 
-        # Test 2: User Registration
-        reg_success, user_data = self.test_user_registration()
-        if not reg_success:
-            print("❌ Registration failed - stopping tests")
-            return False
+        # Test 2: Existing User Login (Priority test from test_result.md)
+        existing_login_success = self.test_existing_user_login()
+        if not existing_login_success:
+            print("⚠️  Existing user login failed - continuing with new user registration")
 
-        # Test 3: User Login
-        if not self.test_user_login(user_data):
-            print("❌ Login failed - stopping tests")
-            return False
+        # Test 3: User Registration (if existing login failed)
+        if not existing_login_success:
+            reg_success, user_data = self.test_user_registration()
+            if not reg_success:
+                print("❌ Registration failed - stopping tests")
+                return False
 
-        # Test 4: Role Selection
+            # Test 4: User Login with new user
+            if not self.test_user_login(user_data):
+                print("❌ Login failed - stopping tests")
+                return False
+
+        # Test 5: Role Selection
         if not self.test_role_selection():
             print("❌ Role selection failed - continuing with other tests")
 
-        # Test 5: User Profile
+        # Test 6: User Profile
         self.test_user_profile()
 
-        # Test 6: Categories
+        # Test 7: Categories
         cat_success, categories = self.test_categories()
 
-        # Test 7: Products Listing
+        # Test 8: Products Listing
         self.test_products_listing()
 
-        # Test 8: Product Creation
+        # Test 9: Product Creation
         prod_success, product_id = self.test_product_creation()
 
-        # Test 9: Product Details (if product was created)
+        # Test 10: Product Details (if product was created)
         if prod_success and product_id:
             self.test_product_details(product_id)
 
-        # Test 10: Orders Listing
+        # Test 11: Orders Listing
         self.test_orders_listing()
 
-        # Test 11: Search Functionality
+        # Test 12: Search Functionality
         self.test_search_functionality()
 
-        # Test 12: Category Filtering
+        # Test 13: Category Filtering
         self.test_category_filtering()
+
+        # Test 14: User Search (Group Buying Feature)
+        self.test_user_search()
+
+        # Test 15: Group Buying Recommendations
+        self.test_group_buying_recommendations()
+
+        # Test 16: Group Buying Create Order
+        self.test_group_buying_create_order()
+
+        # Test 17: Agent Purchase
+        self.test_agent_purchase()
 
         return True
 
