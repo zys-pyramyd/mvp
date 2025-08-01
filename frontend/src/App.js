@@ -1893,31 +1893,29 @@ function App() {
         </div>
       )}
 
-      {/* Group Buying Modal - Commented out for pre-order functionality */}
-      {/* TODO: Replace with pre-order modal */}
-
-      {/* Messaging Modal */}
+      {/* Pre-order Modal - TODO: Implement */}
+      {showCreatePreOrder && (
+        <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto">
             <div className="p-4 border-b border-gray-200">
               <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold">Group Buying - Agent Dashboard</h2>
+                <h2 className="text-lg font-semibold">Create Pre-order</h2>
                 <button
-                  onClick={() => setShowGroupBuying(false)}
+                  onClick={() => setShowCreatePreOrder(false)}
                   className="text-gray-500 hover:text-gray-700"
                 >
                   ×
                 </button>
               </div>
             </div>
+            <div className="p-4">
+              <p className="text-gray-600">Pre-order functionality coming soon!</p>
+            </div>
+          </div>
+        </div>
+      )}
 
-            <div className="p-4 overflow-y-auto max-h-80">
-              {/* Step 1: Search & Product Selection */}
-              {groupBuyingStep === 'search' && (
-                <div className="space-y-6">
-                  <div className="bg-gradient-to-r from-emerald-50 to-blue-50 p-4 rounded-lg">
-                    <h3 className="font-semibold text-gray-800 mb-3">Step 1: Select Produce & Location</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
+      {/* Enhanced Messaging Modal */}
                         <label className="block text-sm font-medium text-gray-700 mb-1">Produce Name</label>
                         <input
                           type="text"
