@@ -277,6 +277,122 @@ class PyramydAPITester:
             self.log_test("Category Filtering", False, f"Category filtering failed: {response}")
             return False
 
+    def test_user_search(self):
+        """Test user search functionality for group buying"""
+        success, response = self.make_request('GET', '/api/users/search?username=test', use_auth=True)
+        
+        if success and isinstance(response, list):
+            self.log_test("User Search", True)
+            return True
+        else:
+            self.log_test("User Search", False, f"User search failed: {response}")
+            return False
+
+    def test_group_buying_recommendations(self):
+        """Test group buying price recommendations"""
+        request_data = {
+            "produce": "tomatoes",
+            "category": "vegetables",
+            "quantity": 100,
+            "location": "Lagos"
+        }
+
+        success, response = self.make_request('POST', '/api/group-buying/recommendations', request_data, 200, use_auth=True)
+        
+        if success and 'recommendations' in response:
+            self.log_test("Group Buying Recommendations", True)
+            return True, response.get('recommendations', [])
+        else:
+            self.log_test("Group Buying Recommendations", False, f"Recommendations failed: {response}")
+            return False, []
+
+    def test_group_buying_create_order(self):
+        """Test creating a group buying order"""
+        # First get recommendations to have valid data
+        rec_success, recommendations = self.test_group_buying_recommendations()
+        
+        if not rec_success or not recommendations:
+            self.log_test("Group Buying Create Order", False, "No recommendations available for testing")
+            return False
+
+        order_data = {
+            "produce": "tomatoes",
+            "category": "vegetables",
+            "location": "Lagos",
+            "quantity": 50,
+            "buyers": [
+                {
+                    "id": "test_buyer_1",
+                    "name": "Test Buyer 1",
+                    "quantity": 25,
+                    "delivery_address": "Test Address 1"
+                },
+                {
+                    "id": "test_buyer_2", 
+                    "name": "Test Buyer 2",
+                    "quantity": 25,
+                    "delivery_address": "Test Address 2"
+                }
+            ],
+            "selectedPrice": recommendations[0] if recommendations else {
+                "farm_id": "test_farm",
+                "price_per_unit": 500,
+                "product_id": "test_product"
+            },
+            "commissionType": "pyramyd"
+        }
+
+        success, response = self.make_request('POST', '/api/group-buying/create-order', order_data, 200, use_auth=True)
+        
+        if success and 'order_id' in response:
+            self.log_test("Group Buying Create Order", True)
+            return True
+        else:
+            self.log_test("Group Buying Create Order", False, f"Group order creation failed: {response}")
+            return False
+
+    def test_agent_purchase(self):
+        """Test agent purchase functionality"""
+        # First create a test product to purchase
+        product_success, product_id = self.test_product_creation()
+        
+        if not product_success or not product_id:
+            self.log_test("Agent Purchase", False, "No product available for testing agent purchase")
+            return False
+
+        purchase_data = {
+            "items": [
+                {
+                    "product_id": product_id,
+                    "quantity": 10
+                }
+            ],
+            "purchase_option": {
+                "commission_type": "percentage",
+                "customer_id": "test_customer_123",
+                "delivery_address": "Test Customer Address"
+            }
+        }
+
+        # Split the data for the endpoint
+        items = purchase_data["items"]
+        purchase_option = purchase_data["purchase_option"]
+        
+        # Make request with proper structure
+        request_data = {
+            "items": items,
+            **purchase_option
+        }
+
+        success, response = self.make_request('POST', '/api/agent/purchase', request_data, 200, use_auth=True)
+        
+        if success and 'order_id' in response and 'commission_amount' in response:
+            self.log_test("Agent Purchase", True)
+            return True
+        else:
+            self.log_test("Agent Purchase", False, f"Agent purchase failed: {response}")
+            return False
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting Pyramyd API Tests...")
