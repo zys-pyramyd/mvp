@@ -843,31 +843,28 @@ function App() {
               <h3 className="text-lg font-semibold text-gray-800 mb-2">
                 Slide Shows
               </h3>
-              <div className="min-h-[60px] flex items-center justify-center">
-                {currentPlatform === 'buy_from_farm' ? (
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">PyHub - Buy from Farm</h2>
-                    <p className="text-gray-600 text-sm">
-                      Buy fresh produce directly from farms and get the best quality at source prices
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Pyramyd Home</h2>
-                    <p className="text-gray-600 text-sm">
-                      Your comprehensive agricultural marketplace connecting farmers, suppliers, and buyers
-                    </p>
-                  </div>
-                )}
+              <div className="min-h-[80px] flex items-center justify-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    {slideContent[currentSlide].title}
+                  </h2>
+                  <p className="text-gray-600 text-sm">
+                    {slideContent[currentSlide].description}
+                  </p>
+                </div>
               </div>
               
               {/* Pagination dots */}
               <div className="flex justify-center space-x-2 mt-4">
-                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                {slideContent.map((_, index) => (
+                  <div 
+                    key={index}
+                    onClick={() => setCurrentSlide(index)}
+                    className={`w-2 h-2 rounded-full cursor-pointer transition-colors ${
+                      index === currentSlide ? 'bg-emerald-500' : 'bg-gray-300 hover:bg-gray-400'
+                    }`}
+                  ></div>
+                ))}
               </div>
             </div>
             
