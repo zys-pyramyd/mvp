@@ -1025,17 +1025,155 @@ function App() {
     }
   };
 
-  const startConversation = (targetUser) => {
-    const conversation = {
-      id: `conv_${user.username}_${targetUser.username}`,
-      participants: [user.username, targetUser.username],
-      name: targetUser.first_name + ' ' + targetUser.last_name,
-      avatar: targetUser.username.charAt(0).toUpperCase()
-    };
+  // Checkout and cart management functions
+  const calculateOrderSummary = () => {
+    let subtotal = 0;
+    let deliveryTotal = 0;
+    let itemCount = 0;
+
+    cart.forEach(item => {
+      const itemTotal = item.product.price_per_unit * item.quantity;
+      subtotal += itemTotal;
+      itemCount += item.quantity;
+      
+      // Calculate delivery fees based on method
+      if (item.delivery_method === 'platform') {
+        // Platform delivery fee calculation (could be based on distance, weight, etc.)
+        const baseDeliveryFee = 500; // Base fee of ₦500
+        const weightMultiplier = (item.product.weight_kg || 1) * 50; // ₦50 per kg
+        deliveryTotal += baseDeliveryFee + weightMultiplier;
+      } else {
+        // Offline delivery - might have different fee structure or be free
+        deliveryTotal += 200; // Minimal handling fee for offline delivery
+      }
+    });
+
+    const total = subtotal + deliveryTotal;
     
-    setSelectedConversation(conversation);
-    setFoundUsers([]);
-    setUsernameSearch('');
+    setOrderSummary({
+      subtotal,
+      delivery_total: deliveryTotal,
+      total,
+      item_count: itemCount
+    });
+    
+    return { subtotal, delivery_total: deliveryTotal, total, item_count: itemCount };
+  };
+
+  const updateCartItemQuantity = (itemId, newQuantity) => {
+    if (newQuantity <= 0) {
+      removeFromCart(itemId);
+      return;
+    }
+    
+    setCart(prevCart => 
+      prevCart.map(item => 
+        item.id === itemId 
+          ? { ...item, quantity: newQuantity }
+          : item
+      )
+    );
+    calculateOrderSummary();
+  };
+
+  const removeFromCart = (itemId) => {
+    setCart(prevCart => prevCart.filter(item => item.id !== itemId));
+    calculateOrderSummary();
+  };
+
+  const updateCartItemDeliveryMethod = (itemId, deliveryMethod) => {
+    setCart(prevCart => 
+      prevCart.map(item => 
+        item.id === itemId 
+          ? { ...item, delivery_method: deliveryMethod }
+          : item
+      )
+    );
+    calculateOrderSummary();
+  };
+
+  const proceedToCheckout = () => {
+    if (cart.length === 0) {
+      alert('Your cart is empty!');
+      return;
+    }
+    
+    calculateOrderSummary();
+    setCheckoutStep('review');
+    setShowCheckout(true);
+    setShowCart(false);
+  };
+
+  const validateAddress = () => {
+    const required = ['full_name', 'phone', 'address_line_1', 'city', 'state'];
+    const missing = required.filter(field => !shippingAddress[field].trim());
+    
+    if (missing.length > 0) {
+      alert(`Please fill in the following required fields: ${missing.join(', ')}`);
+      return false;
+    }
+    
+    // Basic phone validation
+    if (!/^\+?[\d\s-()]+$/.test(shippingAddress.phone)) {
+      alert('Please enter a valid phone number');
+      return false;
+    }
+    
+    return true;
+  };
+
+  const createOrder = async () => {
+    try {
+      if (!validateAddress()) return;
+      
+      const token = localStorage.getItem('token');
+      const orders = [];
+      
+      // Create individual orders for each cart item (to handle different sellers)
+      for (const item of cart) {
+        const orderData = {
+          product_id: item.product.id || item.product._id,
+          quantity: item.quantity,
+          unit: item.unit,
+          unit_specification: item.unit_specification,
+          shipping_address: `${shippingAddress.full_name}, ${shippingAddress.address_line_1}, ${shippingAddress.address_line_2 ? shippingAddress.address_line_2 + ', ' : ''}${shippingAddress.city}, ${shippingAddress.state}, ${shippingAddress.country}`,
+          delivery_method: item.delivery_method
+        };
+        
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/orders/create`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(orderData)
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          orders.push(result);
+        } else {
+          const error = await response.json();
+          throw new Error(error.detail || 'Failed to create order');
+        }
+      }
+      
+      // Clear cart and show success
+      setCart([]);
+      setShowCheckout(false);
+      
+      alert(`Orders created successfully! 
+      Total orders: ${orders.length}
+      Total amount: ₦${orderSummary.total}
+      Order IDs: ${orders.map(o => o.order_id).join(', ')}`);
+      
+      return orders;
+      
+    } catch (error) {
+      console.error('Error creating orders:', error);
+      alert(`Error creating orders: ${error.message}`);
+      return null;
+    }
   };
 
   const sendMessage = () => {
