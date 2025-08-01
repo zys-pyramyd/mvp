@@ -436,25 +436,118 @@ async def get_profile(current_user: dict = Depends(get_current_user)):
     return user_data
 
 @app.get("/api/products")
-async def get_products(platform: str = "pyhub", category: Optional[str] = None, search: Optional[str] = None):
-    query = {"platform": platform}
-    
-    if category:
-        query["category"] = category
-    
-    if search:
-        query["$or"] = [
-            {"title": {"$regex": search, "$options": "i"}},
-            {"description": {"$regex": search, "$options": "i"}}
-        ]
-    
-    products = list(db.products.find(query).sort("created_at", -1))
-    
-    # Convert ObjectId to string and clean up
-    for product in products:
-        product.pop('_id', None)
-    
-    return products
+async def get_products(
+    category: Optional[str] = None,
+    location: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    only_preorders: Optional[bool] = None,
+    search_term: Optional[str] = None,
+    seller_type: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20
+):
+    """Get products with advanced filtering"""
+    try:
+        results = {"products": [], "preorders": [], "total_count": 0, "page": page, "limit": limit}
+        
+        # Regular products query
+        if not only_preorders:
+            products_query = {}
+            
+            if category:
+                products_query["category"] = category
+                
+            if location:
+                products_query["location"] = {"$regex": location, "$options": "i"}
+                
+            if min_price is not None or max_price is not None:
+                price_filter = {}
+                if min_price is not None:
+                    price_filter["$gte"] = min_price
+                if max_price is not None:
+                    price_filter["$lte"] = max_price
+                products_query["price_per_unit"] = price_filter
+                
+            if search_term:
+                products_query["$or"] = [
+                    {"crop_type": {"$regex": search_term, "$options": "i"}},
+                    {"location": {"$regex": search_term, "$options": "i"}},
+                    {"farm_name": {"$regex": search_term, "$options": "i"}}
+                ]
+            
+            # Get products
+            skip = (page - 1) * limit
+            products = list(db.products.find(products_query).sort("created_at", -1).skip(skip).limit(limit))
+            
+            # Clean up products
+            for product in products:
+                product["_id"] = str(product["_id"])
+                if "created_at" in product and isinstance(product["created_at"], datetime):
+                    product["created_at"] = product["created_at"].isoformat()
+                product["type"] = "regular"
+            
+            results["products"] = products
+            results["total_count"] += db.products.count_documents(products_query)
+        
+        # Pre-orders query (if not filtering out pre-orders)
+        if only_preorders or only_preorders is None:
+            preorders_query = {"status": PreOrderStatus.PUBLISHED}
+            
+            if category:
+                preorders_query["product_category"] = category
+                
+            if location:
+                preorders_query["location"] = {"$regex": location, "$options": "i"}
+                
+            if min_price is not None or max_price is not None:
+                price_filter = {}
+                if min_price is not None:
+                    price_filter["$gte"] = min_price
+                if max_price is not None:
+                    price_filter["$lte"] = max_price
+                preorders_query["price_per_unit"] = price_filter
+                
+            if search_term:
+                preorders_query["$or"] = [
+                    {"product_name": {"$regex": search_term, "$options": "i"}},
+                    {"description": {"$regex": search_term, "$options": "i"}},
+                    {"business_name": {"$regex": search_term, "$options": "i"}},
+                    {"farm_name": {"$regex": search_term, "$options": "i"}}
+                ]
+                
+            if seller_type:
+                preorders_query["seller_type"] = seller_type
+            
+            # Get pre-orders
+            skip = (page - 1) * limit if only_preorders else 0
+            limit_preorders = limit if only_preorders else limit - len(results["products"])
+            
+            if limit_preorders > 0:
+                preorders = list(db.preorders.find(preorders_query).sort("created_at", -1).skip(skip).limit(limit_preorders))
+                
+                # Clean up pre-orders
+                for preorder in preorders:
+                    preorder.pop('_id', None)
+                    preorder["created_at"] = preorder["created_at"].isoformat()
+                    preorder["updated_at"] = preorder["updated_at"].isoformat()
+                    preorder["delivery_date"] = preorder["delivery_date"].isoformat()
+                    preorder["type"] = "preorder"
+                
+                results["preorders"] = preorders
+                results["total_count"] += db.preorders.count_documents(preorders_query)
+        
+        results["total_pages"] = (results["total_count"] + limit - 1) // limit
+        
+        return results
+        
+    except Exception as e:
+        print(f"Error getting products: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get products")
+
+@app.get("/api/categories")
+async def get_categories():
+    return [{"value": cat.value, "label": cat.value.replace("_", " ").title()} for cat in ProductCategory]
 
 @app.post("/api/products")
 async def create_product(product_data: ProductCreate, current_user: dict = Depends(get_current_user)):
