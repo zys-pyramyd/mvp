@@ -70,29 +70,48 @@ function App() {
   // Slide state
   const [currentSlide, setCurrentSlide] = useState(0);
   
-  // Slide content
+  // Slide content with different background colors and CTAs
   const slideContent = [
     {
-      title: currentPlatform === 'buy_from_farm' ? 'PyHub - Buy from Farm' : 'Pyramyd Home',
+      title: currentPlatform === 'buy_from_farm' ? 'PyHub - Buy from Farm' : 'Pyramyd',
       description: currentPlatform === 'buy_from_farm' 
         ? 'Buy fresh produce directly from farms and get the best quality at source prices'
-        : 'Your comprehensive agricultural marketplace connecting farmers, suppliers, and buyers'
+        : 'Your comprehensive agricultural marketplace connecting farmers, suppliers, and buyers',
+      bgGradient: 'from-emerald-100 to-emerald-50',
+      cta: null
     },
     {
-      title: 'Fresh & Quality Produce',
-      description: 'Connect directly with verified farmers and suppliers for the freshest agricultural products'
+      title: 'Join Our Agent Network',
+      description: 'Earn commissions while helping farmers reach more customers. Connect producers with buyers and grow your income.',
+      bgGradient: 'from-blue-100 to-blue-50',
+      cta: {
+        text: 'Become an Agent',
+        action: 'agent_register'
+      }
     },
     {
-      title: 'Best Prices Guaranteed',
-      description: 'Get the best market prices with our transparent pricing system and bulk buying options'
+      title: 'Suppliers & Processors Welcome',
+      description: 'List your products and reach thousands of buyers. Expand your market reach with our platform.',
+      bgGradient: 'from-purple-100 to-purple-50',
+      cta: {
+        text: 'Become a Supplier',
+        action: 'supplier_register'
+      }
+    },
+    {
+      title: 'Hotels, Cafes & Restaurants',
+      description: 'Source fresh ingredients directly from farms and suppliers. Get the best prices for your business needs.',
+      bgGradient: 'from-orange-100 to-orange-50',
+      cta: {
+        text: 'Register Your Business',
+        action: 'business_register'
+      }
     },
     {
       title: 'Fast & Reliable Delivery',
-      description: 'Quick delivery with our network of verified drivers and logistics partners'
-    },
-    {
-      title: 'Agent Support System',
-      description: 'Join our agent network and earn commissions while helping farmers reach more customers'
+      description: 'Quick delivery with our network of verified drivers and logistics partners nationwide.',
+      bgGradient: 'from-green-100 to-green-50',
+      cta: null
     }
   ];
   
