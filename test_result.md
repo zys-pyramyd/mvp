@@ -213,9 +213,8 @@ metadata:
 
 test_plan:
   current_focus:
-    - "User Login Integration"
-  stuck_tasks:
-    - "User Login Integration"
+    - "Group Buying UI"
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
