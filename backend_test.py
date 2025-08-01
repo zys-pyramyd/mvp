@@ -310,6 +310,8 @@ class PyramydAPITester:
         else:
             self.log_test("Complete Registration (Agent)", False, f"Complete registration failed: {response}")
             return False, registration_data
+
+    def test_user_search(self):
         """Test user search functionality for group buying"""
         success, response = self.make_request('GET', '/api/users/search?username=test', use_auth=True)
         
