@@ -695,6 +695,16 @@ class PyramydAPITester:
         # Test 17: Agent Purchase
         self.test_agent_purchase()
 
+        # Test 18-21: Enhanced Messaging System Tests
+        print("\n📱 Testing Enhanced Messaging System...")
+        self.test_messaging_user_search()
+        self.test_messaging_send_message()
+        self.test_messaging_conversations()
+        self.test_messaging_get_messages()
+        
+        # Test 22: Complete Messaging System Workflow
+        self.test_messaging_system_complete()
+
         return True
 
     def print_summary(self):
