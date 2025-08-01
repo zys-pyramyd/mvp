@@ -1535,24 +1535,465 @@ async def get_my_preorders(current_user: dict = Depends(get_current_user)):
         print(f"Error getting user pre-orders: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get user pre-orders")
 
-@app.get("/api/my-preorder-orders")
-async def get_my_preorder_orders(current_user: dict = Depends(get_current_user)):
-    """Get current user's pre-order purchases"""
+@app.post("/api/drivers/register-independent")
+async def register_independent_driver(driver_data: DriverCreate, current_user: dict = Depends(get_current_user)):
+    """Register as an independent driver"""
     try:
-        orders = list(db.preorder_orders.find({"buyer_username": current_user["username"]}).sort("created_at", -1))
+        # Validate user can register as driver
+        if current_user.get('role') != 'driver':
+            raise HTTPException(status_code=403, detail="Only users with driver role can register as independent drivers")
+        
+        # Check if user already has a driver profile
+        existing_driver = db.drivers.find_one({"driver_username": current_user["username"]})
+        if existing_driver:
+            raise HTTPException(status_code=400, detail="Driver profile already exists")
+        
+        # Create driver document
+        driver = {
+            "id": str(uuid.uuid4()),
+            "driver_username": current_user["username"],
+            "driver_name": driver_data.driver_name,
+            "phone_number": driver_data.phone_number,
+            "email": driver_data.email,
+            "profile_picture": driver_data.profile_picture,
+            "driver_license": driver_data.driver_license,
+            "status": DriverStatus.OFFLINE,
+            "current_location": None,
+            "rating": 5.0,
+            "total_deliveries": 0,
+            "is_independent": True,
+            "logistics_business_id": None,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        # Create vehicle document
+        vehicle = {
+            "id": str(uuid.uuid4()),
+            "driver_id": driver["id"],
+            "vehicle_type": driver_data.vehicle_type,
+            "plate_number": driver_data.plate_number,
+            "make_model": driver_data.make_model,
+            "color": driver_data.color,
+            "year": driver_data.year,
+            "created_at": datetime.utcnow()
+        }
+        
+        # Store in database
+        db.drivers.insert_one(driver)
+        db.vehicles.insert_one(vehicle)
+        
+        return {"message": "Driver registered successfully", "driver_id": driver["id"]}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error registering independent driver: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to register driver")
+
+@app.post("/api/logistics/add-driver")
+async def add_driver_to_logistics(driver_data: DriverCreate, current_user: dict = Depends(get_current_user)):
+    """Add a driver to logistics business dashboard"""
+    try:
+        # Validate user is logistics business
+        if current_user.get('partner_type') != 'business' or current_user.get('business_category') != 'logistics_business':
+            raise HTTPException(status_code=403, detail="Only logistics businesses can add managed drivers")
+        
+        # Get or create logistics business profile
+        logistics_business = db.logistics_businesses.find_one({"business_username": current_user["username"]})
+        if not logistics_business:
+            # Create logistics business profile
+            logistics_business = {
+                "id": str(uuid.uuid4()),
+                "business_username": current_user["username"],
+                "business_name": current_user.get("business_info", {}).get("business_name", "Unknown Business"),
+                "business_address": current_user.get("business_info", {}).get("business_address", ""),
+                "phone_number": current_user.get("phone", ""),
+                "email": current_user.get("email", ""),
+                "cac_number": current_user.get("verification_info", {}).get("cac_number", ""),
+                "drivers": [],
+                "vehicles": [],
+                "created_at": datetime.utcnow()
+            }
+            db.logistics_businesses.insert_one(logistics_business)
+        
+        # Create unique driver username
+        driver_username = f"{current_user['username']}_driver_{len(logistics_business.get('drivers', [])) + 1}"
+        
+        # Create driver document
+        driver = {
+            "id": str(uuid.uuid4()),
+            "driver_username": driver_username,
+            "driver_name": driver_data.driver_name,
+            "phone_number": driver_data.phone_number,
+            "email": driver_data.email,
+            "profile_picture": driver_data.profile_picture,
+            "driver_license": driver_data.driver_license,
+            "status": DriverStatus.OFFLINE,
+            "current_location": None,
+            "rating": 5.0,
+            "total_deliveries": 0,
+            "is_independent": False,
+            "logistics_business_id": logistics_business["id"],
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        # Create vehicle document
+        vehicle = {
+            "id": str(uuid.uuid4()),
+            "driver_id": driver["id"],
+            "vehicle_type": driver_data.vehicle_type,
+            "plate_number": driver_data.plate_number,
+            "make_model": driver_data.make_model,
+            "color": driver_data.color,
+            "year": driver_data.year,
+            "created_at": datetime.utcnow()
+        }
+        
+        # Store in database
+        db.drivers.insert_one(driver)
+        db.vehicles.insert_one(vehicle)
+        
+        # Update logistics business
+        db.logistics_businesses.update_one(
+            {"id": logistics_business["id"]},
+            {
+                "$push": {
+                    "drivers": driver["id"],
+                    "vehicles": vehicle["id"]
+                }
+            }
+        )
+        
+        return {
+            "message": "Driver added successfully",
+            "driver_id": driver["id"],
+            "driver_username": driver_username,
+            "driver_access_link": f"/driver-portal?token={driver['id']}"  # Link for driver to access portal
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error adding driver to logistics: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add driver")
+
+@app.get("/api/logistics/my-drivers")
+async def get_my_drivers(current_user: dict = Depends(get_current_user)):
+    """Get all drivers managed by current logistics business"""
+    try:
+        # Get logistics business
+        logistics_business = db.logistics_businesses.find_one({"business_username": current_user["username"]})
+        if not logistics_business:
+            return {"drivers": [], "vehicles": []}
+        
+        # Get drivers
+        drivers = list(db.drivers.find({
+            "logistics_business_id": logistics_business["id"]
+        }))
+        
+        # Get vehicles
+        vehicles = list(db.vehicles.find({
+            "driver_id": {"$in": [driver["id"] for driver in drivers]}
+        }))
         
         # Clean up response
-        for order in orders:
-            order.pop('_id', None)
-            order["created_at"] = order["created_at"].isoformat()
-            order["updated_at"] = order["updated_at"].isoformat()
-            order["delivery_date"] = order["delivery_date"].isoformat()
+        for driver in drivers:
+            driver.pop('_id', None)
+            if driver.get("created_at"):
+                driver["created_at"] = driver["created_at"].isoformat()
+            if driver.get("updated_at"):
+                driver["updated_at"] = driver["updated_at"].isoformat()
         
-        return orders
+        for vehicle in vehicles:
+            vehicle.pop('_id', None)
+            if vehicle.get("created_at"):
+                vehicle["created_at"] = vehicle["created_at"].isoformat()
+        
+        return {"drivers": drivers, "vehicles": vehicles}
         
     except Exception as e:
-        print(f"Error getting user pre-order purchases: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get user pre-order purchases")
+        print(f"Error getting logistics drivers: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get drivers")
+
+@app.post("/api/delivery/request")
+async def create_delivery_request(request_data: DeliveryRequestCreate, current_user: dict = Depends(get_current_user)):
+    """Create a delivery request"""
+    try:
+        # Validate user can request delivery
+        allowed_roles = ['agent', 'farmer', 'supplier', 'processor']
+        if current_user.get('role') not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Only sellers can request delivery")
+        
+        # Calculate distance (simplified - in real app would use maps API)
+        import random
+        distance_km = random.uniform(5.0, 50.0)  # Mock distance
+        
+        # Generate OTP
+        import random
+        otp = str(random.randint(100000, 999999))
+        
+        # Create delivery request
+        delivery_request = {
+            "id": str(uuid.uuid4()),
+            "order_id": request_data.order_id,
+            "order_type": request_data.order_type,
+            "requester_username": current_user["username"],
+            "pickup_location": {
+                "address": request_data.pickup_address,
+                "lat": 0.0,  # Would be geocoded in real app
+                "lng": 0.0
+            },
+            "delivery_location": {
+                "address": request_data.delivery_address,
+                "lat": 0.0,
+                "lng": 0.0
+            },
+            "distance_km": distance_km,
+            "estimated_price": request_data.estimated_price,
+            "product_details": request_data.product_details,
+            "weight_kg": request_data.weight_kg,
+            "special_instructions": request_data.special_instructions,
+            "status": DeliveryStatus.PENDING,
+            "delivery_otp": otp,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        # Store in database
+        db.delivery_requests.insert_one(delivery_request)
+        
+        return {
+            "message": "Delivery request created successfully",
+            "request_id": delivery_request["id"],
+            "estimated_price": request_data.estimated_price,
+            "distance_km": distance_km,
+            "delivery_otp": otp
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error creating delivery request: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create delivery request")
+
+@app.get("/api/delivery/available")
+async def get_available_deliveries(current_user: dict = Depends(get_current_user)):
+    """Get available delivery requests for drivers"""
+    try:
+        # Check if user is a driver
+        driver = db.drivers.find_one({"driver_username": current_user["username"]})
+        if not driver:
+            raise HTTPException(status_code=403, detail="Only registered drivers can view delivery requests")
+        
+        # Get pending delivery requests
+        delivery_requests = list(db.delivery_requests.find({
+            "status": DeliveryStatus.PENDING
+        }).sort("created_at", -1))
+        
+        # Clean up response
+        for request in delivery_requests:
+            request.pop('_id', None)
+            request["created_at"] = request["created_at"].isoformat()
+            request["updated_at"] = request["updated_at"].isoformat()
+            # Don't expose OTP to drivers until they accept
+            request.pop('delivery_otp', None)
+        
+        return {"delivery_requests": delivery_requests}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting available deliveries: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get available deliveries")
+
+@app.post("/api/delivery/{request_id}/accept")
+async def accept_delivery_request(request_id: str, current_user: dict = Depends(get_current_user)):
+    """Accept a delivery request"""
+    try:
+        # Check if user is a driver
+        driver = db.drivers.find_one({"driver_username": current_user["username"]})
+        if not driver:
+            raise HTTPException(status_code=403, detail="Only registered drivers can accept deliveries")
+        
+        # Check if driver is available
+        if driver["status"] in [DriverStatus.BUSY, DriverStatus.ON_DELIVERY]:
+            raise HTTPException(status_code=400, detail="Driver is not available")
+        
+        # Find and update delivery request
+        delivery_request = db.delivery_requests.find_one({"id": request_id})
+        if not delivery_request:
+            raise HTTPException(status_code=404, detail="Delivery request not found")
+        
+        if delivery_request["status"] != DeliveryStatus.PENDING:
+            raise HTTPException(status_code=400, detail="Delivery request is no longer available")
+        
+        # Update delivery request
+        db.delivery_requests.update_one(
+            {"id": request_id},
+            {
+                "$set": {
+                    "assigned_driver_id": driver["id"],
+                    "status": DeliveryStatus.ACCEPTED,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        # Update driver status
+        db.drivers.update_one(
+            {"id": driver["id"]},
+            {
+                "$set": {
+                    "status": DriverStatus.ON_DELIVERY,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        return {
+            "message": "Delivery request accepted",
+            "request_id": request_id,
+            "pickup_address": delivery_request["pickup_location"]["address"],
+            "delivery_address": delivery_request["delivery_location"]["address"],
+            "estimated_price": delivery_request["estimated_price"],
+            "delivery_otp": delivery_request["delivery_otp"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error accepting delivery: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to accept delivery")
+
+@app.post("/api/delivery/{request_id}/complete")
+async def complete_delivery(request_id: str, otp: str, current_user: dict = Depends(get_current_user)):
+    """Complete delivery with OTP verification"""
+    try:
+        # Find delivery request
+        delivery_request = db.delivery_requests.find_one({"id": request_id})
+        if not delivery_request:
+            raise HTTPException(status_code=404, detail="Delivery request not found")
+        
+        # Verify OTP
+        if delivery_request["delivery_otp"] != otp:
+            raise HTTPException(status_code=400, detail="Invalid OTP")
+        
+        # Check if user is authorized (buyer or the assigned driver)
+        driver = db.drivers.find_one({"id": delivery_request.get("assigned_driver_id")})
+        if current_user["username"] != driver.get("driver_username"):
+            # Could be buyer/agent confirming - add additional validation here
+            pass
+        
+        # Update delivery request
+        db.delivery_requests.update_one(
+            {"id": request_id},
+            {
+                "$set": {
+                    "status": DeliveryStatus.DELIVERED,
+                    "completed_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        # Update driver status and stats
+        if driver:
+            db.drivers.update_one(
+                {"id": driver["id"]},
+                {
+                    "$set": {
+                        "status": DriverStatus.ONLINE,
+                        "updated_at": datetime.utcnow()
+                    },
+                    "$inc": {"total_deliveries": 1}
+                }
+            )
+        
+        # TODO: Process payment to agents and sellers here
+        # This would integrate with payment processing system
+        
+        return {
+            "message": "Delivery completed successfully",
+            "request_id": request_id,
+            "completed_at": datetime.utcnow().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error completing delivery: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to complete delivery")
+
+@app.post("/api/delivery/{request_id}/negotiate")
+async def negotiate_delivery_price(request_id: str, proposed_price: float, current_user: dict = Depends(get_current_user)):
+    """Negotiate delivery price"""
+    try:
+        # Check if user is a driver
+        driver = db.drivers.find_one({"driver_username": current_user["username"]})
+        if not driver:
+            raise HTTPException(status_code=403, detail="Only registered drivers can negotiate prices")
+        
+        # Find delivery request
+        delivery_request = db.delivery_requests.find_one({"id": request_id})
+        if not delivery_request:
+            raise HTTPException(status_code=404, detail="Delivery request not found")
+        
+        if delivery_request["status"] != DeliveryStatus.PENDING:
+            raise HTTPException(status_code=400, detail="Cannot negotiate on this delivery request")
+        
+        # Update with negotiated price
+        db.delivery_requests.update_one(
+            {"id": request_id},
+            {
+                "$set": {
+                    "negotiated_price": proposed_price,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        return {
+            "message": "Price negotiation submitted",
+            "request_id": request_id,
+            "proposed_price": proposed_price,
+            "original_price": delivery_request["estimated_price"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error negotiating price: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to negotiate price")
+
+@app.put("/api/drivers/status")
+async def update_driver_status(status: DriverStatus, current_user: dict = Depends(get_current_user)):
+    """Update driver online/offline status"""
+    try:
+        # Find driver
+        driver = db.drivers.find_one({"driver_username": current_user["username"]})
+        if not driver:
+            raise HTTPException(status_code=404, detail="Driver profile not found")
+        
+        # Update status
+        db.drivers.update_one(
+            {"driver_username": current_user["username"]},
+            {
+                "$set": {
+                    "status": status,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        return {"message": f"Driver status updated to {status}", "status": status}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating driver status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update driver status")
 
 if __name__ == "__main__":
     import uvicorn
