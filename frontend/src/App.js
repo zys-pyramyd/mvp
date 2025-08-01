@@ -1724,24 +1724,91 @@ function App() {
                     Seller: {product.seller_username || `agent_${Math.random().toString().substr(2, 6)}`}
                   </div>
 
-                  {/* Action Button */}
-                  <button
-                    onClick={() => {
-                      if (product.type === 'preorder') {
-                        setSelectedPreOrder(product);
-                        setShowPreOrderDetails(true);
-                      } else {
-                        addToCart(product);
-                      }
-                    }}
-                    className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
-                      product.type === 'preorder'
-                        ? 'bg-orange-600 hover:bg-orange-700 text-white'
-                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    }`}
-                  >
-                    {product.type === 'preorder' ? 'View Pre-order' : 'Add to Cart'}
-                  </button>
+                  {/* Enhanced Add to Cart - includes delivery method and unit specification */}
+                  <div className="mt-4 space-y-3">
+                    {/* Quantity Selection */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
+                        <input
+                          type="number"
+                          min="1"
+                          defaultValue="1"
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
+                          id={`quantity-${product.id || product._id || index}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Unit</label>
+                        <select
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
+                          id={`unit-${product.id || product._id || index}`}
+                        >
+                          <option value="kg">kg</option>
+                          <option value="g">g</option>
+                          <option value="pieces">pieces</option>
+                          <option value="bags">bags</option>
+                          <option value="crates">crates</option>
+                          <option value="gallons">gallons</option>
+                          <option value="liters">liters</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Spec (optional)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., 100kg"
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
+                          id={`spec-${product.id || product._id || index}`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Delivery Method Selection */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Delivery Method</label>
+                      <div className="flex space-x-2">
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name={`delivery-${product.id || product._id || index}`}
+                            value="platform"
+                            defaultChecked
+                            className="w-3 h-3 text-emerald-600 border-gray-300 focus:ring-emerald-500"
+                          />
+                          <span className="ml-1 text-xs text-gray-700">🚛 Platform Driver</span>
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name={`delivery-${product.id || product._id || index}`}
+                            value="offline"
+                            className="w-3 h-3 text-emerald-600 border-gray-300 focus:ring-emerald-500"
+                          />
+                          <span className="ml-1 text-xs text-gray-700">🚚 Offline Delivery</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Enhanced Add to Cart Button */}
+                    <button
+                      onClick={() => {
+                        const quantity = parseFloat(document.getElementById(`quantity-${product.id || product._id || index}`).value) || 1;
+                        const unit = document.getElementById(`unit-${product.id || product._id || index}`).value;
+                        const specification = document.getElementById(`spec-${product.id || product._id || index}`).value;
+                        const deliveryMethod = document.querySelector(`input[name="delivery-${product.id || product._id || index}"]:checked`).value;
+                        
+                        addEnhancedToCart(product, quantity, unit, specification, deliveryMethod);
+                      }}
+                      className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
+                        product.type === 'preorder'
+                          ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
+                    >
+                      {product.type === 'preorder' ? 'Add Pre-order to Cart' : 'Add to Cart'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
