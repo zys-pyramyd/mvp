@@ -147,6 +147,54 @@ backend:
         agent: "testing"
         comment: "✅ BACKEND TESTING COMPLETE: Group buying functionality is fully implemented and working. Tested all endpoints: /api/users/search (user search for group buying), /api/group-buying/recommendations (price recommendations), /api/group-buying/create-order (group order creation), and /api/agent/purchase (agent purchasing with commission). All group buying backend logic is functional."
 
+  - task: "Enhanced Messaging System - User Search API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ USER SEARCH API WORKING: Comprehensive testing of /api/users/search-messaging endpoint confirmed all requirements: 1) Minimum 2-character validation working (returns 400 for single character) 2) Case-insensitive partial matching functional 3) Current user properly excluded from results 4) Returns clean user data without passwords. Fixed duplicate endpoint issue and ObjectId serialization problems."
+
+  - task: "Enhanced Messaging System - Message Sending API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ MESSAGE SENDING API WORKING: Successfully tested /api/messages/send endpoint with all features: 1) Text message sending functional 2) Audio message sending with audio_data working 3) Recipient validation properly returns 404 for non-existent users 4) Conversation_id handling working correctly 5) Message storage in MongoDB successful. Fixed error handling and ObjectId serialization issues."
+
+  - task: "Enhanced Messaging System - Conversations API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ CONVERSATIONS API WORKING: /api/messages/conversations endpoint fully functional: 1) Retrieves user conversations correctly 2) Groups messages by conversation_id 3) Shows latest message for each conversation 4) Includes other participant details (username, first_name, last_name) 5) Proper timestamp formatting for JSON serialization. Fixed ObjectId serialization and datetime formatting issues."
+
+  - task: "Enhanced Messaging System - Messages Retrieval API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ MESSAGES RETRIEVAL API WORKING: /api/messages/{conversation_id} endpoint fully functional: 1) Retrieves messages for specific conversations 2) Proper message ordering by timestamp (ascending) 3) Automatically marks messages as read when retrieved 4) Includes all message fields (id, sender, recipient, content, timestamp, read status) 5) Clean JSON serialization without ObjectId issues. All messaging system components working correctly."
+
 frontend:
   - task: "JSX Syntax Error Fix"
     implemented: true
