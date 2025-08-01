@@ -69,6 +69,109 @@ class OrderStatus(str, Enum):
     DELIVERED = "delivered"
     CANCELLED = "cancelled"
 
+class DriverStatus(str, Enum):
+    OFFLINE = "offline"
+    ONLINE = "online"
+    BUSY = "busy"
+    ON_DELIVERY = "on_delivery"
+
+class DeliveryStatus(str, Enum):
+    PENDING = "pending"
+    ASSIGNED = "assigned"
+    ACCEPTED = "accepted" 
+    IN_TRANSIT = "in_transit"
+    DELIVERED = "delivered"
+    CANCELLED = "cancelled"
+
+class VehicleType(str, Enum):
+    MOTORCYCLE = "motorcycle"
+    CAR = "car"
+    VAN = "van"
+    TRUCK = "truck"
+    BICYCLE = "bicycle"
+
+class Driver(BaseModel):
+    id: Optional[str] = None
+    driver_username: str
+    driver_name: str
+    phone_number: str
+    email: Optional[str] = None
+    profile_picture: Optional[str] = None  # base64 image
+    driver_license: Optional[str] = None
+    status: DriverStatus = DriverStatus.OFFLINE
+    current_location: Optional[dict] = None  # {"lat": float, "lng": float, "address": str}
+    rating: float = 5.0
+    total_deliveries: int = 0
+    is_independent: bool = True  # True for self-registered, False for logistics business managed
+    logistics_business_id: Optional[str] = None  # If managed by logistics business
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class Vehicle(BaseModel):
+    id: Optional[str] = None
+    driver_id: str
+    vehicle_type: VehicleType
+    plate_number: str
+    make_model: str  # e.g., "Honda CBR 150", "Toyota Camry"
+    color: str
+    year: Optional[int] = None
+    insurance_info: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+class LogisticsBusiness(BaseModel):
+    id: Optional[str] = None
+    business_username: str
+    business_name: str
+    business_address: str
+    phone_number: str
+    email: str
+    cac_number: Optional[str] = None
+    drivers: List[str] = []  # List of driver IDs
+    vehicles: List[str] = []  # List of vehicle IDs
+    created_at: Optional[datetime] = None
+
+class DeliveryRequest(BaseModel):
+    id: Optional[str] = None
+    order_id: str  # References order or pre-order
+    order_type: str  # "regular" or "preorder"
+    requester_username: str  # Agent, farmer, or supplier requesting delivery
+    pickup_location: dict  # {"lat": float, "lng": float, "address": str}
+    delivery_location: dict
+    distance_km: float
+    estimated_price: float
+    negotiated_price: Optional[float] = None
+    product_details: str
+    weight_kg: Optional[float] = None
+    special_instructions: Optional[str] = None
+    assigned_driver_id: Optional[str] = None
+    status: DeliveryStatus = DeliveryStatus.PENDING
+    delivery_otp: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+class DriverCreate(BaseModel):
+    driver_name: str
+    phone_number: str
+    email: Optional[str] = None
+    profile_picture: Optional[str] = None
+    driver_license: Optional[str] = None
+    vehicle_type: VehicleType
+    plate_number: str
+    make_model: str
+    color: str
+    year: Optional[int] = None
+
+class DeliveryRequestCreate(BaseModel):
+    order_id: str
+    order_type: str
+    pickup_address: str
+    delivery_address: str
+    product_details: str
+    weight_kg: Optional[float] = None
+    special_instructions: Optional[str] = None
+    estimated_price: float
+
 class PreOrderStatus(str, Enum):
     DRAFT = "draft"
     PUBLISHED = "published" 
