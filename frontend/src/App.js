@@ -92,15 +92,32 @@ function App() {
     color: '',
     year: ''
   });
-  const [deliveryRequestForm, setDeliveryRequestForm] = useState({
+  // Enhanced driver system state
+  const [driverSearch, setDriverSearch] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedDriver, setSelectedDriver] = useState(null);
+  const [showDriverMessages, setShowDriverMessages] = useState(false);
+  const [deliveryMessages, setDeliveryMessages] = useState([]);
+  const [currentDeliveryChat, setCurrentDeliveryChat] = useState('');
+  const [newDeliveryMessage, setNewDeliveryMessage] = useState('');
+  const [pickupCoordinates, setPickupCoordinates] = useState(null);
+  const [deliveryCoordinates, setDeliveryCoordinates] = useState([]);
+  const [showMap, setShowMap] = useState(false);
+  const [trackingData, setTrackingData] = useState(null);
+  const [multipleDestinations, setMultipleDestinations] = useState(['']);
+  
+  const [enhancedDeliveryForm, setEnhancedDeliveryForm] = useState({
     order_id: '',
     order_type: 'regular',
     pickup_address: '',
-    delivery_address: '',
+    delivery_addresses: [''],
+    total_quantity: '',
+    quantity_unit: 'kg',
     product_details: '',
     weight_kg: '',
     special_instructions: '',
-    estimated_price: ''
+    estimated_price: '',
+    preferred_driver_username: ''
   });
   const [preOrderForm, setPreOrderForm] = useState({
     product_name: '',
