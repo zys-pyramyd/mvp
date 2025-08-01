@@ -780,17 +780,66 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Platform Description */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {currentPlatform === 'buy_from_farm' ? 'PyHub - Buy from Farm' : 'Pyramyd Home'}
-          </h1>
-          <p className="text-gray-600">
-            {currentPlatform === 'buy_from_farm' 
-              ? 'Buy fresh produce directly from farms and get the best quality at source prices'
-              : 'Your comprehensive agricultural marketplace connecting farmers, suppliers, and buyers'
-            }
-          </p>
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+            />
+            <button className="absolute right-3 top-3 text-emerald-600 hover:text-emerald-700">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Auto-changing Slides */}
+        <div className="mb-6">
+          <div className="relative bg-gradient-to-r from-emerald-100 to-emerald-50 rounded-xl p-6 overflow-hidden">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                Slide Shows
+              </h3>
+              <div className="min-h-[60px] flex items-center justify-center">
+                {currentPlatform === 'buy_from_farm' ? (
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">PyHub - Buy from Farm</h2>
+                    <p className="text-gray-600 text-sm">
+                      Buy fresh produce directly from farms and get the best quality at source prices
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Pyramyd Home</h2>
+                    <p className="text-gray-600 text-sm">
+                      Your comprehensive agricultural marketplace connecting farmers, suppliers, and buyers
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Pagination dots */}
+              <div className="flex justify-center space-x-2 mt-4">
+                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+              </div>
+            </div>
+            
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 opacity-10">
+              <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            </div>
+          </div>
         </div>
 
         {/* Categories - Swipeable Cards */}
