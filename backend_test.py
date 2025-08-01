@@ -109,7 +109,7 @@ class PyramydAPITester:
     def test_user_login(self, user_data: Dict):
         """Test user login"""
         login_data = {
-            "email": user_data["email"],
+            "email_or_phone": user_data["email"],
             "password": user_data["password"]
         }
 
@@ -121,6 +121,24 @@ class PyramydAPITester:
             return True
         else:
             self.log_test("User Login", False, f"Login failed: {response}")
+            return False
+
+    def test_existing_user_login(self):
+        """Test login with existing test user testagent123"""
+        login_data = {
+            "email_or_phone": "testagent@pyramyd.com",
+            "password": "password123"
+        }
+
+        success, response = self.make_request('POST', '/api/auth/login', login_data, 200)
+        
+        if success and 'token' in response and 'user' in response:
+            self.token = response['token']  # Update token for further tests
+            self.user_id = response['user']['id']
+            self.log_test("Existing User Login (testagent123)", True)
+            return True
+        else:
+            self.log_test("Existing User Login (testagent123)", False, f"Login failed: {response}")
             return False
 
     def test_role_selection(self):
