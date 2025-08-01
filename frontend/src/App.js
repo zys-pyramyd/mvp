@@ -912,6 +912,8 @@ function App() {
                           Manage Profile
                         </button>
                         
+                        {/* Group Buying menu item - commented out for pre-order functionality */}
+                        {/* 
                         {user.role === 'agent' && (
                           <button
                             onClick={() => {
@@ -923,6 +925,7 @@ function App() {
                             Group Buying
                           </button>
                         )}
+                        */}
                         
                         <button
                           onClick={() => {
