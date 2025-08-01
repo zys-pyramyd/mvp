@@ -2140,6 +2140,202 @@ function App() {
         </div>
       )}
 
+      {/* Pre-order Details Modal */}
+      {showPreOrderDetails && selectedPreOrder && (
+        <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold text-gray-900">Pre-order Details</h2>
+                <button
+                  onClick={() => {
+                    setShowPreOrderDetails(false);
+                    setSelectedPreOrder(null);
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              {/* Product Image */}
+              {selectedPreOrder.images && selectedPreOrder.images.length > 0 ? (
+                <img 
+                  src={selectedPreOrder.images[0]} 
+                  alt={selectedPreOrder.product_name}
+                  className="w-full h-48 object-cover rounded-lg mb-4"
+                />
+              ) : (
+                <div className="w-full h-48 bg-gray-200 flex items-center justify-center rounded-lg mb-4">
+                  <span className="text-gray-500">No Image</span>
+                </div>
+              )}
+
+              {/* Product Info */}
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">{selectedPreOrder.product_name}</h3>
+              <p className="text-gray-600 mb-4">{selectedPreOrder.description}</p>
+
+              {/* Price and Stock */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-emerald-50 p-3 rounded-lg">
+                  <div className="text-sm text-gray-600">Price per unit</div>
+                  <div className="text-xl font-bold text-emerald-600">
+                    ₦{selectedPreOrder.price_per_unit}/{selectedPreOrder.unit}
+                  </div>
+                </div>
+                <div className="bg-orange-50 p-3 rounded-lg">
+                  <div className="text-sm text-gray-600">Available stock</div>
+                  <div className="text-xl font-bold text-orange-600">
+                    {selectedPreOrder.available_stock} {selectedPreOrder.unit}
+                  </div>
+                </div>
+              </div>
+
+              {/* Business Info */}
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold text-gray-900 mb-2">Seller Information</h4>
+                <div className="space-y-1 text-sm">
+                  <div><span className="font-medium">Business:</span> {selectedPreOrder.business_name}</div>
+                  {selectedPreOrder.farm_name && (
+                    <div><span className="font-medium">Farm:</span> {selectedPreOrder.farm_name}</div>
+                  )}
+                  {selectedPreOrder.agent_username && (
+                    <div><span className="font-medium">Agent:</span> @{selectedPreOrder.agent_username}</div>
+                  )}
+                  <div><span className="font-medium">Location:</span> {selectedPreOrder.location}</div>
+                  <div><span className="font-medium">Seller Type:</span> {selectedPreOrder.seller_type}</div>
+                </div>
+              </div>
+
+              {/* Pre-order Details */}
+              <div className="mb-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                <h4 className="font-semibold text-orange-900 mb-2">Pre-order Information</h4>
+                <div className="space-y-1 text-sm text-orange-800">
+                  <div>
+                    <span className="font-medium">Partial payment required:</span> 
+                    {Math.round(selectedPreOrder.partial_payment_percentage * 100)}% upfront
+                  </div>
+                  <div>
+                    <span className="font-medium">Remaining payment:</span> 
+                    {100 - Math.round(selectedPreOrder.partial_payment_percentage * 100)}% on delivery
+                  </div>
+                  <div>
+                    <span className="font-medium">Expected delivery:</span> 
+                    {new Date(selectedPreOrder.delivery_date).toLocaleDateString()}
+                  </div>
+                  {selectedPreOrder.orders_count > 0 && (
+                    <div>
+                      <span className="font-medium">Current orders:</span> 
+                      {selectedPreOrder.orders_count} ({selectedPreOrder.total_ordered_quantity} {selectedPreOrder.unit})
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Order Form */}
+              {user ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Quantity ({selectedPreOrder.unit})
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={selectedPreOrder.available_stock}
+                      defaultValue="1"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                      id="preorder-quantity"
+                    />
+                  </div>
+
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <div className="text-sm text-gray-600 mb-1">Order Summary</div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>Unit price:</span>
+                        <span>₦{selectedPreOrder.price_per_unit}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Quantity:</span>
+                        <span id="summary-quantity">1 {selectedPreOrder.unit}</span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>Total amount:</span>
+                        <span id="summary-total">₦{selectedPreOrder.price_per_unit}</span>
+                      </div>
+                      <div className="flex justify-between text-orange-600">
+                        <span>Partial payment now:</span>
+                        <span id="summary-partial">₦{Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600">
+                        <span>Remaining on delivery:</span>
+                        <span id="summary-remaining">₦{selectedPreOrder.price_per_unit - Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      const quantity = parseInt(document.getElementById('preorder-quantity').value);
+                      if (quantity <= 0 || quantity > selectedPreOrder.available_stock) {
+                        alert('Please enter a valid quantity');
+                        return;
+                      }
+
+                      try {
+                        const token = localStorage.getItem('token');
+                        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/preorders/${selectedPreOrder.id}/order`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                          },
+                          body: JSON.stringify({ quantity })
+                        });
+
+                        if (response.ok) {
+                          const result = await response.json();
+                          alert(`Pre-order placed successfully! Order ID: ${result.order_id}\nPartial payment: ₦${result.partial_amount}\nRemaining: ₦${result.remaining_amount}`);
+                          setShowPreOrderDetails(false);
+                          setSelectedPreOrder(null);
+                          fetchProducts(); // Refresh products to update stock
+                        } else {
+                          const error = await response.json();
+                          alert(`Error: ${error.detail || 'Failed to place pre-order'}`);
+                        }
+                      } catch (error) {
+                        console.error('Error placing pre-order:', error);
+                        alert('Error placing pre-order. Please try again.');
+                      }
+                    }}
+                    className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 font-medium transition-colors"
+                  >
+                    Place Pre-order
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <p className="text-gray-600 mb-3">Please sign in to place pre-orders</p>
+                  <button
+                    onClick={() => {
+                      setShowPreOrderDetails(false);
+                      setAuthMode('login');
+                      setShowAuthModal(true);
+                    }}
+                    className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                  >
+                    Sign In
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create Pre-order Modal */}
       {showCreatePreOrder && (
         <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
