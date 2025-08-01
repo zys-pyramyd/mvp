@@ -4055,6 +4055,146 @@ function App() {
         </div>
       )}
 
+      {/* Enhanced Cart Modal */}
+      {showCart && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+          <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-lg flex flex-col">
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold">🛒 Shopping Cart ({cart.length})</h2>
+                <button
+                  onClick={() => setShowCart(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {cart.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-gray-500 mb-4">
+                    <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.1 5H17M9 19a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM20 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+                    </svg>
+                    <p className="text-lg">Your cart is empty</p>
+                    <p className="text-sm">Add some products to get started!</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {cart.map((item) => (
+                    <div key={item.id} className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-gray-900 text-sm">
+                            {item.product.product_name || item.product.crop_type}
+                          </h3>
+                          <p className="text-xs text-gray-600">
+                            ₦{item.product.price_per_unit}/{item.unit} • {item.product.seller_username}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => removeCartItem(item.id)}
+                          className="text-red-500 hover:text-red-700 text-sm"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      
+                      {/* Quantity Controls */}
+                      <div className="flex items-center space-x-2 mb-2">
+                        <button
+                          onClick={() => updateCartItemQuantity(item.id, item.quantity - 1)}
+                          className="w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-sm"
+                        >
+                          -
+                        </button>
+                        <span className="text-sm font-medium w-12 text-center">
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() => updateCartItemQuantity(item.id, item.quantity + 1)}
+                          className="w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-sm"
+                        >
+                          +
+                        </button>
+                        <span className="text-xs text-gray-600">
+                          {item.unit}{item.unit_specification && ` (${item.unit_specification})`}
+                        </span>
+                      </div>
+                      
+                      {/* Delivery Method Toggle */}
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="text-xs text-gray-600">Delivery:</span>
+                        <button
+                          onClick={() => updateCartItemDeliveryMethod(
+                            item.id, 
+                            item.delivery_method === 'platform' ? 'offline' : 'platform'
+                          )}
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            item.delivery_method === 'platform'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-green-100 text-green-700'
+                          }`}
+                        >
+                          {item.delivery_method === 'platform' ? '🚛 Platform' : '🚚 Offline'}
+                        </button>
+                      </div>
+                      
+                      {/* Item Total */}
+                      <div className="text-right">
+                        <span className="font-semibold text-emerald-600">
+                          ₦{(item.product.price_per_unit * item.quantity).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Cart Footer */}
+            {cart.length > 0 && (
+              <div className="p-4 border-t border-gray-200 bg-white">
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Items ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span>
+                    <span className="font-medium">₦{cart.reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Est. Delivery</span>
+                    <span className="font-medium">₦{Math.round(cart.length * 350).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold text-emerald-600 pt-2 border-t border-gray-200">
+                    <span>Total</span>
+                    <span>₦{(cart.reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0) + Math.round(cart.length * 350)).toLocaleString()}</span>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => {
+                    calculateOrderSummary();
+                    proceedToCheckout();
+                  }}
+                  className="w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 font-medium transition-colors"
+                >
+                  Proceed to Checkout
+                </button>
+                
+                <button
+                  onClick={() => setShowCart(false)}
+                  className="w-full mt-2 text-gray-600 hover:text-gray-800 py-2 text-sm"
+                >
+                  Continue Shopping
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Enhanced Messaging Modal */}
       {showMessaging && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
