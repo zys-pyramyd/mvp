@@ -56,6 +56,7 @@ function App() {
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [showOrderTracking, setShowOrderTracking] = useState(false);
   const [orders, setOrders] = useState([]);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   
   // Group buying state
   const [showGroupBuying, setShowGroupBuying] = useState(false);
