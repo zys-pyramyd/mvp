@@ -1226,6 +1226,10 @@ class PyramydAPITester:
         # Test 31: Complete Pre-order System Workflow
         self.test_preorder_system_complete()
 
+        # Test 32-40: Driver System Tests
+        print("\n🚗 Testing Driver System...")
+        self.test_driver_system_complete()
+
         return True
 
     def print_summary(self):
