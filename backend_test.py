@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 class PyramydAPITester:
-    def __init__(self, base_url: str = "https://341d692e-ab8b-4198-a7ed-a5401a2e2097.preview.emergentagent.com"):
+    def __init__(self, base_url: str = "https://f85d82b5-c3d9-4b5c-ac39-13c8f9f753c8.preview.emergentagent.com"):
         self.base_url = base_url
         self.token = None
         self.user_id = None
