@@ -128,6 +128,20 @@ function App() {
     total: 0,
     item_count: 0
   });
+  
+  const [enhancedDeliveryForm, setEnhancedDeliveryForm] = useState({
+    order_id: '',
+    order_type: 'regular',
+    pickup_address: '',
+    delivery_addresses: [''],
+    total_quantity: '',
+    quantity_unit: 'kg',
+    product_details: '',
+    weight_kg: '',
+    special_instructions: '',
+    estimated_price: '',
+    preferred_driver_username: ''
+  });
   const [preOrderForm, setPreOrderForm] = useState({
     product_name: '',
     product_category: 'vegetables',
