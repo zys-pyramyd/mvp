@@ -1088,6 +1088,132 @@ function App() {
           </div>
         </div>
 
+        {/* Advanced Filters Toggle */}
+        <div className="mb-4 flex justify-between items-center">
+          <button
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+            </svg>
+            <span>Advanced Filters</span>
+            <svg className={`w-4 h-4 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {/* Create Pre-order Button - Only for sellers */}
+          {user && ['farmer', 'supplier', 'processor', 'agent'].includes(user.role) && (
+            <button
+              onClick={() => setShowCreatePreOrder(true)}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+            >
+              + Create Pre-order
+            </button>
+          )}
+        </div>
+
+        {/* Advanced Filters Panel */}
+        {showAdvancedFilters && (
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Location Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Lagos, Kano"
+                  value={filters.location}
+                  onChange={(e) => setFilters(prev => ({ ...prev, location: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Price Range */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Min Price (₦)</label>
+                <input
+                  type="number"
+                  placeholder="Min price"
+                  value={filters.min_price}
+                  onChange={(e) => setFilters(prev => ({ ...prev, min_price: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Max Price (₦)</label>
+                <input
+                  type="number"
+                  placeholder="Max price"
+                  value={filters.max_price}
+                  onChange={(e) => setFilters(prev => ({ ...prev, max_price: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Seller Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Seller Type</label>
+                <select
+                  value={filters.seller_type}
+                  onChange={(e) => setFilters(prev => ({ ...prev, seller_type: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                >
+                  <option value="">All Sellers</option>
+                  <option value="farmer">Farmers</option>
+                  <option value="supplier">Suppliers</option>
+                  <option value="processor">Processors</option>
+                  <option value="agent">Agents</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between">
+              {/* Pre-orders Only Toggle */}
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={filters.only_preorders}
+                  onChange={(e) => setFilters(prev => ({ ...prev, only_preorders: e.target.checked }))}
+                  className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Show only pre-orders</span>
+              </label>
+
+              {/* Filter Actions */}
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => {
+                    setFilters({
+                      category: '',
+                      location: '',
+                      min_price: '',
+                      max_price: '',
+                      only_preorders: false,
+                      seller_type: ''
+                    });
+                    setSelectedCategory('');
+                  }}
+                  className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Clear All
+                </button>
+                <button
+                  onClick={() => {
+                    fetchProducts();
+                    setShowAdvancedFilters(false);
+                  }}
+                  className="px-4 py-1 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Categories - Swipeable Cards */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-3">Shop by Category</h3>
