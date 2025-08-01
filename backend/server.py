@@ -2326,58 +2326,150 @@ async def update_driver_location(location_data: dict, current_user: dict = Depen
         print(f"Error updating driver location: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to update location")
 
-@app.get("/api/delivery/{request_id}/tracking")
-async def get_delivery_tracking(request_id: str, current_user: dict = Depends(get_current_user)):
-    """Get real-time delivery tracking information"""
+@app.post("/api/orders/create")
+async def create_order(order_data: OrderCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new order with enhanced quantity system and delivery options"""
     try:
-        # Find delivery request
-        delivery_request = db.delivery_requests.find_one({"id": request_id})
-        if not delivery_request:
-            raise HTTPException(status_code=404, detail="Delivery request not found")
+        # Find the product
+        product = db.products.find_one({"_id": order_data.product_id}) or db.preorders.find_one({"id": order_data.product_id})
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
         
-        # Get driver location if assigned
-        driver_location = None
-        driver_info = None
-        if delivery_request.get("assigned_driver_id"):
-            driver = db.drivers.find_one({"id": delivery_request["assigned_driver_id"]})
-            if driver:
-                driver_location = driver.get("current_location")
-                vehicle = db.vehicles.find_one({"driver_id": driver["id"]})
-                driver_info = {
-                    "name": driver["driver_name"],
-                    "username": driver["driver_username"],
-                    "rating": driver["rating"],
-                    "phone": driver["phone_number"],
-                    "vehicle": {
-                        "type": vehicle.get("vehicle_type") if vehicle else "unknown",
-                        "plate_number": vehicle.get("plate_number") if vehicle else "",
-                        "make_model": vehicle.get("make_model") if vehicle else "",
-                        "color": vehicle.get("color") if vehicle else ""
-                    }
-                }
+        # Calculate total amount
+        unit_price = product.get("price_per_unit", 0)
+        total_amount = order_data.quantity * unit_price
+        
+        # Create order
+        order = {
+            "id": str(uuid.uuid4()),
+            "order_id": f"ORD-{uuid.uuid4().hex[:8].upper()}",
+            "buyer_username": current_user["username"],
+            "seller_username": product.get("seller_username", ""),
+            "product_details": {
+                "product_id": order_data.product_id,
+                "name": product.get("product_name") or product.get("crop_type", ""),
+                "category": product.get("product_category") or product.get("category", ""),
+                "description": product.get("description", "")
+            },
+            "quantity": order_data.quantity,
+            "unit": order_data.unit,
+            "unit_specification": order_data.unit_specification,
+            "unit_price": unit_price,
+            "total_amount": total_amount,
+            "delivery_method": order_data.delivery_method,
+            "delivery_status": "pending" if order_data.delivery_method == "offline" else "",
+            "shipping_address": order_data.shipping_address,
+            "status": OrderStatus.PENDING,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        # Store order
+        db.orders.insert_one(order)
         
         return {
-            "delivery_request": {
-                "id": delivery_request["id"],
-                "status": delivery_request["status"],
-                "pickup_location": delivery_request["pickup_location"],
-                "delivery_locations": delivery_request["delivery_locations"],
-                "estimated_price": delivery_request["estimated_price"],
-                "negotiated_price": delivery_request.get("negotiated_price"),
-                "total_quantity": delivery_request["total_quantity"],
-                "quantity_unit": delivery_request["quantity_unit"],
-                "created_at": delivery_request["created_at"].isoformat(),
-                "updated_at": delivery_request["updated_at"].isoformat()
-            },
-            "driver_location": driver_location,
-            "driver_info": driver_info
+            "message": "Order created successfully",
+            "order_id": order["order_id"],
+            "total_amount": total_amount,
+            "delivery_method": order_data.delivery_method,
+            "quantity_display": f"{order_data.quantity} {order_data.unit}" + (f" ({order_data.unit_specification})" if order_data.unit_specification else "")
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting delivery tracking: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get tracking information")
+        print(f"Error creating order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create order")
+
+@app.put("/api/orders/{order_id}/status")
+async def update_order_status(order_id: str, status_update: OrderStatusUpdate, current_user: dict = Depends(get_current_user)):
+    """Update order status - for sellers managing offline deliveries"""
+    try:
+        # Find the order
+        order = db.orders.find_one({"order_id": order_id})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Check if user is the seller
+        if order["seller_username"] != current_user["username"]:
+            raise HTTPException(status_code=403, detail="Only the seller can update order status")
+        
+        # Update order
+        update_data = {
+            "status": status_update.status,
+            "updated_at": datetime.utcnow()
+        }
+        
+        if status_update.delivery_status:
+            update_data["delivery_status"] = status_update.delivery_status
+        
+        if status_update.status == OrderStatus.DELIVERED:
+            update_data["delivered_at"] = datetime.utcnow()
+        
+        db.orders.update_one(
+            {"order_id": order_id},
+            {"$set": update_data}
+        )
+        
+        return {
+            "message": f"Order status updated to {status_update.status}",
+            "order_id": order_id,
+            "status": status_update.status,
+            "delivery_status": status_update.delivery_status
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating order status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update order status")
+
+@app.get("/api/orders/my-orders")
+async def get_my_orders(order_type: str = "buyer", current_user: dict = Depends(get_current_user)):
+    """Get user's orders (as buyer or seller)"""
+    try:
+        if order_type == "buyer":
+            query = {"buyer_username": current_user["username"]}
+        elif order_type == "seller":
+            query = {"seller_username": current_user["username"]}
+        else:
+            raise HTTPException(status_code=400, detail="order_type must be 'buyer' or 'seller'")
+        
+        orders = list(db.orders.find(query).sort("created_at", -1))
+        
+        # Clean up response
+        for order in orders:
+            order.pop('_id', None)
+            if order.get("created_at"):
+                order["created_at"] = order["created_at"].isoformat()
+            if order.get("updated_at"):
+                order["updated_at"] = order["updated_at"].isoformat()
+            if order.get("delivered_at"):
+                order["delivered_at"] = order["delivered_at"].isoformat()
+        
+        return {"orders": orders}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get orders")
+
+@app.get("/api/orders/units")
+async def get_available_units():
+    """Get all available units with examples"""
+    return {
+        "units": [
+            {"value": "kg", "label": "Kilograms", "examples": ["50kg", "100kg"]},
+            {"value": "g", "label": "Grams", "examples": ["500g", "1000g"]},
+            {"value": "ton", "label": "Tons", "examples": ["1 ton", "5 tons"]},
+            {"value": "pieces", "label": "Pieces", "examples": ["10 pieces", "50 pieces"]},
+            {"value": "liters", "label": "Liters", "examples": ["5 liters", "20 liters"]},
+            {"value": "bags", "label": "Bags", "examples": ["100kg per bag", "50kg per bag"]},
+            {"value": "crates", "label": "Crates", "examples": ["24 bottles per crate", "50 pieces per crate"]},
+            {"value": "gallons", "label": "Gallons", "examples": ["5 litres per gallon", "4 litres per gallon"]}
+        ]
+    }
 
 if __name__ == "__main__":
     import uvicorn
