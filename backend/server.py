@@ -426,21 +426,6 @@ class CartItem(BaseModel):
     product_id: str
     quantity: int
 
-class Order(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    buyer_id: str
-    buyer_name: str
-    seller_id: str
-    seller_name: str
-    items: List[dict]  # product details with quantities
-    total_amount: float
-    status: OrderStatus = OrderStatus.PENDING
-    delivery_address: str
-    agent_id: Optional[str] = None  # If purchased by agent
-    agent_commission_type: Optional[str] = None  # "percentage" or "collect_after_delivery"
-    agent_commission_amount: Optional[float] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
 # Helper functions
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
