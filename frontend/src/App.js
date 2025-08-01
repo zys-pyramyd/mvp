@@ -766,7 +766,7 @@ function App() {
                 <div className="relative">
                   <button
                     onClick={() => setShowProfileMenu(!showProfileMenu)}
-                    className="nav-button icon-button flex items-center space-x-1 p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg"
+                    className="nav-button icon-button flex items-center space-x-1 p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
                     title="Profile Menu"
                   >
                     <ProfileIcon />
