@@ -421,7 +421,7 @@ class PyramydAPITester:
     def test_messaging_user_search(self):
         """Test user search API for messaging system"""
         # Test with minimum 2 characters
-        success, response = self.make_request('GET', '/api/users/search?username=te', use_auth=True)
+        success, response = self.make_request('GET', '/api/users/search-messaging?username=te', use_auth=True)
         
         if success and isinstance(response, list):
             self.log_test("Messaging User Search (2 chars)", True)
@@ -431,7 +431,7 @@ class PyramydAPITester:
             search_2_success = False
 
         # Test with less than 2 characters (should fail)
-        success, response = self.make_request('GET', '/api/users/search?username=t', use_auth=True, expected_status=400)
+        success, response = self.make_request('GET', '/api/users/search-messaging?username=t', use_auth=True, expected_status=400)
         
         if success:  # Should return 400 error
             self.log_test("Messaging User Search (1 char - validation)", True)
@@ -441,7 +441,7 @@ class PyramydAPITester:
             validation_success = False
 
         # Test case sensitivity and partial matches
-        success, response = self.make_request('GET', '/api/users/search?username=TEST', use_auth=True)
+        success, response = self.make_request('GET', '/api/users/search-messaging?username=TEST', use_auth=True)
         
         if success and isinstance(response, list):
             self.log_test("Messaging User Search (case insensitive)", True)
