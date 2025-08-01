@@ -821,21 +821,23 @@ async def accept_outsourced_order(order_id: str, current_user: dict = Depends(ge
     
     return {"message": "Order accepted successfully"}
 
-@app.get("/api/users/search")
-async def search_users(username: str, current_user: User = Depends(get_current_user)):
+@app.get("/api/users/search-messaging")
+async def search_users_messaging(username: str, current_user: dict = Depends(get_current_user)):
     """Search users by username for messaging"""
     if len(username) < 2:
         raise HTTPException(status_code=400, detail="Search term must be at least 2 characters")
     
-    # Search for users with username containing the search term
+    # Search for users with username containing the search term, excluding current user
     users = list(users_collection.find({
-        "username": {"$regex": username, "$options": "i"},
-        "username": {"$ne": current_user["username"]}  # Exclude current user
+        "$and": [
+            {"username": {"$regex": username, "$options": "i"}},
+            {"username": {"$ne": current_user["username"]}}
+        ]
     }, {"password": 0}))  # Exclude password field
     
-    # Convert ObjectId to string for JSON serialization
+    # Clean up response
     for user in users:
-        user["_id"] = str(user["_id"])
+        user.pop('_id', None)
     
     return users[:10]  # Limit to 10 results
 
