@@ -67,6 +67,35 @@ function App() {
   const [buyerSearch, setBuyerSearch] = useState('');
   const [foundBuyers, setFoundBuyers] = useState([]);
   
+  // Slide state
+  const [currentSlide, setCurrentSlide] = useState(0);
+  
+  // Slide content
+  const slideContent = [
+    {
+      title: currentPlatform === 'buy_from_farm' ? 'PyHub - Buy from Farm' : 'Pyramyd Home',
+      description: currentPlatform === 'buy_from_farm' 
+        ? 'Buy fresh produce directly from farms and get the best quality at source prices'
+        : 'Your comprehensive agricultural marketplace connecting farmers, suppliers, and buyers'
+    },
+    {
+      title: 'Fresh & Quality Produce',
+      description: 'Connect directly with verified farmers and suppliers for the freshest agricultural products'
+    },
+    {
+      title: 'Best Prices Guaranteed',
+      description: 'Get the best market prices with our transparent pricing system and bulk buying options'
+    },
+    {
+      title: 'Fast & Reliable Delivery',
+      description: 'Quick delivery with our network of verified drivers and logistics partners'
+    },
+    {
+      title: 'Agent Support System',
+      description: 'Join our agent network and earn commissions while helping farmers reach more customers'
+    }
+  ];
+  
   // Auth form states - Updated structure
   const [authForm, setAuthForm] = useState({
     first_name: '',
