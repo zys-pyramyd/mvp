@@ -1062,7 +1062,7 @@ function App() {
 
   const updateCartItemQuantity = (itemId, newQuantity) => {
     if (newQuantity <= 0) {
-      removeFromCart(itemId);
+      removeCartItem(itemId);
       return;
     }
     
@@ -1076,7 +1076,7 @@ function App() {
     calculateOrderSummary();
   };
 
-  const removeFromCart = (itemId) => {
+  const removeCartItem = (itemId) => {
     setCart(prevCart => prevCart.filter(item => item.id !== itemId));
     calculateOrderSummary();
   };
