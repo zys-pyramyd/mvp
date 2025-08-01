@@ -43,11 +43,17 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // New state for enhanced features
+  // Enhanced messaging state
   const [showMessaging, setShowMessaging] = useState(false);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [conversations, setConversations] = useState([]);
+  const [usernameSearch, setUsernameSearch] = useState('');
+  const [foundUsers, setFoundUsers] = useState([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
   const [showOrderTracking, setShowOrderTracking] = useState(false);
   const [orders, setOrders] = useState([]);
   
