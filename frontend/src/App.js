@@ -640,7 +640,9 @@ function App() {
     }
   };
 
-  // Group Buying Functions
+  // Pre-order Functions (replacing Group Buying Functions)
+  // TODO: Implement pre-order functionality
+  /*
   const searchBuyers = async (username) => {
     try {
       const token = localStorage.getItem('token');
@@ -747,6 +749,7 @@ function App() {
       console.error('Error creating group order:', error);
     }
   };
+  */
 
   const getUserPlatformAccess = (userRole) => {
     // All users can access both home page and buy from farm
