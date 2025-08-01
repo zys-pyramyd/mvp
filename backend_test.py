@@ -617,6 +617,513 @@ class PyramydAPITester:
         
         return overall_success
 
+    # ===== PRE-ORDER SYSTEM TESTS =====
+    
+    def test_preorder_creation(self):
+        """Test pre-order creation with validation"""
+        print("\n📦 Testing Pre-order Creation...")
+        
+        # Test 1: Valid pre-order creation
+        valid_preorder_data = {
+            "product_name": "Premium Organic Tomatoes",
+            "product_category": "vegetables",
+            "description": "Fresh organic tomatoes from our certified farm",
+            "total_stock": 1000,
+            "unit": "kg",
+            "price_per_unit": 800.0,
+            "partial_payment_percentage": 0.3,  # 30%
+            "location": "Kano, Nigeria",
+            "delivery_date": "2025-02-15T10:00:00Z",
+            "business_name": "Green Valley Farms",
+            "farm_name": "Green Valley Farm",
+            "images": ["https://example.com/tomato1.jpg"]
+        }
+
+        success, response = self.make_request('POST', '/api/preorders/create', valid_preorder_data, 200, use_auth=True)
+        
+        if success and 'preorder_id' in response:
+            self.log_test("Pre-order Creation (Valid)", True)
+            preorder_id = response['preorder_id']
+            valid_creation_success = True
+        else:
+            self.log_test("Pre-order Creation (Valid)", False, f"Valid pre-order creation failed: {response}")
+            preorder_id = None
+            valid_creation_success = False
+
+        # Test 2: Invalid partial payment percentage (below 10%)
+        invalid_percentage_low = valid_preorder_data.copy()
+        invalid_percentage_low["partial_payment_percentage"] = 0.05  # 5% - should fail
+
+        success, response = self.make_request('POST', '/api/preorders/create', invalid_percentage_low, 422, use_auth=True)
+        
+        if success:  # Should return 422 validation error
+            self.log_test("Pre-order Creation (Invalid % Low)", True)
+            validation_low_success = True
+        else:
+            self.log_test("Pre-order Creation (Invalid % Low)", False, f"Should return 422 error: {response}")
+            validation_low_success = False
+
+        # Test 3: Invalid partial payment percentage (above 90%)
+        invalid_percentage_high = valid_preorder_data.copy()
+        invalid_percentage_high["partial_payment_percentage"] = 0.95  # 95% - should fail
+
+        success, response = self.make_request('POST', '/api/preorders/create', invalid_percentage_high, 422, use_auth=True)
+        
+        if success:  # Should return 422 validation error
+            self.log_test("Pre-order Creation (Invalid % High)", True)
+            validation_high_success = True
+        else:
+            self.log_test("Pre-order Creation (Invalid % High)", False, f"Should return 422 error: {response}")
+            validation_high_success = False
+
+        # Test 4: Invalid stock (zero or negative)
+        invalid_stock = valid_preorder_data.copy()
+        invalid_stock["total_stock"] = 0  # Should fail
+
+        success, response = self.make_request('POST', '/api/preorders/create', invalid_stock, 422, use_auth=True)
+        
+        if success:  # Should return 422 validation error
+            self.log_test("Pre-order Creation (Invalid Stock)", True)
+            stock_validation_success = True
+        else:
+            self.log_test("Pre-order Creation (Invalid Stock)", False, f"Should return 422 error: {response}")
+            stock_validation_success = False
+
+        # Test 5: Invalid price (zero or negative)
+        invalid_price = valid_preorder_data.copy()
+        invalid_price["price_per_unit"] = -100.0  # Should fail
+
+        success, response = self.make_request('POST', '/api/preorders/create', invalid_price, 422, use_auth=True)
+        
+        if success:  # Should return 422 validation error
+            self.log_test("Pre-order Creation (Invalid Price)", True)
+            price_validation_success = True
+        else:
+            self.log_test("Pre-order Creation (Invalid Price)", False, f"Should return 422 error: {response}")
+            price_validation_success = False
+
+        # Test 6: Role authorization (only farmers, suppliers, processors, agents allowed)
+        # This test assumes current user has appropriate role from previous tests
+        
+        overall_success = (valid_creation_success and validation_low_success and 
+                          validation_high_success and stock_validation_success and 
+                          price_validation_success)
+        
+        return overall_success, preorder_id
+
+    def test_preorder_publishing(self):
+        """Test pre-order publishing functionality"""
+        print("\n📢 Testing Pre-order Publishing...")
+        
+        # First create a pre-order to publish
+        creation_success, preorder_id = self.test_preorder_creation()
+        
+        if not creation_success or not preorder_id:
+            self.log_test("Pre-order Publishing", False, "Cannot test publishing without valid pre-order")
+            return False
+
+        # Test 1: Valid publishing
+        success, response = self.make_request('POST', f'/api/preorders/{preorder_id}/publish', {}, 200, use_auth=True)
+        
+        if success and response.get('message'):
+            self.log_test("Pre-order Publishing (Valid)", True)
+            publish_success = True
+        else:
+            self.log_test("Pre-order Publishing (Valid)", False, f"Publishing failed: {response}")
+            publish_success = False
+
+        # Test 2: Try to publish already published pre-order (should fail)
+        success, response = self.make_request('POST', f'/api/preorders/{preorder_id}/publish', {}, 400, use_auth=True)
+        
+        if success:  # Should return 400 error
+            self.log_test("Pre-order Publishing (Already Published)", True)
+            already_published_success = True
+        else:
+            self.log_test("Pre-order Publishing (Already Published)", False, f"Should return 400 error: {response}")
+            already_published_success = False
+
+        # Test 3: Try to publish non-existent pre-order
+        fake_preorder_id = "non-existent-preorder-id"
+        success, response = self.make_request('POST', f'/api/preorders/{fake_preorder_id}/publish', {}, 404, use_auth=True)
+        
+        if success:  # Should return 404 error
+            self.log_test("Pre-order Publishing (Non-existent)", True)
+            not_found_success = True
+        else:
+            self.log_test("Pre-order Publishing (Non-existent)", False, f"Should return 404 error: {response}")
+            not_found_success = False
+
+        overall_success = publish_success and already_published_success and not_found_success
+        return overall_success, preorder_id if publish_success else None
+
+    def test_advanced_product_filtering(self):
+        """Test advanced product filtering including pre-orders"""
+        print("\n🔍 Testing Advanced Product Filtering...")
+        
+        # Test 1: Basic products filtering
+        success, response = self.make_request('GET', '/api/products')
+        
+        if success and 'products' in response and 'preorders' in response:
+            self.log_test("Advanced Product Filtering (Basic)", True)
+            basic_success = True
+        else:
+            self.log_test("Advanced Product Filtering (Basic)", False, f"Basic filtering failed: {response}")
+            basic_success = False
+
+        # Test 2: Category filtering
+        success, response = self.make_request('GET', '/api/products?category=vegetables')
+        
+        if success and isinstance(response, dict):
+            self.log_test("Advanced Product Filtering (Category)", True)
+            category_success = True
+        else:
+            self.log_test("Advanced Product Filtering (Category)", False, f"Category filtering failed: {response}")
+            category_success = False
+
+        # Test 3: Location filtering
+        success, response = self.make_request('GET', '/api/products?location=Lagos')
+        
+        if success and isinstance(response, dict):
+            self.log_test("Advanced Product Filtering (Location)", True)
+            location_success = True
+        else:
+            self.log_test("Advanced Product Filtering (Location)", False, f"Location filtering failed: {response}")
+            location_success = False
+
+        # Test 4: Price range filtering
+        success, response = self.make_request('GET', '/api/products?min_price=100&max_price=1000')
+        
+        if success and isinstance(response, dict):
+            self.log_test("Advanced Product Filtering (Price Range)", True)
+            price_success = True
+        else:
+            self.log_test("Advanced Product Filtering (Price Range)", False, f"Price filtering failed: {response}")
+            price_success = False
+
+        # Test 5: Search functionality
+        success, response = self.make_request('GET', '/api/products?search_term=tomato')
+        
+        if success and isinstance(response, dict):
+            self.log_test("Advanced Product Filtering (Search)", True)
+            search_success = True
+        else:
+            self.log_test("Advanced Product Filtering (Search)", False, f"Search filtering failed: {response}")
+            search_success = False
+
+        # Test 6: Only pre-orders filtering
+        success, response = self.make_request('GET', '/api/products?only_preorders=true')
+        
+        if success and isinstance(response, dict):
+            self.log_test("Advanced Product Filtering (Only Pre-orders)", True)
+            preorders_only_success = True
+        else:
+            self.log_test("Advanced Product Filtering (Only Pre-orders)", False, f"Pre-orders only filtering failed: {response}")
+            preorders_only_success = False
+
+        # Test 7: Pagination
+        success, response = self.make_request('GET', '/api/products?page=1&limit=5')
+        
+        if success and isinstance(response, dict) and 'page' in response and 'limit' in response:
+            self.log_test("Advanced Product Filtering (Pagination)", True)
+            pagination_success = True
+        else:
+            self.log_test("Advanced Product Filtering (Pagination)", False, f"Pagination failed: {response}")
+            pagination_success = False
+
+        overall_success = (basic_success and category_success and location_success and 
+                          price_success and search_success and preorders_only_success and 
+                          pagination_success)
+        
+        return overall_success
+
+    def test_preorder_listing(self):
+        """Test pre-order listing with filtering"""
+        print("\n📋 Testing Pre-order Listing...")
+        
+        # Test 1: Basic pre-order listing
+        success, response = self.make_request('GET', '/api/preorders')
+        
+        if success and 'preorders' in response and 'total_count' in response:
+            self.log_test("Pre-order Listing (Basic)", True)
+            basic_success = True
+        else:
+            self.log_test("Pre-order Listing (Basic)", False, f"Basic listing failed: {response}")
+            basic_success = False
+
+        # Test 2: Category filtering
+        success, response = self.make_request('GET', '/api/preorders?category=vegetables')
+        
+        if success and 'preorders' in response:
+            self.log_test("Pre-order Listing (Category Filter)", True)
+            category_success = True
+        else:
+            self.log_test("Pre-order Listing (Category Filter)", False, f"Category filtering failed: {response}")
+            category_success = False
+
+        # Test 3: Location filtering
+        success, response = self.make_request('GET', '/api/preorders?location=Kano')
+        
+        if success and 'preorders' in response:
+            self.log_test("Pre-order Listing (Location Filter)", True)
+            location_success = True
+        else:
+            self.log_test("Pre-order Listing (Location Filter)", False, f"Location filtering failed: {response}")
+            location_success = False
+
+        # Test 4: Price range filtering
+        success, response = self.make_request('GET', '/api/preorders?min_price=500&max_price=1000')
+        
+        if success and 'preorders' in response:
+            self.log_test("Pre-order Listing (Price Range)", True)
+            price_success = True
+        else:
+            self.log_test("Pre-order Listing (Price Range)", False, f"Price filtering failed: {response}")
+            price_success = False
+
+        # Test 5: Search functionality
+        success, response = self.make_request('GET', '/api/preorders?search_term=tomato')
+        
+        if success and 'preorders' in response:
+            self.log_test("Pre-order Listing (Search)", True)
+            search_success = True
+        else:
+            self.log_test("Pre-order Listing (Search)", False, f"Search failed: {response}")
+            search_success = False
+
+        # Test 6: Seller type filtering
+        success, response = self.make_request('GET', '/api/preorders?seller_type=farmer')
+        
+        if success and 'preorders' in response:
+            self.log_test("Pre-order Listing (Seller Type)", True)
+            seller_type_success = True
+        else:
+            self.log_test("Pre-order Listing (Seller Type)", False, f"Seller type filtering failed: {response}")
+            seller_type_success = False
+
+        # Test 7: Pagination
+        success, response = self.make_request('GET', '/api/preorders?page=1&limit=10')
+        
+        if success and 'page' in response and 'limit' in response and 'total_pages' in response:
+            self.log_test("Pre-order Listing (Pagination)", True)
+            pagination_success = True
+        else:
+            self.log_test("Pre-order Listing (Pagination)", False, f"Pagination failed: {response}")
+            pagination_success = False
+
+        overall_success = (basic_success and category_success and location_success and 
+                          price_success and search_success and seller_type_success and 
+                          pagination_success)
+        
+        return overall_success
+
+    def test_preorder_details(self):
+        """Test getting specific pre-order details"""
+        print("\n📄 Testing Pre-order Details...")
+        
+        # First create and publish a pre-order
+        publish_success, preorder_id = self.test_preorder_publishing()
+        
+        if not publish_success or not preorder_id:
+            self.log_test("Pre-order Details", False, "Cannot test details without published pre-order")
+            return False
+
+        # Test 1: Valid pre-order details
+        success, response = self.make_request('GET', f'/api/preorders/{preorder_id}')
+        
+        if success and response.get('id') == preorder_id:
+            # Check required fields
+            required_fields = ['id', 'seller_username', 'product_name', 'price_per_unit', 
+                             'total_stock', 'available_stock', 'status', 'delivery_date']
+            if all(field in response for field in required_fields):
+                self.log_test("Pre-order Details (Valid)", True)
+                valid_success = True
+            else:
+                self.log_test("Pre-order Details (Valid)", False, f"Missing required fields: {response}")
+                valid_success = False
+        else:
+            self.log_test("Pre-order Details (Valid)", False, f"Details retrieval failed: {response}")
+            valid_success = False
+
+        # Test 2: Non-existent pre-order
+        fake_preorder_id = "non-existent-preorder-id"
+        success, response = self.make_request('GET', f'/api/preorders/{fake_preorder_id}', expected_status=404)
+        
+        if success:  # Should return 404 error
+            self.log_test("Pre-order Details (Non-existent)", True)
+            not_found_success = True
+        else:
+            self.log_test("Pre-order Details (Non-existent)", False, f"Should return 404 error: {response}")
+            not_found_success = False
+
+        overall_success = valid_success and not_found_success
+        return overall_success, preorder_id if valid_success else None
+
+    def test_place_preorder(self):
+        """Test placing orders on pre-orders"""
+        print("\n🛒 Testing Place Pre-order...")
+        
+        # First get a valid pre-order
+        details_success, preorder_id = self.test_preorder_details()
+        
+        if not details_success or not preorder_id:
+            self.log_test("Place Pre-order", False, "Cannot test ordering without valid pre-order")
+            return False
+
+        # Test 1: Valid pre-order placement
+        valid_order_data = {
+            "quantity": 50
+        }
+
+        success, response = self.make_request('POST', f'/api/preorders/{preorder_id}/order', valid_order_data, 200, use_auth=True)
+        
+        if success and 'order_id' in response and 'total_amount' in response and 'partial_amount' in response:
+            self.log_test("Place Pre-order (Valid)", True)
+            valid_order_success = True
+        else:
+            self.log_test("Place Pre-order (Valid)", False, f"Order placement failed: {response}")
+            valid_order_success = False
+
+        # Test 2: Invalid quantity (zero or negative)
+        invalid_quantity_data = {
+            "quantity": 0
+        }
+
+        success, response = self.make_request('POST', f'/api/preorders/{preorder_id}/order', invalid_quantity_data, 400, use_auth=True)
+        
+        if success:  # Should return 400 error
+            self.log_test("Place Pre-order (Invalid Quantity)", True)
+            invalid_quantity_success = True
+        else:
+            self.log_test("Place Pre-order (Invalid Quantity)", False, f"Should return 400 error: {response}")
+            invalid_quantity_success = False
+
+        # Test 3: Quantity exceeding available stock
+        excessive_quantity_data = {
+            "quantity": 999999  # Assuming this exceeds available stock
+        }
+
+        success, response = self.make_request('POST', f'/api/preorders/{preorder_id}/order', excessive_quantity_data, 400, use_auth=True)
+        
+        if success:  # Should return 400 error
+            self.log_test("Place Pre-order (Excessive Quantity)", True)
+            excessive_quantity_success = True
+        else:
+            self.log_test("Place Pre-order (Excessive Quantity)", False, f"Should return 400 error: {response}")
+            excessive_quantity_success = False
+
+        # Test 4: Non-existent pre-order
+        fake_preorder_id = "non-existent-preorder-id"
+        success, response = self.make_request('POST', f'/api/preorders/{fake_preorder_id}/order', valid_order_data, 404, use_auth=True)
+        
+        if success:  # Should return 404 error
+            self.log_test("Place Pre-order (Non-existent)", True)
+            not_found_success = True
+        else:
+            self.log_test("Place Pre-order (Non-existent)", False, f"Should return 404 error: {response}")
+            not_found_success = False
+
+        overall_success = (valid_order_success and invalid_quantity_success and 
+                          excessive_quantity_success and not_found_success)
+        
+        return overall_success
+
+    def test_user_preorders(self):
+        """Test getting user's created pre-orders"""
+        print("\n👤 Testing User Pre-orders...")
+        
+        success, response = self.make_request('GET', '/api/my-preorders', use_auth=True)
+        
+        if success and isinstance(response, list):
+            # Check structure if any pre-orders exist
+            if len(response) > 0:
+                preorder = response[0]
+                required_fields = ['id', 'seller_username', 'product_name', 'status', 'created_at']
+                if all(field in preorder for field in required_fields):
+                    self.log_test("User Pre-orders", True)
+                    return True
+                else:
+                    self.log_test("User Pre-orders", False, f"Pre-order missing required fields: {preorder}")
+                    return False
+            else:
+                self.log_test("User Pre-orders", True, "No pre-orders found (expected for some users)")
+                return True
+        else:
+            self.log_test("User Pre-orders", False, f"User pre-orders retrieval failed: {response}")
+            return False
+
+    def test_user_preorder_orders(self):
+        """Test getting user's pre-order purchases"""
+        print("\n🛍️ Testing User Pre-order Orders...")
+        
+        success, response = self.make_request('GET', '/api/my-preorder-orders', use_auth=True)
+        
+        if success and isinstance(response, list):
+            # Check structure if any orders exist
+            if len(response) > 0:
+                order = response[0]
+                required_fields = ['id', 'preorder_id', 'buyer_username', 'quantity', 'total_amount', 'status']
+                if all(field in order for field in required_fields):
+                    self.log_test("User Pre-order Orders", True)
+                    return True
+                else:
+                    self.log_test("User Pre-order Orders", False, f"Order missing required fields: {order}")
+                    return False
+            else:
+                self.log_test("User Pre-order Orders", True, "No pre-order orders found (expected for some users)")
+                return True
+        else:
+            self.log_test("User Pre-order Orders", False, f"User pre-order orders retrieval failed: {response}")
+            return False
+
+    def test_preorder_system_complete(self):
+        """Test complete pre-order system workflow"""
+        print("\n🔄 Testing Complete Pre-order System Workflow...")
+        
+        # Step 1: Create pre-order
+        creation_success, preorder_id = self.test_preorder_creation()
+        
+        # Step 2: Publish pre-order
+        if creation_success and preorder_id:
+            publish_success, published_preorder_id = self.test_preorder_publishing()
+        else:
+            publish_success = False
+            published_preorder_id = None
+        
+        # Step 3: Test advanced filtering
+        filtering_success = self.test_advanced_product_filtering()
+        
+        # Step 4: Test pre-order listing
+        listing_success = self.test_preorder_listing()
+        
+        # Step 5: Test pre-order details
+        if published_preorder_id:
+            details_success, _ = self.test_preorder_details()
+        else:
+            details_success = False
+        
+        # Step 6: Place pre-order
+        if published_preorder_id:
+            place_order_success = self.test_place_preorder()
+        else:
+            place_order_success = False
+        
+        # Step 7: Test user pre-orders
+        user_preorders_success = self.test_user_preorders()
+        
+        # Step 8: Test user pre-order orders
+        user_orders_success = self.test_user_preorder_orders()
+        
+        overall_success = (creation_success and publish_success and filtering_success and 
+                          listing_success and details_success and place_order_success and 
+                          user_preorders_success and user_orders_success)
+        
+        if overall_success:
+            self.log_test("Complete Pre-order System", True)
+        else:
+            self.log_test("Complete Pre-order System", False, "One or more pre-order components failed")
+        
+        return overall_success
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting Pyramyd API Tests...")
