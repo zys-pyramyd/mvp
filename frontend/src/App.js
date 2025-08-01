@@ -590,6 +590,20 @@ function App() {
     setUsernameSearch('');
   };
 
+  const sendMessage = () => {
+    if (newMessage.trim()) {
+      const message = {
+        id: Date.now(),
+        text: newMessage,
+        sender: user?.username || 'You',
+        timestamp: new Date().toLocaleTimeString(),
+        isOwn: true
+      };
+      setMessages([...messages, message]);
+      setNewMessage('');
+    }
+  };
+
   const fetchOrders = async () => {
     if (!user) return;
     
