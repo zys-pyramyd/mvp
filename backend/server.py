@@ -885,7 +885,7 @@ async def send_message(
         raise HTTPException(status_code=500, detail="Failed to send message")
 
 @app.get("/api/messages/conversations")
-async def get_conversations(current_user: User = Depends(get_current_user)):
+async def get_conversations(current_user: dict = Depends(get_current_user)):
     """Get user's conversations"""
     try:
         # Get all messages where user is sender or recipient
@@ -906,6 +906,14 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
                 other_user_data = users_collection.find_one({"username": other_user}, {"password": 0})
                 
                 if other_user_data:
+                    # Clean up other_user_data
+                    other_user_data.pop('_id', None)
+                    
+                    # Clean up message for response
+                    message_copy = message.copy()
+                    message_copy.pop('_id', None)
+                    message_copy["timestamp"] = message_copy["timestamp"].isoformat()
+                    
                     conversations[conv_id] = {
                         "id": conv_id,
                         "participants": [current_user["username"], other_user],
@@ -914,8 +922,8 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
                             "first_name": other_user_data.get("first_name", ""),
                             "last_name": other_user_data.get("last_name", "")
                         },
-                        "last_message": message,
-                        "timestamp": message["timestamp"]
+                        "last_message": message_copy,
+                        "timestamp": message["timestamp"].isoformat()
                     }
         
         return list(conversations.values())
