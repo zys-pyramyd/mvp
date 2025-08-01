@@ -646,6 +646,30 @@ function App() {
   const cartTotal = cart.reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
+  // CTA Handlers for slides
+  const handleSlideAction = (action) => {
+    if (action === 'agent_register') {
+      setSelectedUserPath('partner');
+      setPartnerType('agent');
+      setRegistrationStep('basic');
+      setShowLogin(false);
+      setShowRegister(true);
+    } else if (action === 'supplier_register') {
+      setSelectedUserPath('partner');
+      setPartnerType('business');
+      setBusinessCategory('supplier');
+      setRegistrationStep('basic');
+      setShowLogin(false);
+      setShowRegister(true);
+    } else if (action === 'business_register') {
+      setSelectedUserPath('buyer');
+      setSelectedBuyerType('hotel'); // Default to hotel, user can change
+      setRegistrationStep('basic');
+      setShowLogin(false);
+      setShowRegister(true);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
