@@ -935,7 +935,7 @@ async def get_conversations(current_user: dict = Depends(get_current_user)):
 @app.get("/api/messages/{conversation_id}")
 async def get_messages(
     conversation_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """Get messages for a specific conversation"""
     try:
@@ -948,9 +948,9 @@ async def get_messages(
             ]
         }).sort("timestamp", 1))
         
-        # Convert ObjectId to string and format for frontend
+        # Clean up messages for response
         for message in messages:
-            message["_id"] = str(message["_id"])
+            message.pop('_id', None)
             message["timestamp"] = message["timestamp"].isoformat()
         
         # Mark messages as read
