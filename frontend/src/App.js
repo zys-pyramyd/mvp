@@ -652,21 +652,21 @@ function App() {
       setSelectedUserPath('partner');
       setPartnerType('agent');
       setRegistrationStep('basic');
-      setShowLogin(false);
-      setShowRegister(true);
+      setAuthMode('register');
+      setShowAuthModal(true);
     } else if (action === 'supplier_register') {
       setSelectedUserPath('partner');
       setPartnerType('business');
       setBusinessCategory('supplier');
       setRegistrationStep('basic');
-      setShowLogin(false);
-      setShowRegister(true);
+      setAuthMode('register');
+      setShowAuthModal(true);
     } else if (action === 'business_register') {
       setSelectedUserPath('buyer');
       setSelectedBuyerType('hotel'); // Default to hotel, user can change
       setRegistrationStep('basic');
-      setShowLogin(false);
-      setShowRegister(true);
+      setAuthMode('register');
+      setShowAuthModal(true);
     }
   };
 
