@@ -1895,7 +1895,8 @@ function App() {
 
       {/* Group Buying Modal - Commented out for pre-order functionality */}
       {/* TODO: Replace with pre-order modal */}
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-96 overflow-hidden">
+
+      {/* Messaging Modal */}
             <div className="p-4 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <h2 className="text-lg font-semibold">Group Buying - Agent Dashboard</h2>
