@@ -2804,6 +2804,371 @@ function App() {
         </div>
       )}
 
+      {/* Comprehensive Checkout Page */}
+      {showCheckout && (
+        <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-semibold text-gray-900">🛒 Checkout</h2>
+                <button
+                  onClick={() => setShowCheckout(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+              
+              {/* Progress Steps */}
+              <div className="mt-4 flex items-center space-x-4">
+                <div className={`flex items-center ${checkoutStep === 'review' ? 'text-emerald-600' : 'text-gray-400'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                    checkoutStep === 'review' ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'
+                  }`}>1</div>
+                  <span className="ml-2 text-sm font-medium">Review Order</span>
+                </div>
+                <div className="h-px bg-gray-200 flex-1"></div>
+                <div className={`flex items-center ${checkoutStep === 'address' ? 'text-emerald-600' : 'text-gray-400'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                    checkoutStep === 'address' ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'
+                  }`}>2</div>
+                  <span className="ml-2 text-sm font-medium">Shipping Address</span>
+                </div>
+                <div className="h-px bg-gray-200 flex-1"></div>
+                <div className={`flex items-center ${checkoutStep === 'payment' ? 'text-emerald-600' : 'text-gray-400'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                    checkoutStep === 'payment' ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'
+                  }`}>3</div>
+                  <span className="ml-2 text-sm font-medium">Payment</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Main Content */}
+                <div className="lg:col-span-2">
+                  {/* Step 1: Review Order */}
+                  {checkoutStep === 'review' && (
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-semibold text-gray-900">📦 Review Your Order</h3>
+                      
+                      {cart.length === 0 ? (
+                        <div className="text-center py-8">
+                          <div className="text-gray-500">Your cart is empty</div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {cart.map((item) => (
+                            <div key={item.id} className="bg-gray-50 rounded-lg p-4">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-gray-900">
+                                    {item.product.product_name || item.product.crop_type}
+                                  </h4>
+                                  <p className="text-sm text-gray-600 mb-2">
+                                    {item.product.description || 'Fresh organic produce'}
+                                  </p>
+                                  
+                                  <div className="flex items-center space-x-4 text-sm">
+                                    <span className="text-gray-700">
+                                      <strong>Quantity:</strong> {item.quantity} {item.unit}
+                                      {item.unit_specification && ` (${item.unit_specification})`}
+                                    </span>
+                                    <span className="text-gray-700">
+                                      <strong>Price:</strong> ₦{item.product.price_per_unit}/{item.unit}
+                                    </span>
+                                    <span className={`px-2 py-1 rounded-full text-xs ${
+                                      item.delivery_method === 'platform' 
+                                        ? 'bg-blue-100 text-blue-800' 
+                                        : 'bg-green-100 text-green-800'
+                                    }`}>
+                                      {item.delivery_method === 'platform' ? '🚛 Platform Driver' : '🚚 Offline Delivery'}
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="mt-2 text-sm text-gray-600">
+                                    <strong>Seller:</strong> {item.product.seller_username}
+                                    {item.product.business_name && ` (${item.product.business_name})`}
+                                  </div>
+                                </div>
+                                
+                                <div className="text-right">
+                                  <div className="text-lg font-semibold text-gray-900">
+                                    ₦{(item.product.price_per_unit * item.quantity).toLocaleString()}
+                                  </div>
+                                  <button
+                                    onClick={() => removeCartItem(item.id)}
+                                    className="text-red-600 hover:text-red-800 text-sm mt-1"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-end">
+                        <button
+                          onClick={() => setCheckoutStep('address')}
+                          className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
+                        >
+                          Continue to Shipping
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Step 2: Shipping Address */}
+                  {checkoutStep === 'address' && (
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-semibold text-gray-900">📍 Shipping Address</h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                          <input
+                            type="text"
+                            value={shippingAddress.full_name}
+                            onChange={(e) => setShippingAddress(prev => ({...prev, full_name: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                            placeholder="Enter your full name"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                          <input
+                            type="tel"
+                            value={shippingAddress.phone}
+                            onChange={(e) => setShippingAddress(prev => ({...prev, phone: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                            placeholder="+234 xxx xxx xxxx"
+                          />
+                        </div>
+                        
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                          <input
+                            type="email"
+                            value={shippingAddress.email}
+                            onChange={(e) => setShippingAddress(prev => ({...prev, email: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                            placeholder="your.email@example.com"
+                          />
+                        </div>
+                        
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1 *</label>
+                          <input
+                            type="text"
+                            value={shippingAddress.address_line_1}
+                            onChange={(e) => setShippingAddress(prev => ({...prev, address_line_1: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                            placeholder="Street address, P.O. box, company name"
+                          />
+                        </div>
+                        
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
+                          <input
+                            type="text"
+                            value={shippingAddress.address_line_2}
+                            onChange={(e) => setShippingAddress(prev => ({...prev, address_line_2: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                            placeholder="Apartment, suite, unit, building, floor, etc."
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                          <input
+                            type="text"
+                            value={shippingAddress.city}
+                            onChange={(e) => setShippingAddress(prev => ({...prev, city: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                            placeholder="Lagos"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
+                          <input
+                            type="text"
+                            value={shippingAddress.state}
+                            onChange={(e) => setShippingAddress(prev => ({...prev, state: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                            placeholder="Lagos State"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                          <input
+                            type="text"
+                            value={shippingAddress.postal_code}
+                            onChange={(e) => setShippingAddress(prev => ({...prev, postal_code: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                            placeholder="100001"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                          <select
+                            value={shippingAddress.country}
+                            onChange={(e) => setShippingAddress(prev => ({...prev, country: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                          >
+                            <option value="Nigeria">Nigeria</option>
+                            <option value="Ghana">Ghana</option>
+                            <option value="Kenya">Kenya</option>
+                          </select>
+                        </div>
+                        
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Instructions</label>
+                          <textarea
+                            value={shippingAddress.delivery_instructions}
+                            onChange={(e) => setShippingAddress(prev => ({...prev, delivery_instructions: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                            rows="3"
+                            placeholder="Any special delivery instructions..."
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <button
+                          onClick={() => setCheckoutStep('review')}
+                          className="px-6 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+                        >
+                          Back to Review
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (validateAddress()) {
+                              setCheckoutStep('payment');
+                            }
+                          }}
+                          className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
+                        >
+                          Continue to Payment
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Step 3: Payment */}
+                  {checkoutStep === 'payment' && (
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-semibold text-gray-900">💳 Payment</h3>
+                      
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-center">
+                          <svg className="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <div>
+                            <div className="font-medium text-blue-900">Payment Integration Ready</div>
+                            <div className="text-sm text-blue-700">Paystack payment gateway will be integrated here</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className="font-medium text-gray-900">Payment Methods Available:</div>
+                        <div className="space-y-2">
+                          <div className="flex items-center p-3 border border-gray-200 rounded-lg">
+                            <input type="radio" name="payment_method" defaultChecked className="w-4 h-4 text-emerald-600" />
+                            <div className="ml-3">
+                              <div className="font-medium">💳 Card Payment</div>
+                              <div className="text-sm text-gray-600">Visa, Mastercard, Verve</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center p-3 border border-gray-200 rounded-lg">
+                            <input type="radio" name="payment_method" className="w-4 h-4 text-emerald-600" />
+                            <div className="ml-3">
+                              <div className="font-medium">🏦 Bank Transfer</div>
+                              <div className="text-sm text-gray-600">Direct bank transfer</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center p-3 border border-gray-200 rounded-lg">
+                            <input type="radio" name="payment_method" className="w-4 h-4 text-emerald-600" />
+                            <div className="ml-3">
+                              <div className="font-medium">📱 Mobile Money</div>
+                              <div className="text-sm text-gray-600">MTN, Airtel, etc.</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <button
+                          onClick={() => setCheckoutStep('address')}
+                          className="px-6 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+                        >
+                          Back to Address
+                        </button>
+                        <button
+                          onClick={createOrder}
+                          className="px-8 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
+                        >
+                          Place Order (₦{orderSummary.total?.toLocaleString() || 0})
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Order Summary Sidebar */}
+                <div className="lg:col-span-1">
+                  <div className="bg-gray-50 rounded-lg p-6 sticky top-0">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Order Summary</h3>
+                    
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Subtotal ({orderSummary.item_count} items)</span>
+                        <span className="font-medium">₦{orderSummary.subtotal?.toLocaleString()}</span>
+                      </div>
+                      
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Delivery Fees</span>
+                        <span className="font-medium">₦{orderSummary.delivery_total?.toLocaleString()}</span>
+                      </div>
+                      
+                      <div className="border-t border-gray-200 pt-3">
+                        <div className="flex justify-between">
+                          <span className="text-lg font-semibold text-gray-900">Total</span>
+                          <span className="text-lg font-semibold text-emerald-600">₦{orderSummary.total?.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Shipping Address Summary */}
+                    {checkoutStep !== 'review' && shippingAddress.full_name && (
+                      <div className="mt-6 pt-6 border-t border-gray-200">
+                        <h4 className="font-medium text-gray-900 mb-2">📍 Shipping To:</h4>
+                        <div className="text-sm text-gray-600">
+                          <div>{shippingAddress.full_name}</div>
+                          <div>{shippingAddress.address_line_1}</div>
+                          {shippingAddress.address_line_2 && <div>{shippingAddress.address_line_2}</div>}
+                          <div>{shippingAddress.city}, {shippingAddress.state}</div>
+                          <div>{shippingAddress.country}</div>
+                          <div className="mt-1 font-medium">{shippingAddress.phone}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Enhanced Delivery Request Modal */}
       {showCreateDeliveryRequest && (
         <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
