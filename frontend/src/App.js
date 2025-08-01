@@ -917,6 +917,25 @@ function App() {
     }));
   };
 
+  const fetchMyDrivers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/logistics/my-drivers`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setMyDrivers(data.drivers || []);
+        setMyVehicles(data.vehicles || []);
+      }
+    } catch (error) {
+      console.error('Error fetching drivers:', error);
+    }
+  };
+
   const startConversation = (targetUser) => {
     const conversation = {
       id: `conv_${user.username}_${targetUser.username}`,
