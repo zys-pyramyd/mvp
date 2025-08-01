@@ -2248,6 +2248,16 @@ function App() {
                       defaultValue="1"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
                       id="preorder-quantity"
+                      onChange={(e) => {
+                        const quantity = parseInt(e.target.value) || 1;
+                        const total = quantity * selectedPreOrder.price_per_unit;
+                        const partial = Math.round(total * selectedPreOrder.partial_payment_percentage);
+                        
+                        document.getElementById('summary-quantity').textContent = `${quantity} ${selectedPreOrder.unit}`;
+                        document.getElementById('summary-total').textContent = `₦${total}`;
+                        document.getElementById('summary-partial').textContent = `₦${partial}`;
+                        document.getElementById('summary-remaining').textContent = `₦${total - partial}`;
+                      }}
                     />
                   </div>
 
