@@ -311,11 +311,32 @@ function App() {
       const platform = currentPlatform === 'buy_from_farm' ? 'buy_from_farm' : 'home';
       let url = `${process.env.REACT_APP_BACKEND_URL}/api/products?platform=${platform}`;
       
-      if (selectedCategory) {
-        url += `&category=${selectedCategory}`;
+      // Add category filter
+      const categoryFilter = selectedCategory || filters.category;
+      if (categoryFilter) {
+        url += `&category=${categoryFilter}`;
       }
+      
+      // Add search term
       if (searchTerm) {
         url += `&search_term=${searchTerm}`;
+      }
+      
+      // Add advanced filters
+      if (filters.location) {
+        url += `&location=${filters.location}`;
+      }
+      if (filters.min_price) {
+        url += `&min_price=${filters.min_price}`;
+      }
+      if (filters.max_price) {
+        url += `&max_price=${filters.max_price}`;
+      }
+      if (filters.only_preorders) {
+        url += `&only_preorders=true`;
+      }
+      if (filters.seller_type) {
+        url += `&seller_type=${filters.seller_type}`;
       }
       
       const response = await fetch(url);
