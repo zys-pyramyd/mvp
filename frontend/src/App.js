@@ -748,10 +748,17 @@ function App() {
     }
   };
 
-  const fetchMyDrivers = async () => {
+  // Enhanced driver system functions
+  const searchDrivers = async (pickupLocation) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/logistics/my-drivers`, {
+      let url = `${process.env.REACT_APP_BACKEND_URL}/api/drivers/search?min_rating=3.0&radius_km=50`;
+      
+      if (pickupLocation && pickupLocation.lat && pickupLocation.lng) {
+        url += `&pickup_lat=${pickupLocation.lat}&pickup_lng=${pickupLocation.lng}`;
+      }
+      
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -759,12 +766,155 @@ function App() {
       
       if (response.ok) {
         const data = await response.json();
-        setMyDrivers(data.drivers || []);
-        setMyVehicles(data.vehicles || []);
+        setSearchResults(data.drivers || []);
       }
     } catch (error) {
-      console.error('Error fetching drivers:', error);
+      console.error('Error searching drivers:', error);
     }
+  };
+
+  const createEnhancedDeliveryRequest = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/delivery/request-enhanced`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...enhancedDeliveryForm,
+          total_quantity: parseFloat(enhancedDeliveryForm.total_quantity),
+          weight_kg: enhancedDeliveryForm.weight_kg ? parseFloat(enhancedDeliveryForm.weight_kg) : null,
+          estimated_price: parseFloat(enhancedDeliveryForm.estimated_price),
+          pickup_coordinates: pickupCoordinates,
+          delivery_coordinates: deliveryCoordinates
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`Delivery request created successfully! 
+        Request ID: ${result.request_id}
+        Total destinations: ${result.total_destinations}
+        Quantity: ${result.total_quantity} ${result.quantity_unit}
+        Estimated price: ₦${result.estimated_price}
+        OTP: ${result.delivery_otp}`);
+        
+        setShowCreateDeliveryRequest(false);
+        // Reset form
+        setEnhancedDeliveryForm({
+          order_id: '',
+          order_type: 'regular',
+          pickup_address: '',
+          delivery_addresses: [''],
+          total_quantity: '',
+          quantity_unit: 'kg',
+          product_details: '',
+          weight_kg: '',
+          special_instructions: '',
+          estimated_price: '',
+          preferred_driver_username: ''
+        });
+        setMultipleDestinations(['']);
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.detail || 'Failed to create delivery request'}`);
+      }
+    } catch (error) {
+      console.error('Error creating delivery request:', error);
+      alert('Error creating delivery request. Please try again.');
+    }
+  };
+
+  const sendDeliveryMessage = async (requestId, content, type = 'text') => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/delivery/${requestId}/message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          content,
+          type,
+          location_data: type === 'location' ? pickupCoordinates : null
+        })
+      });
+
+      if (response.ok) {
+        fetchDeliveryMessages(requestId); // Refresh messages
+        setNewDeliveryMessage('');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
+  const fetchDeliveryMessages = async (requestId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/delivery/${requestId}/messages`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setDeliveryMessages(data.messages || []);
+        setTrackingData(data.delivery_request);
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  };
+
+  const updateDriverLocation = async (lat, lng, address) => {
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/drivers/location`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ lat, lng, address })
+      });
+    } catch (error) {
+      console.error('Error updating location:', error);
+    }
+  };
+
+  const addDeliveryDestination = () => {
+    setMultipleDestinations([...multipleDestinations, '']);
+    setEnhancedDeliveryForm(prev => ({
+      ...prev,
+      delivery_addresses: [...prev.delivery_addresses, '']
+    }));
+  };
+
+  const removeDeliveryDestination = (index) => {
+    const newDestinations = multipleDestinations.filter((_, i) => i !== index);
+    setMultipleDestinations(newDestinations);
+    setEnhancedDeliveryForm(prev => ({
+      ...prev,
+      delivery_addresses: prev.delivery_addresses.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateDeliveryDestination = (index, value) => {
+    const newDestinations = [...multipleDestinations];
+    newDestinations[index] = value;
+    setMultipleDestinations(newDestinations);
+    
+    const newAddresses = [...enhancedDeliveryForm.delivery_addresses];
+    newAddresses[index] = value;
+    setEnhancedDeliveryForm(prev => ({
+      ...prev,
+      delivery_addresses: newAddresses
+    }));
   };
 
   const startConversation = (targetUser) => {
