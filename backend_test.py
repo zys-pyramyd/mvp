@@ -462,9 +462,9 @@ class PyramydAPITester:
                 print("❌ Login failed - stopping tests")
                 return False
 
-        # Test 5: Role Selection
-        if not self.test_role_selection():
-            print("❌ Role selection failed - continuing with other tests")
+        # Test 5: Role Selection (skip - using complete registration instead)
+        # if not self.test_role_selection():
+        #     print("❌ Role selection failed - continuing with other tests")
 
         # Test 6: User Profile
         self.test_user_profile()
