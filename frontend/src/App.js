@@ -591,16 +591,20 @@ function App() {
   };
 
   const sendMessage = () => {
-    if (newMessage.trim()) {
+    if (newMessage.trim() && selectedConversation) {
       const message = {
         id: Date.now(),
-        text: newMessage,
-        sender: user?.username || 'You',
-        timestamp: new Date().toLocaleTimeString(),
-        isOwn: true
+        type: 'text',
+        content: newMessage,
+        sender: user.username,
+        timestamp: new Date().toISOString(),
+        conversation_id: selectedConversation.id
       };
-      setMessages([...messages, message]);
+      setMessages(prev => [...prev, message]);
       setNewMessage('');
+      
+      // Here you would send to backend
+      // sendMessageToBackend(message);
     }
   };
 
