@@ -291,6 +291,18 @@ backend:
         agent: "testing"
         comment: "✅ USER PRE-ORDER ORDERS API WORKING: /api/my-preorder-orders endpoint fully functional: 1) Successfully retrieves current user's pre-order purchases 2) Returns proper structure with required fields (id, preorder_id, buyer_username, quantity, total_amount, status) 3) Sorted by creation date (newest first) 4) Clean JSON serialization with proper datetime formatting. User pre-order purchase history working correctly."
 
+  - task: "Complete Pre-order System End-to-End Testing"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ COMPLETE PRE-ORDER SYSTEM E2E TESTING SUCCESSFUL: Comprehensive end-to-end testing achieved 94.7% success rate (18/19 tests passed). Successfully tested complete flow: 1) Created test agent user with proper role authorization 2) Created pre-order with all required fields and validation 3) Published pre-order successfully 4) Tested advanced filtering API with 7 different parameter combinations 5) Verified products API returns both regular products and pre-orders (13 products, 7 pre-orders) 6) Placed order on pre-order with proper amount calculations (₦21,250 total, ₦8,500 partial payment) 7) Verified stock management reduces available stock correctly (500→475) 8) Confirmed user pre-orders and orders APIs working. Complete pre-order lifecycle from creation to ordering is fully functional and ready for production use."
+
 frontend:
   - task: "JSX Syntax Error Fix"
     implemented: true
