@@ -65,9 +65,53 @@ class UserRole(str, Enum):
 class OrderStatus(str, Enum):
     PENDING = "pending"
     CONFIRMED = "confirmed"
+    PROCESSING = "processing"
     IN_TRANSIT = "in_transit"
     DELIVERED = "delivered"
     CANCELLED = "cancelled"
+
+class Order(BaseModel):
+    id: Optional[str] = None
+    order_id: str
+    buyer_username: str
+    seller_username: str
+    product_details: dict
+    quantity: float
+    unit: str
+    unit_specification: Optional[str] = None  # e.g., "100kg" for bags, "5 litres" for gallons
+    unit_price: float
+    total_amount: float
+    delivery_method: str = "platform"  # "platform" or "offline"
+    delivery_status: str = "pending"  # For offline deliveries
+    shipping_address: str
+    status: OrderStatus = OrderStatus.PENDING
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+
+class QuantityUnit(BaseModel):
+    unit: str
+    specification: Optional[str] = None
+    
+    @validator('unit')
+    def validate_unit(cls, v):
+        allowed_units = ['kg', 'g', 'ton', 'pieces', 'liters', 'bags', 'crates', 'gallons']
+        if v not in allowed_units:
+            raise ValueError(f'Unit must be one of: {", ".join(allowed_units)}')
+        return v
+
+class OrderCreate(BaseModel):
+    product_id: str
+    quantity: float
+    unit: str
+    unit_specification: Optional[str] = None
+    shipping_address: str
+    delivery_method: str = "platform"  # "platform" or "offline"
+    
+class OrderStatusUpdate(BaseModel):
+    order_id: str
+    status: OrderStatus
+    delivery_status: Optional[str] = None  # For offline deliveries
 
 class DriverStatus(str, Enum):
     OFFLINE = "offline"
