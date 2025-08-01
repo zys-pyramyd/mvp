@@ -40,6 +40,8 @@ app.add_middleware(
 # MongoDB connection
 client = MongoClient(MONGO_URL)
 db = client.pyramyd_db
+users_collection = db.users
+messages_collection = db.messages
 
 # Security
 security = HTTPBearer()
