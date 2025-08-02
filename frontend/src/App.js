@@ -4691,10 +4691,10 @@ function App() {
         </div>
       )}
 
-      {/* Product Detail Modal */}
+      {/* Product Detail Modal - Simplified Version */}
       {showProductDetail && selectedProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-6xl w-full max-h-screen overflow-hidden">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
             {/* Header */}
             <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-blue-50">
               <div className="flex justify-between items-start">
@@ -4706,9 +4706,9 @@ function App() {
                     {/* Enhanced Pricing Display */}
                     <div className="text-3xl font-bold text-emerald-600">
                       ₦{selectedProduct.price_per_unit}/{selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'}
-                      {(selectedProduct.unit_specification || selectedProduct.unit_of_measure !== (selectedProduct.unit || 'kg')) && 
+                      {(selectedProduct.unit_specification) && 
                         <span className="text-lg font-medium text-gray-600 ml-2">
-                          ({selectedProduct.unit_specification || selectedProduct.unit_of_measure || 'standard'})
+                          ({selectedProduct.unit_specification})
                         </span>
                       }
                     </div>
@@ -4717,13 +4717,6 @@ function App() {
                     {selectedProduct.type === 'preorder' && (
                       <div className="bg-orange-500 text-white px-4 py-2 rounded-full text-sm font-bold">
                         ⚡ PRE-ORDER
-                      </div>
-                    )}
-                    
-                    {/* Seller Type Badge */}
-                    {selectedProduct.seller_type && (
-                      <div className="bg-emerald-500 text-white px-3 py-1 rounded-full text-sm font-semibold capitalize">
-                        {selectedProduct.seller_type}
                       </div>
                     )}
                   </div>
@@ -4738,43 +4731,72 @@ function App() {
               </div>
             </div>
 
-            {/* Content */}
-            <div className="p-0 overflow-y-auto max-h-[calc(100vh-200px)]">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6">
-                {/* Left Column - Product Images and Info */}
+            {/* Content - Scrollable */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Left Column - Product Image and Info */}
                 <div>
                   {/* Product Image */}
-                  <div className="mb-6">
-                    {selectedProduct.images && selectedProduct.images.length > 0 ? (
-                      <img 
-                        src={selectedProduct.images[0]} 
-                        alt={selectedProduct.product_name || selectedProduct.crop_type}
-                        className="w-full h-96 object-cover rounded-lg shadow-lg"
-                      />
-                    ) : (
-                      <div className="w-full h-96 bg-gradient-to-r from-gray-200 to-gray-300 flex items-center justify-center rounded-lg shadow-lg">
-                        <span className="text-gray-500 text-lg">📦 Product Image</span>
-                      </div>
-                    )}
-                  </div>
+                  {selectedProduct.images && selectedProduct.images.length > 0 ? (
+                    <img 
+                      src={selectedProduct.images[0]} 
+                      alt={selectedProduct.product_name || selectedProduct.crop_type}
+                      className="w-full h-64 object-cover rounded-lg shadow-lg mb-4"
+                    />
+                  ) : (
+                    <div className="w-full h-64 bg-gradient-to-r from-gray-200 to-gray-300 flex items-center justify-center rounded-lg shadow-lg mb-4">
+                      <span className="text-gray-500 text-lg">📦 Product Image</span>
+                    </div>
+                  )}
 
                   {/* Product Description */}
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Product Description</h3>
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Product Description</h3>
                     <p className="text-gray-600 leading-relaxed">
-                      {selectedProduct.description || 'Fresh organic produce from certified farms. High quality guaranteed with proper storage and handling.'}
+                      {selectedProduct.description || 'High quality organic produce from certified farms. Fresh, nutritious, and carefully handled to ensure maximum freshness and quality.'}
                     </p>
                   </div>
 
+                  {/* Location and Seller Info */}
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Seller Information</h3>
+                    
+                    {selectedProduct.farm_name && (
+                      <div className="mb-2">
+                        <span className="text-sm text-gray-600">Farm:</span>
+                        <div className="font-medium text-gray-800">{selectedProduct.farm_name}</div>
+                      </div>
+                    )}
+
+                    {selectedProduct.agent_username && (
+                      <div className="mb-2">
+                        <span className="text-sm text-gray-600">Agent:</span>
+                        <div className="font-medium text-blue-600">@{selectedProduct.agent_username}</div>
+                        <div className="flex items-center mt-1">
+                          <span className="text-yellow-400">★★★★☆</span>
+                          <span className="text-sm text-gray-600 ml-2">4.2/5 (Agent Rating)</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <span className="text-sm text-gray-600">Location:</span>
+                      <div className="font-medium text-gray-800">📍 {selectedProduct.location}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column - Purchase Options */}
+                <div>
                   {/* Stock Information */}
                   <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                     <h3 className="text-lg font-semibold text-gray-900 mb-3">Stock Information</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <span className="text-sm text-gray-600">Available Stock:</span>
+                        <span className="text-sm text-gray-600">Available:</span>
                         <div className="font-semibold text-emerald-600">
                           {selectedProduct.type === 'preorder' ? (
-                            `${selectedProduct.available_stock || selectedProduct.total_stock} ${selectedProduct.unit}`
+                            `${selectedProduct.available_stock || selectedProduct.total_stock || 100} ${selectedProduct.unit || 'kg'}`
                           ) : (
                             `${selectedProduct.quantity || '100'} ${selectedProduct.unit || 'kg'}`
                           )}
@@ -4784,7 +4806,7 @@ function App() {
                       {selectedProduct.type === 'preorder' && (
                         <>
                           <div>
-                            <span className="text-sm text-gray-600">Pre-orders Placed:</span>
+                            <span className="text-sm text-gray-600">Pre-orders:</span>
                             <div className="font-semibold text-orange-600">
                               {selectedProduct.orders_count || 0}
                             </div>
@@ -4796,7 +4818,7 @@ function App() {
                             </div>
                           </div>
                           <div>
-                            <span className="text-sm text-gray-600">Delivery Date:</span>
+                            <span className="text-sm text-gray-600">Delivery:</span>
                             <div className="font-semibold text-gray-700">
                               {new Date(selectedProduct.delivery_date).toLocaleDateString()}
                             </div>
@@ -4805,70 +4827,9 @@ function App() {
                       )}
                     </div>
                   </div>
-                </div>
 
-                {/* Right Column - Purchase Options and Seller Info */}
-                <div>
-                  {/* Seller Information */}
-                  <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Seller Information</h3>
-                    
-                    {/* Business/Farm Name */}
-                    <div className="mb-3">
-                      {selectedProduct.business_name && (
-                        <div className="mb-2">
-                          <span className="text-sm text-gray-600">Business:</span>
-                          <div className="font-medium text-gray-800">{selectedProduct.business_name}</div>
-                        </div>
-                      )}
-                      {selectedProduct.farm_name && (
-                        <div className="mb-2">
-                          <span className="text-sm text-gray-600">Farm:</span>
-                          <div className="font-medium text-gray-800">{selectedProduct.farm_name}</div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Agent Information */}
-                    {selectedProduct.agent_username && (
-                      <div className="mb-3">
-                        <span className="text-sm text-gray-600">Agent:</span>
-                        <div className="font-medium text-blue-600">@{selectedProduct.agent_username}</div>
-                        <div className="flex items-center mt-1">
-                          <span className="text-yellow-400">★★★★☆</span>
-                          <span className="text-sm text-gray-600 ml-2">4.2/5 (Agent Rating)</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Farm Rating (when no agent) */}
-                    {!selectedProduct.agent_username && (
-                      <div className="mb-3">
-                        <span className="text-sm text-gray-600">Farm Rating:</span>
-                        <div className="flex items-center">
-                          <span className="text-yellow-400">★★★★★</span>
-                          <span className="text-sm text-gray-600 ml-2">4.8/5 (Farm Rating)</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Detailed Location */}
-                    <div>
-                      <span className="text-sm text-gray-600">Location:</span>
-                      <div className="font-medium text-gray-800">
-                        📍 {selectedProduct.location}
-                        <div className="text-sm text-gray-600 mt-1">
-                          Village: {selectedProduct.village || 'N/A'} • 
-                          City: {selectedProduct.city || selectedProduct.location?.split(',')[0] || 'N/A'} • 
-                          State: {selectedProduct.state || selectedProduct.location?.split(',')[1]?.trim() || 'N/A'} •
-                          Country: Nigeria
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Purchase Options - Enhanced Add to Cart */}
-                  <div className="mb-6 p-4 bg-emerald-50 rounded-lg">
+                  {/* Purchase Options */}
+                  <div className="p-4 bg-emerald-50 rounded-lg">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Purchase Options</h3>
                     
                     <div className="space-y-4">
@@ -4881,55 +4842,52 @@ function App() {
                             min="1"
                             defaultValue="1"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            id={`detail-quantity-${selectedProduct.id || selectedProduct._id}`}
+                            id={`detail-quantity`}
                           />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
                           <select
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            id={`detail-unit-${selectedProduct.id || selectedProduct._id}`}
+                            id={`detail-unit`}
                           >
                             <option value="kg">kg</option>
-                            <option value="g">g</option>
-                            <option value="pieces">pieces</option>
                             <option value="bags">bags</option>
                             <option value="crates">crates</option>
                             <option value="gallons">gallons</option>
-                            <option value="liters">liters</option>
                           </select>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Specification</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Spec</label>
                           <input
                             type="text"
                             placeholder="e.g., 100kg"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            id={`detail-spec-${selectedProduct.id || selectedProduct._id}`}
+                            id={`detail-spec`}
                           />
                         </div>
                       </div>
 
-                      {/* Delivery Method Selection */}
+                      {/* Delivery Method */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Delivery Method</label>
                         <div className="flex space-x-4">
                           <label className="flex items-center">
                             <input
                               type="radio"
-                              name={`detail-delivery-${selectedProduct.id || selectedProduct._id}`}
+                              name="detail-delivery"
                               value="platform"
                               defaultChecked
-                              className="w-4 h-4 text-emerald-600 border-gray-300 focus:ring-emerald-500"
+                              className="w-4 h-4 text-emerald-600"
                             />
                             <span className="ml-2 text-sm text-gray-700">🚛 Platform Driver</span>
                           </label>
                           <label className="flex items-center">
                             <input
                               type="radio"
-                              name={`detail-delivery-${selectedProduct.id || selectedProduct._id}`}
+                              name="detail-delivery"
                               value="offline"
-                              className="w-4 h-4 text-emerald-600 border-gray-300 focus:ring-emerald-500"
+                              className="w-4 h-4 text-emerald-600"
                             />
                             <span className="ml-2 text-sm text-gray-700">🚚 Offline Delivery</span>
                           </label>
@@ -4939,16 +4897,10 @@ function App() {
                       {/* Add to Cart Button */}
                       <button
                         onClick={() => {
-                          const productId = selectedProduct.id || selectedProduct._id;
-                          const quantityEl = document.getElementById(`detail-quantity-${productId}`);
-                          const unitEl = document.getElementById(`detail-unit-${productId}`);
-                          const specEl = document.getElementById(`detail-spec-${productId}`);
-                          const deliveryEl = document.querySelector(`input[name="detail-delivery-${productId}"]:checked`);
-                          
-                          const quantity = parseFloat(quantityEl?.value) || 1;
-                          const unit = unitEl?.value || 'kg';
-                          const specification = specEl?.value || '';
-                          const deliveryMethod = deliveryEl?.value || 'platform';
+                          const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
+                          const unit = document.getElementById('detail-unit')?.value || 'kg';
+                          const specification = document.getElementById('detail-spec')?.value || '';
+                          const deliveryMethod = document.querySelector('input[name="detail-delivery"]:checked')?.value || 'platform';
                           
                           addEnhancedToCart(selectedProduct, quantity, unit, specification, deliveryMethod);
                           closeProductDetail();
@@ -4966,130 +4918,24 @@ function App() {
                 </div>
               </div>
 
-              {/* Pre-Order Sales Section */}
-              <div className="px-6 mb-8">
-                <div className="border-t border-gray-200 pt-8">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">🔥 More Pre-Order Sales</h2>
-                      <p className="text-gray-600">Discover other products available for pre-order</p>
+              {/* Simple Pre-Order and Recommended Sections */}
+              <div className="mt-8 pt-8 border-t border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">🔥 More Pre-Orders Available</h2>
+                <div className="flex space-x-4 overflow-x-auto pb-4">
+                  {products.filter(product => 
+                    product.type === 'preorder' && 
+                    (product.id || product._id) !== (selectedProduct.id || selectedProduct._id)
+                  ).slice(0, 3).map((product, index) => (
+                    <div key={index} className="flex-shrink-0 w-48 bg-orange-50 rounded-lg p-3 border border-orange-200 cursor-pointer"
+                         onClick={() => setSelectedProduct(product)}>
+                      <h4 className="font-bold text-sm text-gray-900 mb-1">
+                        {product.product_name || product.crop_type}
+                      </h4>
+                      <div className="text-orange-600 font-bold">
+                        ₦{product.price_per_unit}/{product.unit || 'kg'}
+                      </div>
                     </div>
-                    <button
-                      onClick={() => {
-                        setFilters(prev => ({ ...prev, only_preorders: true }));
-                        fetchProducts();
-                        closeProductDetail();
-                      }}
-                      className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-medium"
-                    >
-                      See All Pre-Orders →
-                    </button>
-                  </div>
-
-                  {/* Pre-Order Products Horizontal Scroll */}
-                  <div className="flex overflow-x-auto space-x-4 pb-4 scrollbar-hide">
-                    {products.filter(product => product.type === 'preorder' && (product.id || product._id) !== (selectedProduct.id || selectedProduct._id)).slice(0, 4).map((product, index) => (
-                      <div key={`detail-preorder-${product.id || product._id || index}`} className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg shadow-md hover:shadow-lg transition-all flex-shrink-0 w-72 border-2 border-orange-200 hover:border-orange-300 cursor-pointer">
-                        <div 
-                          className="relative"
-                          onClick={() => {
-                            setSelectedProduct(product);
-                            // Scroll to top of modal
-                            document.querySelector('.overflow-y-auto')?.scrollTo(0, 0);
-                          }}
-                        >
-                          {product.images && product.images.length > 0 ? (
-                            <img 
-                              src={product.images[0]} 
-                              alt={product.product_name || product.crop_type}
-                              className="w-full h-32 object-cover rounded-t-lg"
-                            />
-                          ) : (
-                            <div className="w-full h-32 bg-gradient-to-r from-orange-200 to-orange-300 flex items-center justify-center rounded-t-lg">
-                              <span className="text-orange-600 font-medium text-sm">🌾 Pre-Order</span>
-                            </div>
-                          )}
-                          
-                          <div className="absolute top-2 left-2 bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                            ⚡ PRE-ORDER
-                          </div>
-                        </div>
-
-                        <div className="p-3">
-                          <h4 className="font-bold text-gray-900 text-sm mb-2">
-                            {product.product_name || product.crop_type}
-                          </h4>
-                          <div className="text-lg font-bold text-orange-600 mb-2">
-                            ₦{product.price_per_unit}/{product.unit || 'kg'}
-                            {product.unit_specification && 
-                              <span className="text-xs font-medium text-gray-600 ml-1">
-                                ({product.unit_specification})
-                              </span>
-                            }
-                          </div>
-                          <div className="text-xs text-gray-600">
-                            📍 {product.location}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Recommended Products Section */}
-              <div className="px-6 pb-8">
-                <div className="border-t border-gray-200 pt-8">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">💡 Recommended Products</h2>
-
-                  {/* Recommended Products Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {products.filter(product => 
-                      product.type !== 'preorder' && 
-                      (product.id || product._id) !== (selectedProduct.id || selectedProduct._id) &&
-                      (product.category === selectedProduct.category || 
-                       product.product_category === selectedProduct.product_category)
-                    ).slice(0, 4).map((product, index) => (
-                      <div key={`recommended-${product.id || product._id || index}`} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer border border-gray-200">
-                        <div 
-                          onClick={() => {
-                            setSelectedProduct(product);
-                            // Scroll to top of modal
-                            document.querySelector('.overflow-y-auto')?.scrollTo(0, 0);
-                          }}
-                        >
-                          {product.images && product.images.length > 0 ? (
-                            <img 
-                              src={product.images[0]} 
-                              alt={product.product_name || product.crop_type}
-                              className="w-full h-32 object-cover rounded-t-lg"
-                            />
-                          ) : (
-                            <div className="w-full h-32 bg-gray-200 flex items-center justify-center rounded-t-lg">
-                              <span className="text-gray-500 text-sm">📦 Product</span>
-                            </div>
-                          )}
-
-                          <div className="p-3">
-                            <h4 className="font-semibold text-gray-900 text-sm mb-1">
-                              {product.product_name || product.crop_type}
-                            </h4>
-                            <div className="text-lg font-bold text-emerald-600 mb-1">
-                              ₦{product.price_per_unit}/{product.unit || 'kg'}
-                              {product.unit_specification && 
-                                <span className="text-xs font-medium text-gray-600 ml-1">
-                                  ({product.unit_specification})
-                                </span>
-                              }
-                            </div>
-                            <div className="text-xs text-gray-600">
-                              📍 {product.location}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
