@@ -1936,6 +1936,131 @@ function App() {
           </div>
         </div>
 
+        {/* Pre-Order Sales Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">🔥 Pre-Order Sales</h3>
+              <p className="text-sm text-gray-600">Secure your products in advance with special pre-order pricing!</p>
+            </div>
+            <button
+              onClick={() => {
+                setFilters(prev => ({ ...prev, only_preorders: true }));
+                fetchProducts();
+              }}
+              className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-medium text-sm"
+            >
+              See All Pre-Orders →
+            </button>
+          </div>
+
+          {/* Pre-Order Products Horizontal Scroll */}
+          <div className="relative">
+            <div className="flex overflow-x-auto space-x-4 pb-4 scrollbar-hide">
+              {products.filter(product => product.type === 'preorder').slice(0, 6).map((product, index) => (
+                <div key={`preorder-${product.id || product._id || index}`} className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg shadow-md hover:shadow-lg transition-all flex-shrink-0 w-80 border-2 border-orange-200 hover:border-orange-300">
+                  {/* Pre-Order Badge */}
+                  <div className="relative">
+                    {product.images && product.images.length > 0 ? (
+                      <img 
+                        src={product.images[0]} 
+                        alt={product.product_name || product.crop_type}
+                        className="w-full h-40 object-cover rounded-t-lg"
+                      />
+                    ) : (
+                      <div className="w-full h-40 bg-gradient-to-r from-orange-200 to-orange-300 flex items-center justify-center rounded-t-lg">
+                        <span className="text-orange-600 font-medium">🌾 Pre-Order Product</span>
+                      </div>
+                    )}
+                    
+                    <div className="absolute top-2 left-2 bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center">
+                      ⚡ PRE-ORDER
+                    </div>
+                    
+                    {/* Pre-order percentage badge */}
+                    <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                      -{Math.round((1 - (product.partial_payment_percentage || 0.3)) * 100)}% OFF
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    <h4 className="font-bold text-gray-900 mb-2">
+                      {product.product_name || product.crop_type}
+                    </h4>
+                    
+                    {/* Enhanced Pricing for Pre-orders */}
+                    <div className="flex items-center space-x-2 mb-2">
+                      <span className="text-lg font-bold text-orange-600">
+                        ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
+                        {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) && 
+                          <span className="text-sm font-medium text-gray-600 ml-1">
+                            ({product.unit_specification || product.unit_of_measure || 'standard'})
+                          </span>
+                        }
+                      </span>
+                    </div>
+
+                    {/* Pre-order specific info */}
+                    <div className="mb-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                      <div className="text-xs text-orange-800 space-y-1">
+                        <div className="flex justify-between">
+                          <span>💰 Partial Payment:</span>
+                          <span className="font-bold">{Math.round((product.partial_payment_percentage || 0.3) * 100)}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>📦 Available:</span>
+                          <span className="font-bold">{product.available_stock || product.total_stock} {product.unit}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>🚚 Delivery:</span>
+                          <span className="font-bold">{new Date(product.delivery_date).toLocaleDateString()}</span>
+                        </div>
+                        {product.orders_count > 0 && (
+                          <div className="flex justify-between">
+                            <span>👥 Pre-orders:</span>
+                            <span className="font-bold text-green-600">{product.orders_count}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Location */}
+                    <div className="text-xs text-gray-600 mb-3 flex items-center">
+                      📍 {product.location}
+                    </div>
+
+                    {/* Action button */}
+                    <button
+                      onClick={() => {
+                        const quantity = 1;
+                        const unit = product.unit || 'kg';
+                        const specification = product.unit_specification || '';
+                        const deliveryMethod = 'platform';
+                        
+                        addEnhancedToCart(product, quantity, unit, specification, deliveryMethod);
+                      }}
+                      className="w-full py-2 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors text-sm"
+                    >
+                      🛒 Add Pre-order to Cart
+                    </button>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Show message if no pre-orders */}
+              {products.filter(product => product.type === 'preorder').length === 0 && (
+                <div className="w-full text-center py-8 bg-orange-50 rounded-lg border-2 border-dashed border-orange-200">
+                  <div className="text-orange-600">
+                    <div className="text-2xl mb-2">📦</div>
+                    <h4 className="font-medium text-gray-700">No Pre-Orders Available</h4>
+                    <p className="text-sm text-gray-500">Check back soon for exciting pre-order deals!</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Products Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-auto items-start">{/* Added items-start to align grid items to start and allow different heights */}
           {products.length === 0 ? (
