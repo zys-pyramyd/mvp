@@ -2049,7 +2049,7 @@ function App() {
                           min="1"
                           defaultValue="1"
                           className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
-                          id={`quantity-${product.id || product._id || index}`}
+                          id={`quantity-${index}`}
                         />
                       </div>
                       <div>
