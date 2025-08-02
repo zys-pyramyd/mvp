@@ -1915,6 +1915,11 @@ class PyramydAPITester:
         # Test 6: User Profile
         self.test_user_profile()
 
+        # PRIORITY TEST: Pre-order Visibility Debug (from review request)
+        print("\n🎯 PRE-ORDER VISIBILITY DEBUG (HIGH PRIORITY)")
+        print("-" * 60)
+        self.test_preorder_visibility_debug()
+
         # Test 7: Categories
         cat_success, categories = self.test_categories()
 
