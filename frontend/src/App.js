@@ -2295,6 +2295,14 @@ function App() {
                         <select
                           className="w-full px-1.5 sm:px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
                           id={`spec-${index}`}
+                          onChange={(e) => {
+                            const customSpecDiv = document.getElementById(`custom-spec-${index}`);
+                            if (e.target.value === 'others') {
+                              customSpecDiv.classList.remove('hidden');
+                            } else {
+                              customSpecDiv.classList.add('hidden');
+                            }
+                          }}
                         >
                           <option value="standard">Standard</option>
                           <option value="premium">Premium</option>
