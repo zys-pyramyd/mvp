@@ -2260,44 +2260,60 @@ function App() {
                     Seller: {product.seller_username || `agent_${Math.random().toString().substr(2, 6)}`}
                   </div>
 
-                  {/* Enhanced Add to Cart - Responsive */}
-                  <div className="mt-auto pt-3 sm:pt-4 space-y-2 sm:space-y-3">{/* Responsive padding and spacing */}
-                    {/* Quantity Selection */}
-                    <div className="grid grid-cols-3 gap-1 sm:gap-2">
+                  {/* Enhanced Add to Cart - Buyer Interface */}
+                  <div className="mt-auto pt-3 sm:pt-4 space-y-2 sm:space-y-3">
+                    {/* Product Unit Display (Read-only for buyers) */}
+                    <div className="mb-2 p-2 bg-emerald-50 rounded-lg border border-emerald-200">
+                      <div className="text-xs sm:text-sm font-medium text-emerald-700">
+                        Unit: {product.unit || product.unit_of_measure || 'kg'}
+                        {(product.unit_specification) && 
+                          <span className="ml-2 text-emerald-600">({product.unit_specification})</span>
+                        }
+                      </div>
+                      <div className="text-xs text-emerald-600">
+                        You can only buy in this unit as defined by the seller
+                      </div>
+                    </div>
+
+                    {/* Buyer Selection */}
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Quantity (Number of {product.unit || product.unit_of_measure || 'units'})
+                        </label>
                         <input
                           type="number"
                           min="1"
                           defaultValue="1"
                           className="w-full px-1.5 sm:px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
                           id={`quantity-${index}`}
+                          placeholder="1, 2, 3..."
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Unit</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Specification</label>
                         <select
                           className="w-full px-1.5 sm:px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
-                          id={`unit-${index}`}
+                          id={`spec-${index}`}
                         >
-                          <option value="kg">kg</option>
-                          <option value="g">g</option>
-                          <option value="pieces">pieces</option>
-                          <option value="bags">bags</option>
-                          <option value="crates">crates</option>
-                          <option value="gallons">gallons</option>
-                          <option value="liters">liters</option>
+                          <option value="standard">Standard</option>
+                          <option value="premium">Premium</option>
+                          <option value="100kg">100kg</option>
+                          <option value="50kg">50kg</option>
+                          <option value="others">Others</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Spec</label>
-                        <input
-                          type="text"
-                          placeholder="e.g., 100kg"
-                          className="w-full px-1.5 sm:px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
-                          id={`spec-${index}`}
-                        />
-                      </div>
+                    </div>
+
+                    {/* Custom Specification Input (shows when "Others" is selected) */}
+                    <div className="hidden" id={`custom-spec-${index}`}>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Custom Specification</label>
+                      <input
+                        type="text"
+                        placeholder="Specify your requirement"
+                        className="w-full px-1.5 sm:px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
+                        id={`custom-spec-input-${index}`}
+                      />
                     </div>
 
                     {/* Delivery Method Selection - Responsive */}
@@ -2330,13 +2346,14 @@ function App() {
                     <button
                       onClick={() => {
                         const quantityEl = document.getElementById(`quantity-${index}`);
-                        const unitEl = document.getElementById(`unit-${index}`);
                         const specEl = document.getElementById(`spec-${index}`);
+                        const customSpecEl = document.getElementById(`custom-spec-input-${index}`);
                         const deliveryEl = document.querySelector(`input[name="delivery-method-${index}"]:checked`);
                         
                         const quantity = parseFloat(quantityEl?.value) || 1;
-                        const unit = unitEl?.value || 'kg';
-                        const specification = specEl?.value || '';
+                        const unit = product.unit || product.unit_of_measure || 'kg'; // Fixed unit from seller
+                        const selectedSpec = specEl?.value;
+                        const specification = selectedSpec === 'others' ? (customSpecEl?.value || '') : selectedSpec;
                         const deliveryMethod = deliveryEl?.value || 'platform';
                         
                         addEnhancedToCart(product, quantity, unit, specification, deliveryMethod);
