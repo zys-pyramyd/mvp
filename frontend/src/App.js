@@ -664,6 +664,17 @@ function App() {
     );
   };
 
+  // Product Detail functions
+  const openProductDetail = (product) => {
+    setSelectedProduct(product);
+    setShowProductDetail(true);
+  };
+
+  const closeProductDetail = () => {
+    setShowProductDetail(false);
+    setSelectedProduct(null);
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
