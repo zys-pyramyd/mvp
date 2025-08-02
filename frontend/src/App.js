@@ -2204,25 +2204,25 @@ function App() {
                     )}
                   </div>
 
-                  {/* Business/Farm Info */}
-                  <div className="text-sm text-gray-600 mb-2">
+                  {/* Business/Farm Info - Responsive */}
+                  <div className="text-xs sm:text-sm text-gray-600 mb-2">
                     {product.business_name && (
-                      <div className="font-medium">{product.business_name}</div>
+                      <div className="font-medium line-clamp-1">{product.business_name}</div>
                     )}
                     {product.farm_name && (
-                      <div>{product.farm_name}</div>
+                      <div className="line-clamp-1">{product.farm_name}</div>
                     )}
                     {product.agent_username && (
-                      <div className="text-blue-600">Agent: @{product.agent_username}</div>
+                      <div className="text-blue-600 line-clamp-1">Agent: @{product.agent_username}</div>
                     )}
                   </div>
 
-                  {/* Location */}
-                  <div className="text-sm text-gray-500 mb-3">
+                  {/* Location - Responsive */}
+                  <div className="text-xs sm:text-sm text-gray-500 mb-3 line-clamp-1">
                     📍 {product.location}
                   </div>
 
-                  {/* Pre-order specific info */}
+                  {/* Pre-order specific info - Responsive */}
                   {product.type === 'preorder' && (
                     <div className="mb-3 p-2 bg-orange-50 rounded-lg border border-orange-200">
                       <div className="text-xs text-orange-700">
@@ -2232,22 +2232,22 @@ function App() {
                     </div>
                   )}
 
-                  {/* Seller Info */}
-                  <div className="text-xs text-gray-500 mb-3">
+                  {/* Seller Info - Responsive */}
+                  <div className="text-xs text-gray-500 mb-3 line-clamp-1">
                     Seller: {product.seller_username || `agent_${Math.random().toString().substr(2, 6)}`}
                   </div>
 
-                  {/* Enhanced Add to Cart - includes delivery method and unit specification */}
-                  <div className="mt-auto pt-4 space-y-3">{/* Removed debug styling */}
+                  {/* Enhanced Add to Cart - Responsive */}
+                  <div className="mt-auto pt-3 sm:pt-4 space-y-2 sm:space-y-3">{/* Responsive padding and spacing */}
                     {/* Quantity Selection */}
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-3 gap-1 sm:gap-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
                         <input
                           type="number"
                           min="1"
                           defaultValue="1"
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
+                          className="w-full px-1.5 sm:px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
                           id={`quantity-${index}`}
                         />
                       </div>
