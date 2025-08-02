@@ -2168,28 +2168,28 @@ function App() {
                   )}
                 </div>
 
-                <div className="p-4 flex-1 flex flex-col">{/* Changed to flex-1 flex flex-col to allow content to expand */}
-                  <h3 className="font-semibold text-gray-900 mb-2">
+                <div className="p-3 sm:p-4 flex-1 flex flex-col">{/* Responsive padding */}
+                  <h3 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base line-clamp-1">
                     {product.product_name || product.crop_type}
                   </h3>
                   
                   {/* Description */}
-                  <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-                    {product.description || 'Fresh organic produce from test farm'}
+                  <p className="text-gray-600 text-xs sm:text-sm mb-3 line-clamp-2">
+                    {product.description || 'Fresh organic produce from certified farms'}
                   </p>
 
-                  {/* Price with Enhanced Specification Display */}
-                  <div className="text-xl font-bold text-emerald-600 mb-2">
+                  {/* Price with Enhanced Specification Display - Responsive */}
+                  <div className="text-lg sm:text-xl font-bold text-emerald-600 mb-2">
                     ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
                     {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) && 
-                      <span className="text-sm font-medium text-gray-600 ml-1">
+                      <span className="text-xs sm:text-sm font-medium text-gray-600 ml-1">
                         ({product.unit_specification || product.unit_of_measure || 'standard'})
                       </span>
                     }
                   </div>
 
-                  {/* Stock Info */}
-                  <div className="text-sm text-gray-500 mb-2">
+                  {/* Stock Info - Responsive */}
+                  <div className="text-xs sm:text-sm text-gray-500 mb-2">
                     {product.type === 'preorder' ? (
                       <>
                         <span className="text-orange-600 font-medium">
