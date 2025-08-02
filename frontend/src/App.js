@@ -1976,9 +1976,13 @@ function App() {
           <div className="relative">
             <div className="flex overflow-x-auto space-x-4 pb-4 scrollbar-hide">
               {products.filter(product => product.type === 'preorder').slice(0, 6).map((product, index) => (
-                <div key={`preorder-${product.id || product._id || index}`} className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg shadow-md hover:shadow-lg transition-all flex-shrink-0 w-80 border-2 border-orange-200 hover:border-orange-300">
+                <div key={`preorder-${product.id || product._id || index}`} className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg shadow-md hover:shadow-lg transition-all flex-shrink-0 w-80 border-2 border-orange-200 hover:border-orange-300 cursor-pointer">
                   {/* Pre-Order Badge */}
-                  <div className="relative">
+                  <div 
+                    className="relative"
+                    onClick={() => openProductDetail(product)}
+                    title="Click to view product details"
+                  >
                     {product.images && product.images.length > 0 ? (
                       <img 
                         src={product.images[0]} 
