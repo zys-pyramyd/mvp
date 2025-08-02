@@ -612,6 +612,11 @@ function App() {
     }
   };
 
+  const removeCartItem = (itemId) => {
+    setCart(prevCart => prevCart.filter(item => item.id !== itemId));
+    calculateOrderSummary();
+  };
+
   const removeFromCart = (productId) => {
     setCart(cart.filter(item => item.product_id !== productId));
   };
