@@ -2366,6 +2366,20 @@ function App() {
                     >
                       {product.type === 'preorder' ? 'Add Pre-order to Cart' : 'Add to Cart'}
                     </button>
+
+                    {/* JavaScript to handle spec dropdown */}
+                    <script>
+                      {`
+                        document.getElementById('spec-${index}').addEventListener('change', function() {
+                          const customSpecDiv = document.getElementById('custom-spec-${index}');
+                          if (this.value === 'others') {
+                            customSpecDiv.classList.remove('hidden');
+                          } else {
+                            customSpecDiv.classList.add('hidden');
+                          }
+                        });
+                      `}
+                    </script>
                   </div>
                 </div>
               </div>
