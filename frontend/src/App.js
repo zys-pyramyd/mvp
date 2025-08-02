@@ -1608,6 +1608,29 @@ function App() {
                         🏠 My Dashboard
                       </button>
 
+                      {/* Mobile-only options - show on small screens */}
+                      <div className="sm:hidden border-t border-gray-200 pt-2 mt-2">
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setShowMessaging(true);
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          💬 Messages
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setShowOrderTracking(true);
+                            fetchOrders();
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          🚛 Order Tracking
+                        </button>
+                      </div>
+
                       {/* Show "Become a Partner" for non-agents */}
                       {user.role !== 'agent' && (
                         <button
