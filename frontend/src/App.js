@@ -4162,7 +4162,8 @@ function App() {
                             {item.product.product_name || item.product.crop_type}
                           </h3>
                           <p className="text-xs text-gray-600">
-                            ₦{item.product.price_per_unit}/{item.unit} • {item.product.seller_username}
+                            ₦{item.product.price_per_unit}/{item.unit}
+                            {item.unit_specification && <span className="text-gray-500"> ({item.unit_specification})</span>} • {item.product.seller_username}
                           </p>
                         </div>
                         <button
