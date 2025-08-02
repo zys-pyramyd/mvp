@@ -1493,9 +1493,9 @@ function App() {
               </button>
             </div>
 
-            {/* Right side navigation icons - Responsive */}
+            {/* Right side navigation icons - Responsive Priority */}
             <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-              {/* Cart - Responsive */}
+              {/* Cart - Always Visible */}
               <button
                 onClick={() => setShowCart(true)}
                 className="nav-button icon-button relative p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
@@ -1511,7 +1511,7 @@ function App() {
                 )}
               </button>
 
-              {/* Messaging - Responsive */}
+              {/* Messaging - Hidden on small screens */}
               <button
                 onClick={() => {
                   if (!user) {
@@ -1520,7 +1520,7 @@ function App() {
                     setShowMessaging(true);
                   }
                 }}
-                className="nav-button icon-button relative p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                className="nav-button icon-button relative p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 hidden sm:flex"
                 title="Messages"
               >
                 <div className="w-5 h-5 sm:w-6 sm:h-6">
@@ -1533,7 +1533,7 @@ function App() {
                 )}
               </button>
 
-              {/* Order Tracking - Responsive */}
+              {/* Order Tracking - Hidden on small screens */}
               <button
                 onClick={() => {
                   if (!user) {
@@ -1543,7 +1543,7 @@ function App() {
                     fetchOrders();
                   }
                 }}
-                className="nav-button icon-button p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                className="nav-button icon-button p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 hidden sm:flex"
                 title="Track Orders / Find Drivers"
               >
                 <div className="w-5 h-5 sm:w-6 sm:h-6">
@@ -1551,7 +1551,7 @@ function App() {
                 </div>
               </button>
 
-              {/* Profile Icon with Dropdown - Responsive */}
+              {/* Profile Icon with Dropdown - Always Visible */}
               <div className="relative">
                 {!user ? (
                   <button
