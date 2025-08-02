@@ -2078,19 +2078,54 @@ function App() {
                       </div>
                     </div>
 
-                    {/* Simplified Add to Cart Button - removing delivery method temporarily */}
+                    {/* Delivery Method Selection */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Delivery Method</label>
+                      <div className="flex space-x-2">
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name={`delivery-method-${index}`}
+                            value="platform"
+                            defaultChecked
+                            className="w-3 h-3 text-emerald-600 border-gray-300 focus:ring-emerald-500"
+                          />
+                          <span className="ml-1 text-xs text-gray-700">🚛 Platform Driver</span>
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name={`delivery-method-${index}`}
+                            value="offline"
+                            className="w-3 h-3 text-emerald-600 border-gray-300 focus:ring-emerald-500"
+                          />
+                          <span className="ml-1 text-xs text-gray-700">🚚 Offline Delivery</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Enhanced Add to Cart Button */}
                     <button
                       onClick={() => {
-                        const quantity = 1;
-                        const unit = 'kg';
-                        const specification = '';
-                        const deliveryMethod = 'platform';
+                        const quantityEl = document.getElementById(`quantity-${index}`);
+                        const unitEl = document.getElementById(`unit-${index}`);
+                        const specEl = document.getElementById(`spec-${index}`);
+                        const deliveryEl = document.querySelector(`input[name="delivery-method-${index}"]:checked`);
+                        
+                        const quantity = parseFloat(quantityEl?.value) || 1;
+                        const unit = unitEl?.value || 'kg';
+                        const specification = specEl?.value || '';
+                        const deliveryMethod = deliveryEl?.value || 'platform';
                         
                         addEnhancedToCart(product, quantity, unit, specification, deliveryMethod);
                       }}
-                      className="w-full py-2 px-4 rounded-lg font-medium transition-colors bg-emerald-600 hover:bg-emerald-700 text-white"
+                      className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
+                        product.type === 'preorder'
+                          ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
                     >
-                      Add to Cart (Test)
+                      {product.type === 'preorder' ? 'Add Pre-order to Cart' : 'Add to Cart'}
                     </button>
                   </div>
                 </div>
