@@ -2039,7 +2039,7 @@ function App() {
                   </div>
 
                   {/* Enhanced Add to Cart - includes delivery method and unit specification */}
-                  <div className="mt-auto pt-4 space-y-3">{/* Changed to mt-auto to push to bottom */}
+                  <div className="mt-auto pt-4 space-y-3 bg-yellow-50 border-2 border-yellow-400">{/* Added debug styling to make this section visible */}
                     {/* Quantity Selection */}
                     <div className="grid grid-cols-3 gap-2">
                       <div>
