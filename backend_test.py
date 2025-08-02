@@ -1504,6 +1504,13 @@ class PyramydAPITester:
         if prod_success and product_id:
             self.test_product_details(product_id)
 
+        # Test 10.1-10.4: Unit Specification Tests (NEW)
+        print("\n📦 Testing Product Unit Specification Feature...")
+        self.test_product_creation_with_unit_specification()
+        self.test_products_with_unit_specification_retrieval()
+        self.test_products_filtering_with_unit_specification()
+        self.test_unit_specification_complete_workflow()
+
         # Test 11: Orders Listing
         self.test_orders_listing()
 
