@@ -1459,12 +1459,12 @@ function App() {
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
           <div className="flex justify-between items-center h-14 sm:h-16">
-            {/* Logo */}
+            {/* Logo - Better Responsive Scaling */}
             <div className="flex items-center flex-shrink-0">
               <img 
                 src="https://customer-assets.emergentagent.com/job_pyramyd-agritech/artifacts/ml8alcyl_image.png" 
                 alt="Pyramyd" 
-                className="h-6 w-auto sm:h-8 lg:h-10"
+                className="h-5 sm:h-6 md:h-8 lg:h-10 w-auto"
               />
             </div>
 
