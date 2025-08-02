@@ -998,19 +998,41 @@ function App() {
   };
 
   const addEnhancedToCart = (product, quantity, unit, specification, deliveryMethod) => {
-    const cartItem = {
-      product: product,
-      quantity: quantity,
-      unit: unit,
-      unit_specification: specification,
-      delivery_method: deliveryMethod,
-      id: Date.now()
-    };
+    const existingItem = cart.find(item => item.product_id === (product.id || product._id));
     
-    setCart(prevCart => [...prevCart, cartItem]);
+    if (existingItem) {
+      // Update existing item
+      setCart(prevCart => prevCart.map(item => 
+        item.product_id === (product.id || product._id)
+          ? { 
+              ...item, 
+              quantity: item.quantity + quantity,
+              unit: unit,
+              unit_specification: specification,
+              delivery_method: deliveryMethod
+            }
+          : item
+      ));
+    } else {
+      // Add new item with consistent structure
+      const cartItem = {
+        id: `cart-${Date.now()}-${product.id || product._id}`,
+        product_id: product.id || product._id,
+        product: product,
+        quantity: quantity,
+        unit: unit,
+        unit_specification: specification,
+        delivery_method: deliveryMethod
+      };
+      
+      setCart(prevCart => [...prevCart, cartItem]);
+    }
     
     const quantityDisplay = `${quantity} ${unit}${specification ? ` (${specification})` : ''}`;
     const deliveryDisplay = deliveryMethod === 'offline' ? 'Offline Delivery' : 'Platform Driver';
+    
+    // Calculate order summary after adding
+    setTimeout(() => calculateOrderSummary(), 100);
     
     alert(`Added to cart: ${quantityDisplay} of ${product.product_name || product.crop_type}\nDelivery: ${deliveryDisplay}`);
   };
