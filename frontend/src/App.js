@@ -2089,18 +2089,29 @@ function App() {
             products.map((product, index) => (
               <div key={product.id || product._id || index} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex flex-col min-h-0">{/* Added min-h-0 to allow natural expansion */}
                 {/* Product Badge */}
-                <div className="relative">
+                <div 
+                  className="relative cursor-pointer" 
+                  onClick={() => openProductDetail(product)}
+                  title="Click to view product details"
+                >
                   {product.images && product.images.length > 0 ? (
                     <img 
                       src={product.images[0]} 
                       alt={product.product_name || product.crop_type}
-                      className="w-full h-48 object-cover"
+                      className="w-full h-48 object-cover hover:opacity-90 transition-opacity"
                     />
                   ) : (
-                    <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
-                      <span className="text-gray-500">No Image</span>
+                    <div className="w-full h-48 bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors">
+                      <span className="text-gray-500">Click to View Details</span>
                     </div>
                   )}
+                  
+                  {/* View Details Overlay */}
+                  <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all flex items-center justify-center">
+                    <div className="bg-white bg-opacity-0 hover:bg-opacity-90 text-transparent hover:text-gray-800 px-3 py-1 rounded-lg text-sm font-medium transition-all">
+                      👁️ View Details
+                    </div>
+                  </div>
                   
                   {/* Pre-order Badge */}
                   {product.type === 'preorder' && (
