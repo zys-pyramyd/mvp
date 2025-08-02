@@ -1533,7 +1533,7 @@ function App() {
                 )}
               </button>
 
-              {/* Order Tracking - Always visible */}
+              {/* Order Tracking - Responsive */}
               <button
                 onClick={() => {
                   if (!user) {
@@ -1543,10 +1543,12 @@ function App() {
                     fetchOrders();
                   }
                 }}
-                className="nav-button icon-button p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                className="nav-button icon-button p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
                 title="Track Orders / Find Drivers"
               >
-                <TruckIcon />
+                <div className="w-5 h-5 sm:w-6 sm:h-6">
+                  <TruckIcon />
+                </div>
               </button>
 
               {/* Profile Icon with Dropdown - Responsive */}
