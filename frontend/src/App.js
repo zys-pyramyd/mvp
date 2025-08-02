@@ -2002,9 +2002,9 @@ function App() {
                 setFilters(prev => ({ ...prev, only_preorders: true }));
                 fetchProducts();
               }}
-              className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-medium text-sm"
+              className="px-3 sm:px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-medium text-xs sm:text-sm"
             >
-              See All Pre-Orders →
+              See More →
             </button>
           </div>
 
