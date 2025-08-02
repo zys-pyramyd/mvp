@@ -1652,6 +1652,225 @@ class PyramydAPITester:
         
         return overall_success
 
+    def test_preorder_visibility_debug(self):
+        """Debug pre-order visibility issue by testing different API endpoints"""
+        print("\n🔍 DEBUGGING PRE-ORDER VISIBILITY ISSUE")
+        print("=" * 60)
+        
+        # First, ensure we have a test agent user logged in
+        if not self.test_existing_user_login():
+            # Create agent user if needed
+            reg_success, _ = self.test_complete_registration()
+            if not reg_success:
+                self.log_test("Pre-order Visibility Debug", False, "Cannot test without authenticated agent user")
+                return False
+        
+        # Create and publish diverse pre-orders for testing
+        print("\n📦 Creating diverse pre-order products...")
+        preorder_ids = []
+        
+        # Pre-order 1: Rice
+        rice_data = {
+            "product_name": "Premium Basmati Rice - Harvest 2024",
+            "product_category": "grain",
+            "description": "High quality basmati rice from certified farms",
+            "total_stock": 500,
+            "unit": "bag",
+            "price_per_unit": 850.0,
+            "partial_payment_percentage": 0.4,  # 40%
+            "location": "Kebbi State, Nigeria",
+            "delivery_date": "2025-03-15T10:00:00Z",
+            "business_name": "Rice Valley Farms",
+            "farm_name": "Premium Rice Farm",
+            "images": []
+        }
+        
+        success, response = self.make_request('POST', '/api/preorders/create', rice_data, 200, use_auth=True)
+        if success and 'preorder_id' in response:
+            rice_id = response['preorder_id']
+            preorder_ids.append(rice_id)
+            # Publish it
+            self.make_request('POST', f'/api/preorders/{rice_id}/publish', {}, 200, use_auth=True)
+            print(f"✅ Created and published Rice pre-order: {rice_id}")
+        
+        # Pre-order 2: Tomatoes
+        tomato_data = {
+            "product_name": "Fresh Roma Tomatoes - Seasonal",
+            "product_category": "vegetables",
+            "description": "Fresh organic roma tomatoes from local farms",
+            "total_stock": 300,
+            "unit": "crate",
+            "price_per_unit": 400.0,
+            "partial_payment_percentage": 0.3,  # 30%
+            "location": "Kaduna State, Nigeria",
+            "delivery_date": "2025-02-28T10:00:00Z",
+            "business_name": "Green Valley Farms",
+            "farm_name": "Tomato Valley Farm",
+            "images": []
+        }
+        
+        success, response = self.make_request('POST', '/api/preorders/create', tomato_data, 200, use_auth=True)
+        if success and 'preorder_id' in response:
+            tomato_id = response['preorder_id']
+            preorder_ids.append(tomato_id)
+            # Publish it
+            self.make_request('POST', f'/api/preorders/{tomato_id}/publish', {}, 200, use_auth=True)
+            print(f"✅ Created and published Tomato pre-order: {tomato_id}")
+        
+        # Pre-order 3: Palm Oil
+        palm_oil_data = {
+            "product_name": "Pure Red Palm Oil - Cold Pressed",
+            "product_category": "packaged_goods",
+            "description": "Pure red palm oil cold pressed from fresh palm fruits",
+            "total_stock": 200,
+            "unit": "gallon",
+            "price_per_unit": 1200.0,
+            "partial_payment_percentage": 0.35,  # 35%
+            "location": "Cross River State, Nigeria",
+            "delivery_date": "2025-04-10T10:00:00Z",
+            "business_name": "Palm Processing Center",
+            "farm_name": "Red Palm Farm",
+            "images": []
+        }
+        
+        success, response = self.make_request('POST', '/api/preorders/create', palm_oil_data, 200, use_auth=True)
+        if success and 'preorder_id' in response:
+            palm_oil_id = response['preorder_id']
+            preorder_ids.append(palm_oil_id)
+            # Publish it
+            self.make_request('POST', f'/api/preorders/{palm_oil_id}/publish', {}, 200, use_auth=True)
+            print(f"✅ Created and published Palm Oil pre-order: {palm_oil_id}")
+        
+        print(f"\n📊 Created {len(preorder_ids)} pre-orders for testing")
+        
+        # Now test the specific API endpoints mentioned in the review request
+        print("\n🔍 TESTING SPECIFIC API ENDPOINTS")
+        print("-" * 50)
+        
+        # Test 1: GET /api/products (no filters)
+        print("\n1️⃣ Testing GET /api/products (no filters)")
+        success, response = self.make_request('GET', '/api/products')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            preorders = response.get('preorders', [])
+            total_products = len(products)
+            total_preorders = len(preorders)
+            
+            print(f"   📦 Regular products found: {total_products}")
+            print(f"   🎯 Pre-orders found: {total_preorders}")
+            print(f"   📊 Total items: {total_products + total_preorders}")
+            
+            # Check if our created pre-orders appear
+            our_preorders = [p for p in preorders if p.get('id') in preorder_ids]
+            print(f"   ✅ Our test pre-orders found: {len(our_preorders)}")
+            
+            # Check if pre-orders have type field
+            preorders_with_type = [p for p in preorders if p.get('type') == 'preorder']
+            print(f"   🏷️ Pre-orders with type='preorder': {len(preorders_with_type)}")
+            
+            self.log_test("GET /api/products (no filters)", True, 
+                         f"Found {total_products} products, {total_preorders} pre-orders")
+        else:
+            self.log_test("GET /api/products (no filters)", False, f"API call failed: {response}")
+        
+        # Test 2: GET /api/products?platform=home
+        print("\n2️⃣ Testing GET /api/products?platform=home")
+        success, response = self.make_request('GET', '/api/products?platform=home')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            preorders = response.get('preorders', [])
+            total_products = len(products)
+            total_preorders = len(preorders)
+            
+            print(f"   📦 Regular products found: {total_products}")
+            print(f"   🎯 Pre-orders found: {total_preorders}")
+            
+            # Check if platform filter affects pre-orders
+            our_preorders = [p for p in preorders if p.get('id') in preorder_ids]
+            print(f"   ✅ Our test pre-orders found: {len(our_preorders)}")
+            
+            self.log_test("GET /api/products?platform=home", True, 
+                         f"Platform=home: {total_products} products, {total_preorders} pre-orders")
+        else:
+            self.log_test("GET /api/products?platform=home", False, f"API call failed: {response}")
+        
+        # Test 3: GET /api/products?platform=buy_from_farm
+        print("\n3️⃣ Testing GET /api/products?platform=buy_from_farm")
+        success, response = self.make_request('GET', '/api/products?platform=buy_from_farm')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            preorders = response.get('preorders', [])
+            total_products = len(products)
+            total_preorders = len(preorders)
+            
+            print(f"   📦 Regular products found: {total_products}")
+            print(f"   🎯 Pre-orders found: {total_preorders}")
+            
+            # Check if platform filter affects pre-orders
+            our_preorders = [p for p in preorders if p.get('id') in preorder_ids]
+            print(f"   ✅ Our test pre-orders found: {len(our_preorders)}")
+            
+            self.log_test("GET /api/products?platform=buy_from_farm", True, 
+                         f"Platform=buy_from_farm: {total_products} products, {total_preorders} pre-orders")
+        else:
+            self.log_test("GET /api/products?platform=buy_from_farm", False, f"API call failed: {response}")
+        
+        # Test 4: GET /api/preorders - Verify pre-orders exist and are published
+        print("\n4️⃣ Testing GET /api/preorders")
+        success, response = self.make_request('GET', '/api/preorders')
+        
+        if success and isinstance(response, dict):
+            preorders = response.get('preorders', [])
+            total_count = response.get('total_count', 0)
+            
+            print(f"   🎯 Published pre-orders found: {len(preorders)}")
+            print(f"   📊 Total count: {total_count}")
+            
+            # Check if our created pre-orders appear
+            our_preorders = [p for p in preorders if p.get('id') in preorder_ids]
+            print(f"   ✅ Our test pre-orders found: {len(our_preorders)}")
+            
+            # Check status of our pre-orders
+            for preorder in our_preorders:
+                print(f"   📋 Pre-order {preorder.get('product_name')}: status={preorder.get('status')}")
+            
+            self.log_test("GET /api/preorders", True, 
+                         f"Found {len(preorders)} published pre-orders")
+        else:
+            self.log_test("GET /api/preorders", False, f"API call failed: {response}")
+        
+        # Test 5: Check pre-order platform field
+        print("\n5️⃣ Checking pre-order platform field")
+        if preorder_ids:
+            # Get details of first pre-order to check platform field
+            success, response = self.make_request('GET', f'/api/preorders/{preorder_ids[0]}')
+            
+            if success and isinstance(response, dict):
+                platform_field = response.get('platform')
+                print(f"   🏷️ Pre-order platform field: {platform_field}")
+                
+                if platform_field:
+                    self.log_test("Pre-order Platform Field", True, f"Platform field present: {platform_field}")
+                else:
+                    self.log_test("Pre-order Platform Field", False, "Platform field missing from pre-orders")
+                    print("   ⚠️ This could be why pre-orders are filtered out by platform parameter!")
+            else:
+                self.log_test("Pre-order Platform Field", False, f"Cannot get pre-order details: {response}")
+        
+        # Summary and diagnosis
+        print("\n🔍 DIAGNOSIS SUMMARY")
+        print("-" * 50)
+        print("Based on the tests above, the issue might be:")
+        print("1. Pre-orders don't have a 'platform' field, so they get filtered out")
+        print("2. Frontend expects all items in single array with type='preorder'")
+        print("3. Backend returns separate 'products' and 'preorders' arrays")
+        print("4. Frontend needs to merge arrays and add type field to pre-orders")
+        
+        return True
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting Pyramyd API Tests...")
