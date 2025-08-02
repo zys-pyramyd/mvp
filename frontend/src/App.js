@@ -2107,10 +2107,15 @@ function App() {
                     {/* Enhanced Add to Cart Button */}
                     <button
                       onClick={() => {
-                        const quantity = parseFloat(document.getElementById(`quantity-${product.id || product._id || index}`).value) || 1;
-                        const unit = document.getElementById(`unit-${product.id || product._id || index}`).value;
-                        const specification = document.getElementById(`spec-${product.id || product._id || index}`).value;
-                        const deliveryMethod = document.querySelector(`input[name="delivery-${product.id || product._id || index}"]:checked`).value;
+                        const quantityEl = document.getElementById(`quantity-${index}`);
+                        const unitEl = document.getElementById(`unit-${index}`);
+                        const specEl = document.getElementById(`spec-${index}`);
+                        const deliveryEl = document.querySelector(`input[name="delivery-method-${index}"]:checked`);
+                        
+                        const quantity = parseFloat(quantityEl?.value) || 1;
+                        const unit = unitEl?.value || 'kg';
+                        const specification = specEl?.value || '';
+                        const deliveryMethod = deliveryEl?.value || 'platform';
                         
                         addEnhancedToCart(product, quantity, unit, specification, deliveryMethod);
                       }}
