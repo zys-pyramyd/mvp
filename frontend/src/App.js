@@ -2119,16 +2119,16 @@ function App() {
           </div>
         </div>
 
-        {/* Products Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-auto items-start">{/* Added items-start to align grid items to start and allow different heights */}
+        {/* Products Grid - Responsive */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 auto-rows-auto items-start">{/* Made responsive and reduced gap for mobile */}
           {products.length === 0 ? (
-            <div className="col-span-full text-center py-12">
-              <p className="text-gray-500 text-lg">No products found</p>
+            <div className="col-span-full text-center py-8 sm:py-12">
+              <p className="text-gray-500 text-base sm:text-lg">No products found</p>
             </div>
           ) : (
             products.map((product, index) => (
-              <div key={product.id || product._id || index} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex flex-col min-h-0">{/* Added min-h-0 to allow natural expansion */}
-                {/* Product Badge */}
+              <div key={product.id || product._id || index} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex flex-col min-h-0">
+                {/* Product Image - Responsive */}
                 <div 
                   className="relative cursor-pointer" 
                   onClick={() => openProductDetail(product)}
@@ -2138,17 +2138,17 @@ function App() {
                     <img 
                       src={product.images[0]} 
                       alt={product.product_name || product.crop_type}
-                      className="w-full h-48 object-cover hover:opacity-90 transition-opacity"
+                      className="w-full h-40 sm:h-48 object-cover hover:opacity-90 transition-opacity rounded-t-lg"
                     />
                   ) : (
-                    <div className="w-full h-48 bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors">
-                      <span className="text-gray-500">Click to View Details</span>
+                    <div className="w-full h-40 sm:h-48 bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors rounded-t-lg">
+                      <span className="text-gray-500 text-sm sm:text-base">Click to View Details</span>
                     </div>
                   )}
                   
                   {/* View Details Overlay */}
-                  <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all flex items-center justify-center">
-                    <div className="bg-white bg-opacity-0 hover:bg-opacity-90 text-transparent hover:text-gray-800 px-3 py-1 rounded-lg text-sm font-medium transition-all">
+                  <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all flex items-center justify-center rounded-t-lg">
+                    <div className="bg-white bg-opacity-0 hover:bg-opacity-90 text-transparent hover:text-gray-800 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm font-medium transition-all">
                       👁️ View Details
                     </div>
                   </div>
