@@ -2039,7 +2039,7 @@ function App() {
                   </div>
 
                   {/* Enhanced Add to Cart - includes delivery method and unit specification */}
-                  <div className="mt-auto pt-4 space-y-3 bg-yellow-50 border-2 border-yellow-400">{/* Added debug styling to make this section visible */}
+                  <div className="mt-auto pt-4 space-y-3">{/* Removed debug styling */}
                     {/* Quantity Selection */}
                     <div className="grid grid-cols-3 gap-2">
                       <div>
