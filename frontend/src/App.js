@@ -1944,7 +1944,7 @@ function App() {
             </div>
           ) : (
             products.map((product, index) => (
-              <div key={product.id || product._id || index} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex flex-col">
+              <div key={product.id || product._id || index} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex flex-col min-h-0">{/* Added min-h-0 to allow natural expansion */}
                 {/* Product Badge */}
                 <div className="relative">
                   {product.images && product.images.length > 0 ? (
