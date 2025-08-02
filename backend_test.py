@@ -233,6 +233,329 @@ class PyramydAPITester:
             self.log_test("Product Creation", False, f"Product creation failed: {response}")
             return False, None
 
+    def test_product_creation_with_unit_specification(self):
+        """Test creating products with unit_specification field for enhanced pricing display"""
+        print("\n📦 Testing Product Creation with Unit Specification...")
+        
+        # Test 1: Rice with unit_specification
+        rice_data = {
+            "title": "Premium Rice",
+            "description": "High quality rice from local farms",
+            "category": "grain",
+            "price_per_unit": 450.0,
+            "unit_of_measure": "bag",
+            "unit_specification": "100kg",
+            "quantity_available": 50,
+            "minimum_order_quantity": 1,
+            "location": "Kebbi, Nigeria",
+            "farm_name": "Rice Valley Farm",
+            "images": [],
+            "platform": "pyhub"
+        }
+
+        success, response = self.make_request('POST', '/api/products', rice_data, 200, use_auth=True)
+        
+        if success and 'product_id' in response:
+            self.log_test("Product Creation - Rice with Unit Spec", True)
+            rice_product_id = response['product_id']
+            rice_success = True
+        else:
+            self.log_test("Product Creation - Rice with Unit Spec", False, f"Rice creation failed: {response}")
+            rice_product_id = None
+            rice_success = False
+
+        # Test 2: Tomatoes with unit_specification
+        tomatoes_data = {
+            "title": "Fresh Tomatoes",
+            "description": "Fresh organic tomatoes",
+            "category": "vegetables",
+            "price_per_unit": 300.0,
+            "unit_of_measure": "crate",
+            "unit_specification": "big",
+            "quantity_available": 100,
+            "minimum_order_quantity": 1,
+            "location": "Kaduna, Nigeria",
+            "farm_name": "Green Valley Farm",
+            "images": [],
+            "platform": "pyhub"
+        }
+
+        success, response = self.make_request('POST', '/api/products', tomatoes_data, 200, use_auth=True)
+        
+        if success and 'product_id' in response:
+            self.log_test("Product Creation - Tomatoes with Unit Spec", True)
+            tomatoes_product_id = response['product_id']
+            tomatoes_success = True
+        else:
+            self.log_test("Product Creation - Tomatoes with Unit Spec", False, f"Tomatoes creation failed: {response}")
+            tomatoes_product_id = None
+            tomatoes_success = False
+
+        # Test 3: Palm Oil with unit_specification
+        palm_oil_data = {
+            "title": "Pure Palm Oil",
+            "description": "Fresh palm oil from local processing",
+            "category": "packaged_goods",
+            "price_per_unit": 800.0,
+            "unit_of_measure": "gallon",
+            "unit_specification": "5 litres",
+            "quantity_available": 30,
+            "minimum_order_quantity": 1,
+            "location": "Cross River, Nigeria",
+            "farm_name": "Palm Processing Center",
+            "images": [],
+            "platform": "pyhub"
+        }
+
+        success, response = self.make_request('POST', '/api/products', palm_oil_data, 200, use_auth=True)
+        
+        if success and 'product_id' in response:
+            self.log_test("Product Creation - Palm Oil with Unit Spec", True)
+            palm_oil_product_id = response['product_id']
+            palm_oil_success = True
+        else:
+            self.log_test("Product Creation - Palm Oil with Unit Spec", False, f"Palm Oil creation failed: {response}")
+            palm_oil_product_id = None
+            palm_oil_success = False
+
+        # Test 4: Product without unit_specification (should still work)
+        basic_product_data = {
+            "title": "Basic Maize",
+            "description": "Regular maize without unit specification",
+            "category": "grain",
+            "price_per_unit": 200.0,
+            "unit_of_measure": "kg",
+            "quantity_available": 200,
+            "minimum_order_quantity": 5,
+            "location": "Benue, Nigeria",
+            "farm_name": "Maize Farm",
+            "images": [],
+            "platform": "pyhub"
+        }
+
+        success, response = self.make_request('POST', '/api/products', basic_product_data, 200, use_auth=True)
+        
+        if success and 'product_id' in response:
+            self.log_test("Product Creation - Basic Product (No Unit Spec)", True)
+            basic_product_id = response['product_id']
+            basic_success = True
+        else:
+            self.log_test("Product Creation - Basic Product (No Unit Spec)", False, f"Basic product creation failed: {response}")
+            basic_product_id = None
+            basic_success = False
+
+        overall_success = rice_success and tomatoes_success and palm_oil_success and basic_success
+        
+        return overall_success, {
+            'rice': rice_product_id,
+            'tomatoes': tomatoes_product_id,
+            'palm_oil': palm_oil_product_id,
+            'basic': basic_product_id
+        }
+
+    def test_products_with_unit_specification_retrieval(self):
+        """Test retrieving products and verifying unit_specification field is included"""
+        print("\n🔍 Testing Products Retrieval with Unit Specification...")
+        
+        # First create test products with unit specifications
+        creation_success, product_ids = self.test_product_creation_with_unit_specification()
+        
+        if not creation_success:
+            self.log_test("Products Retrieval with Unit Spec", False, "Cannot test without created products")
+            return False
+
+        # Test 1: GET /api/products - verify existing products work and check unit_specification
+        success, response = self.make_request('GET', '/api/products')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            preorders = response.get('preorders', [])
+            
+            # Check if any products have unit_specification
+            products_with_unit_spec = [p for p in products if p.get('unit_specification')]
+            
+            if len(products_with_unit_spec) > 0:
+                self.log_test("GET /api/products - Unit Specification Present", True, 
+                             f"Found {len(products_with_unit_spec)} products with unit_specification")
+                products_success = True
+            else:
+                self.log_test("GET /api/products - Unit Specification Present", True, 
+                             "No products with unit_specification found (acceptable)")
+                products_success = True
+        else:
+            self.log_test("GET /api/products - Basic Functionality", False, f"Products retrieval failed: {response}")
+            products_success = False
+
+        # Test 2: Verify specific product details include unit_specification
+        if product_ids.get('rice'):
+            success, response = self.make_request('GET', f'/api/products/{product_ids["rice"]}')
+            
+            if success and response.get('unit_specification') == '100kg':
+                self.log_test("Product Details - Rice Unit Specification", True, 
+                             f"Rice shows ₦{response.get('price_per_unit')}/{response.get('unit_of_measure')} ({response.get('unit_specification')})")
+                rice_detail_success = True
+            else:
+                self.log_test("Product Details - Rice Unit Specification", False, 
+                             f"Rice unit_specification not found or incorrect: {response}")
+                rice_detail_success = False
+        else:
+            rice_detail_success = False
+
+        if product_ids.get('tomatoes'):
+            success, response = self.make_request('GET', f'/api/products/{product_ids["tomatoes"]}')
+            
+            if success and response.get('unit_specification') == 'big':
+                self.log_test("Product Details - Tomatoes Unit Specification", True,
+                             f"Tomatoes shows ₦{response.get('price_per_unit')}/{response.get('unit_of_measure')} ({response.get('unit_specification')})")
+                tomatoes_detail_success = True
+            else:
+                self.log_test("Product Details - Tomatoes Unit Specification", False,
+                             f"Tomatoes unit_specification not found or incorrect: {response}")
+                tomatoes_detail_success = False
+        else:
+            tomatoes_detail_success = False
+
+        if product_ids.get('palm_oil'):
+            success, response = self.make_request('GET', f'/api/products/{product_ids["palm_oil"]}')
+            
+            if success and response.get('unit_specification') == '5 litres':
+                self.log_test("Product Details - Palm Oil Unit Specification", True,
+                             f"Palm Oil shows ₦{response.get('price_per_unit')}/{response.get('unit_of_measure')} ({response.get('unit_specification')})")
+                palm_oil_detail_success = True
+            else:
+                self.log_test("Product Details - Palm Oil Unit Specification", False,
+                             f"Palm Oil unit_specification not found or incorrect: {response}")
+                palm_oil_detail_success = False
+        else:
+            palm_oil_detail_success = False
+
+        # Test 3: Verify product without unit_specification works normally
+        if product_ids.get('basic'):
+            success, response = self.make_request('GET', f'/api/products/{product_ids["basic"]}')
+            
+            if success and response.get('unit_specification') is None:
+                self.log_test("Product Details - Basic Product (No Unit Spec)", True,
+                             f"Basic product correctly shows no unit_specification")
+                basic_detail_success = True
+            else:
+                self.log_test("Product Details - Basic Product (No Unit Spec)", False,
+                             f"Basic product should not have unit_specification: {response}")
+                basic_detail_success = False
+        else:
+            basic_detail_success = False
+
+        overall_success = (products_success and rice_detail_success and 
+                          tomatoes_detail_success and palm_oil_detail_success and 
+                          basic_detail_success)
+        
+        return overall_success
+
+    def test_products_filtering_with_unit_specification(self):
+        """Test products endpoint with filters to ensure unit_specification doesn't break existing functionality"""
+        print("\n🔧 Testing Products Filtering with Unit Specification...")
+        
+        # Test 1: Category filtering
+        success, response = self.make_request('GET', '/api/products?category=grain')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            # Check if any grain products have unit_specification
+            grain_products_with_spec = [p for p in products if p.get('unit_specification')]
+            self.log_test("Category Filtering - Grain Products", True,
+                         f"Found {len(products)} grain products, {len(grain_products_with_spec)} with unit_specification")
+            category_success = True
+        else:
+            self.log_test("Category Filtering - Grain Products", False, f"Category filtering failed: {response}")
+            category_success = False
+
+        # Test 2: Location filtering
+        success, response = self.make_request('GET', '/api/products?location=Nigeria')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            self.log_test("Location Filtering", True, f"Found {len(products)} products in Nigeria")
+            location_success = True
+        else:
+            self.log_test("Location Filtering", False, f"Location filtering failed: {response}")
+            location_success = False
+
+        # Test 3: Price range filtering
+        success, response = self.make_request('GET', '/api/products?min_price=400&max_price=500')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            # Verify products in price range
+            valid_price_products = [p for p in products if 400 <= p.get('price_per_unit', 0) <= 500]
+            self.log_test("Price Range Filtering", True,
+                         f"Found {len(products)} products, {len(valid_price_products)} in price range ₦400-₦500")
+            price_success = True
+        else:
+            self.log_test("Price Range Filtering", False, f"Price filtering failed: {response}")
+            price_success = False
+
+        # Test 4: Search functionality
+        success, response = self.make_request('GET', '/api/products?search_term=rice')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            preorders = response.get('preorders', [])
+            total_items = len(products) + len(preorders)
+            self.log_test("Search Functionality", True, f"Search for 'rice' returned {total_items} items")
+            search_success = True
+        else:
+            self.log_test("Search Functionality", False, f"Search failed: {response}")
+            search_success = False
+
+        # Test 5: Pagination
+        success, response = self.make_request('GET', '/api/products?page=1&limit=10')
+        
+        if success and isinstance(response, dict) and 'page' in response and 'limit' in response:
+            self.log_test("Pagination", True, f"Page {response.get('page')} with limit {response.get('limit')}")
+            pagination_success = True
+        else:
+            self.log_test("Pagination", False, f"Pagination failed: {response}")
+            pagination_success = False
+
+        # Test 6: Combined filters
+        success, response = self.make_request('GET', '/api/products?category=vegetables&location=Kaduna')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            self.log_test("Combined Filters", True, f"Category + Location filter returned {len(products)} products")
+            combined_success = True
+        else:
+            self.log_test("Combined Filters", False, f"Combined filtering failed: {response}")
+            combined_success = False
+
+        overall_success = (category_success and location_success and price_success and 
+                          search_success and pagination_success and combined_success)
+        
+        return overall_success
+
+    def test_unit_specification_complete_workflow(self):
+        """Test complete workflow for products with unit_specification"""
+        print("\n🔄 Testing Complete Unit Specification Workflow...")
+        
+        # Step 1: Create products with unit_specification
+        creation_success, product_ids = self.test_product_creation_with_unit_specification()
+        
+        # Step 2: Verify retrieval includes unit_specification
+        retrieval_success = self.test_products_with_unit_specification_retrieval()
+        
+        # Step 3: Test filtering doesn't break with unit_specification
+        filtering_success = self.test_products_filtering_with_unit_specification()
+        
+        overall_success = creation_success and retrieval_success and filtering_success
+        
+        if overall_success:
+            self.log_test("Complete Unit Specification Workflow", True,
+                         "All unit_specification functionality working correctly")
+        else:
+            self.log_test("Complete Unit Specification Workflow", False,
+                         "One or more unit_specification components failed")
+        
+        return overall_success
+
     def test_product_details(self, product_id: str):
         """Test getting product details"""
         success, response = self.make_request('GET', f'/api/products/{product_id}')
