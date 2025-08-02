@@ -333,6 +333,18 @@ backend:
         agent: "main"
         comment: "RESOLVED: Fixed product card rendering issue that was preventing delivery method radio buttons and Add to Cart buttons from displaying. Root cause was complex product ID logic in form field IDs causing JavaScript errors. Solution: Simplified field IDs to use index-based naming (quantity-${index}, unit-${index}, etc.) instead of complex product.id||product._id||index logic. Updated CSS grid layout with auto-rows-auto and items-start for proper card expansion. Enhanced cart functionality now fully working: quantity/unit/spec selection, delivery method (Platform/Offline), and Add to Cart buttons all visible and functional."
 
+  - task: "Enhanced Pricing Display Implementation"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py, /app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "✅ ENHANCED PRICING DISPLAY SUCCESSFULLY IMPLEMENTED: Added unit_specification field to Product and ProductCreate models in backend. Updated frontend to display pricing in enhanced format like '₦450/bag (100kg)', '₦800/gallon (5 litres)', '₦300/crate (big)'. Backend testing confirmed 100% success rate (15/15 tests) with proper API handling. Frontend displays enhanced pricing beautifully with specifications in gray parentheses for clarity. Cart modal also updated to show enhanced pricing format."
+
 frontend:
   - task: "JSX Syntax Error Fix"
     implemented: true
