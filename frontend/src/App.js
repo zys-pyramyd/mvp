@@ -2254,7 +2254,7 @@ function App() {
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">Unit</label>
                         <select
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
+                          className="w-full px-1.5 sm:px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
                           id={`unit-${index}`}
                         >
                           <option value="kg">kg</option>
@@ -2267,20 +2267,20 @@ function App() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Spec (optional)</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Spec</label>
                         <input
                           type="text"
                           placeholder="e.g., 100kg"
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
+                          className="w-full px-1.5 sm:px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
                           id={`spec-${index}`}
                         />
                       </div>
                     </div>
 
-                    {/* Delivery Method Selection */}
+                    {/* Delivery Method Selection - Responsive */}
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Delivery Method</label>
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-1 sm:space-x-2">
                         <label className="flex items-center">
                           <input
                             type="radio"
@@ -2289,7 +2289,7 @@ function App() {
                             defaultChecked
                             className="w-3 h-3 text-emerald-600 border-gray-300 focus:ring-emerald-500"
                           />
-                          <span className="ml-1 text-xs text-gray-700">🚛 Platform Driver</span>
+                          <span className="ml-1 text-xs text-gray-700">🚛 Platform</span>
                         </label>
                         <label className="flex items-center">
                           <input
@@ -2298,12 +2298,12 @@ function App() {
                             value="offline"
                             className="w-3 h-3 text-emerald-600 border-gray-300 focus:ring-emerald-500"
                           />
-                          <span className="ml-1 text-xs text-gray-700">🚚 Offline Delivery</span>
+                          <span className="ml-1 text-xs text-gray-700">🚚 Offline</span>
                         </label>
                       </div>
                     </div>
 
-                    {/* Enhanced Add to Cart Button */}
+                    {/* Enhanced Add to Cart Button - Responsive */}
                     <button
                       onClick={() => {
                         const quantityEl = document.getElementById(`quantity-${index}`);
@@ -2318,7 +2318,7 @@ function App() {
                         
                         addEnhancedToCart(product, quantity, unit, specification, deliveryMethod);
                       }}
-                      className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
+                      className={`w-full py-2 px-3 sm:px-4 rounded-lg font-medium transition-colors text-xs sm:text-sm ${
                         product.type === 'preorder'
                           ? 'bg-orange-600 hover:bg-orange-700 text-white'
                           : 'bg-emerald-600 hover:bg-emerald-700 text-white'
