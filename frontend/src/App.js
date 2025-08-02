@@ -1511,7 +1511,7 @@ function App() {
                 )}
               </button>
 
-              {/* Messaging - Always visible */}
+              {/* Messaging - Responsive */}
               <button
                 onClick={() => {
                   if (!user) {
@@ -1520,12 +1520,14 @@ function App() {
                     setShowMessaging(true);
                   }
                 }}
-                className="nav-button icon-button relative p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                className="nav-button icon-button relative p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
                 title="Messages"
               >
-                <MessageIcon />
+                <div className="w-5 h-5 sm:w-6 sm:h-6">
+                  <MessageIcon />
+                </div>
                 {user && messages.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-semibold text-xs">
                     {messages.length}
                   </span>
                 )}
