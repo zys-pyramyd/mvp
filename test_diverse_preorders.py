@@ -48,7 +48,8 @@ class DiversePreorderTester:
             return False, {"error": str(e)}
 
     def login_as_agent(self):
-        """Login with existing agent user"""
+        """Login with existing agent user or create one"""
+        # First try existing agent
         login_data = {
             "email_or_phone": "testagent@pyramyd.com",
             "password": "password123"
@@ -59,10 +60,56 @@ class DiversePreorderTester:
         if success and 'token' in response and 'user' in response:
             self.token = response['token']
             self.user_id = response['user']['id']
-            print("✅ Logged in as agent successfully")
-            return True
+            user_role = response['user'].get('role')
+            print(f"✅ Logged in successfully with role: {user_role}")
+            
+            # Check if user has the right role for creating pre-orders
+            allowed_roles = ['farmer', 'supplier', 'processor', 'agent']
+            if user_role in allowed_roles:
+                print(f"✅ User role '{user_role}' is authorized to create pre-orders")
+                return True
+            else:
+                print(f"❌ User role '{user_role}' is not authorized to create pre-orders")
+                print("Trying to create a new agent user...")
+                return self.create_agent_user()
         else:
             print(f"❌ Login failed: {response}")
+            print("Trying to create a new agent user...")
+            return self.create_agent_user()
+
+    def create_agent_user(self):
+        """Create a new agent user for testing"""
+        timestamp = datetime.now().strftime("%H%M%S")
+        registration_data = {
+            "first_name": "Test",
+            "last_name": "Agent",
+            "username": f"test_agent_preorder_{timestamp}",
+            "email_or_phone": f"agent_preorder_{timestamp}@pyramyd.com",
+            "password": "AgentPass123!",
+            "phone": "+1234567890",
+            "gender": "male",
+            "date_of_birth": "1990-01-01",
+            "user_path": "partner",
+            "partner_type": "agent",
+            "business_info": {
+                "business_name": "Test Agent Business",
+                "business_address": "Test Address"
+            },
+            "verification_info": {
+                "nin": "12345678901"
+            }
+        }
+
+        success, response = self.make_request('POST', '/api/auth/complete-registration', registration_data, 200)
+        
+        if success and 'token' in response and 'user' in response:
+            self.token = response['token']
+            self.user_id = response['user']['id']
+            user_role = response['user'].get('role')
+            print(f"✅ Created new agent user with role: {user_role}")
+            return True
+        else:
+            print(f"❌ Agent user creation failed: {response}")
             return False
 
     def create_diverse_preorder_products(self):
