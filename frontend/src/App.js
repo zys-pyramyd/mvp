@@ -1595,8 +1595,31 @@ function App() {
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                       >
-                        Manage Profile
+                        👤 My Profile
                       </button>
+
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          // Add dashboard functionality where users manage all activities
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-50 font-medium"
+                      >
+                        🏠 My Dashboard
+                      </button>
+
+                      {/* Show "Become a Partner" for non-agents */}
+                      {user.role !== 'agent' && (
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            handleSlideAction('agent_register');
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-gray-50 font-medium"
+                        >
+                          🤝 Become a Partner
+                        </button>
+                      )}
                       
                       {/* Group Buying menu item - commented out for pre-order functionality */}
                       {/* 
