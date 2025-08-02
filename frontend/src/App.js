@@ -337,6 +337,11 @@ function App() {
     
     fetchProducts();
     fetchCategories();
+    
+    // Migrate existing cart items to ensure proper structure
+    if (cart.length > 0) {
+      migrateCartItems();
+    }
   }, [currentPlatform, selectedCategory, searchTerm]);
 
   // Auto-change slides every 5 seconds
