@@ -2056,7 +2056,7 @@ function App() {
                         <label className="block text-xs font-medium text-gray-700 mb-1">Unit</label>
                         <select
                           className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
-                          id={`unit-${product.id || product._id || index}`}
+                          id={`unit-${index}`}
                         >
                           <option value="kg">kg</option>
                           <option value="g">g</option>
