@@ -421,9 +421,21 @@ metadata:
   test_sequence: 2
   run_ui: false
 
+  - task: "Create Diverse Pre-order Products for Frontend"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ DIVERSE PRE-ORDER PRODUCTS CREATION SUCCESSFUL: Successfully created and published 3 diverse pre-order products as requested: 1) Premium Basmati Rice - Harvest 2024 (₦850/bag, 40% partial payment, 45 days delivery, Kebbi State) 2) Fresh Roma Tomatoes - Seasonal (₦400/crate, 30% partial payment, 30 days delivery, Kaduna State) 3) Pure Red Palm Oil - Cold Pressed (₦1200/gallon, 35% partial payment, 60 days delivery, Cross River State). All products are published and retrievable via GET /api/preorders endpoint. The pre-order section on the frontend will now be populated with these diverse products showing the orange gradient styling as implemented."
+
 test_plan:
   current_focus:
-    - "Product Model with Unit Specification Field"
+    - "Create Diverse Pre-order Products for Frontend"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -449,3 +461,5 @@ agent_communication:
     message: "Starting cart management enhancement work. Found existing cart and checkout implementation but cart items structure needs fixing. Cart modal uses functions like removeCartItem, updateCartItemQuantity but cart items may not have consistent ID structure. Will fix cart item structure and enhance cart management functionality."
   - agent: "main"
     message: "✅ ENHANCED PRICING DISPLAY IMPLEMENTATION COMPLETED: Successfully added unit_specification field to backend Product models and updated frontend to display enhanced pricing format like '₦450/bag (100kg)', '₦800/gallon (5 litres)', '₦300/crate (big)'. Backend API testing achieved 100% success rate (15/15 tests). Frontend beautifully displays enhanced pricing with specifications in gray parentheses. Cart modal also shows enhanced pricing format. Ready to proceed with user statistics display and rating system implementation."
+  - agent: "testing"
+    message: "✅ DIVERSE PRE-ORDER PRODUCTS CREATION SUCCESSFUL: Successfully created and published 3 diverse pre-order products as requested to populate the new pre-order section on the frontend: 1) Premium Basmati Rice - Harvest 2024 (₦850/bag, 40% partial payment, 45 days delivery from Kebbi State) 2) Fresh Roma Tomatoes - Seasonal (₦400/crate, 30% partial payment, 30 days delivery from Kaduna State) 3) Pure Red Palm Oil - Cold Pressed (₦1200/gallon, 35% partial payment, 60 days delivery from Cross River State). All products are published and retrievable via GET /api/preorders endpoint with proper structure including unit specifications. The pre-order section on the frontend will now be populated with these diverse products showing the attractive orange gradient styling as implemented. Testing confirmed all products are accessible and ready for frontend display."
