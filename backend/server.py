@@ -693,9 +693,22 @@ async def get_products(
             if seller_type:
                 preorders_query["seller_type"] = seller_type
             
-            # Get pre-orders
+            # Get pre-orders with improved pagination logic
             skip = (page - 1) * limit if only_preorders else 0
-            limit_preorders = limit if only_preorders else limit - len(results["products"])
+            
+            # Fix: Ensure pre-orders get a fair share of the response, not just leftovers
+            if only_preorders:
+                limit_preorders = limit
+            else:
+                # Allow pre-orders alongside products - increase effective limit or reserve space
+                # Option 1: Reserve space for pre-orders (e.g., show up to 15 products + 5 pre-orders)
+                max_products_for_mixed = max(1, int(limit * 0.75))  # Reserve 75% for products, 25% for pre-orders  
+                if len(results["products"]) > max_products_for_mixed:
+                    # Trim products to make space for pre-orders
+                    results["products"] = results["products"][:max_products_for_mixed]
+                
+                limit_preorders = limit - len(results["products"])
+                limit_preorders = max(limit_preorders, int(limit * 0.25))  # Always allow at least 25% for pre-orders
             
             if limit_preorders > 0:
                 preorders = list(db.preorders.find(preorders_query).sort("created_at", -1).skip(skip).limit(limit_preorders))
