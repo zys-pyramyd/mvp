@@ -599,7 +599,16 @@ function App() {
           : item
       ));
     } else {
-      setCart([...cart, { product_id: product.id, quantity: 1, product }]);
+      const cartItem = {
+        id: `cart-${Date.now()}-${product.id}`, // Unique cart item ID
+        product_id: product.id,
+        quantity: 1,
+        product,
+        unit: product.unit || 'kg',
+        unit_specification: product.unit_specification || '',
+        delivery_method: 'platform' // Default delivery method
+      };
+      setCart([...cart, cartItem]);
     }
   };
 
