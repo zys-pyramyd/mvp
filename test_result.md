@@ -303,13 +303,25 @@ backend:
         agent: "testing"
         comment: "✅ COMPLETE PRE-ORDER SYSTEM E2E TESTING SUCCESSFUL: Comprehensive end-to-end testing achieved 94.7% success rate (18/19 tests passed). Successfully tested complete flow: 1) Created test agent user with proper role authorization 2) Created pre-order with all required fields and validation 3) Published pre-order successfully 4) Tested advanced filtering API with 7 different parameter combinations 5) Verified products API returns both regular products and pre-orders (13 products, 7 pre-orders) 6) Placed order on pre-order with proper amount calculations (₦21,250 total, ₦8,500 partial payment) 7) Verified stock management reduces available stock correctly (500→475) 8) Confirmed user pre-orders and orders APIs working. Complete pre-order lifecycle from creation to ordering is fully functional and ready for production use."
 
+  - task: "Product Model with Unit Specification Field"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ UNIT SPECIFICATION TESTING COMPLETE: Comprehensive testing of the updated Product model with unit_specification field achieved 100% success rate (15/15 tests passed). Key findings: 1) GET /api/products - existing products work perfectly and correctly display unit_specification field for enhanced pricing (found 12 products with unit_specification) 2) POST /api/products - successfully created test products with unit_specification: Rice (₦450/bag (100kg)), Tomatoes (₦300/crate (big)), Palm Oil (₦800/gallon (5 litres)) 3) API responses correctly include unit_specification field in product details 4) Products filtering remains fully compatible - tested category, location, price range, search, and pagination filters all working with unit_specification 5) Enhanced pricing display format (₦price/unit (specification)) is fully functional and demonstrated with 15 examples. The backend API correctly handles the new unit_specification field for enhanced pricing display like '₦450/bag (100kg)' format as requested."
+
   - task: "Cart Management Enhancement"
     implemented: true
     working: true
     file: "/app/frontend/src/App.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
