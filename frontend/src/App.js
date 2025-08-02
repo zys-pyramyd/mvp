@@ -1495,23 +1495,21 @@ function App() {
 
             {/* Right side navigation icons - Responsive */}
             <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-              {/* Cart - Responsive */}
+              {/* Cart */}
               <button
                 onClick={() => setShowCart(true)}
-                className="nav-button icon-button relative p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                className="nav-button icon-button relative p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
                 title="Shopping Cart"
               >
-                <div className="w-5 h-5 sm:w-6 sm:h-6">
-                  <AddToCartIcon />
-                </div>
+                <AddToCartIcon />
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-semibold text-xs">
+                  <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold">
                     {cartItemCount}
                   </span>
                 )}
               </button>
 
-              {/* Messaging - Responsive */}
+              {/* Messaging - Always visible */}
               <button
                 onClick={() => {
                   if (!user) {
@@ -1520,20 +1518,18 @@ function App() {
                     setShowMessaging(true);
                   }
                 }}
-                className="nav-button icon-button relative p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                className="nav-button icon-button relative p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
                 title="Messages"
               >
-                <div className="w-5 h-5 sm:w-6 sm:h-6">
-                  <MessageIcon />
-                </div>
+                <MessageIcon />
                 {user && messages.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-semibold text-xs">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold">
                     {messages.length}
                   </span>
                 )}
               </button>
 
-              {/* Order Tracking - Responsive */}
+              {/* Order Tracking - Always visible */}
               <button
                 onClick={() => {
                   if (!user) {
@@ -1543,42 +1539,25 @@ function App() {
                     fetchOrders();
                   }
                 }}
-                className="nav-button icon-button p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                className="nav-button icon-button p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
                 title="Track Orders / Find Drivers"
               >
-                <div className="w-5 h-5 sm:w-6 sm:h-6">
-                  <TruckIcon />
-                </div>
+                <TruckIcon />
               </button>
 
-              {/* Profile Icon with Dropdown - Responsive */}
-              <div className="relative">
-                {!user ? (
-                  <button
-                    onClick={() => setShowAuthModal(true)}
-                    className="nav-button icon-button flex items-center space-x-1 sm:space-x-2 p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
-                    title="Sign In"
-                  >
-                    <div className="w-5 h-5 sm:w-6 sm:h-6">
-                      <ProfileIcon />
-                    </div>
-                    <span className="hidden md:block text-sm font-medium">Sign In</span>
-                  </button>
-                ) : (
+              {/* Profile Menu or Sign In */}
+              {user ? (
+                <div className="relative">
                   <button
                     onClick={() => setShowProfileMenu(!showProfileMenu)}
-                    className="nav-button icon-button flex items-center space-x-1 sm:space-x-2 p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                    className="nav-button icon-button flex items-center space-x-1 p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
                     title="Profile Menu"
                   >
-                    <div className="w-5 h-5 sm:w-6 sm:h-6">
-                      <ProfileIcon />
-                    </div>
-                    <span className="hidden md:block text-sm font-medium">
+                    <ProfileIcon />
+                    <span className="hidden sm:block text-sm font-medium">
                       {user.first_name}
                     </span>
                   </button>
-                )}
-              </div>
 
                   {/* Profile Dropdown */}
                   {showProfileMenu && (
