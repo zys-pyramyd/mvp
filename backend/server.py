@@ -397,7 +397,8 @@ class Product(BaseModel):
     description: str
     category: ProductCategory
     price_per_unit: float
-    unit_of_measure: str  # kg, basket, crate, etc.
+    unit_of_measure: str  # kg, basket, crate, bag, gallon, etc.
+    unit_specification: Optional[str] = None  # "100kg", "big", "5 litres", etc.
     quantity_available: int
     minimum_order_quantity: int = 1
     location: str
