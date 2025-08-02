@@ -610,6 +610,9 @@ function App() {
       };
       setCart([...cart, cartItem]);
     }
+    
+    // Calculate order summary after adding
+    setTimeout(() => calculateOrderSummary(), 100);
   };
 
   const removeFromCart = (productId) => {
