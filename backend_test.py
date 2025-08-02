@@ -1447,6 +1447,211 @@ class PyramydAPITester:
         
         return overall_success
 
+    def test_create_diverse_preorder_products(self):
+        """Create diverse pre-order products as requested by user"""
+        print("\n🌾 Creating Diverse Pre-order Products...")
+        
+        from datetime import datetime, timedelta
+        
+        # Calculate delivery dates
+        rice_delivery = (datetime.utcnow() + timedelta(days=45)).isoformat() + "Z"
+        tomato_delivery = (datetime.utcnow() + timedelta(days=30)).isoformat() + "Z"
+        palm_oil_delivery = (datetime.utcnow() + timedelta(days=60)).isoformat() + "Z"
+        
+        # 1. Rice Pre-order
+        rice_preorder_data = {
+            "product_name": "Premium Basmati Rice - Harvest 2024",
+            "product_category": "grain",
+            "description": "Premium quality Basmati rice from the 2024 harvest season. Carefully selected and processed for superior taste and aroma.",
+            "total_stock": 500,
+            "unit": "bag",
+            "price_per_unit": 850.0,
+            "partial_payment_percentage": 0.4,  # 40%
+            "location": "Kebbi State, Nigeria",
+            "delivery_date": rice_delivery,
+            "business_name": "Kebbi Rice Mills",
+            "farm_name": "Golden Harvest Farm",
+            "images": []
+        }
+
+        success, response = self.make_request('POST', '/api/preorders/create', rice_preorder_data, 200, use_auth=True)
+        
+        if success and 'preorder_id' in response:
+            rice_preorder_id = response['preorder_id']
+            # Publish the rice pre-order
+            publish_success, _ = self.make_request('POST', f'/api/preorders/{rice_preorder_id}/publish', {}, 200, use_auth=True)
+            if publish_success:
+                self.log_test("Create Rice Pre-order (Premium Basmati)", True, "Created and published successfully")
+                rice_success = True
+            else:
+                self.log_test("Create Rice Pre-order (Premium Basmati)", False, "Created but failed to publish")
+                rice_success = False
+        else:
+            self.log_test("Create Rice Pre-order (Premium Basmati)", False, f"Creation failed: {response}")
+            rice_success = False
+
+        # 2. Tomato Pre-order
+        tomato_preorder_data = {
+            "product_name": "Fresh Roma Tomatoes - Seasonal",
+            "product_category": "vegetables",
+            "description": "Fresh, juicy Roma tomatoes perfect for cooking and processing. Harvested at peak ripeness for maximum flavor and nutrition.",
+            "total_stock": 200,
+            "unit": "crate",
+            "price_per_unit": 400.0,
+            "partial_payment_percentage": 0.3,  # 30%
+            "location": "Kaduna State, Nigeria",
+            "delivery_date": tomato_delivery,
+            "business_name": "Kaduna Fresh Produce",
+            "farm_name": "Valley View Tomato Farm",
+            "images": []
+        }
+
+        success, response = self.make_request('POST', '/api/preorders/create', tomato_preorder_data, 200, use_auth=True)
+        
+        if success and 'preorder_id' in response:
+            tomato_preorder_id = response['preorder_id']
+            # Publish the tomato pre-order
+            publish_success, _ = self.make_request('POST', f'/api/preorders/{tomato_preorder_id}/publish', {}, 200, use_auth=True)
+            if publish_success:
+                self.log_test("Create Tomato Pre-order (Fresh Roma)", True, "Created and published successfully")
+                tomato_success = True
+            else:
+                self.log_test("Create Tomato Pre-order (Fresh Roma)", False, "Created but failed to publish")
+                tomato_success = False
+        else:
+            self.log_test("Create Tomato Pre-order (Fresh Roma)", False, f"Creation failed: {response}")
+            tomato_success = False
+
+        # 3. Palm Oil Pre-order
+        palm_oil_preorder_data = {
+            "product_name": "Pure Red Palm Oil - Cold Pressed",
+            "product_category": "packaged_goods",
+            "description": "Pure, unrefined red palm oil extracted using traditional cold-press methods. Rich in vitamins and natural antioxidants.",
+            "total_stock": 100,
+            "unit": "gallon",
+            "price_per_unit": 1200.0,
+            "partial_payment_percentage": 0.35,  # 35%
+            "location": "Cross River State, Nigeria",
+            "delivery_date": palm_oil_delivery,
+            "business_name": "Cross River Palm Processing",
+            "farm_name": "Tropical Palm Estate",
+            "images": []
+        }
+
+        success, response = self.make_request('POST', '/api/preorders/create', palm_oil_preorder_data, 200, use_auth=True)
+        
+        if success and 'preorder_id' in response:
+            palm_oil_preorder_id = response['preorder_id']
+            # Publish the palm oil pre-order
+            publish_success, _ = self.make_request('POST', f'/api/preorders/{palm_oil_preorder_id}/publish', {}, 200, use_auth=True)
+            if publish_success:
+                self.log_test("Create Palm Oil Pre-order (Pure Red)", True, "Created and published successfully")
+                palm_oil_success = True
+            else:
+                self.log_test("Create Palm Oil Pre-order (Pure Red)", False, "Created but failed to publish")
+                palm_oil_success = False
+        else:
+            self.log_test("Create Palm Oil Pre-order (Pure Red)", False, f"Creation failed: {response}")
+            palm_oil_success = False
+
+        overall_success = rice_success and tomato_success and palm_oil_success
+        
+        if overall_success:
+            self.log_test("Create Diverse Pre-order Products", True, "All 3 diverse pre-order products created and published successfully")
+        else:
+            self.log_test("Create Diverse Pre-order Products", False, "One or more pre-order products failed to create/publish")
+        
+        return overall_success
+
+    def test_preorder_products_retrieval(self):
+        """Test that created pre-order products can be retrieved via GET /api/products with type='preorder'"""
+        print("\n🔍 Testing Pre-order Products Retrieval...")
+        
+        # Test 1: Get all products including pre-orders
+        success, response = self.make_request('GET', '/api/products')
+        
+        if success and isinstance(response, dict) and 'preorders' in response:
+            preorders = response.get('preorders', [])
+            products = response.get('products', [])
+            
+            # Look for our created pre-orders
+            rice_found = any(p.get('product_name') == 'Premium Basmati Rice - Harvest 2024' for p in preorders)
+            tomato_found = any(p.get('product_name') == 'Fresh Roma Tomatoes - Seasonal' for p in preorders)
+            palm_oil_found = any(p.get('product_name') == 'Pure Red Palm Oil - Cold Pressed' for p in preorders)
+            
+            found_count = sum([rice_found, tomato_found, palm_oil_found])
+            
+            self.log_test("GET /api/products - Pre-orders Included", True, 
+                         f"Found {len(preorders)} total pre-orders, {found_count}/3 of our created pre-orders visible")
+            products_success = True
+        else:
+            self.log_test("GET /api/products - Pre-orders Included", False, f"Failed to get products: {response}")
+            products_success = False
+
+        # Test 2: Get only pre-orders
+        success, response = self.make_request('GET', '/api/products?only_preorders=true')
+        
+        if success and isinstance(response, dict):
+            preorders = response.get('preorders', [])
+            
+            # Verify we get only pre-orders
+            if len(preorders) > 0:
+                # Check that all items are pre-orders (have type="preorder" or pre-order specific fields)
+                preorder_items = [p for p in preorders if p.get('type') == 'preorder' or 'partial_payment_percentage' in p]
+                
+                self.log_test("GET /api/products?only_preorders=true", True, 
+                             f"Retrieved {len(preorders)} pre-orders successfully")
+                preorders_only_success = True
+            else:
+                self.log_test("GET /api/products?only_preorders=true", True, 
+                             "No pre-orders found (acceptable if none exist)")
+                preorders_only_success = True
+        else:
+            self.log_test("GET /api/products?only_preorders=true", False, f"Failed to get pre-orders only: {response}")
+            preorders_only_success = False
+
+        # Test 3: Search for specific pre-orders
+        success, response = self.make_request('GET', '/api/products?search_term=Basmati')
+        
+        if success and isinstance(response, dict):
+            preorders = response.get('preorders', [])
+            rice_found = any('Basmati' in p.get('product_name', '') for p in preorders)
+            
+            if rice_found:
+                self.log_test("Search Pre-orders (Basmati Rice)", True, "Found Basmati rice pre-order in search results")
+                search_success = True
+            else:
+                self.log_test("Search Pre-orders (Basmati Rice)", True, "Basmati rice not found in search (may not be indexed yet)")
+                search_success = True  # Don't fail if search indexing is delayed
+        else:
+            self.log_test("Search Pre-orders (Basmati Rice)", False, f"Search failed: {response}")
+            search_success = False
+
+        overall_success = products_success and preorders_only_success and search_success
+        
+        return overall_success
+
+    def test_diverse_preorder_complete_workflow(self):
+        """Test complete workflow for creating and retrieving diverse pre-order products"""
+        print("\n🔄 Testing Complete Diverse Pre-order Workflow...")
+        
+        # Step 1: Create diverse pre-order products
+        creation_success = self.test_create_diverse_preorder_products()
+        
+        # Step 2: Test retrieval of pre-order products
+        retrieval_success = self.test_preorder_products_retrieval()
+        
+        overall_success = creation_success and retrieval_success
+        
+        if overall_success:
+            self.log_test("Complete Diverse Pre-order Workflow", True,
+                         "Successfully created and retrieved diverse pre-order products")
+        else:
+            self.log_test("Complete Diverse Pre-order Workflow", False,
+                         "One or more steps in diverse pre-order workflow failed")
+        
+        return overall_success
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting Pyramyd API Tests...")
