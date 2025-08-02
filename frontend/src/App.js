@@ -1984,9 +1984,14 @@ function App() {
                     {product.description || 'Fresh organic produce from test farm'}
                   </p>
 
-                  {/* Price */}
+                  {/* Price with Enhanced Specification Display */}
                   <div className="text-xl font-bold text-emerald-600 mb-2">
-                    ₦{product.price_per_unit}/{product.unit || 'kg'}
+                    ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
+                    {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) && 
+                      <span className="text-sm font-medium text-gray-600 ml-1">
+                        ({product.unit_specification || product.unit_of_measure || 'standard'})
+                      </span>
+                    }
                   </div>
 
                   {/* Stock Info */}
