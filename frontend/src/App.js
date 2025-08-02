@@ -2073,7 +2073,7 @@ function App() {
                           type="text"
                           placeholder="e.g., 100kg"
                           className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
-                          id={`spec-${product.id || product._id || index}`}
+                          id={`spec-${index}`}
                         />
                       </div>
                     </div>
