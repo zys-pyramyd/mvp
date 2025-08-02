@@ -629,6 +629,27 @@ function App() {
           : item
       ));
     }
+    
+    // Calculate order summary after updating
+    setTimeout(() => calculateOrderSummary(), 100);
+  };
+
+  // Migrate existing cart items to ensure they have proper structure
+  const migrateCartItems = () => {
+    setCart(prevCart => 
+      prevCart.map(item => {
+        if (!item.id) {
+          return {
+            ...item,
+            id: `cart-${Date.now()}-${item.product_id}`,
+            unit: item.unit || item.product?.unit || 'kg',
+            unit_specification: item.unit_specification || item.product?.unit_specification || '',
+            delivery_method: item.delivery_method || 'platform'
+          };
+        }
+        return item;
+      })
+    );
   };
 
   const logout = () => {
