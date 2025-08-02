@@ -333,6 +333,18 @@ backend:
         agent: "main"
         comment: "RESOLVED: Fixed product card rendering issue that was preventing delivery method radio buttons and Add to Cart buttons from displaying. Root cause was complex product ID logic in form field IDs causing JavaScript errors. Solution: Simplified field IDs to use index-based naming (quantity-${index}, unit-${index}, etc.) instead of complex product.id||product._id||index logic. Updated CSS grid layout with auto-rows-auto and items-start for proper card expansion. Enhanced cart functionality now fully working: quantity/unit/spec selection, delivery method (Platform/Offline), and Add to Cart buttons all visible and functional."
 
+  - task: "Pre-Order Sales Section Implementation"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py, /app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "✅ PRE-ORDER SALES SECTION SUCCESSFULLY IMPLEMENTED: Fixed critical backend pagination bug (line 698) where limit_preorders = limit - len(products) resulted in 0 pre-orders when products filled pagination limit. Implemented fair pagination logic reserving 25% space for pre-orders and 75% for products. Frontend displays beautiful pre-order section with 🔥 fire emoji, orange gradient cards, discount badges (65% OFF, 70% OFF), complete product details (price, partial payment %, stock, delivery dates, locations), horizontal scrolling, and 'Add Pre-order to Cart' buttons. Pre-order section appears prominently on both Home and Buy from Farm pages above regular products grid."
+
   - task: "Enhanced Pricing Display Implementation"
     implemented: true
     working: true
