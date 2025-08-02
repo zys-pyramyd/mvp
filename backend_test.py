@@ -1761,7 +1761,11 @@ class PyramydAPITester:
         # Test 31: Complete Pre-order System Workflow
         self.test_preorder_system_complete()
 
-        # Test 32-40: Driver System Tests
+        # Test 32: Diverse Pre-order Products Creation (NEW)
+        print("\n🌾 Testing Diverse Pre-order Products Creation...")
+        self.test_diverse_preorder_complete_workflow()
+
+        # Test 33-40: Driver System Tests
         print("\n🚗 Testing Driver System...")
         self.test_driver_system_complete()
 
