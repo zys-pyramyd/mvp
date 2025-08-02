@@ -1944,7 +1944,7 @@ function App() {
             </div>
           ) : (
             products.map((product, index) => (
-              <div key={product.id || product._id || index} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+              <div key={product.id || product._id || index} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex flex-col">
                 {/* Product Badge */}
                 <div className="relative">
                   {product.images && product.images.length > 0 ? (
@@ -1974,7 +1974,7 @@ function App() {
                   )}
                 </div>
 
-                <div className="p-4">
+                <div className="p-4 flex-1 flex flex-col">{/* Changed to flex-1 flex flex-col to allow content to expand */}
                   <h3 className="font-semibold text-gray-900 mb-2">
                     {product.product_name || product.crop_type}
                   </h3>
