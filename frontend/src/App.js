@@ -2010,9 +2010,9 @@ function App() {
 
           {/* Pre-Order Products Horizontal Scroll */}
           <div className="relative">
-            <div className="flex overflow-x-auto space-x-4 pb-4 scrollbar-hide">
+            <div className="flex overflow-x-auto space-x-3 sm:space-x-4 pb-4 scrollbar-hide">
               {products.filter(product => product.type === 'preorder').slice(0, 6).map((product, index) => (
-                <div key={`preorder-${product.id || product._id || index}`} className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg shadow-md hover:shadow-lg transition-all flex-shrink-0 w-80 border-2 border-orange-200 hover:border-orange-300 cursor-pointer">
+                <div key={`preorder-${product.id || product._id || index}`} className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg shadow-md hover:shadow-lg transition-all flex-shrink-0 w-72 sm:w-80 border-2 border-orange-200 hover:border-orange-300 cursor-pointer">
                   {/* Pre-Order Badge */}
                   <div 
                     className="relative"
@@ -2023,35 +2023,35 @@ function App() {
                       <img 
                         src={product.images[0]} 
                         alt={product.product_name || product.crop_type}
-                        className="w-full h-40 object-cover rounded-t-lg"
+                        className="w-full h-32 sm:h-40 object-cover rounded-t-lg"
                       />
                     ) : (
-                      <div className="w-full h-40 bg-gradient-to-r from-orange-200 to-orange-300 flex items-center justify-center rounded-t-lg">
-                        <span className="text-orange-600 font-medium">🌾 Pre-Order Product</span>
+                      <div className="w-full h-32 sm:h-40 bg-gradient-to-r from-orange-200 to-orange-300 flex items-center justify-center rounded-t-lg">
+                        <span className="text-orange-600 font-medium text-sm sm:text-base">🌾 Pre-Order Product</span>
                       </div>
                     )}
                     
-                    <div className="absolute top-2 left-2 bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center">
+                    <div className="absolute top-2 left-2 bg-orange-500 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-bold flex items-center">
                       ⚡ PRE-ORDER
                     </div>
                     
                     {/* Pre-order percentage badge */}
-                    <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                    <div className="absolute top-2 right-2 bg-red-500 text-white px-1.5 sm:px-2 py-1 rounded-full text-xs font-bold">
                       -{Math.round((1 - (product.partial_payment_percentage || 0.3)) * 100)}% OFF
                     </div>
                   </div>
 
-                  <div className="p-4">
-                    <h4 className="font-bold text-gray-900 mb-2">
+                  <div className="p-3 sm:p-4">
+                    <h4 className="font-bold text-gray-900 mb-2 text-sm sm:text-base line-clamp-1">
                       {product.product_name || product.crop_type}
                     </h4>
                     
                     {/* Enhanced Pricing for Pre-orders */}
                     <div className="flex items-center space-x-2 mb-2">
-                      <span className="text-lg font-bold text-orange-600">
+                      <span className="text-base sm:text-lg font-bold text-orange-600">
                         ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
                         {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) && 
-                          <span className="text-sm font-medium text-gray-600 ml-1">
+                          <span className="text-xs sm:text-sm font-medium text-gray-600 ml-1">
                             ({product.unit_specification || product.unit_of_measure || 'standard'})
                           </span>
                         }
@@ -2059,7 +2059,7 @@ function App() {
                     </div>
 
                     {/* Pre-order specific info */}
-                    <div className="mb-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                    <div className="mb-3 p-2 sm:p-3 bg-orange-50 rounded-lg border border-orange-200">
                       <div className="text-xs text-orange-800 space-y-1">
                         <div className="flex justify-between">
                           <span>💰 Partial Payment:</span>
@@ -2071,7 +2071,7 @@ function App() {
                         </div>
                         <div className="flex justify-between">
                           <span>🚚 Delivery:</span>
-                          <span className="font-bold">{new Date(product.delivery_date).toLocaleDateString()}</span>
+                          <span className="font-bold text-xs">{new Date(product.delivery_date).toLocaleDateString()}</span>
                         </div>
                         {product.orders_count > 0 && (
                           <div className="flex justify-between">
@@ -2083,7 +2083,7 @@ function App() {
                     </div>
 
                     {/* Location */}
-                    <div className="text-xs text-gray-600 mb-3 flex items-center">
+                    <div className="text-xs text-gray-600 mb-3 flex items-center line-clamp-1">
                       📍 {product.location}
                     </div>
 
@@ -2097,7 +2097,7 @@ function App() {
                         
                         addEnhancedToCart(product, quantity, unit, specification, deliveryMethod);
                       }}
-                      className="w-full py-2 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors text-sm"
+                      className="w-full py-2 px-3 sm:px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors text-xs sm:text-sm"
                     >
                       🛒 Add Pre-order to Cart
                     </button>
@@ -2107,11 +2107,11 @@ function App() {
               
               {/* Show message if no pre-orders */}
               {products.filter(product => product.type === 'preorder').length === 0 && (
-                <div className="w-full text-center py-8 bg-orange-50 rounded-lg border-2 border-dashed border-orange-200">
+                <div className="w-full text-center py-6 sm:py-8 bg-orange-50 rounded-lg border-2 border-dashed border-orange-200">
                   <div className="text-orange-600">
-                    <div className="text-2xl mb-2">📦</div>
-                    <h4 className="font-medium text-gray-700">No Pre-Orders Available</h4>
-                    <p className="text-sm text-gray-500">Check back soon for exciting pre-order deals!</p>
+                    <div className="text-xl sm:text-2xl mb-2">📦</div>
+                    <h4 className="font-medium text-gray-700 text-sm sm:text-base">No Pre-Orders Available</h4>
+                    <p className="text-xs sm:text-sm text-gray-500">Check back soon for exciting pre-order deals!</p>
                   </div>
                 </div>
               )}
