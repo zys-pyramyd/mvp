@@ -2085,7 +2085,7 @@ function App() {
                         <label className="flex items-center">
                           <input
                             type="radio"
-                            name={`delivery-${product.id || product._id || index}`}
+                            name={`delivery-method-${index}`}
                             value="platform"
                             defaultChecked
                             className="w-3 h-3 text-emerald-600 border-gray-300 focus:ring-emerald-500"
@@ -2095,7 +2095,7 @@ function App() {
                         <label className="flex items-center">
                           <input
                             type="radio"
-                            name={`delivery-${product.id || product._id || index}`}
+                            name={`delivery-method-${index}`}
                             value="offline"
                             className="w-3 h-3 text-emerald-600 border-gray-300 focus:ring-emerald-500"
                           />
