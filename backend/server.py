@@ -416,6 +416,7 @@ class ProductCreate(BaseModel):
     category: ProductCategory
     price_per_unit: float
     unit_of_measure: str
+    unit_specification: Optional[str] = None  # "100kg", "big", "5 litres", etc.
     quantity_available: int
     minimum_order_quantity: int = 1
     location: str
