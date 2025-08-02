@@ -1495,15 +1495,17 @@ function App() {
 
             {/* Right side navigation icons - Responsive */}
             <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-              {/* Cart */}
+              {/* Cart - Responsive */}
               <button
                 onClick={() => setShowCart(true)}
-                className="nav-button icon-button relative p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                className="nav-button icon-button relative p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
                 title="Shopping Cart"
               >
-                <AddToCartIcon />
+                <div className="w-5 h-5 sm:w-6 sm:h-6">
+                  <AddToCartIcon />
+                </div>
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold">
+                  <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-semibold text-xs">
                     {cartItemCount}
                   </span>
                 )}
