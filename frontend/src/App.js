@@ -425,7 +425,9 @@ function App() {
           allProducts = [...allProducts, ...data.products];
         }
         if (data.preorders && Array.isArray(data.preorders)) {
-          allProducts = [...allProducts, ...data.preorders];
+          // Ensure pre-orders have type='preorder' for filtering
+          const preordersWithType = data.preorders.map(preorder => ({ ...preorder, type: 'preorder' }));
+          allProducts = [...allProducts, ...preordersWithType];
         }
         
         // Fallback for legacy API response
