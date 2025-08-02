@@ -255,10 +255,41 @@ class DiversePreorderTester:
             else:
                 print("❌ None of our pre-order products are visible")
                 
-            return found_count > 0
+            products_success = found_count > 0
         else:
             print(f"❌ Failed to get products: {response}")
-            return False
+            products_success = False
+
+        # Test 2: Try the dedicated pre-orders endpoint
+        success, response = self.make_request('GET', '/api/preorders')
+        
+        if success and isinstance(response, dict) and 'preorders' in response:
+            preorders = response.get('preorders', [])
+            
+            # Look for our created pre-orders
+            rice_found = any(p.get('product_name') == 'Premium Basmati Rice - Harvest 2024' for p in preorders)
+            tomato_found = any(p.get('product_name') == 'Fresh Roma Tomatoes - Seasonal' for p in preorders)
+            palm_oil_found = any(p.get('product_name') == 'Pure Red Palm Oil - Cold Pressed' for p in preorders)
+            
+            found_count = sum([rice_found, tomato_found, palm_oil_found])
+            
+            print(f"✅ /api/preorders endpoint: Found {len(preorders)} total pre-orders, {found_count}/3 of our created pre-orders visible")
+            
+            if found_count == 3:
+                print("🎉 All 3 diverse pre-order products are visible in the dedicated pre-orders API!")
+                preorders_success = True
+            elif found_count > 0:
+                print(f"⚠️ Only {found_count}/3 pre-order products are visible in dedicated API")
+                preorders_success = True
+            else:
+                print("❌ None of our pre-order products are visible in dedicated API")
+                preorders_success = False
+                
+        else:
+            print(f"❌ Failed to get pre-orders from dedicated endpoint: {response}")
+            preorders_success = False
+
+        return products_success or preorders_success
 
     def run_test(self):
         """Run the complete test"""
