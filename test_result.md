@@ -411,8 +411,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Cart Management Enhancement"
-    - "Checkout Flow Completion"
+    - "Product Model with Unit Specification Field"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
