@@ -1608,8 +1608,8 @@ function App() {
                         🏠 My Dashboard
                       </button>
 
-                      {/* Mobile-only options - show on small screens */}
-                      <div className="sm:hidden border-t border-gray-200 pt-2 mt-2">
+                      {/* Mobile-only options - show on tablets and smaller */}
+                      <div className="md:hidden border-t border-gray-200 pt-2 mt-2">
                         <button
                           onClick={() => {
                             setShowProfileMenu(false);
