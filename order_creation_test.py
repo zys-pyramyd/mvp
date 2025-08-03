@@ -61,22 +61,38 @@ class OrderCreationTester:
             print(f"   Request failed: {str(e)}")
             return False, {"error": str(e)}
 
-    def login_existing_user(self):
-        """Login with existing test user"""
-        login_data = {
-            "email_or_phone": "testagent@pyramyd.com",
-            "password": "password123"
+    def create_agent_user(self):
+        """Create a complete agent user for testing"""
+        timestamp = datetime.now().strftime("%H%M%S")
+        registration_data = {
+            "first_name": "Test",
+            "last_name": "Agent",
+            "username": f"test_agent_order_{timestamp}",
+            "email_or_phone": f"agent_order_{timestamp}@pyramyd.com",
+            "password": "AgentPass123!",
+            "phone": "+1234567890",
+            "gender": "male",
+            "date_of_birth": "1990-01-01",
+            "user_path": "partner",
+            "partner_type": "agent",
+            "business_info": {
+                "business_name": "Test Agent Business",
+                "business_address": "Test Address"
+            },
+            "verification_info": {
+                "nin": "12345678901"
+            }
         }
 
-        success, response = self.make_request('POST', '/api/auth/login', login_data, 200)
+        success, response = self.make_request('POST', '/api/auth/complete-registration', registration_data, 200)
         
         if success and 'token' in response and 'user' in response:
             self.token = response['token']
             self.user_id = response['user']['id']
-            self.log_test("Login with existing user", True)
+            self.log_test("Agent User Registration", True)
             return True
         else:
-            self.log_test("Login with existing user", False, f"Login failed: {response}")
+            self.log_test("Agent User Registration", False, f"Registration failed: {response}")
             return False
 
     def test_order_creation_fix(self):
