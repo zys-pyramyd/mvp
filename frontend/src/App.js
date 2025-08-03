@@ -1649,6 +1649,19 @@ function App() {
                           🤝 Become a Partner
                         </button>
                       )}
+
+                      {/* Show agent-specific options for agents */}
+                      {user.role === 'agent' && (
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setShowAddDropOff(true);
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-50 font-medium"
+                        >
+                          📍 Add Drop-off Location
+                        </button>
+                      )}
                       
                       {/* Group Buying menu item - commented out for pre-order functionality */}
                       {/* 
