@@ -2768,6 +2768,10 @@ class PyramydAPITester:
         print("\n📍 Testing Drop-off Location Management System...")
         self.test_dropoff_location_system_complete()
 
+        # ORDER CREATION FIX TEST - Main focus from review request
+        print("\n🛒 Testing Order Creation Fix (PRIORITY)...")
+        self.test_order_creation_fix()
+
         return True
 
     def print_summary(self):
