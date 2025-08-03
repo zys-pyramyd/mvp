@@ -467,6 +467,18 @@ function App() {
     }
   };
 
+  const fetchDropOffLocations = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/dropoff-locations?active_only=true&limit=100`);
+      if (response.ok) {
+        const data = await response.json();
+        setDropOffLocations(data.locations || []);
+      }
+    } catch (error) {
+      console.error('Error fetching drop-off locations:', error);
+    }
+  };
+
   const handleBasicRegistration = async (e) => {
     e.preventDefault();
     // Just move to role path selection after basic form
