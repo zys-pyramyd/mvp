@@ -90,6 +90,40 @@ class DropoffLocationTester:
             self.log_test("Existing User Login (testagent@pyramyd.com)", False, f"Login failed: {response}")
             return False
 
+    def test_complete_registration_agent(self):
+        """Test complete registration flow for agent"""
+        timestamp = datetime.now().strftime("%H%M%S")
+        registration_data = {
+            "first_name": "Agent",
+            "last_name": "Test",
+            "username": f"agent_dropoff_{timestamp}",
+            "email_or_phone": f"agent_dropoff_{timestamp}@pyramyd.com",
+            "password": "AgentPass123!",
+            "phone": "+1234567890",
+            "gender": "male",
+            "date_of_birth": "1990-01-01",
+            "user_path": "partner",
+            "partner_type": "agent",
+            "business_info": {
+                "business_name": "Test Agent Business",
+                "business_address": "Test Address"
+            },
+            "verification_info": {
+                "nin": "12345678901"
+            }
+        }
+
+        success, response = self.make_request('POST', '/api/auth/complete-registration', registration_data, 200)
+        
+        if success and 'token' in response and 'user' in response:
+            self.token = response['token']
+            self.user_id = response['user']['id']
+            self.log_test("Complete Registration (Agent)", True)
+            return True, registration_data
+        else:
+            self.log_test("Complete Registration (Agent)", False, f"Complete registration failed: {response}")
+            return False, registration_data
+
     def test_dropoff_location_creation(self):
         """Test drop-off location creation with validation"""
         print("\n📍 Testing Drop-off Location Creation...")
