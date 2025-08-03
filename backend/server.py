@@ -2542,6 +2542,260 @@ async def get_available_units():
         ]
     }
 
+# Drop-off Location Management Endpoints
+@app.post("/api/dropoff-locations")
+async def create_dropoff_location(
+    location_data: DropoffLocationCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new drop-off location (agents and sellers only)"""
+    try:
+        # Validate user can create drop-off locations
+        allowed_roles = ['agent', 'farmer', 'supplier_farm_inputs', 'supplier_food_produce', 'processor']
+        if current_user.get('role') not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Only agents and sellers can create drop-off locations")
+        
+        # Create drop-off location document
+        location = {
+            "id": str(uuid.uuid4()),
+            "name": location_data.name,
+            "address": location_data.address,
+            "city": location_data.city,
+            "state": location_data.state,
+            "country": location_data.country,
+            "coordinates": location_data.coordinates,
+            "contact_person": location_data.contact_person,
+            "contact_phone": location_data.contact_phone,
+            "operating_hours": location_data.operating_hours,
+            "description": location_data.description,
+            "agent_username": current_user["username"],
+            "is_active": True,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        # Store in database
+        dropoff_locations_collection.insert_one(location)
+        
+        return {
+            "message": "Drop-off location created successfully",
+            "location_id": location["id"],
+            "location": {
+                "id": location["id"],
+                "name": location["name"],
+                "address": location["address"],
+                "city": location["city"],
+                "state": location["state"]
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error creating drop-off location: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create drop-off location")
+
+@app.get("/api/dropoff-locations")
+async def get_dropoff_locations(
+    state: Optional[str] = None,
+    city: Optional[str] = None,
+    active_only: bool = True,
+    page: int = 1,
+    limit: int = 50
+):
+    """Get available drop-off locations with optional filtering"""
+    try:
+        # Build filter query
+        query = {}
+        
+        if active_only:
+            query["is_active"] = True
+            
+        if state:
+            query["state"] = {"$regex": state, "$options": "i"}
+            
+        if city:
+            query["city"] = {"$regex": city, "$options": "i"}
+        
+        # Calculate skip for pagination
+        skip = (page - 1) * limit
+        
+        # Get locations with pagination
+        locations = list(dropoff_locations_collection.find(query).sort("state", 1).sort("city", 1).sort("name", 1).skip(skip).limit(limit))
+        
+        # Get total count for pagination
+        total_count = dropoff_locations_collection.count_documents(query)
+        
+        # Clean up response
+        for location in locations:
+            location.pop('_id', None)
+            if isinstance(location.get("created_at"), datetime):
+                location["created_at"] = location["created_at"].isoformat()
+            if isinstance(location.get("updated_at"), datetime):
+                location["updated_at"] = location["updated_at"].isoformat()
+        
+        return {
+            "locations": locations,
+            "total_count": total_count,
+            "page": page,
+            "limit": limit,
+            "total_pages": (total_count + limit - 1) // limit
+        }
+        
+    except Exception as e:
+        print(f"Error getting drop-off locations: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get drop-off locations")
+
+@app.get("/api/dropoff-locations/my-locations")
+async def get_my_dropoff_locations(current_user: dict = Depends(get_current_user)):
+    """Get current agent's created drop-off locations"""
+    try:
+        # Validate user can manage drop-off locations
+        allowed_roles = ['agent', 'farmer', 'supplier_farm_inputs', 'supplier_food_produce', 'processor']
+        if current_user.get('role') not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Only agents and sellers can view their drop-off locations")
+        
+        locations = list(dropoff_locations_collection.find({"agent_username": current_user["username"]}).sort("created_at", -1))
+        
+        # Clean up response
+        for location in locations:
+            location.pop('_id', None)
+            if isinstance(location.get("created_at"), datetime):
+                location["created_at"] = location["created_at"].isoformat()
+            if isinstance(location.get("updated_at"), datetime):
+                location["updated_at"] = location["updated_at"].isoformat()
+        
+        return {
+            "locations": locations,
+            "total_count": len(locations)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting user drop-off locations: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get user drop-off locations")
+
+@app.get("/api/dropoff-locations/{location_id}")
+async def get_dropoff_location(location_id: str):
+    """Get detailed information about a specific drop-off location"""
+    try:
+        location = dropoff_locations_collection.find_one({"id": location_id})
+        if not location:
+            raise HTTPException(status_code=404, detail="Drop-off location not found")
+        
+        if not location.get("is_active", False):
+            raise HTTPException(status_code=404, detail="Drop-off location is not active")
+        
+        # Clean up response
+        location.pop('_id', None)
+        if isinstance(location.get("created_at"), datetime):
+            location["created_at"] = location["created_at"].isoformat()
+        if isinstance(location.get("updated_at"), datetime):
+            location["updated_at"] = location["updated_at"].isoformat()
+        
+        return location
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting drop-off location details: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get drop-off location details")
+
+@app.put("/api/dropoff-locations/{location_id}")
+async def update_dropoff_location(
+    location_id: str,
+    location_data: DropoffLocationUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a drop-off location (only by creator)"""
+    try:
+        # Find the location
+        location = dropoff_locations_collection.find_one({"id": location_id})
+        if not location:
+            raise HTTPException(status_code=404, detail="Drop-off location not found")
+        
+        # Check ownership
+        if location["agent_username"] != current_user["username"]:
+            raise HTTPException(status_code=403, detail="You can only update your own drop-off locations")
+        
+        # Build update data
+        update_data = {"updated_at": datetime.utcnow()}
+        
+        for field, value in location_data.dict(exclude_unset=True).items():
+            if value is not None:
+                update_data[field] = value
+        
+        # Update location
+        dropoff_locations_collection.update_one(
+            {"id": location_id},
+            {"$set": update_data}
+        )
+        
+        return {"message": "Drop-off location updated successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating drop-off location: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update drop-off location")
+
+@app.delete("/api/dropoff-locations/{location_id}")
+async def delete_dropoff_location(
+    location_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Deactivate a drop-off location (only by creator)"""
+    try:
+        # Find the location
+        location = dropoff_locations_collection.find_one({"id": location_id})
+        if not location:
+            raise HTTPException(status_code=404, detail="Drop-off location not found")
+        
+        # Check ownership
+        if location["agent_username"] != current_user["username"]:
+            raise HTTPException(status_code=403, detail="You can only delete your own drop-off locations")
+        
+        # Soft delete by marking as inactive
+        dropoff_locations_collection.update_one(
+            {"id": location_id},
+            {
+                "$set": {
+                    "is_active": False,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        return {"message": "Drop-off location deactivated successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting drop-off location: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete drop-off location")
+
+@app.get("/api/dropoff-locations/states-cities")
+async def get_dropoff_states_cities():
+    """Get available states and cities for drop-off locations"""
+    try:
+        # Get distinct states and cities
+        states = list(dropoff_locations_collection.distinct("state", {"is_active": True}))
+        cities_by_state = {}
+        
+        for state in states:
+            cities = list(dropoff_locations_collection.distinct("city", {"state": state, "is_active": True}))
+            cities_by_state[state] = sorted(cities)
+        
+        return {
+            "states": sorted(states),
+            "cities_by_state": cities_by_state
+        }
+        
+    except Exception as e:
+        print(f"Error getting states and cities: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get states and cities")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
