@@ -1030,7 +1030,7 @@ function App() {
     }
   };
 
-  const addEnhancedToCart = (product, quantity, unit, specification, deliveryMethod) => {
+  const addEnhancedToCart = (product, quantity, unit, specification, deliveryMethod, dropoffLocation = null) => {
     const existingItem = cart.find(item => item.product_id === (product.id || product._id));
     
     if (existingItem) {
@@ -1042,7 +1042,8 @@ function App() {
               quantity: item.quantity + quantity,
               unit: unit,
               unit_specification: specification,
-              delivery_method: deliveryMethod
+              delivery_method: deliveryMethod,
+              dropoff_location: dropoffLocation
             }
           : item
       ));
@@ -1055,14 +1056,20 @@ function App() {
         quantity: quantity,
         unit: unit,
         unit_specification: specification,
-        delivery_method: deliveryMethod
+        delivery_method: deliveryMethod,
+        dropoff_location: dropoffLocation
       };
       
       setCart(prevCart => [...prevCart, cartItem]);
     }
     
     const quantityDisplay = `${quantity} ${unit}${specification ? ` (${specification})` : ''}`;
-    const deliveryDisplay = deliveryMethod === 'offline' ? 'Offline Delivery' : 'Platform Driver';
+    let deliveryDisplay = 'Platform Driver';
+    if (deliveryMethod === 'offline') {
+      deliveryDisplay = 'Offline Delivery';
+    } else if (deliveryMethod === 'dropoff' && dropoffLocation) {
+      deliveryDisplay = `Drop-off at ${dropoffLocation.name}`;
+    }
     
     // Calculate order summary after adding
     setTimeout(() => calculateOrderSummary(), 100);
