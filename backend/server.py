@@ -2418,9 +2418,35 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
         
+        # Handle drop-off location validation and details
+        dropoff_location_details = None
+        if order_data.delivery_method == "dropoff":
+            if not order_data.dropoff_location_id:
+                raise HTTPException(status_code=400, detail="Drop-off location is required for drop-off delivery")
+            
+            # Get drop-off location details
+            dropoff_location = dropoff_locations_collection.find_one({"id": order_data.dropoff_location_id, "is_active": True})
+            if not dropoff_location:
+                raise HTTPException(status_code=404, detail="Drop-off location not found or inactive")
+            
+            # Create snapshot of location details for order
+            dropoff_location_details = {
+                "id": dropoff_location["id"],
+                "name": dropoff_location["name"],
+                "address": dropoff_location["address"],
+                "city": dropoff_location["city"],
+                "state": dropoff_location["state"],
+                "contact_person": dropoff_location.get("contact_person"),
+                "contact_phone": dropoff_location.get("contact_phone"),
+                "operating_hours": dropoff_location.get("operating_hours")
+            }
+        
         # Calculate total amount
         unit_price = product.get("price_per_unit", 0)
         total_amount = order_data.quantity * unit_price
+        
+        # Determine payment timing based on delivery method
+        payment_timing = "after_delivery" if order_data.delivery_method == "offline" else "during_transit"
         
         # Create order
         order = {
@@ -2442,6 +2468,10 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
             "delivery_method": order_data.delivery_method,
             "delivery_status": "pending" if order_data.delivery_method == "offline" else "",
             "shipping_address": order_data.shipping_address,
+            "dropoff_location_id": order_data.dropoff_location_id,
+            "dropoff_location_details": dropoff_location_details,
+            "agent_fee_percentage": 0.05,
+            "payment_timing": payment_timing,
             "status": OrderStatus.PENDING,
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
@@ -2450,12 +2480,31 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
         # Store order
         db.orders.insert_one(order)
         
+        # Prepare response with location info
+        delivery_info = {
+            "method": order_data.delivery_method,
+            "payment_timing": payment_timing
+        }
+        
+        if dropoff_location_details:
+            delivery_info["dropoff_location"] = {
+                "name": dropoff_location_details["name"],
+                "address": dropoff_location_details["address"],
+                "city": dropoff_location_details["city"],
+                "state": dropoff_location_details["state"]
+            }
+        
         return {
             "message": "Order created successfully",
             "order_id": order["order_id"],
             "total_amount": total_amount,
-            "delivery_method": order_data.delivery_method,
-            "quantity_display": f"{order_data.quantity} {order_data.unit}" + (f" ({order_data.unit_specification})" if order_data.unit_specification else "")
+            "delivery_info": delivery_info,
+            "quantity_display": f"{order_data.quantity} {order_data.unit}" + (f" ({order_data.unit_specification})" if order_data.unit_specification else ""),
+            "agent_fee_info": {
+                "percentage": "5%",
+                "amount": total_amount * 0.05,
+                "payment_timing": payment_timing
+            }
         }
         
     except HTTPException:
