@@ -2308,6 +2308,8 @@ function App() {
                           <option value="premium">Premium</option>
                           <option value="100kg">100kg</option>
                           <option value="50kg">50kg</option>
+                          <option value="carton">Carton</option>
+                          <option value="pack">Pack</option>
                           <option value="others">Others</option>
                         </select>
                       </div>
