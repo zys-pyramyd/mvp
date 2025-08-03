@@ -348,6 +348,7 @@ function App() {
     
     fetchProducts();
     fetchCategories();
+    fetchDropOffLocations();
     
     // Migrate existing cart items to ensure proper structure
     if (cart.length > 0) {
