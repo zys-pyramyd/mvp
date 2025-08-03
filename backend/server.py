@@ -110,8 +110,16 @@ class OrderCreate(BaseModel):
     quantity: float
     unit: str
     unit_specification: Optional[str] = None
-    shipping_address: str
-    delivery_method: str = "platform"  # "platform" or "offline"
+    shipping_address: Optional[str] = None  # Optional when using drop-off
+    delivery_method: str = "dropoff"  # "platform", "offline", or "dropoff"
+    dropoff_location_id: Optional[str] = None  # Required when delivery_method is "dropoff"
+    
+    @validator('dropoff_location_id')
+    def validate_dropoff_location(cls, v, values):
+        delivery_method = values.get('delivery_method')
+        if delivery_method == 'dropoff' and not v:
+            raise ValueError('Drop-off location is required when using drop-off delivery method')
+        return v
     
 class OrderStatusUpdate(BaseModel):
     order_id: str
