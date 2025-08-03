@@ -42,6 +42,7 @@ client = MongoClient(MONGO_URL)
 db = client.pyramyd_db
 users_collection = db.users
 messages_collection = db.messages
+dropoff_locations_collection = db.dropoff_locations
 
 # Security
 security = HTTPBearer()
