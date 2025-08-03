@@ -2289,8 +2289,8 @@ function App() {
                       </div>
                     </div>
 
-                    {/* Quantity Selection Only */}
-                    <div className="grid grid-cols-1 gap-2">
+                    {/* Quantity and Drop-off Location Selection */}
+                    <div className="grid grid-cols-1 gap-2 sm:gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Quantity (Number of {product.unit || product.unit_of_measure || 'units'})
@@ -2308,19 +2308,52 @@ function App() {
                           Max available: {product.quantity || product.available_stock || product.total_stock || 100}
                         </div>
                       </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Drop-off Location</label>
+                        <select
+                          className="w-full px-1.5 sm:px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500"
+                          id={`dropoff-${index}`}
+                        >
+                          <option value="">Select drop-off location</option>
+                          {dropOffLocations.map(location => (
+                            <option key={location.id} value={location.id}>
+                              {location.name} - {location.city}, {location.state}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="text-xs text-gray-500 mt-1">
+                          📍 Pick up your order at a convenient location
+                        </div>
+                      </div>
                     </div>
 
                     {/* Enhanced Add to Cart Button */}
                     <button
                       onClick={() => {
                         const quantityEl = document.getElementById(`quantity-${index}`);
+                        const dropoffEl = document.getElementById(`dropoff-${index}`);
                         
                         const quantity = parseFloat(quantityEl?.value) || 1;
-                        const unit = product.unit || product.unit_of_measure || 'kg'; // Fixed unit from seller
-                        const specification = product.unit_specification || 'standard'; // Use seller's specification
-                        const deliveryMethod = 'platform'; // Default - seller will choose during fulfillment
+                        const unit = product.unit || product.unit_of_measure || 'kg';
+                        const specification = product.unit_specification || 'standard';
+                        const dropoffLocationId = dropoffEl?.value;
                         
-                        addEnhancedToCart(product, quantity, unit, specification, deliveryMethod);
+                        if (!dropoffLocationId) {
+                          alert('Please select a drop-off location');
+                          return;
+                        }
+                        
+                        const dropoffLocation = dropOffLocations.find(loc => loc.id.toString() === dropoffLocationId);
+                        const cartItem = {
+                          ...product,
+                          cartQuantity: quantity,
+                          cartUnit: unit,
+                          cartSpecification: specification,
+                          dropoffLocation: dropoffLocation
+                        };
+                        
+                        addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff');
                       }}
                       className={`w-full py-2 px-3 sm:px-4 rounded-lg font-medium transition-colors text-xs sm:text-sm ${
                         product.type === 'preorder'
