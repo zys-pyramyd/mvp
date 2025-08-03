@@ -348,6 +348,61 @@ class PreOrderFilter(BaseModel):
     search_term: Optional[str] = None
     seller_type: Optional[str] = None  # farmer, supplier, processor
 
+# Drop-off Location Models
+class DropoffLocation(BaseModel):
+    id: Optional[str] = None
+    name: str
+    address: str
+    city: str
+    state: str
+    country: str = "Nigeria"
+    coordinates: Optional[dict] = None  # {"lat": float, "lng": float}
+    contact_person: Optional[str] = None
+    contact_phone: Optional[str] = None
+    operating_hours: Optional[str] = None
+    description: Optional[str] = None
+    agent_username: str  # Agent who added this location
+    is_active: bool = True
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class DropoffLocationCreate(BaseModel):
+    name: str
+    address: str
+    city: str
+    state: str
+    country: str = "Nigeria"
+    coordinates: Optional[dict] = None
+    contact_person: Optional[str] = None
+    contact_phone: Optional[str] = None
+    operating_hours: Optional[str] = None
+    description: Optional[str] = None
+    
+    @validator('name')
+    def validate_name(cls, v):
+        if len(v.strip()) < 3:
+            raise ValueError('Location name must be at least 3 characters long')
+        return v.strip()
+    
+    @validator('address')
+    def validate_address(cls, v):
+        if len(v.strip()) < 5:
+            raise ValueError('Address must be at least 5 characters long')
+        return v.strip()
+
+class DropoffLocationUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
+    coordinates: Optional[dict] = None
+    contact_person: Optional[str] = None
+    contact_phone: Optional[str] = None
+    operating_hours: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
 # Pydantic models
 class UserRegister(BaseModel):
     first_name: str
