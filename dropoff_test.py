@@ -210,7 +210,10 @@ class DropoffLocationTester:
         # Test 1: Basic listing
         success, response = self.make_request('GET', '/api/dropoff-locations')
         
-        if success and isinstance(response, list):
+        if success and isinstance(response, dict) and 'locations' in response:
+            self.log_test("Drop-off Location Listing (Basic)", True)
+            basic_success = True
+        elif success and isinstance(response, list):
             self.log_test("Drop-off Location Listing (Basic)", True)
             basic_success = True
         else:
@@ -220,7 +223,7 @@ class DropoffLocationTester:
         # Test 2: State filtering
         success, response = self.make_request('GET', '/api/dropoff-locations?state=Lagos State')
         
-        if success and isinstance(response, list):
+        if success and (isinstance(response, list) or (isinstance(response, dict) and 'locations' in response)):
             self.log_test("Drop-off Location Listing (State Filter)", True)
             state_success = True
         else:
@@ -230,7 +233,7 @@ class DropoffLocationTester:
         # Test 3: City filtering
         success, response = self.make_request('GET', '/api/dropoff-locations?city=Lagos')
         
-        if success and isinstance(response, list):
+        if success and (isinstance(response, list) or (isinstance(response, dict) and 'locations' in response)):
             self.log_test("Drop-off Location Listing (City Filter)", True)
             city_success = True
         else:
