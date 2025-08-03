@@ -4840,15 +4840,12 @@ function App() {
                       {selectedProduct.type === 'preorder' && (
                         <>
                           <div>
-                            <span className="text-sm text-gray-600">Pre-orders:</span>
-                            <div className="font-semibold text-orange-600">
-                              {selectedProduct.orders_count || 0}
-                            </div>
-                          </div>
-                          <div>
-                            <span className="text-sm text-gray-600">Partial Payment:</span>
+                            <span className="text-sm text-gray-600">Payment Required:</span>
                             <div className="font-semibold text-blue-600">
-                              {Math.round((selectedProduct.partial_payment_percentage || 0.3) * 100)}%
+                              {selectedProduct.partial_payment_percentage ? 
+                                `${Math.round(selectedProduct.partial_payment_percentage * 100)}%` : 
+                                '100%'
+                              }
                             </div>
                           </div>
                           <div>
