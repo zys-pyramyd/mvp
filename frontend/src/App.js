@@ -1511,7 +1511,7 @@ function App() {
                 )}
               </button>
 
-              {/* Messaging - Hidden on small screens */}
+              {/* Messaging - Hidden on mobile, shown in profile menu */}
               <button
                 onClick={() => {
                   if (!user) {
@@ -1520,7 +1520,7 @@ function App() {
                     setShowMessaging(true);
                   }
                 }}
-                className="nav-button icon-button relative p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 hidden sm:flex"
+                className="nav-button icon-button relative p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 hidden md:flex"
                 title="Messages"
               >
                 <div className="w-5 h-5 sm:w-6 sm:h-6">
@@ -1533,7 +1533,7 @@ function App() {
                 )}
               </button>
 
-              {/* Order Tracking - Hidden on small screens */}
+              {/* Order Tracking - Hidden on mobile, shown in profile menu */}
               <button
                 onClick={() => {
                   if (!user) {
@@ -1543,7 +1543,7 @@ function App() {
                     fetchOrders();
                   }
                 }}
-                className="nav-button icon-button p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 hidden sm:flex"
+                className="nav-button icon-button p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 hidden md:flex"
                 title="Track Orders / Find Drivers"
               >
                 <div className="w-5 h-5 sm:w-6 sm:h-6">
