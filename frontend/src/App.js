@@ -4929,22 +4929,42 @@ function App() {
                     </div>
                     
                     <div className="space-y-4">
-                      {/* Quantity Selection Only */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Quantity (Number of {selectedProduct.unit || selectedProduct.unit_of_measure || 'units'})
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          max={selectedProduct.quantity || selectedProduct.available_stock || selectedProduct.total_stock || 100}
-                          defaultValue="1"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                          id={`detail-quantity`}
-                          placeholder="1, 2, 3..."
-                        />
-                        <div className="text-xs text-gray-500 mt-1">
-                          Max available: {selectedProduct.quantity || selectedProduct.available_stock || selectedProduct.total_stock || 100}
+                      {/* Quantity and Drop-off Location Selection */}
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Quantity (Number of {selectedProduct.unit || selectedProduct.unit_of_measure || 'units'})
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max={selectedProduct.quantity || selectedProduct.available_stock || selectedProduct.total_stock || 100}
+                            defaultValue="1"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                            id={`detail-quantity`}
+                            placeholder="1, 2, 3..."
+                          />
+                          <div className="text-xs text-gray-500 mt-1">
+                            Max available: {selectedProduct.quantity || selectedProduct.available_stock || selectedProduct.total_stock || 100}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Drop-off Location</label>
+                          <select
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                            id="detail-dropoff"
+                          >
+                            <option value="">Select drop-off location</option>
+                            {dropOffLocations.map(location => (
+                              <option key={location.id} value={location.id}>
+                                {location.name} - {location.city}, {location.state}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="text-xs text-gray-500 mt-1">
+                            📍 Pick up your order at a convenient market or location
+                          </div>
                         </div>
                       </div>
 
@@ -4952,11 +4972,25 @@ function App() {
                       <button
                         onClick={() => {
                           const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
-                          const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'; // Fixed unit from seller
-                          const specification = selectedProduct.unit_specification || 'standard'; // Use seller's specification
-                          const deliveryMethod = 'platform'; // Default - seller will choose during fulfillment
+                          const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg';
+                          const specification = selectedProduct.unit_specification || 'standard';
+                          const dropoffLocationId = document.getElementById('detail-dropoff')?.value;
                           
-                          addEnhancedToCart(selectedProduct, quantity, unit, specification, deliveryMethod);
+                          if (!dropoffLocationId) {
+                            alert('Please select a drop-off location');
+                            return;
+                          }
+                          
+                          const dropoffLocation = dropOffLocations.find(loc => loc.id.toString() === dropoffLocationId);
+                          const cartItem = {
+                            ...selectedProduct,
+                            cartQuantity: quantity,
+                            cartUnit: unit,
+                            cartSpecification: specification,
+                            dropoffLocation: dropoffLocation
+                          };
+                          
+                          addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff');
                           closeProductDetail();
                         }}
                         className={`w-full py-3 px-6 rounded-lg font-bold text-lg transition-colors ${
