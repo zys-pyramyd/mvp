@@ -4875,85 +4875,27 @@ function App() {
                         }
                       </div>
                       <div className="text-xs text-emerald-600 mt-1">
-                        You can only buy in this unit as defined by the seller
+                        Select how many {selectedProduct.unit || selectedProduct.unit_of_measure || 'units'} you want to buy
                       </div>
                     </div>
                     
                     <div className="space-y-4">
-                      {/* Buyer Selection - Quantity and Spec only */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Quantity (Number of {selectedProduct.unit || selectedProduct.unit_of_measure || 'units'})
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            defaultValue="1"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            id={`detail-quantity`}
-                            placeholder="1, 2, 3..."
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Specification</label>
-                          <select
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            id={`detail-spec`}
-                            onChange={(e) => {
-                              const customSpecDiv = document.getElementById('detail-custom-spec');
-                              if (e.target.value === 'others') {
-                                customSpecDiv.classList.remove('hidden');
-                              } else {
-                                customSpecDiv.classList.add('hidden');
-                              }
-                            }}
-                          >
-                            <option value="standard">Standard</option>
-                            <option value="premium">Premium</option>
-                            <option value="100kg">100kg</option>
-                            <option value="50kg">50kg</option>
-                            <option value="carton">Carton</option>
-                            <option value="pack">Pack</option>
-                            <option value="others">Others</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Custom Specification Input */}
-                      <div className="hidden" id="detail-custom-spec">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Custom Specification</label>
-                        <input
-                          type="text"
-                          placeholder="Specify your requirement"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                          id="detail-custom-spec-input"
-                        />
-                      </div>
-
-                      {/* Delivery Method */}
+                      {/* Quantity Selection Only */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Delivery Method</label>
-                        <div className="flex space-x-4">
-                          <label className="flex items-center">
-                            <input
-                              type="radio"
-                              name="detail-delivery"
-                              value="platform"
-                              defaultChecked
-                              className="w-4 h-4 text-emerald-600"
-                            />
-                            <span className="ml-2 text-sm text-gray-700">🚛 Platform Driver</span>
-                          </label>
-                          <label className="flex items-center">
-                            <input
-                              type="radio"
-                              name="detail-delivery"
-                              value="offline"
-                              className="w-4 h-4 text-emerald-600"
-                            />
-                            <span className="ml-2 text-sm text-gray-700">🚚 Offline Delivery</span>
-                          </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Quantity (Number of {selectedProduct.unit || selectedProduct.unit_of_measure || 'units'})
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max={selectedProduct.quantity || selectedProduct.available_stock || selectedProduct.total_stock || 100}
+                          defaultValue="1"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                          id={`detail-quantity`}
+                          placeholder="1, 2, 3..."
+                        />
+                        <div className="text-xs text-gray-500 mt-1">
+                          Max available: {selectedProduct.quantity || selectedProduct.available_stock || selectedProduct.total_stock || 100}
                         </div>
                       </div>
 
@@ -4962,11 +4904,8 @@ function App() {
                         onClick={() => {
                           const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
                           const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'; // Fixed unit from seller
-                          const specEl = document.getElementById('detail-spec');
-                          const customSpecEl = document.getElementById('detail-custom-spec-input');
-                          const selectedSpec = specEl?.value;
-                          const specification = selectedSpec === 'others' ? (customSpecEl?.value || '') : selectedSpec;
-                          const deliveryMethod = document.querySelector('input[name="detail-delivery"]:checked')?.value || 'platform';
+                          const specification = selectedProduct.unit_specification || 'standard'; // Use seller's specification
+                          const deliveryMethod = 'platform'; // Default - seller will choose during fulfillment
                           
                           addEnhancedToCart(selectedProduct, quantity, unit, specification, deliveryMethod);
                           closeProductDetail();
