@@ -255,8 +255,8 @@ class OrderCreationTester:
         print("=" * 60)
         
         # Login first
-        if not self.login_existing_user():
-            print("❌ Login failed. Cannot proceed with tests.")
+        if not self.create_agent_user():
+            print("❌ Agent user creation failed. Cannot proceed with tests.")
             return False
         
         # Run the order creation fix test
