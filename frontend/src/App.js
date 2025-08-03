@@ -2088,8 +2088,13 @@ function App() {
                     <div className="mb-3 p-2 sm:p-3 bg-orange-50 rounded-lg border border-orange-200">
                       <div className="text-xs text-orange-800 space-y-1">
                         <div className="flex justify-between">
-                          <span>💰 Partial Payment:</span>
-                          <span className="font-bold">{Math.round((product.partial_payment_percentage || 0.3) * 100)}%</span>
+                          <span>💰 Payment Required:</span>
+                          <span className="font-bold">
+                            {product.partial_payment_percentage ? 
+                              `${Math.round(product.partial_payment_percentage * 100)}%` : 
+                              '100%'
+                            }
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span>📦 Available:</span>
