@@ -5262,7 +5262,7 @@ function App() {
                             dropoffLocation: dropoffLocation
                           };
                           
-                          addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff');
+                          addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff', dropoffLocation);
                           closeProductDetail();
                         }}
                         className={`w-full py-3 px-6 rounded-lg font-bold text-lg transition-colors ${
