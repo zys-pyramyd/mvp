@@ -2414,7 +2414,7 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
     """Create a new order with enhanced quantity system and delivery options"""
     try:
         # Find the product
-        product = db.products.find_one({"_id": order_data.product_id}) or db.preorders.find_one({"id": order_data.product_id})
+        product = db.products.find_one({"id": order_data.product_id}) or db.preorders.find_one({"id": order_data.product_id})
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
         
