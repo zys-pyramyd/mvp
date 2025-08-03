@@ -1993,6 +1993,10 @@ class PyramydAPITester:
         print("\n🚗 Testing Driver System...")
         self.test_driver_system_complete()
 
+        # Test 41-50: Drop-off Location System Tests (NEW - HIGH PRIORITY)
+        print("\n📍 Testing Drop-off Location Management System...")
+        self.test_dropoff_location_system_complete()
+
         return True
 
     def print_summary(self):
