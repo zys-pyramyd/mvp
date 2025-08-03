@@ -7,7 +7,7 @@ import requests
 import json
 
 def test_preorder_structure():
-    base_url = "https://db16cee4-7596-40bf-9ed9-efba806794f6.preview.emergentagent.com"
+    base_url = "https://7153c80b-e670-44f1-b4af-554c09ef9392.preview.emergentagent.com"
     
     print("🔍 TESTING PRE-ORDER STRUCTURE ISSUE")
     print("=" * 50)

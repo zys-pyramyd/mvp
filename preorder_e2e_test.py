@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
 class PreOrderE2ETester:
-    def __init__(self, base_url: str = "https://db16cee4-7596-40bf-9ed9-efba806794f6.preview.emergentagent.com"):
+    def __init__(self, base_url: str = "https://7153c80b-e670-44f1-b4af-554c09ef9392.preview.emergentagent.com"):
         self.base_url = base_url
         self.token = None
         self.user_id = None
@@ -526,7 +526,7 @@ class PreOrderE2ETester:
 def main():
     """Main test execution"""
     print("🚀 Starting End-to-End Pre-order System Testing...")
-    print("📡 Testing against: https://db16cee4-7596-40bf-9ed9-efba806794f6.preview.emergentagent.com")
+    print("📡 Testing against: https://7153c80b-e670-44f1-b4af-554c09ef9392.preview.emergentagent.com")
     print("👤 Using existing test agent user: testagent@pyramyd.com")
     print("=" * 80)
     
