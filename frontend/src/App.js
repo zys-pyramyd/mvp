@@ -2060,7 +2060,10 @@ function App() {
                     
                     {/* Pre-order percentage badge */}
                     <div className="absolute top-2 right-2 bg-red-500 text-white px-1.5 sm:px-2 py-1 rounded-full text-xs font-bold">
-                      -{Math.round((1 - (product.partial_payment_percentage || 0.3)) * 100)}% OFF
+                      {product.partial_payment_percentage ? 
+                        `${Math.round(product.partial_payment_percentage * 100)}% Payment` : 
+                        '100% Payment'
+                      }
                     </div>
                   </div>
 
