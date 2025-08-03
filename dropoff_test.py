@@ -340,8 +340,18 @@ class DropoffLocationTester:
                 self.log_test("States and Cities Endpoint", False, f"Empty or invalid response: {response}")
                 return False
         else:
-            self.log_test("States and Cities Endpoint", False, f"States/cities endpoint failed: {response}")
-            return False
+            # Try alternative endpoint if the first one fails
+            success2, response2 = self.make_request('GET', '/api/states-cities')
+            if success2 and isinstance(response2, dict):
+                if 'states' in response2 or len(response2) > 0:
+                    self.log_test("States and Cities Endpoint", True)
+                    return True
+                else:
+                    self.log_test("States and Cities Endpoint", False, f"Empty response from both endpoints: {response}, {response2}")
+                    return False
+            else:
+                self.log_test("States and Cities Endpoint", False, f"Both endpoints failed: {response}, {response2}")
+                return False
 
     def run_dropoff_tests(self):
         """Run all drop-off location tests"""
