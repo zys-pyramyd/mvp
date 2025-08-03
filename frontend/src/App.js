@@ -4916,40 +4916,69 @@ function App() {
                   <div className="p-4 bg-emerald-50 rounded-lg">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Purchase Options</h3>
                     
+                    {/* Product Unit Display (Read-only for buyers) */}
+                    <div className="mb-4 p-3 bg-emerald-100 rounded-lg border border-emerald-300">
+                      <div className="text-sm font-medium text-emerald-700">
+                        Unit: {selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'}
+                        {(selectedProduct.unit_specification) && 
+                          <span className="ml-2 text-emerald-600">({selectedProduct.unit_specification})</span>
+                        }
+                      </div>
+                      <div className="text-xs text-emerald-600 mt-1">
+                        You can only buy in this unit as defined by the seller
+                      </div>
+                    </div>
+                    
                     <div className="space-y-4">
-                      {/* Quantity Selection */}
-                      <div className="grid grid-cols-3 gap-3">
+                      {/* Buyer Selection - Quantity and Spec only */}
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Quantity (Number of {selectedProduct.unit || selectedProduct.unit_of_measure || 'units'})
+                          </label>
                           <input
                             type="number"
                             min="1"
                             defaultValue="1"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
                             id={`detail-quantity`}
+                            placeholder="1, 2, 3..."
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Specification</label>
                           <select
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            id={`detail-unit`}
+                            id={`detail-spec`}
+                            onChange={(e) => {
+                              const customSpecDiv = document.getElementById('detail-custom-spec');
+                              if (e.target.value === 'others') {
+                                customSpecDiv.classList.remove('hidden');
+                              } else {
+                                customSpecDiv.classList.add('hidden');
+                              }
+                            }}
                           >
-                            <option value="kg">kg</option>
-                            <option value="bags">bags</option>
-                            <option value="crates">crates</option>
-                            <option value="gallons">gallons</option>
+                            <option value="standard">Standard</option>
+                            <option value="premium">Premium</option>
+                            <option value="100kg">100kg</option>
+                            <option value="50kg">50kg</option>
+                            <option value="carton">Carton</option>
+                            <option value="pack">Pack</option>
+                            <option value="others">Others</option>
                           </select>
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Spec</label>
-                          <input
-                            type="text"
-                            placeholder="e.g., 100kg"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            id={`detail-spec`}
-                          />
-                        </div>
+                      </div>
+
+                      {/* Custom Specification Input */}
+                      <div className="hidden" id="detail-custom-spec">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Custom Specification</label>
+                        <input
+                          type="text"
+                          placeholder="Specify your requirement"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                          id="detail-custom-spec-input"
+                        />
                       </div>
 
                       {/* Delivery Method */}
@@ -4982,8 +5011,11 @@ function App() {
                       <button
                         onClick={() => {
                           const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
-                          const unit = document.getElementById('detail-unit')?.value || 'kg';
-                          const specification = document.getElementById('detail-spec')?.value || '';
+                          const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'; // Fixed unit from seller
+                          const specEl = document.getElementById('detail-spec');
+                          const customSpecEl = document.getElementById('detail-custom-spec-input');
+                          const selectedSpec = specEl?.value;
+                          const specification = selectedSpec === 'others' ? (customSpecEl?.value || '') : selectedSpec;
                           const deliveryMethod = document.querySelector('input[name="detail-delivery"]:checked')?.value || 'platform';
                           
                           addEnhancedToCart(selectedProduct, quantity, unit, specification, deliveryMethod);
