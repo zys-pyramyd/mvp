@@ -249,7 +249,10 @@ class DropoffLocationTester:
         
         success, response = self.make_request('GET', '/api/dropoff-locations/my-locations', use_auth=True)
         
-        if success and isinstance(response, list):
+        if success and isinstance(response, dict) and 'locations' in response:
+            self.log_test("Agent's Drop-off Locations", True)
+            return True, response['locations']
+        elif success and isinstance(response, list):
             self.log_test("Agent's Drop-off Locations", True)
             return True, response
         else:
