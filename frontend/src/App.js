@@ -59,11 +59,7 @@ function App() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   
   // Drop-off locations state
-  const [dropOffLocations, setDropOffLocations] = useState([
-    { id: 1, name: "Mile 12 Market", address: "Mile 12, Lagos State", city: "Lagos", state: "Lagos" },
-    { id: 2, name: "Kano Main Market", address: "Kano Central Market, Kano State", city: "Kano", state: "Kano" },
-    { id: 3, name: "Onitsha Market", address: "Main Market Road, Onitsha, Anambra State", city: "Onitsha", state: "Anambra" }
-  ]);
+  const [dropOffLocations, setDropOffLocations] = useState([]);
   const [showAddDropOff, setShowAddDropOff] = useState(false);
   const [showCreatePreOrder, setShowCreatePreOrder] = useState(false);
   const [showPreOrderDetails, setShowPreOrderDetails] = useState(false);
