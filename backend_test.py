@@ -2475,6 +2475,173 @@ class PyramydAPITester:
         
         return overall_success
 
+    def test_order_creation_fix(self):
+        """Test the order creation endpoint fix - specifically testing dropoff_location_id and product lookup bug"""
+        print("\n🛒 Testing Order Creation Fix...")
+        
+        # Step 1: Create a test product first
+        print("📦 Creating test product for order testing...")
+        product_data = {
+            "title": "Test Product for Order",
+            "description": "Test product for order creation testing",
+            "category": "vegetables",
+            "price_per_unit": 500.0,
+            "unit_of_measure": "kg",
+            "unit_specification": "fresh",
+            "quantity_available": 100,
+            "minimum_order_quantity": 1,
+            "location": "Lagos, Nigeria",
+            "farm_name": "Test Farm",
+            "images": [],
+            "platform": "pyhub"
+        }
+
+        success, response = self.make_request('POST', '/api/products', product_data, 200, use_auth=True)
+        
+        if success and 'product_id' in response:
+            self.log_test("Order Test - Product Creation", True)
+            test_product_id = response['product_id']
+        else:
+            self.log_test("Order Test - Product Creation", False, f"Product creation failed: {response}")
+            return False
+        
+        # Step 2: Create a test drop-off location
+        print("📍 Creating test drop-off location...")
+        dropoff_data = {
+            "name": "Test Drop-off Location",
+            "address": "123 Test Street, Test Area",
+            "city": "Lagos",
+            "state": "Lagos",
+            "country": "Nigeria",
+            "contact_person": "Test Contact",
+            "contact_phone": "+2341234567890",
+            "operating_hours": "9AM - 6PM",
+            "description": "Test drop-off location for order testing"
+        }
+
+        success, response = self.make_request('POST', '/api/dropoff-locations', dropoff_data, 200, use_auth=True)
+        
+        if success and 'location_id' in response:
+            self.log_test("Order Test - Drop-off Location Creation", True)
+            test_dropoff_id = response['location_id']
+        else:
+            self.log_test("Order Test - Drop-off Location Creation", False, f"Drop-off location creation failed: {response}")
+            return False
+        
+        # Step 3: Test order creation with dropoff_location_id (main fix test)
+        print("🛒 Testing order creation with drop-off location...")
+        order_data = {
+            "product_id": test_product_id,
+            "quantity": 5.0,
+            "unit": "kg",
+            "unit_specification": "fresh",
+            "delivery_method": "dropoff",
+            "dropoff_location_id": test_dropoff_id
+        }
+
+        success, response = self.make_request('POST', '/api/orders/create', order_data, 200, use_auth=True)
+        
+        if success and 'order_id' in response:
+            self.log_test("Order Creation with Drop-off Location", True)
+            
+            # Verify the response contains expected fields
+            expected_fields = ['order_id', 'total_amount', 'delivery_info', 'agent_fee_info']
+            if all(field in response for field in expected_fields):
+                self.log_test("Order Response - Required Fields", True)
+                
+                # Step 4: Check agent fee is 5%
+                agent_fee_info = response.get('agent_fee_info', {})
+                if agent_fee_info.get('percentage') == '5%':
+                    self.log_test("Agent Fee Calculation (5%)", True)
+                    agent_fee_success = True
+                else:
+                    self.log_test("Agent Fee Calculation (5%)", False, f"Expected 5%, got {agent_fee_info.get('percentage')}")
+                    agent_fee_success = False
+                
+                # Step 5: Check payment timing is set correctly for dropoff
+                if agent_fee_info.get('payment_timing') == 'during_transit':
+                    self.log_test("Payment Timing (Drop-off)", True)
+                    payment_timing_success = True
+                else:
+                    self.log_test("Payment Timing (Drop-off)", False, f"Expected 'during_transit', got {agent_fee_info.get('payment_timing')}")
+                    payment_timing_success = False
+                
+                # Step 6: Verify drop-off location details are included
+                delivery_info = response.get('delivery_info', {})
+                if 'dropoff_location' in delivery_info:
+                    dropoff_info = delivery_info['dropoff_location']
+                    if dropoff_info.get('name') == 'Test Drop-off Location':
+                        self.log_test("Drop-off Location Details", True)
+                        dropoff_details_success = True
+                    else:
+                        self.log_test("Drop-off Location Details", False, f"Drop-off location name mismatch: {dropoff_info}")
+                        dropoff_details_success = False
+                else:
+                    self.log_test("Drop-off Location Details", False, "Drop-off location details missing from response")
+                    dropoff_details_success = False
+                
+                order_creation_success = True
+            else:
+                self.log_test("Order Response - Required Fields", False, f"Missing fields in response: {response}")
+                agent_fee_success = False
+                payment_timing_success = False
+                dropoff_details_success = False
+                order_creation_success = True  # Order was created, just response format issue
+        else:
+            self.log_test("Order Creation with Drop-off Location", False, f"Order creation failed: {response}")
+            agent_fee_success = False
+            payment_timing_success = False
+            dropoff_details_success = False
+            order_creation_success = False
+        
+        # Step 7: Test offline delivery payment timing
+        print("🚚 Testing offline delivery payment timing...")
+        offline_order_data = {
+            "product_id": test_product_id,
+            "quantity": 3.0,
+            "unit": "kg",
+            "unit_specification": "fresh",
+            "delivery_method": "offline",
+            "shipping_address": "123 Test Address, Lagos"
+        }
+
+        success, response = self.make_request('POST', '/api/orders/create', offline_order_data, 200, use_auth=True)
+        
+        if success and 'agent_fee_info' in response:
+            agent_fee_info = response['agent_fee_info']
+            if agent_fee_info.get('payment_timing') == 'after_delivery':
+                self.log_test("Payment Timing (Offline)", True)
+                offline_payment_success = True
+            else:
+                self.log_test("Payment Timing (Offline)", False, f"Expected 'after_delivery', got {agent_fee_info.get('payment_timing')}")
+                offline_payment_success = False
+        else:
+            self.log_test("Payment Timing (Offline)", False, f"Offline order creation failed: {response}")
+            offline_payment_success = False
+        
+        # Step 8: Test product lookup bug fix (ensure it uses 'id' not '_id')
+        print("🔍 Testing product lookup bug fix...")
+        # This is implicitly tested by the successful order creation above
+        # If the bug existed (using '_id' instead of 'id'), the product lookup would fail
+        if order_creation_success:
+            self.log_test("Product Lookup Bug Fix", True, "Product found successfully using 'id' field")
+            product_lookup_success = True
+        else:
+            self.log_test("Product Lookup Bug Fix", False, "Product lookup may still have issues")
+            product_lookup_success = False
+        
+        # Overall success
+        overall_success = (order_creation_success and agent_fee_success and 
+                          payment_timing_success and dropoff_details_success and 
+                          offline_payment_success and product_lookup_success)
+        
+        if overall_success:
+            self.log_test("Order Creation Fix - Complete", True, "All order creation functionality working correctly")
+        else:
+            self.log_test("Order Creation Fix - Complete", False, "Some order creation issues remain")
+        
+        return overall_success
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting Pyramyd API Tests...")
