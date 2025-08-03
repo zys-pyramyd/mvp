@@ -1224,7 +1224,11 @@ function App() {
 
   const createOrder = async () => {
     try {
-      if (!validateAddress()) return;
+      // For drop-off delivery, we don't need shipping address validation
+      const hasDropoffItems = cart.some(item => item.delivery_method === 'dropoff');
+      const hasShippingItems = cart.some(item => item.delivery_method !== 'dropoff');
+      
+      if (hasShippingItems && !validateAddress()) return;
       
       const token = localStorage.getItem('token');
       const orders = [];
@@ -1236,9 +1240,15 @@ function App() {
           quantity: item.quantity,
           unit: item.unit,
           unit_specification: item.unit_specification,
-          shipping_address: `${shippingAddress.full_name}, ${shippingAddress.address_line_1}, ${shippingAddress.address_line_2 ? shippingAddress.address_line_2 + ', ' : ''}${shippingAddress.city}, ${shippingAddress.state}, ${shippingAddress.country}`,
           delivery_method: item.delivery_method
         };
+        
+        // Add appropriate delivery details based on method
+        if (item.delivery_method === 'dropoff' && item.dropoff_location) {
+          orderData.dropoff_location_id = item.dropoff_location.id;
+        } else if (item.delivery_method !== 'dropoff') {
+          orderData.shipping_address = `${shippingAddress.full_name}, ${shippingAddress.address_line_1}, ${shippingAddress.address_line_2 ? shippingAddress.address_line_2 + ', ' : ''}${shippingAddress.city}, ${shippingAddress.state}, ${shippingAddress.country}`;
+        }
         
         const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/orders/create`, {
           method: 'POST',
@@ -1262,10 +1272,24 @@ function App() {
       setCart([]);
       setShowCheckout(false);
       
-      alert(`Orders created successfully! 
+      let successMessage = `Orders created successfully! 
       Total orders: ${orders.length}
       Total amount: ₦${orderSummary.total}
-      Order IDs: ${orders.map(o => o.order_id).join(', ')}`);
+      Order IDs: ${orders.map(o => o.order_id).join(', ')}`;
+      
+      // Add drop-off location info if applicable
+      const dropoffOrders = orders.filter(o => o.delivery_info?.method === 'dropoff');
+      if (dropoffOrders.length > 0) {
+        successMessage += `\n\nDrop-off Locations:`;
+        dropoffOrders.forEach(order => {
+          if (order.delivery_info?.dropoff_location) {
+            const loc = order.delivery_info.dropoff_location;
+            successMessage += `\n• ${loc.name} - ${loc.city}, ${loc.state}`;
+          }
+        });
+      }
+      
+      alert(successMessage);
       
       return orders;
       
