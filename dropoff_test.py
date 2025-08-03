@@ -348,10 +348,35 @@ class DropoffLocationTester:
         print("🚀 Starting Drop-off Location Testing...")
         print("=" * 60)
         
-        # Login first
-        if not self.test_existing_user_login():
-            print("❌ Login failed - stopping tests")
-            return False
+        # Try existing user login first
+        existing_login_success = self.test_existing_user_login()
+        
+        # If existing user doesn't work or doesn't have proper role, create agent user
+        if not existing_login_success:
+            print("ℹ️  Existing user login failed, creating new agent user...")
+            agent_reg_success, agent_data = self.test_complete_registration_agent()
+            if not agent_reg_success:
+                print("❌ Agent registration failed - stopping tests")
+                return False
+        else:
+            # Try to create a location to test if user has proper role
+            test_location_data = {
+                "name": "Test Location",
+                "address": "Test Address 123",
+                "city": "Lagos",
+                "state": "Lagos State"
+            }
+            test_success, test_response = self.make_request('POST', '/api/dropoff-locations', test_location_data, 200, use_auth=True)
+            if not test_success and 'Only agents and sellers can create drop-off locations' in str(test_response):
+                print("ℹ️  Existing user doesn't have proper role, creating new agent user...")
+                agent_reg_success, agent_data = self.test_complete_registration_agent()
+                if not agent_reg_success:
+                    print("❌ Agent registration failed - stopping tests")
+                    return False
+            else:
+                # Clean up test location if it was created
+                if test_success and 'location_id' in test_response:
+                    self.make_request('DELETE', f'/api/dropoff-locations/{test_response["location_id"]}', use_auth=True)
         
         # Step 1: Create drop-off locations
         creation_success, location_id, minimal_location_id = self.test_dropoff_location_creation()
