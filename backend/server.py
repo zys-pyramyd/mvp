@@ -82,9 +82,13 @@ class Order(BaseModel):
     unit_specification: Optional[str] = None  # e.g., "100kg" for bags, "5 litres" for gallons
     unit_price: float
     total_amount: float
-    delivery_method: str = "platform"  # "platform" or "offline"
+    delivery_method: str = "dropoff"  # "platform", "offline", or "dropoff"
     delivery_status: str = "pending"  # For offline deliveries
-    shipping_address: str
+    shipping_address: Optional[str] = None  # Traditional shipping address (optional when using dropoff)
+    dropoff_location_id: Optional[str] = None  # ID of selected drop-off location
+    dropoff_location_details: Optional[dict] = None  # Snapshot of drop-off location info
+    agent_fee_percentage: float = 0.05  # Updated agent fee (5%)
+    payment_timing: str = "after_delivery"  # "after_delivery" for offline, "during_transit" for platform
     status: OrderStatus = OrderStatus.PENDING
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
