@@ -21,7 +21,7 @@ TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'dummy_twilio_token')
 # Commission structure for agents (updated rates)
 AGENT_COMMISSION_RATES = {
     'purchase': 0.05,  # 5% commission for agent purchases
-    'sale': 0.04,      # 4% commission for agent sales
+    'sale': 0.05,      # 5% commission for agent sales (updated from 4% to 5%)
     'onboarding': 0.075, # 7.5% farmer onboarding incentive (first sale only)
     'verification': 0.02  # 2% farmer verification fee
 }
