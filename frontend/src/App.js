@@ -4777,6 +4777,262 @@ function App() {
         </div>
       )}
 
+      {/* Add Drop-off Location Modal */}
+      {showAddDropOff && user && user.role === 'agent' && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">📍 Add Drop-off Location</h2>
+                  <p className="text-gray-600 mt-1">Create a convenient pickup location for buyers</p>
+                </div>
+                <button
+                  onClick={() => setShowAddDropOff(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* Form Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <form 
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target);
+                  
+                  const locationData = {
+                    name: formData.get('name'),
+                    address: formData.get('address'),
+                    city: formData.get('city'),
+                    state: formData.get('state'),
+                    country: formData.get('country') || 'Nigeria',
+                    contact_person: formData.get('contact_person'),
+                    contact_phone: formData.get('contact_phone'),
+                    operating_hours: formData.get('operating_hours'),
+                    description: formData.get('description')
+                  };
+
+                  try {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/dropoff-locations`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify(locationData)
+                    });
+
+                    if (response.ok) {
+                      const result = await response.json();
+                      alert(`Drop-off location "${result.location.name}" created successfully!`);
+                      
+                      // Add to local state
+                      setDropOffLocations(prev => [...prev, {
+                        id: result.location.id,
+                        name: result.location.name,
+                        address: result.location.address,
+                        city: result.location.city,
+                        state: result.location.state
+                      }]);
+                      
+                      setShowAddDropOff(false);
+                      e.target.reset();
+                    } else {
+                      const error = await response.json();
+                      alert(`Error: ${error.detail}`);
+                    }
+                  } catch (error) {
+                    console.error('Error creating drop-off location:', error);
+                    alert('Error creating drop-off location. Please try again.');
+                  }
+                }}
+                className="space-y-6"
+              >
+                {/* Basic Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Location Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      required
+                      placeholder="e.g., Mile 12 Market, Kano Central Market"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      State *
+                    </label>
+                    <select
+                      name="state"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    >
+                      <option value="">Select State</option>
+                      <option value="Lagos">Lagos</option>
+                      <option value="Kano">Kano</option>
+                      <option value="Anambra">Anambra</option>
+                      <option value="Rivers">Rivers</option>
+                      <option value="Kaduna">Kaduna</option>
+                      <option value="Oyo">Oyo</option>
+                      <option value="Delta">Delta</option>
+                      <option value="Imo">Imo</option>
+                      <option value="Ogun">Ogun</option>
+                      <option value="FCT">FCT Abuja</option>
+                      <option value="Cross River">Cross River</option>
+                      <option value="Plateau">Plateau</option>
+                      <option value="Abia">Abia</option>
+                      <option value="Enugu">Enugu</option>
+                      <option value="Benue">Benue</option>
+                      <option value="Edo">Edo</option>
+                      <option value="Kwara">Kwara</option>
+                      <option value="Akwa Ibom">Akwa Ibom</option>
+                      <option value="Osun">Osun</option>
+                      <option value="Kogi">Kogi</option>
+                      <option value="Zamfara">Zamfara</option>
+                      <option value="Sokoto">Sokoto</option>
+                      <option value="Kebbi">Kebbi</option>
+                      <option value="Niger">Niger</option>
+                      <option value="Jigawa">Jigawa</option>
+                      <option value="Yobe">Yobe</option>
+                      <option value="Borno">Borno</option>
+                      <option value="Gombe">Gombe</option>
+                      <option value="Bauchi">Bauchi</option>
+                      <option value="Adamawa">Adamawa</option>
+                      <option value="Taraba">Taraba</option>
+                      <option value="Nasarawa">Nasarawa</option>
+                      <option value="Ebonyi">Ebonyi</option>
+                      <option value="Ekiti">Ekiti</option>
+                      <option value="Ondo">Ondo</option>
+                      <option value="Bayelsa">Bayelsa</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      City *
+                    </label>
+                    <input
+                      type="text"
+                      name="city"
+                      required
+                      placeholder="e.g., Lagos, Kano, Onitsha"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Country
+                    </label>
+                    <input
+                      type="text"
+                      name="country"
+                      defaultValue="Nigeria"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50"
+                      readOnly
+                    />
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Address *
+                  </label>
+                  <textarea
+                    name="address"
+                    required
+                    rows="3"
+                    placeholder="e.g., Shop 45, Mile 12 International Market, Mile 12, Lagos State"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  ></textarea>
+                </div>
+
+                {/* Contact Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Contact Person
+                    </label>
+                    <input
+                      type="text"
+                      name="contact_person"
+                      placeholder="e.g., Mr. John Doe"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Contact Phone
+                    </label>
+                    <input
+                      type="tel"
+                      name="contact_phone"
+                      placeholder="e.g., +234 801 234 5678"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Operating Hours */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Operating Hours
+                  </label>
+                  <input
+                    type="text"
+                    name="operating_hours"
+                    placeholder="e.g., 6:00 AM - 6:00 PM (Mon-Sat)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Additional Notes
+                  </label>
+                  <textarea
+                    name="description"
+                    rows="2"
+                    placeholder="e.g., Near Gate 3, look for the blue sign"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  ></textarea>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex space-x-4 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddDropOff(false)}
+                    className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+                  >
+                    📍 Add Location
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Product Detail Modal - Simplified Version */}
       {showProductDetail && selectedProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
