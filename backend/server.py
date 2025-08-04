@@ -487,6 +487,9 @@ class Product(BaseModel):
     delivery_cost_dropoff: float = 0.0  # Cost for drop-off delivery (0.0 = free)
     delivery_cost_shipping: float = 0.0  # Cost for shipping delivery (0.0 = free)
     delivery_notes: Optional[str] = None  # Special delivery instructions/notes
+    # Rating information
+    average_rating: float = 5.0  # Product rating
+    total_ratings: int = 0  # Number of product ratings
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class ProductCreate(BaseModel):
