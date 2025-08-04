@@ -2493,7 +2493,9 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
             "unit": order_data.unit,
             "unit_specification": order_data.unit_specification,
             "unit_price": unit_price,
-            "total_amount": total_amount,
+            "product_total": product_total,  # Product cost without delivery
+            "delivery_cost": delivery_cost,  # Separate delivery cost
+            "total_amount": total_amount,  # Total including delivery
             "delivery_method": order_data.delivery_method,
             "delivery_status": "pending" if order_data.delivery_method == "offline" else "",
             "shipping_address": order_data.shipping_address,
