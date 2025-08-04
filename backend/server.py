@@ -43,6 +43,8 @@ db = client.pyramyd_db
 users_collection = db.users
 messages_collection = db.messages
 dropoff_locations_collection = db.dropoff_locations
+ratings_collection = db.ratings
+driver_slots_collection = db.driver_slots
 
 # Security
 security = HTTPBearer()
