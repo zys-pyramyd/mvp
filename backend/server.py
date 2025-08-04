@@ -508,6 +508,128 @@ class CartItem(BaseModel):
     product_id: str
     quantity: int
 
+# Rating System Models
+class RatingType(str, Enum):
+    USER_RATING = "user_rating"  # Rating for farmers, agents, suppliers, processors
+    PRODUCT_RATING = "product_rating"  # Rating for products
+    DRIVER_RATING = "driver_rating"  # Rating for drivers
+    ORDER_RATING = "order_rating"  # Overall order experience rating
+
+class Rating(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    rating_type: RatingType
+    rating_value: int = Field(..., ge=1, le=5)  # 1-5 star rating
+    rater_username: str  # Who gave the rating
+    rater_id: str
+    rated_entity_id: str  # ID of user, product, driver being rated
+    rated_entity_username: Optional[str] = None  # Username if rating a user/driver
+    order_id: Optional[str] = None  # Associated order if applicable
+    comment: Optional[str] = None  # Optional review comment
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+class RatingCreate(BaseModel):
+    rating_type: RatingType
+    rating_value: int = Field(..., ge=1, le=5)
+    rated_entity_id: str
+    rated_entity_username: Optional[str] = None
+    order_id: Optional[str] = None
+    comment: Optional[str] = None
+
+class RatingResponse(BaseModel):
+    id: str
+    rating_type: RatingType
+    rating_value: int
+    rater_username: str
+    rated_entity_id: str
+    rated_entity_username: Optional[str] = None
+    comment: Optional[str] = None
+    created_at: datetime
+
+# Driver Management Models
+class DriverSubscriptionStatus(str, Enum):
+    TRIAL = "trial"  # 14-day free trial
+    ACTIVE = "active"  # Paid subscription
+    EXPIRED = "expired"  # Subscription expired
+    SUSPENDED = "suspended"  # Suspended by admin
+
+class LogisticsDriverSlot(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    logistics_business_id: str
+    logistics_username: str
+    slot_number: int
+    driver_id: Optional[str] = None  # Assigned driver ID
+    driver_username: Optional[str] = None
+    driver_name: Optional[str] = None
+    vehicle_type: Optional[VehicleType] = None
+    plate_number: Optional[str] = None
+    vehicle_make_model: Optional[str] = None
+    vehicle_color: Optional[str] = None
+    vehicle_year: Optional[int] = None
+    vehicle_photo: Optional[str] = None  # base64 vehicle image
+    date_of_birth: Optional[str] = None
+    address: Optional[str] = None
+    driver_license: Optional[str] = None
+    registration_link: Optional[str] = None  # Unique registration link for driver
+    subscription_status: DriverSubscriptionStatus = DriverSubscriptionStatus.TRIAL
+    trial_start_date: datetime = Field(default_factory=datetime.utcnow)
+    subscription_start_date: Optional[datetime] = None
+    subscription_end_date: Optional[datetime] = None
+    monthly_fee: float = 500.0  # ₦500 per driver per month
+    is_active: bool = True
+    total_trips: int = 0
+    average_rating: float = 5.0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+class DriverSlotCreate(BaseModel):
+    driver_name: str
+    vehicle_type: VehicleType
+    plate_number: str
+    vehicle_make_model: str
+    vehicle_color: str
+    vehicle_year: Optional[int] = None
+    vehicle_photo: Optional[str] = None
+    date_of_birth: str  # Format: YYYY-MM-DD
+    address: str
+    driver_license: Optional[str] = None
+
+class DriverSlotUpdate(BaseModel):
+    driver_name: Optional[str] = None
+    vehicle_type: Optional[VehicleType] = None
+    plate_number: Optional[str] = None
+    vehicle_make_model: Optional[str] = None
+    vehicle_color: Optional[str] = None
+    vehicle_year: Optional[int] = None
+    vehicle_photo: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    address: Optional[str] = None
+    driver_license: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class DriverRegistrationComplete(BaseModel):
+    username: str
+    password: str
+    registration_token: str
+
+# Enhanced Driver Profile for Uber-like Interface
+class EnhancedDriverProfile(BaseModel):
+    id: str
+    driver_username: str
+    driver_name: str
+    phone_number: Optional[str] = None
+    profile_picture: Optional[str] = None
+    vehicle_info: dict  # Complete vehicle information
+    current_location: Optional[dict] = None
+    status: DriverStatus = DriverStatus.OFFLINE
+    average_rating: float = 5.0
+    total_trips: int = 0
+    total_earnings: float = 0.0
+    is_independent: bool = False  # False for logistics business managed drivers
+    logistics_business_name: Optional[str] = None
+    created_at: datetime
+    last_active: Optional[datetime] = None
+
 # Helper functions
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
