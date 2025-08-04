@@ -66,6 +66,10 @@ function App() {
   const [selectedPreOrder, setSelectedPreOrder] = useState(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   
+  // Enhanced delivery options state
+  const [productDeliveryOptions, setProductDeliveryOptions] = useState({});
+  const [selectedDeliveryMethod, setSelectedDeliveryMethod] = useState('dropoff');
+  
   // Product Detail Page state
   const [showProductDetail, setShowProductDetail] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
