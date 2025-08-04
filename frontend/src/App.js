@@ -5283,22 +5283,123 @@ function App() {
                           </div>
                         </div>
 
+                        {/* Enhanced Delivery Options Selection */}
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Drop-off Location</label>
-                          <select
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            id="detail-dropoff"
-                          >
-                            <option value="">Select drop-off location</option>
-                            {dropOffLocations.map(location => (
-                              <option key={location.id} value={location.id}>
-                                {location.name} - {location.city}, {location.state}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="text-xs text-gray-500 mt-1">
-                            📍 Pick up your order at a convenient market or location
-                          </div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Delivery Options</label>
+                          
+                          {(() => {
+                            const productId = selectedProduct.id || selectedProduct._id;
+                            const deliveryOptions = productDeliveryOptions[productId];
+                            
+                            if (!deliveryOptions) {
+                              return (
+                                <div className="p-3 bg-gray-100 rounded-lg">
+                                  <div className="text-gray-600">Loading delivery options...</div>
+                                </div>
+                              );
+                            }
+                            
+                            const supportsBoth = deliveryOptions.supports_dropoff_delivery && deliveryOptions.supports_shipping_delivery;
+                            const supportsDropoff = deliveryOptions.supports_dropoff_delivery;
+                            const supportsShipping = deliveryOptions.supports_shipping_delivery;
+                            
+                            return (
+                              <div className="space-y-3">
+                                {/* Delivery Method Selection (only show if both are supported) */}
+                                {supportsBoth && (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedDeliveryMethod('dropoff')}
+                                      className={`p-3 rounded-lg border-2 transition-colors ${
+                                        selectedDeliveryMethod === 'dropoff'
+                                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                      }`}
+                                    >
+                                      <div className="text-sm font-medium">📍 Drop-off Location</div>
+                                      <div className="text-xs mt-1">
+                                        {deliveryOptions.delivery_costs.dropoff.is_free 
+                                          ? 'Free' 
+                                          : `₦${deliveryOptions.delivery_costs.dropoff.cost}`
+                                        }
+                                      </div>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedDeliveryMethod('shipping')}
+                                      className={`p-3 rounded-lg border-2 transition-colors ${
+                                        selectedDeliveryMethod === 'shipping'
+                                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                      }`}
+                                    >
+                                      <div className="text-sm font-medium">🚚 Home Delivery</div>
+                                      <div className="text-xs mt-1">
+                                        {deliveryOptions.delivery_costs.shipping.is_free 
+                                          ? 'Free' 
+                                          : `₦${deliveryOptions.delivery_costs.shipping.cost}`
+                                        }
+                                      </div>
+                                    </button>
+                                  </div>
+                                )}
+                                
+                                {/* Drop-off Location Selection */}
+                                {(selectedDeliveryMethod === 'dropoff' || (supportsDropoff && !supportsBoth)) && (
+                                  <div>
+                                    <select
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                                      id="detail-dropoff"
+                                    >
+                                      <option value="">Select drop-off location</option>
+                                      {dropOffLocations.map(location => (
+                                        <option key={location.id} value={location.id}>
+                                          {location.name} - {location.city}, {location.state}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      📍 Pick up your order at a convenient market or location
+                                      {deliveryOptions.delivery_costs.dropoff.cost > 0 && (
+                                        <span className="text-emerald-600 font-medium ml-2">
+                                          (₦{deliveryOptions.delivery_costs.dropoff.cost} fee)
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Shipping Address Input */}
+                                {(selectedDeliveryMethod === 'shipping' || (supportsShipping && !supportsBoth)) && (
+                                  <div>
+                                    <textarea
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                      id="detail-shipping-address"
+                                      placeholder="Enter your full delivery address..."
+                                      rows="3"
+                                    ></textarea>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      🚚 We'll deliver directly to your address
+                                      {deliveryOptions.delivery_costs.shipping.cost > 0 && (
+                                        <span className="text-blue-600 font-medium ml-2">
+                                          (₦{deliveryOptions.delivery_costs.shipping.cost} fee)
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Delivery Notes */}
+                                {deliveryOptions.delivery_notes && (
+                                  <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <div className="text-xs font-medium text-yellow-800">Delivery Notes:</div>
+                                    <div className="text-xs text-yellow-700 mt-1">{deliveryOptions.delivery_notes}</div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
 
