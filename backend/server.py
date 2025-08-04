@@ -2430,6 +2430,14 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
         
+        # Validate delivery method against supplier preferences
+        if order_data.delivery_method == "dropoff":
+            if not product.get("supports_dropoff_delivery", True):
+                raise HTTPException(status_code=400, detail="This supplier does not support drop-off delivery. Please choose shipping address.")
+        elif order_data.delivery_method in ["platform", "offline"] and order_data.shipping_address:
+            if not product.get("supports_shipping_delivery", True):
+                raise HTTPException(status_code=400, detail="This supplier does not support shipping delivery. Please choose a drop-off location.")
+        
         # Handle drop-off location validation and details
         dropoff_location_details = None
         if order_data.delivery_method == "dropoff":
