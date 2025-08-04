@@ -476,6 +476,12 @@ class Product(BaseModel):
     agent_name: Optional[str] = None
     images: List[str] = []
     platform: str  # "pyhub" or "pyexpress"
+    # Enhanced delivery options for suppliers
+    supports_dropoff_delivery: bool = True  # Whether supplier accepts drop-off locations
+    supports_shipping_delivery: bool = True  # Whether supplier accepts shipping addresses
+    delivery_cost_dropoff: float = 0.0  # Cost for drop-off delivery (0.0 = free)
+    delivery_cost_shipping: float = 0.0  # Cost for shipping delivery (0.0 = free)
+    delivery_notes: Optional[str] = None  # Special delivery instructions/notes
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class ProductCreate(BaseModel):
