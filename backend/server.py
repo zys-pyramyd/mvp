@@ -2511,9 +2511,11 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
         # Store order
         db.orders.insert_one(order)
         
-        # Prepare response with location info
+        # Prepare response with delivery info and cost breakdown
         delivery_info = {
             "method": order_data.delivery_method,
+            "cost": delivery_cost,
+            "is_free": delivery_cost == 0.0,
             "payment_timing": payment_timing
         }
         
@@ -2528,7 +2530,12 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
         return {
             "message": "Order created successfully",
             "order_id": order["order_id"],
-            "total_amount": total_amount,
+            "cost_breakdown": {
+                "product_total": product_total,
+                "delivery_cost": delivery_cost,
+                "total_amount": total_amount
+            },
+            "total_amount": total_amount,  # Keep for backward compatibility
             "delivery_info": delivery_info,
             "quantity_display": f"{order_data.quantity} {order_data.unit}" + (f" ({order_data.unit_specification})" if order_data.unit_specification else ""),
             "agent_fee_info": {
