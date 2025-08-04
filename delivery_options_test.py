@@ -467,11 +467,13 @@ class DeliveryOptionsAPITester:
             validation_success = False
 
         # Test 4: Verify cost breakdown in order responses includes product_total and delivery_cost
-        if self.test_product_ids.get('both_free'):
+        if self.test_product_ids.get('different_costs'):
+            # Use different_costs product which has free dropoff delivery
             free_order_data = {
-                "product_id": self.test_product_ids['both_free'],
+                "product_id": self.test_product_ids['different_costs'],
                 "quantity": 3.0,
-                "unit": "kg",
+                "unit": "bag",
+                "unit_specification": "100kg",
                 "delivery_method": "dropoff",
                 "dropoff_location_id": dropoff_location_id
             }
@@ -480,7 +482,7 @@ class DeliveryOptionsAPITester:
             
             if success and 'cost_breakdown' in response:
                 cost_breakdown = response['cost_breakdown']
-                # Both delivery methods are free for this product, so delivery_cost should be 0
+                # different_costs product has free dropoff delivery, so delivery_cost should be 0
                 if (cost_breakdown.get('delivery_cost') == 0.0 and
                     'product_total' in cost_breakdown and
                     'total_amount' in cost_breakdown):
