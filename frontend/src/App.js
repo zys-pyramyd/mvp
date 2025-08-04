@@ -1068,7 +1068,7 @@ function App() {
     }
   };
 
-  const addEnhancedToCart = (product, quantity, unit, specification, deliveryMethod, dropoffLocation = null) => {
+  const addEnhancedToCart = (product, quantity, unit, specification, deliveryMethod, dropoffLocation = null, shippingAddress = null) => {
     const existingItem = cart.find(item => item.product_id === (product.id || product._id));
     
     if (existingItem) {
@@ -1081,7 +1081,8 @@ function App() {
               unit: unit,
               unit_specification: specification,
               delivery_method: deliveryMethod,
-              dropoff_location: dropoffLocation
+              dropoff_location: dropoffLocation,
+              shipping_address: shippingAddress
             }
           : item
       ));
@@ -1095,7 +1096,8 @@ function App() {
         unit: unit,
         unit_specification: specification,
         delivery_method: deliveryMethod,
-        dropoff_location: dropoffLocation
+        dropoff_location: dropoffLocation,
+        shipping_address: shippingAddress
       };
       
       setCart(prevCart => [...prevCart, cartItem]);
@@ -1107,6 +1109,8 @@ function App() {
       deliveryDisplay = 'Offline Delivery';
     } else if (deliveryMethod === 'dropoff' && dropoffLocation) {
       deliveryDisplay = `Drop-off at ${dropoffLocation.name}`;
+    } else if (shippingAddress) {
+      deliveryDisplay = 'Home Delivery';
     }
     
     // Calculate order summary after adding
