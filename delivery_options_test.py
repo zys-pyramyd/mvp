@@ -77,21 +77,7 @@ class DeliveryOptionsAPITester:
         """Setup a test user with proper role for testing"""
         print("🔐 Setting up test user with agent role...")
         
-        # Try existing user first
-        login_data = {
-            "email_or_phone": "testagent@pyramyd.com",
-            "password": "password123"
-        }
-
-        success, response = self.make_request('POST', '/api/auth/login', login_data, 200)
-        
-        if success and 'token' in response:
-            self.token = response['token']
-            self.user_id = response['user']['id']
-            self.log_test("Login with Existing Agent User", True)
-            return True
-        
-        # If existing user fails, create new agent user
+        # Create new agent user with complete registration
         timestamp = datetime.now().strftime("%H%M%S")
         registration_data = {
             "first_name": "Delivery",
