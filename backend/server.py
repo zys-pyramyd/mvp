@@ -441,6 +441,9 @@ class User(BaseModel):
     role: Optional[UserRole] = None
     is_verified: bool = False
     wallet_balance: float = 0.0
+    # Rating information
+    average_rating: float = 5.0  # Overall rating as seller/service provider
+    total_ratings: int = 0  # Number of ratings received
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class CompleteRegistration(BaseModel):
