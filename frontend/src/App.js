@@ -5781,6 +5781,19 @@ function App() {
                       >
                         {selectedProduct.type === 'preorder' ? '🛒 Add Pre-order to Cart' : '🛒 Add to Cart'}
                       </button>
+
+                      {/* Rate Product Button */}
+                      {user && (
+                        <button
+                          onClick={() => {
+                            const productId = selectedProduct.id || selectedProduct._id;
+                            openRatingModal('product_rating', productId, null, null);
+                          }}
+                          className="w-full mt-3 py-2 px-6 border-2 border-yellow-400 text-yellow-600 rounded-lg font-medium text-sm hover:bg-yellow-50 transition-colors"
+                        >
+                          ⭐ Rate this Product
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
