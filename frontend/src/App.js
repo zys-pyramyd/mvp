@@ -69,6 +69,23 @@ function App() {
   // Enhanced delivery options state
   const [productDeliveryOptions, setProductDeliveryOptions] = useState({});
   const [selectedDeliveryMethod, setSelectedDeliveryMethod] = useState('dropoff');
+
+  // Rating system state
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingModalData, setRatingModalData] = useState(null);
+  const [userRatings, setUserRatings] = useState({});
+  const [productRatings, setProductRatings] = useState({});
+
+  // Driver management state (for logistics businesses)
+  const [showDriverManagement, setShowDriverManagement] = useState(false);
+  const [driverSlots, setDriverSlots] = useState([]);
+  const [availableDrivers, setAvailableDrivers] = useState([]);
+  const [showFindDrivers, setShowFindDrivers] = useState(false);
+  const [driverSearchFilters, setDriverSearchFilters] = useState({
+    location: '',
+    vehicle_type: '',
+    min_rating: null
+  });
   
   // Product Detail Page state
   const [showProductDetail, setShowProductDetail] = useState(false);
