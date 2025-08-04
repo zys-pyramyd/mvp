@@ -702,9 +702,24 @@ function App() {
   };
 
   // Product Detail functions
-  const openProductDetail = (product) => {
+  const openProductDetail = async (product) => {
     setSelectedProduct(product);
     setShowProductDetail(true);
+    
+    // Fetch delivery options for this product
+    const productId = product.id || product._id;
+    if (productId) {
+      const deliveryOptions = await fetchProductDeliveryOptions(productId);
+      
+      // Set default delivery method based on what's supported
+      if (deliveryOptions) {
+        if (deliveryOptions.supports_dropoff_delivery) {
+          setSelectedDeliveryMethod('dropoff');
+        } else if (deliveryOptions.supports_shipping_delivery) {
+          setSelectedDeliveryMethod('shipping');
+        }
+      }
+    }
   };
 
   const closeProductDetail = () => {
