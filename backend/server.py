@@ -2551,6 +2551,82 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
         print(f"Error creating order: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create order")
 
+@app.get("/api/products/{product_id}/delivery-options")
+async def get_product_delivery_options(product_id: str):
+    """Get delivery options for a specific product"""
+    try:
+        product = db.products.find_one({"id": product_id}) or db.preorders.find_one({"id": product_id})
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        delivery_options = {
+            "product_id": product_id,
+            "supports_dropoff_delivery": product.get("supports_dropoff_delivery", True),
+            "supports_shipping_delivery": product.get("supports_shipping_delivery", True),
+            "delivery_costs": {
+                "dropoff": {
+                    "cost": product.get("delivery_cost_dropoff", 0.0),
+                    "is_free": product.get("delivery_cost_dropoff", 0.0) == 0.0
+                },
+                "shipping": {
+                    "cost": product.get("delivery_cost_shipping", 0.0),
+                    "is_free": product.get("delivery_cost_shipping", 0.0) == 0.0
+                }
+            },
+            "delivery_notes": product.get("delivery_notes")
+        }
+        
+        return delivery_options
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting delivery options: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get delivery options")
+
+@app.put("/api/products/{product_id}/delivery-options")
+async def update_product_delivery_options(
+    product_id: str,
+    delivery_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update delivery options for a product (suppliers only)"""
+    try:
+        # Check if product exists and user owns it
+        product = db.products.find_one({"id": product_id})
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        if product.get("seller_id") != current_user["id"]:
+            raise HTTPException(status_code=403, detail="You can only update delivery options for your own products")
+        
+        # Validate at least one delivery method is supported
+        supports_dropoff = delivery_data.get("supports_dropoff_delivery", True)
+        supports_shipping = delivery_data.get("supports_shipping_delivery", True)
+        
+        if not supports_dropoff and not supports_shipping:
+            raise HTTPException(status_code=400, detail="At least one delivery method must be supported")
+        
+        # Update product delivery options
+        update_data = {
+            "supports_dropoff_delivery": supports_dropoff,
+            "supports_shipping_delivery": supports_shipping,
+            "delivery_cost_dropoff": max(0.0, delivery_data.get("delivery_cost_dropoff", 0.0)),
+            "delivery_cost_shipping": max(0.0, delivery_data.get("delivery_cost_shipping", 0.0)),
+            "delivery_notes": delivery_data.get("delivery_notes", "").strip() or None,
+            "updated_at": datetime.utcnow()
+        }
+        
+        db.products.update_one({"id": product_id}, {"$set": update_data})
+        
+        return {"message": "Delivery options updated successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating delivery options: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update delivery options")
+
 @app.put("/api/orders/{order_id}/status")
 async def update_order_status(order_id: str, status_update: OrderStatusUpdate, current_user: dict = Depends(get_current_user)):
     """Update order status - for sellers managing offline deliveries"""
