@@ -3292,6 +3292,10 @@ class PyramydAPITester:
         print("\n📍 Testing Drop-off Location Management System...")
         self.test_dropoff_location_system_complete()
 
+        # NEW: Enhanced Delivery Options System Testing (PRIORITY FROM REVIEW REQUEST)
+        print("\n🚚 Testing Enhanced Delivery Options System...")
+        self.test_enhanced_delivery_options_system()
+
         # ORDER CREATION FIX TEST - Main focus from review request
         print("\n🛒 Testing Order Creation Fix (PRIORITY)...")
         self.test_order_creation_fix()
