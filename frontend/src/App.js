@@ -5760,6 +5760,372 @@ function App() {
           </div>
         </div>
       )}
+      
+      {/* Rating Modal */}
+      {showRatingModal && ratingModalData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Rate & Review</h2>
+              <button
+                onClick={closeRatingModal}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const ratingValue = parseInt(formData.get('rating'));
+              const comment = formData.get('comment');
+              
+              try {
+                await submitRating({
+                  ...ratingModalData,
+                  rating_value: ratingValue,
+                  comment: comment || null
+                });
+                
+                alert('Rating submitted successfully!');
+                closeRatingModal();
+                
+                // Refresh products to show updated ratings
+                fetchProducts();
+              } catch (error) {
+                alert('Failed to submit rating: ' + error.message);
+              }
+            }}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Your Rating
+                </label>
+                <div className="flex space-x-1">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <label key={star} className="cursor-pointer">
+                      <input
+                        type="radio"
+                        name="rating"
+                        value={star}
+                        required
+                        className="hidden"
+                      />
+                      <span className="text-2xl text-gray-300 hover:text-yellow-400 transition-colors">
+                        ⭐
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Review (Optional)
+                </label>
+                <textarea
+                  name="comment"
+                  rows="3"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                  placeholder="Share your experience..."
+                ></textarea>
+              </div>
+              
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={closeRatingModal}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                >
+                  Submit Rating
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Driver Management Modal (for logistics businesses) */}
+      {showDriverManagement && user && user.role === 'logistics' && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-semibold">Driver Management</h2>
+                <button
+                  onClick={() => setShowDriverManagement(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              {/* Purchase New Slots Section */}
+              <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
+                <h3 className="text-lg font-semibold mb-4">Purchase Driver Slots</h3>
+                <p className="text-gray-600 mb-4">
+                  Each driver slot costs ₦500/month with a 14-day free trial. Purchase slots to add drivers to your fleet.
+                </p>
+                <div className="flex space-x-4">
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    placeholder="Number of slots"
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                    id="slots-count"
+                  />
+                  <button
+                    onClick={async () => {
+                      const slotsCount = parseInt(document.getElementById('slots-count').value);
+                      if (slotsCount >= 1 && slotsCount <= 10) {
+                        try {
+                          const result = await purchaseDriverSlots(slotsCount);
+                          alert(`Successfully purchased ${result.slots_created} driver slots!\nTotal cost: ${result.total_monthly_cost}/month\n14-day free trial included`);
+                        } catch (error) {
+                          alert('Error: ' + error.message);
+                        }
+                      } else {
+                        alert('Please enter a valid number of slots (1-10)');
+                      }
+                    }}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Purchase Slots
+                  </button>
+                </div>
+              </div>
+              
+              {/* Current Driver Slots */}
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">Your Driver Slots</h3>
+                  <button
+                    onClick={fetchDriverSlots}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                
+                {driverSlots.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No driver slots found. Purchase slots to get started!</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {driverSlots.map(slot => (
+                      <div key={slot.id} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-medium">Slot #{slot.slot_number}</h4>
+                          <span className={`text-xs px-2 py-1 rounded ${
+                            slot.subscription_status === 'trial' 
+                              ? 'bg-green-100 text-green-800' 
+                              : slot.subscription_status === 'active'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {slot.subscription_status}
+                          </span>
+                        </div>
+                        
+                        {slot.driver_id ? (
+                          <div className="space-y-2">
+                            <div className="text-sm">
+                              <strong>Driver:</strong> {slot.driver_name}
+                            </div>
+                            <div className="text-sm">
+                              <strong>Vehicle:</strong> {slot.vehicle_make_model} ({slot.plate_number})
+                            </div>
+                            <div className="text-sm">
+                              <strong>Rating:</strong> ⭐ {slot.average_rating}/5.0
+                            </div>
+                            <div className="text-sm">
+                              <strong>Trips:</strong> {slot.total_trips}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <p className="text-gray-500 text-sm">No driver assigned</p>
+                            <button
+                              onClick={() => {
+                                // Simple driver assignment form
+                                const driverName = prompt('Driver Name:');
+                                const plateNumber = prompt('Plate Number:');
+                                const vehicleMake = prompt('Vehicle Make/Model:');
+                                const vehicleColor = prompt('Vehicle Color:');
+                                const dob = prompt('Date of Birth (YYYY-MM-DD):');
+                                const address = prompt('Address:');
+                                
+                                if (driverName && plateNumber && vehicleMake && vehicleColor && dob && address) {
+                                  assignDriverToSlot(slot.id, {
+                                    driver_name: driverName,
+                                    vehicle_type: 'motorcycle', // Default, could be improved
+                                    plate_number: plateNumber,
+                                    vehicle_make_model: vehicleMake,
+                                    vehicle_color: vehicleColor,
+                                    date_of_birth: dob,
+                                    address: address
+                                  }).then(result => {
+                                    alert(`Driver assigned successfully!\nRegistration link: ${result.registration_link}`);
+                                  }).catch(error => {
+                                    alert('Error: ' + error.message);
+                                  });
+                                }
+                              }}
+                              className="w-full px-3 py-2 bg-emerald-600 text-white rounded text-sm hover:bg-emerald-700"
+                            >
+                              Assign Driver
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Find Drivers Modal (Uber-like interface) */}
+      {showFindDrivers && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-semibold">🚗 Find Drivers</h2>
+                <button
+                  onClick={() => setShowFindDrivers(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              {/* Search Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <input
+                  type="text"
+                  placeholder="Location..."
+                  value={driverSearchFilters.location}
+                  onChange={(e) => setDriverSearchFilters(prev => ({...prev, location: e.target.value}))}
+                  className="px-3 py-2 border border-gray-300 rounded-lg"
+                />
+                <select
+                  value={driverSearchFilters.vehicle_type}
+                  onChange={(e) => setDriverSearchFilters(prev => ({...prev, vehicle_type: e.target.value}))}
+                  className="px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">All Vehicle Types</option>
+                  <option value="motorcycle">Motorcycle</option>
+                  <option value="car">Car</option>
+                  <option value="van">Van</option>
+                  <option value="truck">Truck</option>
+                </select>
+                <select
+                  value={driverSearchFilters.min_rating || ''}
+                  onChange={(e) => setDriverSearchFilters(prev => ({...prev, min_rating: e.target.value ? parseFloat(e.target.value) : null}))}
+                  className="px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">Any Rating</option>
+                  <option value="4.5">4.5+ Stars</option>
+                  <option value="4.0">4.0+ Stars</option>
+                  <option value="3.5">3.5+ Stars</option>
+                </select>
+              </div>
+              
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Available Drivers</h3>
+                <button
+                  onClick={() => fetchAvailableDrivers(driverSearchFilters)}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                >
+                  Search Drivers
+                </button>
+              </div>
+              
+              {availableDrivers.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Click "Search Drivers" to find available drivers</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {availableDrivers.map(driver => (
+                    <div key={driver.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-center space-x-3 mb-3">
+                        <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                          <span className="text-emerald-600 font-semibold">
+                            {driver.name?.charAt(0) || 'D'}
+                          </span>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold">{driver.name}</h4>
+                          <div className="flex items-center">
+                            <span className="text-yellow-400">⭐</span>
+                            <span className="ml-1 text-sm text-gray-600">
+                              {driver.average_rating.toFixed(1)} ({driver.total_trips} trips)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2 mb-4">
+                        <div className="text-sm">
+                          <strong>Vehicle:</strong> {driver.vehicle_info?.make_model || 'N/A'}
+                        </div>
+                        <div className="text-sm">
+                          <strong>Type:</strong> {driver.vehicle_info?.type || 'N/A'}
+                        </div>
+                        <div className="text-sm">
+                          <strong>Plate:</strong> {driver.vehicle_info?.plate_number || 'N/A'}
+                        </div>
+                        {driver.logistics_business && (
+                          <div className="text-sm">
+                            <strong>Company:</strong> @{driver.logistics_business}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => {
+                            // Could integrate with order creation or messaging
+                            alert(`Driver: ${driver.name}\nContact through platform messaging`);
+                          }}
+                          className="flex-1 px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                        >
+                          View Profile
+                        </button>
+                        <button
+                          onClick={() => {
+                            alert(`Request sent to ${driver.name}!`);
+                          }}
+                          className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded text-sm hover:bg-emerald-700"
+                        >
+                          Request Driver
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
