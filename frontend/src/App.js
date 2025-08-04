@@ -382,6 +382,13 @@ function App() {
     return () => clearInterval(slideInterval);
   }, [slideContent.length]);
 
+  // Load driver slots for logistics businesses
+  useEffect(() => {
+    if (user && user.role === 'logistics') {
+      fetchDriverSlots();
+    }
+  }, [user]);
+
   const fetchUserProfile = async (token) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/user/profile`, {
