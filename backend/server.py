@@ -2461,9 +2461,18 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
                 "operating_hours": dropoff_location.get("operating_hours")
             }
         
-        # Calculate total amount
+        # Calculate total amount including delivery costs
         unit_price = product.get("price_per_unit", 0)
-        total_amount = order_data.quantity * unit_price
+        product_total = order_data.quantity * unit_price
+        
+        # Add delivery cost based on delivery method and supplier preferences
+        delivery_cost = 0.0
+        if order_data.delivery_method == "dropoff":
+            delivery_cost = product.get("delivery_cost_dropoff", 0.0)
+        elif order_data.delivery_method in ["platform", "offline"] and order_data.shipping_address:
+            delivery_cost = product.get("delivery_cost_shipping", 0.0)
+        
+        total_amount = product_total + delivery_cost
         
         # Determine payment timing based on delivery method
         payment_timing = "after_delivery" if order_data.delivery_method == "offline" else "during_transit"
