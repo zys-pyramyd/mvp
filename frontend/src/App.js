@@ -1953,6 +1953,56 @@ function App() {
                         </button>
                       )}
                       
+                      {/* Rating & Reviews */}
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          alert('Feature coming soon! View and manage your ratings and reviews.');
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        ⭐ My Ratings & Reviews
+                      </button>
+
+                      {/* Driver Management for logistics businesses */}
+                      {user.role === 'logistics' && (
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setShowDriverManagement(true);
+                            fetchDriverSlots();
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-50 font-medium"
+                        >
+                          🚗 Manage Drivers
+                        </button>
+                      )}
+
+                      {/* Find Drivers option for all users */}
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          setShowFindDrivers(true);
+                          fetchAvailableDrivers();
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        🔍 Find Drivers
+                      </button>
+
+                      {/* Driver Portal Access (for drivers) */}
+                      {user.role === 'driver' && (
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            alert('Driver Portal Access - Feature coming soon!\nTrack your deliveries, earnings, and ratings.');
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-50 font-medium"
+                        >
+                          🚛 Driver Portal
+                        </button>
+                      )}
+                      
                       {/* Group Buying menu item - commented out for pre-order functionality */}
                       {/* 
                       {user.role === 'agent' && (
