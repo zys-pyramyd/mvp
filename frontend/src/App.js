@@ -1266,11 +1266,13 @@ function App() {
 
   const createOrder = async () => {
     try {
-      // For drop-off delivery, we don't need shipping address validation
+      // Check what types of delivery methods we have in cart
       const hasDropoffItems = cart.some(item => item.delivery_method === 'dropoff');
-      const hasShippingItems = cart.some(item => item.delivery_method !== 'dropoff');
+      const hasShippingItems = cart.some(item => item.delivery_method !== 'dropoff' && item.shipping_address);
+      const hasOldShippingItems = cart.some(item => item.delivery_method !== 'dropoff' && !item.shipping_address);
       
-      if (hasShippingItems && !validateAddress()) return;
+      // Validate traditional shipping address form if we have old-style shipping items
+      if (hasOldShippingItems && !validateAddress()) return;
       
       const token = localStorage.getItem('token');
       const orders = [];
@@ -1288,7 +1290,11 @@ function App() {
         // Add appropriate delivery details based on method
         if (item.delivery_method === 'dropoff' && item.dropoff_location) {
           orderData.dropoff_location_id = item.dropoff_location.id;
+        } else if (item.shipping_address) {
+          // Use shipping address from cart item (new enhanced delivery system)
+          orderData.shipping_address = item.shipping_address;
         } else if (item.delivery_method !== 'dropoff') {
+          // Use traditional shipping address form (backward compatibility)
           orderData.shipping_address = `${shippingAddress.full_name}, ${shippingAddress.address_line_1}, ${shippingAddress.address_line_2 ? shippingAddress.address_line_2 + ', ' : ''}${shippingAddress.city}, ${shippingAddress.state}, ${shippingAddress.country}`;
         }
         
@@ -1314,11 +1320,21 @@ function App() {
       setCart([]);
       setShowCheckout(false);
       
+      // Calculate total from orders with delivery costs
+      const totalAmount = orders.reduce((sum, order) => sum + (order.cost_breakdown?.total_amount || order.total_amount || 0), 0);
+      
       let successMessage = `Orders created successfully! 
       Total orders: ${orders.length}
-      Total amount: ₦${orderSummary.total}
+      Total amount: ₦${totalAmount.toLocaleString()}
       Order IDs: ${orders.map(o => o.order_id).join(', ')}`;
       
+      // Add delivery cost breakdown if applicable
+      const totalDeliveryCost = orders.reduce((sum, order) => sum + (order.cost_breakdown?.delivery_cost || 0), 0);
+      if (totalDeliveryCost > 0) {
+        successMessage += `\n\nCost Breakdown:
+        Product Total: ₦${(totalAmount - totalDeliveryCost).toLocaleString()}
+        Delivery Cost: ₦${totalDeliveryCost.toLocaleString()}`;
+      }
       // Add drop-off location info if applicable
       const dropoffOrders = orders.filter(o => o.delivery_info?.method === 'dropoff');
       if (dropoffOrders.length > 0) {
