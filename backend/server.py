@@ -3101,6 +3101,603 @@ async def get_dropoff_states_cities():
         print(f"Error getting states and cities: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get states and cities")
 
+# ==================== RATING SYSTEM ENDPOINTS ====================
+
+@app.post("/api/ratings")
+async def create_rating(
+    rating_data: RatingCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new rating (1-5 stars) for users, products, or drivers"""
+    try:
+        # Validate rating value
+        if rating_data.rating_value < 1 or rating_data.rating_value > 5:
+            raise HTTPException(status_code=400, detail="Rating must be between 1 and 5 stars")
+        
+        # Check if rating already exists for this entity by this user
+        existing_rating = ratings_collection.find_one({
+            "rater_id": current_user["id"],
+            "rated_entity_id": rating_data.rated_entity_id,
+            "rating_type": rating_data.rating_type,
+            "order_id": rating_data.order_id  # Allow multiple ratings for different orders
+        })
+        
+        # If updating existing rating
+        if existing_rating:
+            # Update existing rating
+            update_data = {
+                "rating_value": rating_data.rating_value,
+                "comment": rating_data.comment,
+                "updated_at": datetime.utcnow()
+            }
+            
+            ratings_collection.update_one(
+                {"id": existing_rating["id"]},
+                {"$set": update_data}
+            )
+            
+            rating_id = existing_rating["id"]
+        else:
+            # Create new rating
+            rating = {
+                "id": str(uuid.uuid4()),
+                "rating_type": rating_data.rating_type,
+                "rating_value": rating_data.rating_value,
+                "rater_username": current_user["username"],
+                "rater_id": current_user["id"],
+                "rated_entity_id": rating_data.rated_entity_id,
+                "rated_entity_username": rating_data.rated_entity_username,
+                "order_id": rating_data.order_id,
+                "comment": rating_data.comment,
+                "created_at": datetime.utcnow(),
+                "updated_at": None
+            }
+            
+            ratings_collection.insert_one(rating)
+            rating_id = rating["id"]
+        
+        # Update average rating for the rated entity
+        await update_entity_average_rating(rating_data.rated_entity_id, rating_data.rating_type)
+        
+        return {
+            "message": "Rating submitted successfully",
+            "rating_id": rating_id,
+            "rating_value": rating_data.rating_value
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error creating rating: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create rating")
+
+async def update_entity_average_rating(entity_id: str, rating_type: RatingType):
+    """Helper function to update average rating for users, products, or drivers"""
+    try:
+        # Get all ratings for this entity
+        all_ratings = list(ratings_collection.find({
+            "rated_entity_id": entity_id,
+            "rating_type": rating_type
+        }))
+        
+        if not all_ratings:
+            return
+        
+        # Calculate new average
+        total_rating = sum(rating["rating_value"] for rating in all_ratings)
+        average_rating = round(total_rating / len(all_ratings), 1)
+        total_ratings = len(all_ratings)
+        
+        # Update appropriate collection based on rating type
+        if rating_type == RatingType.USER_RATING:
+            users_collection.update_one(
+                {"id": entity_id},
+                {"$set": {
+                    "average_rating": average_rating,
+                    "total_ratings": total_ratings
+                }}
+            )
+        elif rating_type == RatingType.PRODUCT_RATING:
+            db.products.update_one(
+                {"id": entity_id},
+                {"$set": {
+                    "average_rating": average_rating,
+                    "total_ratings": total_ratings
+                }}
+            )
+            db.preorders.update_one(
+                {"id": entity_id},
+                {"$set": {
+                    "average_rating": average_rating,
+                    "total_ratings": total_ratings
+                }}
+            )
+        elif rating_type == RatingType.DRIVER_RATING:
+            # Update driver slot rating
+            driver_slots_collection.update_one(
+                {"driver_id": entity_id},
+                {"$set": {
+                    "average_rating": average_rating,
+                    "total_ratings": total_ratings
+                }}
+            )
+            # Also update user rating if driver is also a user
+            users_collection.update_one(
+                {"id": entity_id},
+                {"$set": {
+                    "average_rating": average_rating,
+                    "total_ratings": total_ratings
+                }}
+            )
+    except Exception as e:
+        print(f"Error updating average rating: {str(e)}")
+
+@app.get("/api/ratings/{entity_id}")
+async def get_entity_ratings(
+    entity_id: str,
+    rating_type: RatingType,
+    page: int = 1,
+    limit: int = 20
+):
+    """Get ratings for a specific entity (user, product, or driver)"""
+    try:
+        skip = (page - 1) * limit
+        
+        # Get ratings for the entity
+        ratings = list(ratings_collection.find({
+            "rated_entity_id": entity_id,
+            "rating_type": rating_type
+        }).sort("created_at", -1).skip(skip).limit(limit))
+        
+        # Get total count
+        total_count = ratings_collection.count_documents({
+            "rated_entity_id": entity_id,
+            "rating_type": rating_type
+        })
+        
+        # Clean up response
+        for rating in ratings:
+            rating.pop('_id', None)
+            if isinstance(rating.get("created_at"), datetime):
+                rating["created_at"] = rating["created_at"].isoformat()
+        
+        # Calculate rating summary
+        rating_distribution = {}
+        for i in range(1, 6):
+            count = ratings_collection.count_documents({
+                "rated_entity_id": entity_id,
+                "rating_type": rating_type,
+                "rating_value": i
+            })
+            rating_distribution[f"{i}_star"] = count
+        
+        return {
+            "ratings": ratings,
+            "total_count": total_count,
+            "rating_distribution": rating_distribution,
+            "page": page,
+            "limit": limit,
+            "total_pages": (total_count + limit - 1) // limit if total_count > 0 else 0
+        }
+        
+    except Exception as e:
+        print(f"Error getting entity ratings: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get ratings")
+
+@app.get("/api/ratings/my-ratings")
+async def get_my_ratings(
+    rating_type: Optional[RatingType] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get ratings given by the current user"""
+    try:
+        query = {"rater_id": current_user["id"]}
+        if rating_type:
+            query["rating_type"] = rating_type
+        
+        ratings = list(ratings_collection.find(query).sort("created_at", -1))
+        
+        # Clean up response
+        for rating in ratings:
+            rating.pop('_id', None)
+            if isinstance(rating.get("created_at"), datetime):
+                rating["created_at"] = rating["created_at"].isoformat()
+        
+        return {
+            "ratings": ratings,
+            "total_count": len(ratings)
+        }
+        
+    except Exception as e:
+        print(f"Error getting user ratings: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get user ratings")
+
+# ==================== DRIVER MANAGEMENT SYSTEM ====================
+
+@app.post("/api/driver-slots/purchase")
+async def purchase_driver_slots(
+    slots_count: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Purchase driver slots for logistics business (₦500 per slot, 14-day free trial)"""
+    try:
+        # Validate user is logistics business
+        if current_user.get('role') != 'logistics':
+            raise HTTPException(status_code=403, detail="Only logistics businesses can purchase driver slots")
+        
+        if slots_count < 1 or slots_count > 50:
+            raise HTTPException(status_code=400, detail="Slot count must be between 1 and 50")
+        
+        # Get existing slots count for this business
+        existing_slots = driver_slots_collection.count_documents({
+            "logistics_business_id": current_user["id"],
+            "is_active": True
+        })
+        
+        # Create new slots
+        slots_created = []
+        for i in range(slots_count):
+            slot_number = existing_slots + i + 1
+            
+            slot = {
+                "id": str(uuid.uuid4()),
+                "logistics_business_id": current_user["id"],
+                "logistics_username": current_user["username"],
+                "slot_number": slot_number,
+                "driver_id": None,
+                "driver_username": None,
+                "driver_name": None,
+                "vehicle_type": None,
+                "plate_number": None,
+                "vehicle_make_model": None,
+                "vehicle_color": None,
+                "vehicle_year": None,
+                "vehicle_photo": None,
+                "date_of_birth": None,
+                "address": None,
+                "driver_license": None,
+                "registration_link": None,
+                "subscription_status": DriverSubscriptionStatus.TRIAL,
+                "trial_start_date": datetime.utcnow(),
+                "subscription_start_date": None,
+                "subscription_end_date": None,
+                "monthly_fee": 500.0,
+                "is_active": True,
+                "total_trips": 0,
+                "average_rating": 5.0,
+                "created_at": datetime.utcnow(),
+                "updated_at": None
+            }
+            
+            driver_slots_collection.insert_one(slot)
+            slots_created.append(slot["id"])
+        
+        total_cost = slots_count * 500.0
+        trial_end_date = datetime.utcnow() + timedelta(days=14)
+        
+        return {
+            "message": f"Successfully purchased {slots_count} driver slots",
+            "slots_created": len(slots_created),
+            "total_slots": existing_slots + slots_count,
+            "trial_period": "14 days",
+            "trial_end_date": trial_end_date.isoformat(),
+            "monthly_cost_per_slot": "₦500",
+            "total_monthly_cost": f"₦{total_cost:,.0f}",
+            "slot_ids": slots_created
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error purchasing driver slots: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to purchase driver slots")
+
+@app.get("/api/driver-slots/my-slots")
+async def get_my_driver_slots(
+    include_inactive: bool = False,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get driver slots owned by logistics business"""
+    try:
+        # Validate user is logistics business
+        if current_user.get('role') != 'logistics':
+            raise HTTPException(status_code=403, detail="Only logistics businesses can view driver slots")
+        
+        query = {"logistics_business_id": current_user["id"]}
+        if not include_inactive:
+            query["is_active"] = True
+        
+        slots = list(driver_slots_collection.find(query).sort("slot_number", 1))
+        
+        # Clean up response
+        for slot in slots:
+            slot.pop('_id', None)
+            if isinstance(slot.get("created_at"), datetime):
+                slot["created_at"] = slot["created_at"].isoformat()
+            if isinstance(slot.get("trial_start_date"), datetime):
+                slot["trial_start_date"] = slot["trial_start_date"].isoformat()
+        
+        # Calculate summary statistics
+        active_slots = len([s for s in slots if s.get("is_active")])
+        occupied_slots = len([s for s in slots if s.get("driver_id")])
+        trial_slots = len([s for s in slots if s.get("subscription_status") == "trial"])
+        
+        return {
+            "slots": slots,
+            "summary": {
+                "total_slots": len(slots),
+                "active_slots": active_slots,
+                "occupied_slots": occupied_slots,
+                "available_slots": active_slots - occupied_slots,
+                "trial_slots": trial_slots,
+                "monthly_cost": f"₦{active_slots * 500:,.0f}"
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting driver slots: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get driver slots")
+
+@app.post("/api/driver-slots/{slot_id}/assign-driver")
+async def assign_driver_to_slot(
+    slot_id: str,
+    driver_data: DriverSlotCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Assign driver information to a purchased slot and generate registration link"""
+    try:
+        # Find the slot
+        slot = driver_slots_collection.find_one({"id": slot_id})
+        if not slot:
+            raise HTTPException(status_code=404, detail="Driver slot not found")
+        
+        # Validate ownership
+        if slot["logistics_business_id"] != current_user["id"]:
+            raise HTTPException(status_code=403, detail="You can only assign drivers to your own slots")
+        
+        # Check if slot is already occupied
+        if slot.get("driver_id"):
+            raise HTTPException(status_code=400, detail="This slot is already assigned to a driver")
+        
+        # Generate unique registration link
+        registration_token = str(uuid.uuid4())
+        registration_link = f"/api/drivers/register/{registration_token}"
+        
+        # Update slot with driver information
+        update_data = {
+            "driver_name": driver_data.driver_name,
+            "vehicle_type": driver_data.vehicle_type,
+            "plate_number": driver_data.plate_number.upper(),
+            "vehicle_make_model": driver_data.vehicle_make_model,
+            "vehicle_color": driver_data.vehicle_color,
+            "vehicle_year": driver_data.vehicle_year,
+            "vehicle_photo": driver_data.vehicle_photo,
+            "date_of_birth": driver_data.date_of_birth,
+            "address": driver_data.address,
+            "driver_license": driver_data.driver_license,
+            "registration_link": registration_link,
+            "registration_token": registration_token,
+            "updated_at": datetime.utcnow()
+        }
+        
+        driver_slots_collection.update_one(
+            {"id": slot_id},
+            {"$set": update_data}
+        )
+        
+        return {
+            "message": "Driver assigned to slot successfully",
+            "slot_id": slot_id,
+            "driver_name": driver_data.driver_name,
+            "vehicle_info": f"{driver_data.vehicle_make_model} ({driver_data.plate_number})",
+            "registration_link": registration_link,
+            "instructions": "Share this registration link with the driver to complete their account setup"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error assigning driver to slot: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to assign driver to slot")
+
+@app.post("/api/drivers/register/{registration_token}")
+async def complete_driver_registration(
+    registration_token: str,
+    registration_data: DriverRegistrationComplete
+):
+    """Complete driver registration using the provided registration link"""
+    try:
+        # Find slot with this registration token
+        slot = driver_slots_collection.find_one({"registration_token": registration_token})
+        if not slot:
+            raise HTTPException(status_code=404, detail="Invalid registration link")
+        
+        # Check if slot is already activated
+        if slot.get("driver_id"):
+            raise HTTPException(status_code=400, detail="This registration link has already been used")
+        
+        # Check if username is available
+        existing_user = users_collection.find_one({"username": registration_data.username})
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username already exists")
+        
+        # Create driver user account
+        driver_user = {
+            "id": str(uuid.uuid4()),
+            "first_name": slot["driver_name"].split()[0] if slot.get("driver_name") else "Driver",
+            "last_name": " ".join(slot["driver_name"].split()[1:]) if slot.get("driver_name") and len(slot["driver_name"].split()) > 1 else "",
+            "username": registration_data.username,
+            "email": f"{registration_data.username}@pyramyddriver.com",  # Generated email
+            "password": hash_password(registration_data.password),
+            "phone": None,  # Will be updated when driver provides it
+            "role": UserRole.DRIVER,
+            "is_verified": True,  # Auto-verify logistics business managed drivers
+            "wallet_balance": 0.0,
+            "average_rating": 5.0,
+            "total_ratings": 0,
+            "created_at": datetime.utcnow()
+        }
+        
+        users_collection.insert_one(driver_user)
+        
+        # Update slot with driver account information
+        driver_slots_collection.update_one(
+            {"id": slot["id"]},
+            {"$set": {
+                "driver_id": driver_user["id"],
+                "driver_username": registration_data.username,
+                "registration_token": None,  # Clear token after use
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        
+        return {
+            "message": "Driver registration completed successfully",
+            "driver_username": registration_data.username,
+            "vehicle_info": {
+                "type": slot.get("vehicle_type"),
+                "make_model": slot.get("vehicle_make_model"),
+                "plate_number": slot.get("plate_number"),
+                "color": slot.get("vehicle_color")
+            },
+            "logistics_business": slot["logistics_username"],
+            "instructions": "You can now access the driver platform using your username and password"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error completing driver registration: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to complete driver registration")
+
+@app.get("/api/drivers/profile/{driver_username}")
+async def get_driver_profile(driver_username: str):
+    """Get enhanced driver profile for uber-like interface"""
+    try:
+        # Get driver user information
+        driver_user = users_collection.find_one({"username": driver_username, "role": "driver"})
+        if not driver_user:
+            raise HTTPException(status_code=404, detail="Driver not found")
+        
+        # Get driver slot information
+        driver_slot = driver_slots_collection.find_one({"driver_username": driver_username})
+        
+        # Get driver ratings
+        driver_ratings = list(ratings_collection.find({
+            "rated_entity_id": driver_user["id"],
+            "rating_type": RatingType.DRIVER_RATING
+        }).sort("created_at", -1).limit(10))
+        
+        # Clean up ratings
+        for rating in driver_ratings:
+            rating.pop('_id', None)
+            if isinstance(rating.get("created_at"), datetime):
+                rating["created_at"] = rating["created_at"].isoformat()
+        
+        # Build enhanced profile
+        profile = {
+            "id": driver_user["id"],
+            "driver_username": driver_username,
+            "driver_name": f"{driver_user['first_name']} {driver_user['last_name']}".strip(),
+            "phone_number": driver_user.get("phone"),
+            "average_rating": driver_user.get("average_rating", 5.0),
+            "total_ratings": driver_user.get("total_ratings", 0),
+            "total_trips": driver_slot.get("total_trips", 0) if driver_slot else 0,
+            "is_independent": driver_slot is None,  # Independent if no slot found
+            "status": "offline",  # Default status, would be updated with real-time data
+            "vehicle_info": {},
+            "logistics_business_info": None,
+            "recent_ratings": driver_ratings,
+            "created_at": driver_user["created_at"].isoformat() if isinstance(driver_user.get("created_at"), datetime) else None
+        }
+        
+        # Add vehicle and logistics information if slot exists
+        if driver_slot:
+            profile["vehicle_info"] = {
+                "type": driver_slot.get("vehicle_type"),
+                "make_model": driver_slot.get("vehicle_make_model"),
+                "plate_number": driver_slot.get("plate_number"),
+                "color": driver_slot.get("vehicle_color"),
+                "year": driver_slot.get("vehicle_year"),
+                "photo": driver_slot.get("vehicle_photo")
+            }
+            profile["logistics_business_info"] = {
+                "business_username": driver_slot.get("logistics_username"),
+                "slot_number": driver_slot.get("slot_number")
+            }
+        
+        return profile
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting driver profile: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get driver profile")
+
+@app.get("/api/drivers/find-drivers")
+async def find_available_drivers(
+    location: Optional[str] = None,
+    vehicle_type: Optional[VehicleType] = None,
+    min_rating: Optional[float] = None,
+    limit: int = 20
+):
+    """Find available drivers for uber-like interface"""
+    try:
+        # Build query for active driver slots
+        query = {"is_active": True, "driver_id": {"$ne": None}}
+        
+        if vehicle_type:
+            query["vehicle_type"] = vehicle_type
+        
+        if min_rating:
+            query["average_rating"] = {"$gte": min_rating}
+        
+        # Get driver slots
+        driver_slots = list(driver_slots_collection.find(query).limit(limit))
+        
+        # Build driver profiles
+        drivers = []
+        for slot in driver_slots:
+            # Get user information
+            driver_user = users_collection.find_one({"id": slot["driver_id"]})
+            if not driver_user:
+                continue
+            
+            driver_profile = {
+                "id": slot["driver_id"],
+                "username": slot["driver_username"],
+                "name": slot["driver_name"],
+                "average_rating": slot.get("average_rating", 5.0),
+                "total_trips": slot.get("total_trips", 0),
+                "vehicle_info": {
+                    "type": slot.get("vehicle_type"),
+                    "make_model": slot.get("vehicle_make_model"),
+                    "plate_number": slot.get("plate_number"),
+                    "color": slot.get("vehicle_color"),
+                    "photo": slot.get("vehicle_photo")
+                },
+                "logistics_business": slot.get("logistics_username"),
+                "status": "available"  # Would be dynamic in real implementation
+            }
+            
+            drivers.append(driver_profile)
+        
+        return {
+            "drivers": drivers,
+            "total_found": len(drivers),
+            "filters_applied": {
+                "location": location,
+                "vehicle_type": vehicle_type,
+                "min_rating": min_rating
+            }
+        }
+        
+    except Exception as e:
+        print(f"Error finding drivers: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to find drivers")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
