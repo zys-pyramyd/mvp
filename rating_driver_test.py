@@ -148,13 +148,13 @@ class RatingDriverTester:
             "comment": "This should fail"
         }
         
-        success, response = self.make_request('POST', '/api/ratings', invalid_rating_data, 400, use_auth=True)
+        success, response = self.make_request('POST', '/api/ratings', invalid_rating_data, 422, use_auth=True)
         
-        if success:  # Should return 400 error
+        if success:  # Should return 422 error (Pydantic validation)
             self.log_test("Rating Validation (6 stars - invalid)", True)
             validation_high_success = True
         else:
-            self.log_test("Rating Validation (6 stars - invalid)", False, f"Should return 400 error: {response}")
+            self.log_test("Rating Validation (6 stars - invalid)", False, f"Should return 422 error: {response}")
             validation_high_success = False
         
         # Test 4: Test rating validation - invalid rating value (0 stars - should fail)
@@ -165,13 +165,13 @@ class RatingDriverTester:
             "comment": "This should also fail"
         }
         
-        success, response = self.make_request('POST', '/api/ratings', invalid_rating_low_data, 400, use_auth=True)
+        success, response = self.make_request('POST', '/api/ratings', invalid_rating_low_data, 422, use_auth=True)
         
-        if success:  # Should return 400 error
+        if success:  # Should return 422 error (Pydantic validation)
             self.log_test("Rating Validation (0 stars - invalid)", True)
             validation_low_success = True
         else:
-            self.log_test("Rating Validation (0 stars - invalid)", False, f"Should return 400 error: {response}")
+            self.log_test("Rating Validation (0 stars - invalid)", False, f"Should return 422 error: {response}")
             validation_low_success = False
         
         # Test 5: Update existing rating
