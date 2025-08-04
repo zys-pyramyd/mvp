@@ -499,6 +499,18 @@ metadata:
         agent: "testing"
         comment: "✅ DIVERSE PRE-ORDER PRODUCTS CREATION SUCCESSFUL: Successfully created and published 3 diverse pre-order products as requested: 1) Premium Basmati Rice - Harvest 2024 (₦850/bag, 40% partial payment, 45 days delivery, Kebbi State) 2) Fresh Roma Tomatoes - Seasonal (₦400/crate, 30% partial payment, 30 days delivery, Kaduna State) 3) Pure Red Palm Oil - Cold Pressed (₦1200/gallon, 35% partial payment, 60 days delivery, Cross River State). All products are published and retrievable via GET /api/preorders endpoint. The pre-order section on the frontend will now be populated with these diverse products showing the orange gradient styling as implemented."
 
+  - task: "Enhanced Delivery Options System for Suppliers"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ ENHANCED DELIVERY OPTIONS SYSTEM TESTING COMPLETE: Comprehensive testing of the new supplier delivery options system achieved 100% success rate (20/20 tests passed). Successfully tested all requested functionality: 1) PRODUCT CREATION WITH DELIVERY OPTIONS - Created 4 test products with various delivery preferences: both methods free, dropoff-only ₦200, shipping-only ₦500, different costs (dropoff free, shipping ₦300) 2) DELIVERY OPTIONS API ENDPOINTS - GET /api/products/{product_id}/delivery-options working perfectly, returning correct delivery costs and support flags; PUT /api/products/{product_id}/delivery-options successfully updates delivery preferences with verification 3) ENHANCED ORDER CREATION - Order creation with delivery cost calculations working flawlessly: dropoff orders include dropoff costs (₦1600 product + ₦200 delivery = ₦1800), shipping orders include shipping costs (₦1200 product + ₦500 delivery = ₦1700), validation prevents unsupported delivery methods, cost breakdown includes product_total and delivery_cost fields 4) EDGE CASES & VALIDATION - Ownership validation prevents unauthorized updates (403 error), disabling both delivery methods fails correctly (400 error), negative costs converted to 0, non-existent products return 404. All delivery options functionality is working correctly and ready for production use."
+
 test_plan:
   current_focus:
     - "Order Creation Fix Testing"
