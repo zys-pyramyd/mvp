@@ -515,6 +515,181 @@ function App() {
     return null;
   };
 
+  // Rating system functions
+  const submitRating = async (ratingData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/ratings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(ratingData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // Update local state
+        if (ratingData.rating_type === 'user_rating') {
+          await fetchUserRatings(ratingData.rated_entity_id);
+        } else if (ratingData.rating_type === 'product_rating') {
+          await fetchProductRatings(ratingData.rated_entity_id);
+        }
+        return result;
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to submit rating');
+      }
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      throw error;
+    }
+  };
+
+  const fetchUserRatings = async (userId) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/ratings/${userId}?rating_type=user_rating`);
+      if (response.ok) {
+        const data = await response.json();
+        setUserRatings(prev => ({
+          ...prev,
+          [userId]: data
+        }));
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching user ratings:', error);
+    }
+    return null;
+  };
+
+  const fetchProductRatings = async (productId) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/ratings/${productId}?rating_type=product_rating`);
+      if (response.ok) {
+        const data = await response.json();
+        setProductRatings(prev => ({
+          ...prev,
+          [productId]: data
+        }));
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching product ratings:', error);
+    }
+    return null;
+  };
+
+  const openRatingModal = (ratingType, entityId, entityUsername = null, orderId = null) => {
+    setRatingModalData({
+      rating_type: ratingType,
+      rated_entity_id: entityId,
+      rated_entity_username: entityUsername,
+      order_id: orderId
+    });
+    setShowRatingModal(true);
+  };
+
+  const closeRatingModal = () => {
+    setShowRatingModal(false);
+    setRatingModalData(null);
+  };
+
+  // Driver management functions (for logistics businesses)
+  const fetchDriverSlots = async () => {
+    if (!user || user.role !== 'logistics') return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/driver-slots/my-slots`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setDriverSlots(data.slots || []);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching driver slots:', error);
+    }
+    return null;
+  };
+
+  const purchaseDriverSlots = async (slotsCount) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/driver-slots/purchase`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ slots_count: slotsCount })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        await fetchDriverSlots(); // Refresh slots
+        return result;
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to purchase driver slots');
+      }
+    } catch (error) {
+      console.error('Error purchasing driver slots:', error);
+      throw error;
+    }
+  };
+
+  const assignDriverToSlot = async (slotId, driverData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/driver-slots/${slotId}/assign-driver`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(driverData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        await fetchDriverSlots(); // Refresh slots
+        return result;
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to assign driver to slot');
+      }
+    } catch (error) {
+      console.error('Error assigning driver:', error);
+      throw error;
+    }
+  };
+
+  const fetchAvailableDrivers = async (filters = {}) => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (filters.location) queryParams.append('location', filters.location);
+      if (filters.vehicle_type) queryParams.append('vehicle_type', filters.vehicle_type);
+      if (filters.min_rating) queryParams.append('min_rating', filters.min_rating);
+      
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/drivers/find-drivers?${queryParams}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableDrivers(data.drivers || []);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching available drivers:', error);
+    }
+    return null;
+  };
+
   const handleBasicRegistration = async (e) => {
     e.preventDefault();
     // Just move to role path selection after basic form
