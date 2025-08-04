@@ -480,6 +480,24 @@ function App() {
     }
   };
 
+  // Fetch product delivery options
+  const fetchProductDeliveryOptions = async (productId) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/products/${productId}/delivery-options`);
+      if (response.ok) {
+        const data = await response.json();
+        setProductDeliveryOptions(prev => ({
+          ...prev,
+          [productId]: data
+        }));
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching product delivery options:', error);
+    }
+    return null;
+  };
+
   const handleBasicRegistration = async (e) => {
     e.preventDefault();
     // Just move to role path selection after basic form
