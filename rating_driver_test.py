@@ -268,8 +268,8 @@ class RatingDriverTester:
         # Test with current user (will likely fail due to role validation)
         slots_count = 3
         
-        success, response = self.make_request('POST', '/api/driver-slots/purchase', 
-                                            {"slots_count": slots_count}, 403, use_auth=True)
+        success, response = self.make_request('GET', f'/api/driver-slots/purchase?slots_count={slots_count}', 
+                                            expected_status=403, use_auth=True)
         
         if success:  # Should return 403 for non-logistics user
             self.log_test("Driver Slot Purchase (Role Validation)", True, "Correctly rejected non-logistics user")
@@ -279,8 +279,8 @@ class RatingDriverTester:
             role_validation_success = False
         
         # Test invalid slot count (too high)
-        success, response = self.make_request('POST', '/api/driver-slots/purchase', 
-                                            {"slots_count": 100}, 403, use_auth=True)
+        success, response = self.make_request('GET', '/api/driver-slots/purchase?slots_count=100', 
+                                            expected_status=403, use_auth=True)
         
         if success:  # Should return 403 (role validation takes precedence)
             self.log_test("Driver Slot Purchase (Invalid Count High)", True, "Role validation working")
@@ -290,8 +290,8 @@ class RatingDriverTester:
             validation_high_success = False
         
         # Test invalid slot count (too low)
-        success, response = self.make_request('POST', '/api/driver-slots/purchase', 
-                                            {"slots_count": 0}, 403, use_auth=True)
+        success, response = self.make_request('GET', '/api/driver-slots/purchase?slots_count=0', 
+                                            expected_status=403, use_auth=True)
         
         if success:  # Should return 403 (role validation takes precedence)
             self.log_test("Driver Slot Purchase (Invalid Count Low)", True, "Role validation working")
