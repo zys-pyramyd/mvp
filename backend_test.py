@@ -3284,9 +3284,13 @@ class PyramydAPITester:
         print("\n🌾 Testing Diverse Pre-order Products Creation...")
         self.test_diverse_preorder_complete_workflow()
 
-        # Test 33-40: Driver System Tests
-        print("\n🚗 Testing Driver System...")
-        self.test_driver_system_complete()
+        # Test 33-40: Rating System Tests (NEW - HIGH PRIORITY)
+        print("\n⭐ Testing Rating System...")
+        self.test_rating_system_complete()
+
+        # Test 41-50: Driver Management Platform Tests (NEW - HIGH PRIORITY)
+        print("\n🚗 Testing Driver Management Platform...")
+        self.test_driver_management_platform_complete()
 
         # Test 41-50: Drop-off Location System Tests (NEW - HIGH PRIORITY)
         print("\n📍 Testing Drop-off Location Management System...")
