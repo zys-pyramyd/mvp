@@ -234,7 +234,7 @@ class RatingDriverTester:
             product_retrieval_success = False
         
         # Test 3: Get my ratings (ratings given by current user)
-        success, response = self.make_request('GET', '/api/ratings/my-ratings', use_auth=True)
+        success, response = self.make_request('GET', '/api/ratings/my-ratings?rating_type=user_rating', use_auth=True)
         
         if success and 'ratings' in response and 'total_count' in response:
             ratings = response.get('ratings', [])
