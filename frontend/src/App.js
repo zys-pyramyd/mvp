@@ -2558,8 +2558,34 @@ function App() {
                   </div>
 
                   {/* Location - Responsive */}
-                  <div className="text-xs sm:text-sm text-gray-500 mb-3 line-clamp-1">
+                  <div className="text-xs sm:text-sm text-gray-500 mb-2 line-clamp-1">
                     📍 {product.location}
+                  </div>
+
+                  {/* Rating Display - New */}
+                  <div className="flex items-center mb-3">
+                    <div className="flex items-center">
+                      {[...Array(5)].map((_, i) => (
+                        <span
+                          key={i}
+                          className={`text-sm ${
+                            i < Math.floor(product.average_rating || 5)
+                              ? 'text-yellow-400'
+                              : 'text-gray-300'
+                          }`}
+                        >
+                          ⭐
+                        </span>
+                      ))}
+                    </div>
+                    <span className="text-xs text-gray-600 ml-2">
+                      {product.average_rating ? product.average_rating.toFixed(1) : '5.0'}
+                    </span>
+                    {product.total_ratings > 0 && (
+                      <span className="text-xs text-gray-500 ml-1">
+                        ({product.total_ratings} reviews)
+                      </span>
+                    )}
                   </div>
 
                   {/* Pre-order specific info - Responsive */}
