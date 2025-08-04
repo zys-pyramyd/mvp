@@ -5403,29 +5403,86 @@ function App() {
                         </div>
                       </div>
 
-                      {/* Add to Cart Button */}
+                      {/* Enhanced Add to Cart Button */}
                       <button
                         onClick={() => {
                           const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
                           const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg';
                           const specification = selectedProduct.unit_specification || 'standard';
-                          const dropoffLocationId = document.getElementById('detail-dropoff')?.value;
                           
-                          if (!dropoffLocationId) {
-                            alert('Please select a drop-off location');
+                          const productId = selectedProduct.id || selectedProduct._id;
+                          const deliveryOptions = productDeliveryOptions[productId];
+                          
+                          if (!deliveryOptions) {
+                            alert('Unable to determine delivery options. Please try again.');
                             return;
                           }
                           
-                          const dropoffLocation = dropOffLocations.find(loc => loc.id.toString() === dropoffLocationId);
+                          // Determine actual delivery method based on what's supported
+                          let deliveryMethod = selectedDeliveryMethod;
+                          if (!deliveryOptions.supports_dropoff_delivery && !deliveryOptions.supports_shipping_delivery) {
+                            alert('This product has no available delivery methods. Please contact the supplier.');
+                            return;
+                          }
+                          
+                          // Default to available method if current selection isn't supported
+                          if (deliveryMethod === 'dropoff' && !deliveryOptions.supports_dropoff_delivery) {
+                            deliveryMethod = 'shipping';
+                          } else if (deliveryMethod === 'shipping' && !deliveryOptions.supports_shipping_delivery) {
+                            deliveryMethod = 'dropoff';
+                          }
+                          
+                          let deliveryDetails = null;
+                          
+                          // Validate and get delivery details based on method
+                          if (deliveryMethod === 'dropoff') {
+                            const dropoffLocationId = document.getElementById('detail-dropoff')?.value;
+                            if (!dropoffLocationId) {
+                              alert('Please select a drop-off location');
+                              return;
+                            }
+                            
+                            const dropoffLocation = dropOffLocations.find(loc => loc.id.toString() === dropoffLocationId);
+                            if (!dropoffLocation) {
+                              alert('Invalid drop-off location selected');
+                              return;
+                            }
+                            
+                            deliveryDetails = {
+                              type: 'dropoff',
+                              dropoffLocation: dropoffLocation,
+                              cost: deliveryOptions.delivery_costs.dropoff.cost
+                            };
+                          } else if (deliveryMethod === 'shipping') {
+                            const shippingAddress = document.getElementById('detail-shipping-address')?.value?.trim();
+                            if (!shippingAddress) {
+                              alert('Please enter your delivery address');
+                              return;
+                            }
+                            
+                            deliveryDetails = {
+                              type: 'shipping',
+                              shippingAddress: shippingAddress,
+                              cost: deliveryOptions.delivery_costs.shipping.cost
+                            };
+                          }
+                          
                           const cartItem = {
                             ...selectedProduct,
                             cartQuantity: quantity,
                             cartUnit: unit,
                             cartSpecification: specification,
-                            dropoffLocation: dropoffLocation
+                            deliveryMethod: deliveryMethod,
+                            deliveryDetails: deliveryDetails
                           };
                           
-                          addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff', dropoffLocation);
+                          // Use the appropriate parameters for addEnhancedToCart based on delivery method
+                          if (deliveryMethod === 'dropoff') {
+                            addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff', deliveryDetails.dropoffLocation);
+                          } else {
+                            addEnhancedToCart(cartItem, quantity, unit, specification, 'platform', null, deliveryDetails.shippingAddress);
+                          }
+                          
                           closeProductDetail();
                         }}
                         className={`w-full py-3 px-6 rounded-lg font-bold text-lg transition-colors ${
