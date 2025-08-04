@@ -725,6 +725,7 @@ function App() {
   const closeProductDetail = () => {
     setShowProductDetail(false);
     setSelectedProduct(null);
+    setSelectedDeliveryMethod('dropoff'); // Reset to default
   };
 
   const logout = () => {
