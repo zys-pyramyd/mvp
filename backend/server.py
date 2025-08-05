@@ -638,6 +638,142 @@ class EnhancedDriverProfile(BaseModel):
     created_at: datetime
     last_active: Optional[datetime] = None
 
+# Digital Wallet System Models
+class TransactionType(str, Enum):
+    WALLET_FUNDING = "wallet_funding"
+    WALLET_WITHDRAWAL = "wallet_withdrawal" 
+    ORDER_PAYMENT = "order_payment"
+    ORDER_REFUND = "order_refund"
+    GIFT_CARD_PURCHASE = "gift_card_purchase"
+    GIFT_CARD_REDEMPTION = "gift_card_redemption"
+    COMMISSION_PAYMENT = "commission_payment"
+    DRIVER_PAYMENT = "driver_payment"
+
+class TransactionStatus(str, Enum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+class FundingMethod(str, Enum):
+    BANK_TRANSFER = "bank_transfer"
+    DEBIT_CARD = "debit_card"
+    USSD = "ussd"
+    BANK_DEPOSIT = "bank_deposit"
+    GIFT_CARD = "gift_card"
+
+class WalletTransaction(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    username: str
+    transaction_type: TransactionType
+    amount: float
+    balance_before: float
+    balance_after: float
+    status: TransactionStatus = TransactionStatus.PENDING
+    reference: str = Field(default_factory=lambda: f"TXN-{uuid.uuid4().hex[:12].upper()}")
+    description: str
+    funding_method: Optional[FundingMethod] = None
+    order_id: Optional[str] = None  # If related to an order
+    gift_card_id: Optional[str] = None  # If related to gift card
+    metadata: Optional[dict] = None  # Additional transaction data
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = None
+
+class WalletTransactionCreate(BaseModel):
+    transaction_type: TransactionType
+    amount: float = Field(..., gt=0)
+    description: str
+    funding_method: Optional[FundingMethod] = None
+    order_id: Optional[str] = None
+    metadata: Optional[dict] = None
+
+class MockBankAccount(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    account_name: str
+    account_number: str = Field(..., regex=r'^\d{10}$')  # 10-digit account number
+    bank_name: str
+    bank_code: str = Field(..., regex=r'^\d{3}$')  # 3-digit bank code
+    is_primary: bool = False
+    is_verified: bool = False  # Mock verification status
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class BankAccountCreate(BaseModel):
+    account_name: str
+    account_number: str = Field(..., regex=r'^\d{10}$')
+    bank_name: str
+    bank_code: str = Field(..., regex=r'^\d{3}$')
+    is_primary: bool = False
+
+# Gift Card System Models
+class GiftCardStatus(str, Enum):
+    ACTIVE = "active"
+    REDEEMED = "redeemed"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
+class GiftCard(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    card_code: str = Field(default_factory=lambda: f"GIFT-{uuid.uuid4().hex[:8].upper()}")
+    amount: float
+    balance: float  # Remaining balance (can be partially used)
+    status: GiftCardStatus = GiftCardStatus.ACTIVE
+    purchaser_id: str  # User who bought the gift card
+    purchaser_username: str
+    recipient_email: Optional[str] = None  # If gifted to someone
+    recipient_name: Optional[str] = None
+    message: Optional[str] = None  # Gift message
+    expiry_date: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(days=365))  # 1 year validity
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    redeemed_at: Optional[datetime] = None
+    redeemed_by_id: Optional[str] = None
+    redeemed_by_username: Optional[str] = None
+
+class GiftCardCreate(BaseModel):
+    amount: float = Field(..., ge=100, le=100000)  # ₦100 to ₦100,000
+    recipient_email: Optional[str] = None
+    recipient_name: Optional[str] = None
+    message: Optional[str] = None
+
+class GiftCardRedeem(BaseModel):
+    card_code: str
+    amount: Optional[float] = None  # Amount to redeem (for partial redemption)
+
+# Wallet Settings and Security
+class WalletSecurity(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    transaction_pin: Optional[str] = None  # Hashed 4-6 digit PIN
+    pin_attempts: int = 0
+    pin_locked_until: Optional[datetime] = None
+    two_factor_enabled: bool = False
+    daily_limit: float = 50000.0  # ₦50,000 default daily limit
+    monthly_limit: float = 1000000.0  # ₦1,000,000 default monthly limit
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+class WalletPinCreate(BaseModel):
+    pin: str = Field(..., regex=r'^\d{4,6}$')  # 4-6 digit PIN
+
+class WalletPinVerify(BaseModel):
+    pin: str = Field(..., regex=r'^\d{4,6}$')
+
+# Enhanced User Wallet Summary
+class UserWalletSummary(BaseModel):
+    user_id: str
+    username: str
+    balance: float
+    total_funded: float
+    total_spent: float
+    total_withdrawn: float
+    pending_transactions: int
+    last_transaction_date: Optional[datetime] = None
+    security_status: dict
+    linked_accounts: int
+    gift_cards_purchased: int
+    gift_cards_redeemed: int
+
 # Helper functions
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
