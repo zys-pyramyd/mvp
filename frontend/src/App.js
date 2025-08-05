@@ -713,6 +713,257 @@ function App() {
     return null;
   };
 
+  // Digital Wallet management functions
+  const fetchWalletSummary = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/wallet/summary`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setWalletSummary(data);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching wallet summary:', error);
+    }
+    return null;
+  };
+
+  const fundWallet = async (amount, fundingMethod, description) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/wallet/fund`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          transaction_type: 'wallet_funding',
+          amount: parseFloat(amount),
+          description: description,
+          funding_method: fundingMethod
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        await fetchWalletSummary(); // Refresh wallet data
+        await fetchWalletTransactions(); // Refresh transactions
+        return result;
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to fund wallet');
+      }
+    } catch (error) {
+      console.error('Error funding wallet:', error);
+      throw error;
+    }
+  };
+
+  const withdrawFunds = async (amount, bankAccountId, description) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/wallet/withdraw`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          amount: parseFloat(amount),
+          bank_account_id: bankAccountId,
+          description: description
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        await fetchWalletSummary(); // Refresh wallet data
+        await fetchWalletTransactions(); // Refresh transactions
+        return result;
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to withdraw funds');
+      }
+    } catch (error) {
+      console.error('Error withdrawing funds:', error);
+      throw error;
+    }
+  };
+
+  const fetchWalletTransactions = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/wallet/transactions?limit=50`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setWalletTransactions(data.transactions || []);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching wallet transactions:', error);
+    }
+    return null;
+  };
+
+  const fetchBankAccounts = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/wallet/bank-accounts`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setBankAccounts(data.accounts || []);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching bank accounts:', error);
+    }
+    return null;
+  };
+
+  const addBankAccount = async (accountData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/wallet/bank-accounts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(accountData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        await fetchBankAccounts(); // Refresh bank accounts
+        return result;
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to add bank account');
+      }
+    } catch (error) {
+      console.error('Error adding bank account:', error);
+      throw error;
+    }
+  };
+
+  // Gift Card management functions
+  const createGiftCard = async (amount, recipientEmail, recipientName, message) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/wallet/gift-cards`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          amount: parseFloat(amount),
+          recipient_email: recipientEmail || null,
+          recipient_name: recipientName || null,
+          message: message || null
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        await fetchWalletSummary(); // Refresh wallet data
+        await fetchUserGiftCards(); // Refresh gift cards
+        return result;
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to create gift card');
+      }
+    } catch (error) {
+      console.error('Error creating gift card:', error);
+      throw error;
+    }
+  };
+
+  const redeemGiftCard = async (cardCode, amount = null) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/wallet/gift-cards/redeem`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          card_code: cardCode.toUpperCase(),
+          amount: amount ? parseFloat(amount) : null
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        await fetchWalletSummary(); // Refresh wallet data
+        return result;
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to redeem gift card');
+      }
+    } catch (error) {
+      console.error('Error redeeming gift card:', error);
+      throw error;
+    }
+  };
+
+  const fetchUserGiftCards = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/wallet/gift-cards/my-cards`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setUserGiftCards(data.gift_cards || []);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching user gift cards:', error);
+    }
+    return null;
+  };
+
+  const fetchGiftCardDetails = async (cardCode) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/wallet/gift-cards/${cardCode.toUpperCase()}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setGiftCardDetails(data);
+        return data;
+      } else {
+        setGiftCardDetails(null);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error fetching gift card details:', error);
+      setGiftCardDetails(null);
+      return null;
+    }
+  };
+
   const handleBasicRegistration = async (e) => {
     e.preventDefault();
     // Just move to role path selection after basic form
