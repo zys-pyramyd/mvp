@@ -4004,12 +4004,13 @@ class PyramydAPITester:
         # Test 3: Get user bank accounts
         success, response = self.make_request('GET', '/api/wallet/bank-accounts', use_auth=True)
         
-        if success and isinstance(response, list):
+        if success and 'accounts' in response:
+            accounts = response['accounts']
             # Check if accounts have masked numbers
-            if len(response) > 0:
-                account = response[0]
+            if len(accounts) > 0:
+                account = accounts[0]
                 if 'masked_account_number' in account:
-                    self.log_test("Get Bank Accounts", True, f"Found {len(response)} accounts with masked numbers")
+                    self.log_test("Get Bank Accounts", True, f"Found {len(accounts)} accounts with masked numbers")
                     get_accounts_success = True
                 else:
                     self.log_test("Get Bank Accounts", False, "Account numbers not properly masked")
