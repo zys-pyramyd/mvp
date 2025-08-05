@@ -2227,6 +2227,32 @@ function App() {
                         </button>
                       )}
                       
+                      {/* Digital Wallet */}
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          setShowWallet(true);
+                          fetchWalletSummary();
+                          fetchWalletTransactions();
+                          fetchBankAccounts();
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-50 font-medium"
+                      >
+                        💰 My Wallet
+                      </button>
+
+                      {/* Gift Cards */}
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          setShowGiftCards(true);
+                          fetchUserGiftCards();
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-pink-600 hover:bg-gray-50 font-medium"
+                      >
+                        🎁 Gift Cards
+                      </button>
+
                       {/* Rating & Reviews */}
                       <button
                         onClick={() => {
