@@ -3862,10 +3862,27 @@ class PyramydAPITester:
             self.log_test("Wallet Withdrawal", False, "Cannot test withdrawal without funding")
             return False
 
+        # First add a bank account for withdrawal
+        bank_account_data = {
+            "account_name": "Test Withdrawal Account",
+            "account_number": "9876543210",
+            "bank_name": "Test Withdrawal Bank",
+            "bank_code": "456",
+            "is_primary": True
+        }
+        
+        add_success, add_response = self.make_request('POST', '/api/wallet/bank-accounts', bank_account_data, 200, use_auth=True)
+        
+        if not add_success or 'account_id' not in add_response:
+            self.log_test("Wallet Withdrawal", False, "Cannot test withdrawal without valid bank account")
+            return False
+        
+        bank_account_id = add_response['account_id']
+
         # Test 1: Valid withdrawal
         withdrawal_data = {
             "amount": 1000.0,
-            "bank_account_id": "test-bank-account-123",
+            "bank_account_id": bank_account_id,
             "description": "Test withdrawal to bank account"
         }
         
@@ -3881,7 +3898,7 @@ class PyramydAPITester:
         # Test 2: Insufficient balance withdrawal
         large_withdrawal_data = {
             "amount": 999999.0,
-            "bank_account_id": "test-bank-account-123",
+            "bank_account_id": bank_account_id,
             "description": "Test insufficient balance withdrawal"
         }
         
@@ -3897,7 +3914,7 @@ class PyramydAPITester:
         # Test 3: Invalid amount (negative)
         invalid_withdrawal_data = {
             "amount": -500.0,
-            "bank_account_id": "test-bank-account-123",
+            "bank_account_id": bank_account_id,
             "description": "Invalid negative withdrawal"
         }
         
