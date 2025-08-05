@@ -6493,6 +6493,554 @@ function App() {
         </div>
       )}
 
+      {/* Digital Wallet Dashboard */}
+      {showWallet && user && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-semibold">💰 My Wallet</h2>
+                <button
+                  onClick={() => setShowWallet(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              {/* Wallet Balance Card */}
+              <div className="mb-8 p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg">
+                <h3 className="text-lg font-semibold mb-2">Wallet Balance</h3>
+                <div className="text-3xl font-bold mb-4">
+                  ₦{walletSummary ? walletSummary.balance.toLocaleString() : '0'}
+                </div>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <div className="text-purple-200">Total Funded</div>
+                    <div className="font-medium">₦{walletSummary ? walletSummary.total_funded.toLocaleString() : '0'}</div>
+                  </div>
+                  <div>
+                    <div className="text-purple-200">Total Spent</div>
+                    <div className="font-medium">₦{walletSummary ? walletSummary.total_spent.toLocaleString() : '0'}</div>
+                  </div>
+                  <div>
+                    <div className="text-purple-200">Withdrawn</div>
+                    <div className="font-medium">₦{walletSummary ? walletSummary.total_withdrawn.toLocaleString() : '0'}</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Quick Actions */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <button
+                  onClick={() => setShowFundWallet(true)}
+                  className="p-4 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                >
+                  <div className="text-2xl mb-2">💳</div>
+                  <div className="font-medium">Fund Wallet</div>
+                </button>
+                <button
+                  onClick={() => setShowWithdrawFunds(true)}
+                  className="p-4 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                >
+                  <div className="text-2xl mb-2">🏦</div>
+                  <div className="font-medium">Withdraw</div>
+                </button>
+                <button
+                  onClick={() => setShowCreateGiftCard(true)}
+                  className="p-4 bg-pink-100 text-pink-700 rounded-lg hover:bg-pink-200 transition-colors"
+                >
+                  <div className="text-2xl mb-2">🎁</div>
+                  <div className="font-medium">Buy Gift Card</div>
+                </button>
+                <button
+                  onClick={() => setShowAddBankAccount(true)}
+                  className="p-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <div className="text-2xl mb-2">🏧</div>
+                  <div className="font-medium">Add Bank</div>
+                </button>
+              </div>
+              
+              {/* Transaction History */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Recent Transactions</h3>
+                {walletTransactions.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No transactions yet. Start by funding your wallet!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {walletTransactions.slice(0, 10).map(transaction => (
+                      <div key={transaction.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className={`text-2xl ${
+                            transaction.transaction_type.includes('funding') || transaction.transaction_type.includes('redemption') 
+                              ? 'text-green-600' 
+                              : 'text-red-600'
+                          }`}>
+                            {transaction.transaction_type.includes('funding') ? '⬇️' : 
+                             transaction.transaction_type.includes('withdrawal') ? '⬆️' :
+                             transaction.transaction_type.includes('gift_card') ? '🎁' : '💰'}
+                          </div>
+                          <div>
+                            <div className="font-medium">{transaction.description}</div>
+                            <div className="text-sm text-gray-500">
+                              {new Date(transaction.created_at).toLocaleDateString()} • {transaction.reference}
+                            </div>
+                          </div>
+                        </div>
+                        <div className={`text-right ${
+                          transaction.transaction_type.includes('funding') || transaction.transaction_type.includes('redemption') 
+                            ? 'text-green-600' 
+                            : 'text-red-600'
+                        }`}>
+                          <div className="font-semibold">
+                            {transaction.transaction_type.includes('funding') || transaction.transaction_type.includes('redemption') ? '+' : '-'}
+                            ₦{transaction.amount.toLocaleString()}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Status: {transaction.status}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fund Wallet Modal */}
+      {showFundWallet && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">💳 Fund Wallet</h3>
+              <button
+                onClick={() => setShowFundWallet(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const amount = formData.get('amount');
+              const fundingMethod = formData.get('funding_method');
+              const description = formData.get('description');
+              
+              try {
+                await fundWallet(amount, fundingMethod, description);
+                alert(`Successfully funded wallet with ₦${parseFloat(amount).toLocaleString()}`);
+                setShowFundWallet(false);
+              } catch (error) {
+                alert('Failed to fund wallet: ' + error.message);
+              }
+            }}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Amount (₦)
+                  </label>
+                  <input
+                    type="number"
+                    name="amount"
+                    min="100"
+                    max="500000"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    placeholder="Enter amount to fund"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Funding Method
+                  </label>
+                  <select
+                    name="funding_method"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="">Select funding method</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="debit_card">Debit Card</option>
+                    <option value="ussd">USSD</option>
+                    <option value="bank_deposit">Bank Deposit</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    name="description"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    placeholder="Wallet funding"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex space-x-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowFundWallet(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  Fund Wallet
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Gift Cards Modal */}
+      {showGiftCards && user && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-semibold">🎁 Gift Cards</h2>
+                <button
+                  onClick={() => setShowGiftCards(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              {/* Quick Actions */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <button
+                  onClick={() => setShowCreateGiftCard(true)}
+                  className="p-6 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:from-pink-600 hover:to-purple-700 transition-colors"
+                >
+                  <div className="text-3xl mb-2">🎁</div>
+                  <div className="text-lg font-semibold">Create Gift Card</div>
+                  <div className="text-sm text-pink-100">Purchase gift cards for others</div>
+                </button>
+                <button
+                  onClick={() => setShowRedeemGiftCard(true)}
+                  className="p-6 bg-gradient-to-r from-green-500 to-blue-600 text-white rounded-lg hover:from-green-600 hover:to-blue-700 transition-colors"
+                >
+                  <div className="text-3xl mb-2">💰</div>
+                  <div className="text-lg font-semibold">Redeem Gift Card</div>
+                  <div className="text-sm text-green-100">Add gift card value to wallet</div>
+                </button>
+              </div>
+              
+              {/* User's Gift Cards */}
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">My Gift Cards</h3>
+                  <button
+                    onClick={fetchUserGiftCards}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                
+                {userGiftCards.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No gift cards purchased yet. Create your first gift card!</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {userGiftCards.map(giftCard => (
+                      <div key={giftCard.id} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-br from-pink-50 to-purple-50">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="text-2xl">🎁</div>
+                          <span className={`text-xs px-2 py-1 rounded ${
+                            giftCard.status === 'active' 
+                              ? 'bg-green-100 text-green-800' 
+                              : giftCard.status === 'redeemed'
+                              ? 'bg-gray-100 text-gray-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {giftCard.status}
+                          </span>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div className="font-mono text-sm font-semibold text-purple-600">
+                            {giftCard.card_code}
+                          </div>
+                          <div className="text-lg font-bold">
+                            ₦{giftCard.amount.toLocaleString()}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Balance: ₦{giftCard.balance.toLocaleString()}
+                          </div>
+                          {giftCard.recipient_name && (
+                            <div className="text-sm text-gray-600">
+                              For: {giftCard.recipient_name}
+                            </div>
+                          )}
+                          <div className="text-xs text-gray-500">
+                            Expires: {new Date(giftCard.expiry_date).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Gift Card Modal */}
+      {showCreateGiftCard && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">🎁 Create Gift Card</h3>
+              <button
+                onClick={() => setShowCreateGiftCard(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const amount = formData.get('amount');
+              const recipientEmail = formData.get('recipient_email');
+              const recipientName = formData.get('recipient_name');
+              const message = formData.get('message');
+              
+              try {
+                const result = await createGiftCard(amount, recipientEmail, recipientName, message);
+                alert(`Gift card created successfully!\nCard Code: ${result.gift_card.card_code}\nAmount: ₦${parseFloat(amount).toLocaleString()}`);
+                setShowCreateGiftCard(false);
+              } catch (error) {
+                alert('Failed to create gift card: ' + error.message);
+              }
+            }}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Gift Card Amount (₦)
+                  </label>
+                  <input
+                    type="number"
+                    name="amount"
+                    min="100"
+                    max="100000"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                    placeholder="Enter gift card value"
+                  />
+                  <div className="text-xs text-gray-500 mt-1">Min: ₦100, Max: ₦100,000</div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Recipient Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    name="recipient_name"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                    placeholder="Who is this gift card for?"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Recipient Email (Optional)
+                  </label>
+                  <input
+                    type="email"
+                    name="recipient_email"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                    placeholder="Recipient's email address"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Gift Message (Optional)
+                  </label>
+                  <textarea
+                    name="message"
+                    rows="3"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                    placeholder="Add a personal message..."
+                  ></textarea>
+                </div>
+              </div>
+              
+              <div className="flex space-x-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateGiftCard(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700"
+                >
+                  Create Gift Card
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Redeem Gift Card Modal */}
+      {showRedeemGiftCard && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">💰 Redeem Gift Card</h3>
+              <button
+                onClick={() => {
+                  setShowRedeemGiftCard(false);
+                  setGiftCardDetails(null);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const cardCode = formData.get('card_code');
+              const amount = formData.get('amount');
+              
+              try {
+                const result = await redeemGiftCard(cardCode, amount);
+                alert(`Gift card redeemed successfully!\nRedeemed: ₦${result.redeemed_amount.toLocaleString()}\nNew wallet balance: ₦${result.new_wallet_balance.toLocaleString()}`);
+                setShowRedeemGiftCard(false);
+                setGiftCardDetails(null);
+              } catch (error) {
+                alert('Failed to redeem gift card: ' + error.message);
+              }
+            }}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Gift Card Code
+                  </label>
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      name="card_code"
+                      required
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 uppercase"
+                      placeholder="GIFT-XXXXXXXX"
+                      onChange={async (e) => {
+                        const code = e.target.value.trim();
+                        if (code.length >= 8) {
+                          await fetchGiftCardDetails(code);
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const code = document.querySelector('input[name="card_code"]').value;
+                        if (code) await fetchGiftCardDetails(code);
+                      }}
+                      className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    >
+                      Check
+                    </button>
+                  </div>
+                </div>
+                
+                {giftCardDetails && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="space-y-2">
+                      <div className="font-semibold text-green-800">
+                        Gift Card Found!
+                      </div>
+                      <div className="text-sm text-green-700">
+                        Available Balance: ₦{giftCardDetails.balance.toLocaleString()}
+                      </div>
+                      <div className="text-sm text-green-600">
+                        Status: {giftCardDetails.status} • 
+                        Expires: {new Date(giftCardDetails.expiry_date).toLocaleDateString()}
+                      </div>
+                      {giftCardDetails.message && (
+                        <div className="text-sm text-green-600 italic">
+                          "{giftCardDetails.message}"
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Amount to Redeem (Optional)
+                  </label>
+                  <input
+                    type="number"
+                    name="amount"
+                    min="1"
+                    max={giftCardDetails ? giftCardDetails.balance : 100000}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    placeholder="Leave empty to redeem full amount"
+                  />
+                  <div className="text-xs text-gray-500 mt-1">
+                    Leave empty to redeem the full gift card balance
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex space-x-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRedeemGiftCard(false);
+                    setGiftCardDetails(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!giftCardDetails}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
+                >
+                  Redeem Gift Card
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
