@@ -4441,6 +4441,10 @@ class PyramydAPITester:
         print("\n💰 Testing Digital Wallet Enhancement & Gift Card System (PRIORITY)...")
         self.test_wallet_system_complete()
 
+        # ENHANCED SELLER DASHBOARD SYSTEM TESTS - Main focus from current review request
+        print("\n📊 Testing Enhanced Seller Dashboard System (PRIORITY)...")
+        self.test_enhanced_seller_dashboard_complete()
+
         return True
 
     def print_summary(self):
