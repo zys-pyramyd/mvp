@@ -4418,6 +4418,10 @@ class PyramydAPITester:
         print("\n🛒 Testing Order Creation Fix (PRIORITY)...")
         self.test_order_creation_fix()
 
+        # DIGITAL WALLET SYSTEM TESTS - Main focus from current review request
+        print("\n💰 Testing Digital Wallet Enhancement & Gift Card System (PRIORITY)...")
+        self.test_wallet_system_complete()
+
         return True
 
     def print_summary(self):
