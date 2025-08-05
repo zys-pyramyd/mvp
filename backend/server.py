@@ -45,6 +45,10 @@ messages_collection = db.messages
 dropoff_locations_collection = db.dropoff_locations
 ratings_collection = db.ratings
 driver_slots_collection = db.driver_slots
+wallet_transactions_collection = db.wallet_transactions
+bank_accounts_collection = db.bank_accounts
+gift_cards_collection = db.gift_cards
+wallet_security_collection = db.wallet_security
 
 # Security
 security = HTTPBearer()
