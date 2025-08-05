@@ -4152,7 +4152,7 @@ class PyramydAPITester:
         
         success, response = self.make_request('POST', '/api/wallet/gift-cards/redeem', redeem_data, 200, use_auth=True)
         
-        if success and 'new_balance' in response and 'redeemed_amount' in response:
+        if success and 'new_wallet_balance' in response and 'redeemed_amount' in response:
             self.log_test("Redeem Gift Card (Full)", True, f"Redeemed: ₦{response['redeemed_amount']}")
             full_redemption_success = True
         else:
