@@ -696,9 +696,9 @@ class MockBankAccount(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
     account_name: str
-    account_number: str = Field(..., regex=r'^\d{10}$')  # 10-digit account number
+    account_number: str = Field(..., pattern=r'^\d{10}$')  # 10-digit account number
     bank_name: str
-    bank_code: str = Field(..., regex=r'^\d{3}$')  # 3-digit bank code
+    bank_code: str = Field(..., pattern=r'^\d{3}$')  # 3-digit bank code
     is_primary: bool = False
     is_verified: bool = False  # Mock verification status
     created_at: datetime = Field(default_factory=datetime.utcnow)
