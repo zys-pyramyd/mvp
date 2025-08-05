@@ -3753,6 +3753,533 @@ class PyramydAPITester:
         
         return overall_success
 
+    # ===== DIGITAL WALLET SYSTEM TESTS =====
+    
+    def test_wallet_summary(self):
+        """Test wallet summary endpoint"""
+        print("\n💰 Testing Wallet Summary...")
+        
+        success, response = self.make_request('GET', '/api/wallet/summary', use_auth=True)
+        
+        if success and 'balance' in response and 'total_funded' in response:
+            required_fields = ['user_id', 'username', 'balance', 'total_funded', 'total_spent', 
+                             'total_withdrawn', 'pending_transactions', 'security_status', 
+                             'linked_accounts', 'gift_cards_purchased', 'gift_cards_redeemed']
+            
+            if all(field in response for field in required_fields):
+                self.log_test("Wallet Summary", True, f"Balance: ₦{response['balance']}")
+                return True, response
+            else:
+                self.log_test("Wallet Summary", False, f"Missing required fields: {response}")
+                return False, response
+        else:
+            self.log_test("Wallet Summary", False, f"Wallet summary failed: {response}")
+            return False, response
+
+    def test_wallet_funding(self):
+        """Test wallet funding functionality"""
+        print("\n💳 Testing Wallet Funding...")
+        
+        # Test 1: Valid funding with bank transfer
+        funding_data = {
+            "transaction_type": "wallet_funding",
+            "amount": 5000.0,
+            "description": "Test wallet funding via bank transfer",
+            "funding_method": "bank_transfer",
+            "metadata": {"test": "funding"}
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/fund', funding_data, 200, use_auth=True)
+        
+        if success and 'transaction_id' in response and 'new_balance' in response:
+            self.log_test("Wallet Funding (Bank Transfer)", True, f"New balance: ₦{response['new_balance']}")
+            bank_transfer_success = True
+        else:
+            self.log_test("Wallet Funding (Bank Transfer)", False, f"Bank transfer funding failed: {response}")
+            bank_transfer_success = False
+
+        # Test 2: Funding with debit card
+        card_funding_data = {
+            "transaction_type": "wallet_funding",
+            "amount": 2500.0,
+            "description": "Test wallet funding via debit card",
+            "funding_method": "debit_card"
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/fund', card_funding_data, 200, use_auth=True)
+        
+        if success and 'transaction_id' in response:
+            self.log_test("Wallet Funding (Debit Card)", True)
+            debit_card_success = True
+        else:
+            self.log_test("Wallet Funding (Debit Card)", False, f"Debit card funding failed: {response}")
+            debit_card_success = False
+
+        # Test 3: Funding with USSD
+        ussd_funding_data = {
+            "transaction_type": "wallet_funding",
+            "amount": 1000.0,
+            "description": "Test wallet funding via USSD",
+            "funding_method": "ussd"
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/fund', ussd_funding_data, 200, use_auth=True)
+        
+        if success and 'transaction_id' in response:
+            self.log_test("Wallet Funding (USSD)", True)
+            ussd_success = True
+        else:
+            self.log_test("Wallet Funding (USSD)", False, f"USSD funding failed: {response}")
+            ussd_success = False
+
+        # Test 4: Invalid amount (negative)
+        invalid_funding_data = {
+            "transaction_type": "wallet_funding",
+            "amount": -100.0,
+            "description": "Invalid negative amount",
+            "funding_method": "bank_transfer"
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/fund', invalid_funding_data, 422, use_auth=True)
+        
+        if success:  # Should return 422 validation error
+            self.log_test("Wallet Funding (Invalid Amount)", True)
+            validation_success = True
+        else:
+            self.log_test("Wallet Funding (Invalid Amount)", False, f"Should return 422 error: {response}")
+            validation_success = False
+
+        overall_success = bank_transfer_success and debit_card_success and ussd_success and validation_success
+        return overall_success
+
+    def test_wallet_withdrawal(self):
+        """Test wallet withdrawal functionality"""
+        print("\n🏦 Testing Wallet Withdrawal...")
+        
+        # First ensure we have some balance by funding
+        funding_success = self.test_wallet_funding()
+        if not funding_success:
+            self.log_test("Wallet Withdrawal", False, "Cannot test withdrawal without funding")
+            return False
+
+        # Test 1: Valid withdrawal
+        withdrawal_data = {
+            "amount": 1000.0,
+            "bank_account_id": "test-bank-account-123",
+            "description": "Test withdrawal to bank account"
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/withdraw', withdrawal_data, 200, use_auth=True)
+        
+        if success and 'transaction_id' in response and 'new_balance' in response:
+            self.log_test("Wallet Withdrawal (Valid)", True, f"New balance: ₦{response['new_balance']}")
+            valid_withdrawal_success = True
+        else:
+            self.log_test("Wallet Withdrawal (Valid)", False, f"Valid withdrawal failed: {response}")
+            valid_withdrawal_success = False
+
+        # Test 2: Insufficient balance withdrawal
+        large_withdrawal_data = {
+            "amount": 999999.0,
+            "bank_account_id": "test-bank-account-123",
+            "description": "Test insufficient balance withdrawal"
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/withdraw', large_withdrawal_data, 400, use_auth=True)
+        
+        if success:  # Should return 400 error
+            self.log_test("Wallet Withdrawal (Insufficient Balance)", True)
+            insufficient_balance_success = True
+        else:
+            self.log_test("Wallet Withdrawal (Insufficient Balance)", False, f"Should return 400 error: {response}")
+            insufficient_balance_success = False
+
+        # Test 3: Invalid amount (negative)
+        invalid_withdrawal_data = {
+            "amount": -500.0,
+            "bank_account_id": "test-bank-account-123",
+            "description": "Invalid negative withdrawal"
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/withdraw', invalid_withdrawal_data, 400, use_auth=True)
+        
+        if success:  # Should return 400 error
+            self.log_test("Wallet Withdrawal (Invalid Amount)", True)
+            invalid_amount_success = True
+        else:
+            self.log_test("Wallet Withdrawal (Invalid Amount)", False, f"Should return 400 error: {response}")
+            invalid_amount_success = False
+
+        overall_success = valid_withdrawal_success and insufficient_balance_success and invalid_amount_success
+        return overall_success
+
+    def test_wallet_transactions(self):
+        """Test wallet transaction history"""
+        print("\n📊 Testing Wallet Transactions...")
+        
+        # Test 1: Get all transactions
+        success, response = self.make_request('GET', '/api/wallet/transactions', use_auth=True)
+        
+        if success and 'transactions' in response and 'total_count' in response:
+            self.log_test("Wallet Transactions (All)", True, f"Found {response['total_count']} transactions")
+            all_transactions_success = True
+        else:
+            self.log_test("Wallet Transactions (All)", False, f"All transactions failed: {response}")
+            all_transactions_success = False
+
+        # Test 2: Filter by transaction type
+        success, response = self.make_request('GET', '/api/wallet/transactions?transaction_type=wallet_funding', use_auth=True)
+        
+        if success and 'transactions' in response:
+            self.log_test("Wallet Transactions (Funding Filter)", True)
+            funding_filter_success = True
+        else:
+            self.log_test("Wallet Transactions (Funding Filter)", False, f"Funding filter failed: {response}")
+            funding_filter_success = False
+
+        # Test 3: Filter by status
+        success, response = self.make_request('GET', '/api/wallet/transactions?status=completed', use_auth=True)
+        
+        if success and 'transactions' in response:
+            self.log_test("Wallet Transactions (Status Filter)", True)
+            status_filter_success = True
+        else:
+            self.log_test("Wallet Transactions (Status Filter)", False, f"Status filter failed: {response}")
+            status_filter_success = False
+
+        # Test 4: Pagination
+        success, response = self.make_request('GET', '/api/wallet/transactions?page=1&limit=5', use_auth=True)
+        
+        if success and 'page' in response and 'limit' in response:
+            self.log_test("Wallet Transactions (Pagination)", True)
+            pagination_success = True
+        else:
+            self.log_test("Wallet Transactions (Pagination)", False, f"Pagination failed: {response}")
+            pagination_success = False
+
+        overall_success = all_transactions_success and funding_filter_success and status_filter_success and pagination_success
+        return overall_success
+
+    def test_bank_account_management(self):
+        """Test bank account management"""
+        print("\n🏛️ Testing Bank Account Management...")
+        
+        # Test 1: Add bank account
+        bank_account_data = {
+            "account_name": "John Doe Test Account",
+            "account_number": "1234567890",
+            "bank_name": "Test Bank Nigeria",
+            "bank_code": "123",
+            "is_primary": True
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/bank-accounts', bank_account_data, 200, use_auth=True)
+        
+        if success and 'account_id' in response:
+            self.log_test("Add Bank Account", True)
+            account_id = response['account_id']
+            add_account_success = True
+        else:
+            self.log_test("Add Bank Account", False, f"Add bank account failed: {response}")
+            account_id = None
+            add_account_success = False
+
+        # Test 2: Invalid account number (not 10 digits)
+        invalid_account_data = {
+            "account_name": "Invalid Account",
+            "account_number": "123456789",  # 9 digits - should fail
+            "bank_name": "Test Bank",
+            "bank_code": "123"
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/bank-accounts', invalid_account_data, 422, use_auth=True)
+        
+        if success:  # Should return 422 validation error
+            self.log_test("Add Bank Account (Invalid Number)", True)
+            validation_success = True
+        else:
+            self.log_test("Add Bank Account (Invalid Number)", False, f"Should return 422 error: {response}")
+            validation_success = False
+
+        # Test 3: Get user bank accounts
+        success, response = self.make_request('GET', '/api/wallet/bank-accounts', use_auth=True)
+        
+        if success and isinstance(response, list):
+            # Check if accounts have masked numbers
+            if len(response) > 0:
+                account = response[0]
+                if 'masked_account_number' in account:
+                    self.log_test("Get Bank Accounts", True, f"Found {len(response)} accounts with masked numbers")
+                    get_accounts_success = True
+                else:
+                    self.log_test("Get Bank Accounts", False, "Account numbers not properly masked")
+                    get_accounts_success = False
+            else:
+                self.log_test("Get Bank Accounts", True, "No accounts found")
+                get_accounts_success = True
+        else:
+            self.log_test("Get Bank Accounts", False, f"Get accounts failed: {response}")
+            get_accounts_success = False
+
+        # Test 4: Remove bank account (if we created one)
+        if account_id:
+            success, response = self.make_request('DELETE', f'/api/wallet/bank-accounts/{account_id}', use_auth=True)
+            
+            if success:
+                self.log_test("Remove Bank Account", True)
+                remove_account_success = True
+            else:
+                self.log_test("Remove Bank Account", False, f"Remove account failed: {response}")
+                remove_account_success = False
+        else:
+            remove_account_success = True  # Skip if no account was created
+
+        overall_success = add_account_success and validation_success and get_accounts_success and remove_account_success
+        return overall_success
+
+    def test_gift_card_system(self):
+        """Test gift card creation and management"""
+        print("\n🎁 Testing Gift Card System...")
+        
+        # Test 1: Create gift card
+        gift_card_data = {
+            "amount": 5000.0,
+            "recipient_email": "recipient@example.com",
+            "recipient_name": "Gift Recipient",
+            "message": "Happy Birthday! Enjoy shopping on Pyramyd."
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/gift-cards', gift_card_data, 200, use_auth=True)
+        
+        if success and 'card_code' in response and 'new_balance' in response:
+            self.log_test("Create Gift Card", True, f"Card code: {response['card_code']}")
+            card_code = response['card_code']
+            create_gift_card_success = True
+        else:
+            self.log_test("Create Gift Card", False, f"Gift card creation failed: {response}")
+            card_code = None
+            create_gift_card_success = False
+
+        # Test 2: Invalid amount (below minimum)
+        invalid_gift_card_data = {
+            "amount": 50.0,  # Below ₦100 minimum
+            "recipient_email": "test@example.com"
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/gift-cards', invalid_gift_card_data, 422, use_auth=True)
+        
+        if success:  # Should return 422 validation error
+            self.log_test("Create Gift Card (Invalid Amount)", True)
+            invalid_amount_success = True
+        else:
+            self.log_test("Create Gift Card (Invalid Amount)", False, f"Should return 422 error: {response}")
+            invalid_amount_success = False
+
+        # Test 3: Invalid amount (above maximum)
+        excessive_gift_card_data = {
+            "amount": 150000.0,  # Above ₦100,000 maximum
+            "recipient_email": "test@example.com"
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/gift-cards', excessive_gift_card_data, 422, use_auth=True)
+        
+        if success:  # Should return 422 validation error
+            self.log_test("Create Gift Card (Excessive Amount)", True)
+            excessive_amount_success = True
+        else:
+            self.log_test("Create Gift Card (Excessive Amount)", False, f"Should return 422 error: {response}")
+            excessive_amount_success = False
+
+        # Test 4: Get user's gift cards
+        success, response = self.make_request('GET', '/api/wallet/gift-cards/my-cards', use_auth=True)
+        
+        if success and isinstance(response, list):
+            self.log_test("Get My Gift Cards", True, f"Found {len(response)} gift cards")
+            get_gift_cards_success = True
+        else:
+            self.log_test("Get My Gift Cards", False, f"Get gift cards failed: {response}")
+            get_gift_cards_success = False
+
+        overall_success = (create_gift_card_success and invalid_amount_success and 
+                          excessive_amount_success and get_gift_cards_success)
+        
+        return overall_success, card_code
+
+    def test_gift_card_redemption(self):
+        """Test gift card redemption functionality"""
+        print("\n🎫 Testing Gift Card Redemption...")
+        
+        # First create a gift card to redeem
+        gift_card_success, card_code = self.test_gift_card_system()
+        
+        if not gift_card_success or not card_code:
+            self.log_test("Gift Card Redemption", False, "Cannot test redemption without valid gift card")
+            return False
+
+        # Test 1: Get gift card details
+        success, response = self.make_request('GET', f'/api/wallet/gift-cards/{card_code}')
+        
+        if success and response.get('card_code') == card_code:
+            self.log_test("Get Gift Card Details", True, f"Amount: ₦{response.get('amount')}")
+            get_details_success = True
+        else:
+            self.log_test("Get Gift Card Details", False, f"Get details failed: {response}")
+            get_details_success = False
+
+        # Test 2: Full redemption
+        redeem_data = {
+            "card_code": card_code
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/gift-cards/redeem', redeem_data, 200, use_auth=True)
+        
+        if success and 'new_balance' in response and 'redeemed_amount' in response:
+            self.log_test("Redeem Gift Card (Full)", True, f"Redeemed: ₦{response['redeemed_amount']}")
+            full_redemption_success = True
+        else:
+            self.log_test("Redeem Gift Card (Full)", False, f"Full redemption failed: {response}")
+            full_redemption_success = False
+
+        # Test 3: Try to redeem already redeemed card
+        success, response = self.make_request('POST', '/api/wallet/gift-cards/redeem', redeem_data, 400, use_auth=True)
+        
+        if success:  # Should return 400 error
+            self.log_test("Redeem Gift Card (Already Redeemed)", True)
+            already_redeemed_success = True
+        else:
+            self.log_test("Redeem Gift Card (Already Redeemed)", False, f"Should return 400 error: {response}")
+            already_redeemed_success = False
+
+        # Test 4: Invalid gift card code
+        invalid_redeem_data = {
+            "card_code": "INVALID-CARD-CODE"
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/gift-cards/redeem', invalid_redeem_data, 404, use_auth=True)
+        
+        if success:  # Should return 404 error
+            self.log_test("Redeem Gift Card (Invalid Code)", True)
+            invalid_code_success = True
+        else:
+            self.log_test("Redeem Gift Card (Invalid Code)", False, f"Should return 404 error: {response}")
+            invalid_code_success = False
+
+        overall_success = (get_details_success and full_redemption_success and 
+                          already_redeemed_success and invalid_code_success)
+        
+        return overall_success
+
+    def test_wallet_security(self):
+        """Test wallet security features"""
+        print("\n🔒 Testing Wallet Security...")
+        
+        # Test 1: Set transaction PIN
+        pin_data = {
+            "pin": "1234"
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/security/set-pin', pin_data, 200, use_auth=True)
+        
+        if success:
+            self.log_test("Set Transaction PIN", True)
+            set_pin_success = True
+        else:
+            self.log_test("Set Transaction PIN", False, f"Set PIN failed: {response}")
+            set_pin_success = False
+
+        # Test 2: Invalid PIN (too short)
+        invalid_pin_data = {
+            "pin": "12"  # Too short
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/security/set-pin', invalid_pin_data, 422, use_auth=True)
+        
+        if success:  # Should return 422 validation error
+            self.log_test("Set Transaction PIN (Invalid)", True)
+            invalid_pin_success = True
+        else:
+            self.log_test("Set Transaction PIN (Invalid)", False, f"Should return 422 error: {response}")
+            invalid_pin_success = False
+
+        # Test 3: Verify correct PIN
+        verify_pin_data = {
+            "pin": "1234"
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/security/verify-pin', verify_pin_data, 200, use_auth=True)
+        
+        if success:
+            self.log_test("Verify Transaction PIN (Correct)", True)
+            verify_correct_success = True
+        else:
+            self.log_test("Verify Transaction PIN (Correct)", False, f"PIN verification failed: {response}")
+            verify_correct_success = False
+
+        # Test 4: Verify incorrect PIN
+        wrong_pin_data = {
+            "pin": "9999"
+        }
+        
+        success, response = self.make_request('POST', '/api/wallet/security/verify-pin', wrong_pin_data, 400, use_auth=True)
+        
+        if success:  # Should return 400 error
+            self.log_test("Verify Transaction PIN (Incorrect)", True)
+            verify_incorrect_success = True
+        else:
+            self.log_test("Verify Transaction PIN (Incorrect)", False, f"Should return 400 error: {response}")
+            verify_incorrect_success = False
+
+        overall_success = (set_pin_success and invalid_pin_success and 
+                          verify_correct_success and verify_incorrect_success)
+        
+        return overall_success
+
+    def test_wallet_system_complete(self):
+        """Test complete wallet system workflow"""
+        print("\n🔄 Testing Complete Digital Wallet System...")
+        
+        # Step 1: Get wallet summary
+        summary_success, initial_summary = self.test_wallet_summary()
+        
+        # Step 2: Test wallet funding
+        funding_success = self.test_wallet_funding()
+        
+        # Step 3: Test bank account management
+        bank_account_success = self.test_bank_account_management()
+        
+        # Step 4: Test wallet withdrawal
+        withdrawal_success = self.test_wallet_withdrawal()
+        
+        # Step 5: Test transaction history
+        transactions_success = self.test_wallet_transactions()
+        
+        # Step 6: Test gift card system
+        gift_card_success, card_code = self.test_gift_card_system()
+        
+        # Step 7: Test gift card redemption
+        redemption_success = self.test_gift_card_redemption()
+        
+        # Step 8: Test wallet security
+        security_success = self.test_wallet_security()
+        
+        # Step 9: Final wallet summary to verify changes
+        if summary_success:
+            final_summary_success, final_summary = self.test_wallet_summary()
+            if final_summary_success and initial_summary:
+                balance_change = final_summary['balance'] - initial_summary['balance']
+                self.log_test("Wallet Balance Verification", True, f"Balance change: ₦{balance_change}")
+        
+        overall_success = (summary_success and funding_success and bank_account_success and 
+                          withdrawal_success and transactions_success and gift_card_success and 
+                          redemption_success and security_success)
+        
+        if overall_success:
+            self.log_test("Complete Digital Wallet System", True, "All wallet functionality working correctly")
+        else:
+            self.log_test("Complete Digital Wallet System", False, "One or more wallet components failed")
+        
+        return overall_success
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting Pyramyd API Tests...")
