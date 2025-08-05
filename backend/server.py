@@ -758,7 +758,7 @@ class WalletSecurity(BaseModel):
     updated_at: Optional[datetime] = None
 
 class WalletPinCreate(BaseModel):
-    pin: str = Field(..., regex=r'^\d{4,6}$')  # 4-6 digit PIN
+    pin: str = Field(..., pattern=r'^\d{4,6}$')  # 4-6 digit PIN
 
 class WalletPinVerify(BaseModel):
     pin: str = Field(..., regex=r'^\d{4,6}$')
