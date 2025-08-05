@@ -86,6 +86,22 @@ function App() {
     vehicle_type: '',
     min_rating: null
   });
+
+  // Digital wallet state
+  const [showWallet, setShowWallet] = useState(false);
+  const [walletSummary, setWalletSummary] = useState(null);
+  const [walletTransactions, setWalletTransactions] = useState([]);
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [showFundWallet, setShowFundWallet] = useState(false);
+  const [showWithdrawFunds, setShowWithdrawFunds] = useState(false);
+  const [showAddBankAccount, setShowAddBankAccount] = useState(false);
+  
+  // Gift card state
+  const [showGiftCards, setShowGiftCards] = useState(false);
+  const [userGiftCards, setUserGiftCards] = useState([]);
+  const [showCreateGiftCard, setShowCreateGiftCard] = useState(false);
+  const [showRedeemGiftCard, setShowRedeemGiftCard] = useState(false);
+  const [giftCardDetails, setGiftCardDetails] = useState(null);
   
   // Product Detail Page state
   const [showProductDetail, setShowProductDetail] = useState(false);
