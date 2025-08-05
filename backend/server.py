@@ -3998,6 +3998,524 @@ async def verify_transaction_pin(
         print(f"Error verifying PIN: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to verify PIN")
 
+# ==================== ENHANCED SELLER DASHBOARD ENDPOINTS ====================
+
+@app.get("/api/seller/dashboard/analytics")
+async def get_seller_analytics(
+    days: int = 30,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get comprehensive seller analytics and metrics"""
+    try:
+        seller_id = current_user["id"]
+        seller_username = current_user["username"]
+        
+        # Calculate date range
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=days)
+        
+        # Get seller's products (both regular and pre-orders)
+        products = list(db.products.find({"seller_id": seller_id}))
+        preorders = list(db.preorders.find({"seller_id": seller_id}))
+        all_products = products + preorders
+        product_ids = [p["id"] for p in all_products]
+        
+        # Get orders for this seller's products
+        orders_query = {
+            "product_details.product_id": {"$in": product_ids},
+            "created_at": {"$gte": start_date, "$lte": end_date}
+        }
+        orders = list(db.orders.find(orders_query))
+        
+        # Revenue calculations
+        total_revenue = sum(order.get("total_amount", 0) for order in orders if order.get("status") in ["completed", "delivered"])
+        pending_revenue = sum(order.get("total_amount", 0) for order in orders if order.get("status") in ["pending", "confirmed", "in_transit"])
+        
+        # Order statistics
+        total_orders = len(orders)
+        completed_orders = len([o for o in orders if o.get("status") in ["completed", "delivered"]])
+        pending_orders = len([o for o in orders if o.get("status") in ["pending", "confirmed"]])
+        cancelled_orders = len([o for o in orders if o.get("status") == "cancelled"])
+        
+        # Product performance
+        product_performance = {}
+        for product in all_products:
+            product_orders = [o for o in orders if o.get("product_details", {}).get("product_id") == product["id"]]
+            product_performance[product["id"]] = {
+                "product_name": product.get("product_name") or product.get("crop_type", "Unknown"),
+                "total_orders": len(product_orders),
+                "total_revenue": sum(o.get("total_amount", 0) for o in product_orders if o.get("status") in ["completed", "delivered"]),
+                "average_rating": product.get("average_rating", 5.0),
+                "total_ratings": product.get("total_ratings", 0),
+                "stock_level": product.get("quantity_available", 0),
+                "low_stock": product.get("quantity_available", 0) < product.get("minimum_order_quantity", 1) * 5
+            }
+        
+        # Customer insights
+        unique_customers = len(set(order.get("buyer_username") for order in orders))
+        repeat_customers = {}
+        for order in orders:
+            buyer = order.get("buyer_username")
+            if buyer:
+                repeat_customers[buyer] = repeat_customers.get(buyer, 0) + 1
+        
+        repeat_customer_count = len([count for count in repeat_customers.values() if count > 1])
+        
+        # Daily sales trend (last 7 days)
+        daily_sales = {}
+        for i in range(7):
+            date = (datetime.utcnow() - timedelta(days=i)).strftime("%Y-%m-%d")
+            daily_sales[date] = 0
+        
+        for order in orders:
+            if order.get("status") in ["completed", "delivered"]:
+                order_date = order.get("created_at")
+                if isinstance(order_date, datetime):
+                    date_str = order_date.strftime("%Y-%m-%d")
+                    if date_str in daily_sales:
+                        daily_sales[date_str] += order.get("total_amount", 0)
+        
+        # Top customers
+        top_customers = sorted(
+            [{"username": k, "total_spent": sum(o.get("total_amount", 0) for o in orders if o.get("buyer_username") == k and o.get("status") in ["completed", "delivered"]), "order_count": v} 
+             for k, v in repeat_customers.items()],
+            key=lambda x: x["total_spent"],
+            reverse=True
+        )[:5]
+        
+        # Inventory alerts
+        low_stock_products = [p for p in all_products if p.get("quantity_available", 0) < p.get("minimum_order_quantity", 1) * 5]
+        out_of_stock_products = [p for p in all_products if p.get("quantity_available", 0) == 0]
+        
+        return {
+            "period": {
+                "days": days,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat()
+            },
+            "revenue": {
+                "total_revenue": total_revenue,
+                "pending_revenue": pending_revenue,
+                "daily_average": total_revenue / days if days > 0 else 0,
+                "daily_sales": daily_sales
+            },
+            "orders": {
+                "total_orders": total_orders,
+                "completed_orders": completed_orders,
+                "pending_orders": pending_orders,
+                "cancelled_orders": cancelled_orders,
+                "completion_rate": (completed_orders / total_orders * 100) if total_orders > 0 else 0
+            },
+            "customers": {
+                "unique_customers": unique_customers,
+                "repeat_customers": repeat_customer_count,
+                "repeat_rate": (repeat_customer_count / unique_customers * 100) if unique_customers > 0 else 0,
+                "top_customers": top_customers
+            },
+            "products": {
+                "total_products": len(all_products),
+                "active_products": len([p for p in all_products if p.get("quantity_available", 0) > 0]),
+                "low_stock_alerts": len(low_stock_products),
+                "out_of_stock": len(out_of_stock_products),
+                "performance": product_performance
+            },
+            "inventory_alerts": {
+                "low_stock_products": [{"id": p["id"], "name": p.get("product_name") or p.get("crop_type"), "stock": p.get("quantity_available", 0)} for p in low_stock_products[:5]],
+                "out_of_stock_products": [{"id": p["id"], "name": p.get("product_name") or p.get("crop_type")} for p in out_of_stock_products[:5]]
+            }
+        }
+        
+    except Exception as e:
+        print(f"Error getting seller analytics: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get seller analytics")
+
+@app.get("/api/seller/dashboard/orders")
+async def get_seller_orders(
+    status: Optional[str] = None,
+    days: Optional[int] = None,
+    page: int = 1,
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get seller's orders with advanced filtering"""
+    try:
+        seller_id = current_user["id"]
+        
+        # Get seller's products
+        products = list(db.products.find({"seller_id": seller_id}))
+        preorders = list(db.preorders.find({"seller_id": seller_id}))
+        product_ids = [p["id"] for p in products + preorders]
+        
+        # Build query
+        query = {"product_details.product_id": {"$in": product_ids}}
+        
+        if status:
+            query["status"] = status
+        
+        if days:
+            start_date = datetime.utcnow() - timedelta(days=days)
+            query["created_at"] = {"$gte": start_date}
+        
+        # Get total count
+        total_count = db.orders.count_documents(query)
+        
+        # Get orders with pagination
+        skip = (page - 1) * limit
+        orders = list(db.orders.find(query)
+                     .sort("created_at", -1)
+                     .skip(skip)
+                     .limit(limit))
+        
+        # Clean up response
+        for order in orders:
+            order.pop('_id', None)
+            if isinstance(order.get("created_at"), datetime):
+                order["created_at"] = order["created_at"].isoformat()
+            if isinstance(order.get("updated_at"), datetime):
+                order["updated_at"] = order["updated_at"].isoformat()
+        
+        # Order statistics
+        status_counts = {}
+        for status_type in ["pending", "confirmed", "in_transit", "delivered", "completed", "cancelled"]:
+            count = db.orders.count_documents({
+                "product_details.product_id": {"$in": product_ids},
+                "status": status_type
+            })
+            status_counts[status_type] = count
+        
+        return {
+            "orders": orders,
+            "pagination": {
+                "total_count": total_count,
+                "page": page,
+                "limit": limit,
+                "total_pages": (total_count + limit - 1) // limit if total_count > 0 else 0
+            },
+            "status_summary": status_counts,
+            "filters_applied": {
+                "status": status,
+                "days": days
+            }
+        }
+        
+    except Exception as e:
+        print(f"Error getting seller orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get seller orders")
+
+@app.put("/api/seller/orders/{order_id}/status")
+async def update_order_status(
+    order_id: str,
+    status_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update order status (for sellers only)"""
+    try:
+        new_status = status_data.get("status")
+        notes = status_data.get("notes", "")
+        
+        if not new_status:
+            raise HTTPException(status_code=400, detail="Status is required")
+        
+        # Validate status
+        valid_statuses = ["pending", "confirmed", "preparing", "ready", "in_transit", "delivered", "completed", "cancelled"]
+        if new_status not in valid_statuses:
+            raise HTTPException(status_code=400, detail="Invalid status")
+        
+        # Find order
+        order = db.orders.find_one({"order_id": order_id})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Verify seller ownership
+        product_id = order.get("product_details", {}).get("product_id")
+        if not product_id:
+            raise HTTPException(status_code=400, detail="Invalid order structure")
+        
+        # Check if seller owns this product
+        product = db.products.find_one({"id": product_id, "seller_id": current_user["id"]})
+        if not product:
+            product = db.preorders.find_one({"id": product_id, "seller_id": current_user["id"]})
+        
+        if not product:
+            raise HTTPException(status_code=403, detail="You can only update orders for your own products")
+        
+        # Update order status
+        update_data = {
+            "status": new_status,
+            "updated_at": datetime.utcnow()
+        }
+        
+        if notes:
+            update_data["seller_notes"] = notes
+        
+        db.orders.update_one(
+            {"order_id": order_id},
+            {"$set": update_data}
+        )
+        
+        return {
+            "message": "Order status updated successfully",
+            "order_id": order_id,
+            "new_status": new_status
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating order status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update order status")
+
+@app.get("/api/seller/products/performance")
+async def get_product_performance(
+    days: int = 30,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get detailed product performance metrics"""
+    try:
+        seller_id = current_user["id"]
+        
+        # Get seller's products
+        products = list(db.products.find({"seller_id": seller_id}))
+        preorders = list(db.preorders.find({"seller_id": seller_id}))
+        all_products = products + preorders
+        
+        # Calculate date range
+        start_date = datetime.utcnow() - timedelta(days=days)
+        
+        product_metrics = []
+        
+        for product in all_products:
+            product_id = product["id"]
+            
+            # Get orders for this product
+            orders = list(db.orders.find({
+                "product_details.product_id": product_id,
+                "created_at": {"$gte": start_date}
+            }))
+            
+            # Calculate metrics
+            total_orders = len(orders)
+            completed_orders = len([o for o in orders if o.get("status") in ["completed", "delivered"]])
+            revenue = sum(o.get("total_amount", 0) for o in orders if o.get("status") in ["completed", "delivered"])
+            
+            # Get product ratings
+            product_ratings = list(ratings_collection.find({
+                "rated_entity_id": product_id,
+                "rating_type": RatingType.PRODUCT_RATING
+            }))
+            
+            # View count (simulated - would be real in production)
+            view_count = total_orders * 5  # Approximation
+            
+            product_metrics.append({
+                "product_id": product_id,
+                "product_name": product.get("product_name") or product.get("crop_type", "Unknown"),
+                "category": product.get("category", ""),
+                "price_per_unit": product.get("price_per_unit", 0),
+                "stock_level": product.get("quantity_available", 0),
+                "metrics": {
+                    "total_orders": total_orders,
+                    "completed_orders": completed_orders,
+                    "conversion_rate": (completed_orders / total_orders * 100) if total_orders > 0 else 0,
+                    "revenue": revenue,
+                    "view_count": view_count,
+                    "average_rating": product.get("average_rating", 5.0),
+                    "total_ratings": len(product_ratings),
+                    "rating_distribution": {
+                        "5_star": len([r for r in product_ratings if r["rating_value"] == 5]),
+                        "4_star": len([r for r in product_ratings if r["rating_value"] == 4]),
+                        "3_star": len([r for r in product_ratings if r["rating_value"] == 3]),
+                        "2_star": len([r for r in product_ratings if r["rating_value"] == 2]),
+                        "1_star": len([r for r in product_ratings if r["rating_value"] == 1])
+                    }
+                },
+                "alerts": {
+                    "low_stock": product.get("quantity_available", 0) < product.get("minimum_order_quantity", 1) * 5,
+                    "out_of_stock": product.get("quantity_available", 0) == 0,
+                    "low_rating": product.get("average_rating", 5.0) < 3.5,
+                    "no_recent_orders": total_orders == 0
+                }
+            })
+        
+        # Sort by revenue
+        product_metrics.sort(key=lambda x: x["metrics"]["revenue"], reverse=True)
+        
+        return {
+            "products": product_metrics,
+            "summary": {
+                "total_products": len(product_metrics),
+                "low_stock_count": len([p for p in product_metrics if p["alerts"]["low_stock"]]),
+                "out_of_stock_count": len([p for p in product_metrics if p["alerts"]["out_of_stock"]]),
+                "low_rating_count": len([p for p in product_metrics if p["alerts"]["low_rating"]]),
+                "top_performer": product_metrics[0] if product_metrics else None
+            }
+        }
+        
+    except Exception as e:
+        print(f"Error getting product performance: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get product performance")
+
+@app.get("/api/seller/customers/insights")
+async def get_customer_insights(
+    days: int = 30,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get customer insights and analytics"""
+    try:
+        seller_id = current_user["id"]
+        
+        # Get seller's products
+        products = list(db.products.find({"seller_id": seller_id}))
+        preorders = list(db.preorders.find({"seller_id": seller_id}))
+        product_ids = [p["id"] for p in products + preorders]
+        
+        # Calculate date range
+        start_date = datetime.utcnow() - timedelta(days=days)
+        
+        # Get orders
+        orders = list(db.orders.find({
+            "product_details.product_id": {"$in": product_ids},
+            "created_at": {"$gte": start_date}
+        }))
+        
+        # Customer analysis
+        customer_data = {}
+        for order in orders:
+            buyer = order.get("buyer_username")
+            if not buyer:
+                continue
+            
+            if buyer not in customer_data:
+                customer_data[buyer] = {
+                    "username": buyer,
+                    "total_orders": 0,
+                    "total_spent": 0,
+                    "completed_orders": 0,
+                    "first_order": order.get("created_at"),
+                    "last_order": order.get("created_at"),
+                    "favorite_products": {},
+                    "average_order_value": 0
+                }
+            
+            customer = customer_data[buyer]
+            customer["total_orders"] += 1
+            customer["total_spent"] += order.get("total_amount", 0)
+            
+            if order.get("status") in ["completed", "delivered"]:
+                customer["completed_orders"] += 1
+            
+            # Track order dates
+            order_date = order.get("created_at")
+            if order_date:
+                if customer["first_order"] is None or order_date < customer["first_order"]:
+                    customer["first_order"] = order_date
+                if customer["last_order"] is None or order_date > customer["last_order"]:
+                    customer["last_order"] = order_date
+            
+            # Track favorite products
+            product_name = order.get("product_details", {}).get("name", "Unknown")
+            customer["favorite_products"][product_name] = customer["favorite_products"].get(product_name, 0) + 1
+        
+        # Calculate averages and insights
+        for customer in customer_data.values():
+            customer["average_order_value"] = customer["total_spent"] / customer["total_orders"] if customer["total_orders"] > 0 else 0
+            customer["completion_rate"] = customer["completed_orders"] / customer["total_orders"] * 100 if customer["total_orders"] > 0 else 0
+            
+            # Get favorite product
+            if customer["favorite_products"]:
+                customer["top_product"] = max(customer["favorite_products"].items(), key=lambda x: x[1])[0]
+            else:
+                customer["top_product"] = "None"
+            
+            # Clean up dates for JSON serialization
+            if isinstance(customer["first_order"], datetime):
+                customer["first_order"] = customer["first_order"].isoformat()
+            if isinstance(customer["last_order"], datetime):
+                customer["last_order"] = customer["last_order"].isoformat()
+        
+        # Sort customers by total spent
+        top_customers = sorted(customer_data.values(), key=lambda x: x["total_spent"], reverse=True)
+        
+        # Customer segments
+        high_value_customers = [c for c in customer_data.values() if c["total_spent"] > 10000]  # Above ₦10,000
+        repeat_customers = [c for c in customer_data.values() if c["total_orders"] > 1]
+        new_customers = [c for c in customer_data.values() if c["total_orders"] == 1]
+        
+        return {
+            "summary": {
+                "total_customers": len(customer_data),
+                "high_value_customers": len(high_value_customers),
+                "repeat_customers": len(repeat_customers),
+                "new_customers": len(new_customers),
+                "average_customer_value": sum(c["total_spent"] for c in customer_data.values()) / len(customer_data) if customer_data else 0,
+                "customer_retention_rate": len(repeat_customers) / len(customer_data) * 100 if customer_data else 0
+            },
+            "top_customers": top_customers[:10],
+            "segments": {
+                "high_value": len(high_value_customers),
+                "repeat": len(repeat_customers),
+                "new": len(new_customers),
+                "at_risk": len([c for c in customer_data.values() if c["total_orders"] > 1 and c["completion_rate"] < 50])
+            }
+        }
+        
+    except Exception as e:
+        print(f"Error getting customer insights: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get customer insights")
+
+@app.put("/api/seller/products/{product_id}/inventory")
+async def update_product_inventory(
+    product_id: str,
+    inventory_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update product inventory (stock levels)"""
+    try:
+        new_quantity = inventory_data.get("quantity_available")
+        min_quantity = inventory_data.get("minimum_order_quantity")
+        
+        if new_quantity is None:
+            raise HTTPException(status_code=400, detail="quantity_available is required")
+        
+        if new_quantity < 0:
+            raise HTTPException(status_code=400, detail="Quantity cannot be negative")
+        
+        # Find product and verify ownership
+        product = db.products.find_one({"id": product_id, "seller_id": current_user["id"]})
+        if not product:
+            product = db.preorders.find_one({"id": product_id, "seller_id": current_user["id"]})
+        
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found or you don't have permission to update it")
+        
+        # Update inventory
+        update_data = {
+            "quantity_available": new_quantity,
+            "updated_at": datetime.utcnow()
+        }
+        
+        if min_quantity is not None:
+            update_data["minimum_order_quantity"] = max(1, min_quantity)
+        
+        # Update in appropriate collection
+        if product.get("type") == "preorder":
+            db.preorders.update_one({"id": product_id}, {"$set": update_data})
+        else:
+            db.products.update_one({"id": product_id}, {"$set": update_data})
+        
+        return {
+            "message": "Inventory updated successfully",
+            "product_id": product_id,
+            "new_quantity": new_quantity,
+            "minimum_order_quantity": update_data.get("minimum_order_quantity", product.get("minimum_order_quantity", 1))
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating product inventory: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update product inventory")
+
 # ==================== RATING SYSTEM ENDPOINTS ====================
 
 @app.post("/api/ratings")
