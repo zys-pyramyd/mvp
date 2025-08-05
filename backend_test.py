@@ -4051,9 +4051,9 @@ class PyramydAPITester:
         
         success, response = self.make_request('POST', '/api/wallet/gift-cards', gift_card_data, 200, use_auth=True)
         
-        if success and 'card_code' in response and 'new_balance' in response:
-            self.log_test("Create Gift Card", True, f"Card code: {response['card_code']}")
-            card_code = response['card_code']
+        if success and 'gift_card' in response and 'new_balance' in response:
+            card_code = response['gift_card']['card_code']
+            self.log_test("Create Gift Card", True, f"Card code: {card_code}")
             create_gift_card_success = True
         else:
             self.log_test("Create Gift Card", False, f"Gift card creation failed: {response}")
