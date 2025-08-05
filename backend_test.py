@@ -4093,8 +4093,9 @@ class PyramydAPITester:
         # Test 4: Get user's gift cards
         success, response = self.make_request('GET', '/api/wallet/gift-cards/my-cards', use_auth=True)
         
-        if success and isinstance(response, list):
-            self.log_test("Get My Gift Cards", True, f"Found {len(response)} gift cards")
+        if success and 'gift_cards' in response:
+            gift_cards = response['gift_cards']
+            self.log_test("Get My Gift Cards", True, f"Found {len(gift_cards)} gift cards")
             get_gift_cards_success = True
         else:
             self.log_test("Get My Gift Cards", False, f"Get gift cards failed: {response}")
