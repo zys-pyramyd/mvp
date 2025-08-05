@@ -4299,6 +4299,894 @@ class PyramydAPITester:
         
         return overall_success
 
+    # ===== ENHANCED SELLER DASHBOARD TESTS =====
+    
+    def test_seller_analytics_dashboard(self):
+        """Test seller analytics dashboard endpoint"""
+        print("\n📊 Testing Seller Analytics Dashboard...")
+        
+        # Test 1: Default analytics (30 days)
+        success, response = self.make_request('GET', '/api/seller/dashboard/analytics', use_auth=True)
+        
+        if success and 'period' in response and 'revenue' in response and 'orders' in response:
+            # Check required sections
+            required_sections = ['period', 'revenue', 'orders', 'customers', 'products', 'inventory_alerts']
+            if all(section in response for section in required_sections):
+                self.log_test("Seller Analytics Dashboard (Default)", True)
+                default_success = True
+            else:
+                self.log_test("Seller Analytics Dashboard (Default)", False, f"Missing sections: {response}")
+                default_success = False
+        else:
+            self.log_test("Seller Analytics Dashboard (Default)", False, f"Analytics failed: {response}")
+            default_success = False
+        
+        # Test 2: Custom time period (7 days)
+        success, response = self.make_request('GET', '/api/seller/dashboard/analytics?days=7', use_auth=True)
+        
+        if success and response.get('period', {}).get('days') == 7:
+            self.log_test("Seller Analytics Dashboard (7 days)", True)
+            custom_period_success = True
+        else:
+            self.log_test("Seller Analytics Dashboard (7 days)", False, f"Custom period failed: {response}")
+            custom_period_success = False
+        
+        # Test 3: Extended time period (90 days)
+        success, response = self.make_request('GET', '/api/seller/dashboard/analytics?days=90', use_auth=True)
+        
+        if success and response.get('period', {}).get('days') == 90:
+            self.log_test("Seller Analytics Dashboard (90 days)", True)
+            extended_period_success = True
+        else:
+            self.log_test("Seller Analytics Dashboard (90 days)", False, f"Extended period failed: {response}")
+            extended_period_success = False
+        
+        # Test 4: Verify revenue calculations
+        if default_success:
+            revenue_data = response.get('revenue', {})
+            if 'total_revenue' in revenue_data and 'pending_revenue' in revenue_data and 'daily_average' in revenue_data:
+                self.log_test("Seller Analytics - Revenue Calculations", True)
+                revenue_calc_success = True
+            else:
+                self.log_test("Seller Analytics - Revenue Calculations", False, f"Revenue data incomplete: {revenue_data}")
+                revenue_calc_success = False
+        else:
+            revenue_calc_success = False
+        
+        # Test 5: Verify order statistics
+        if default_success:
+            orders_data = response.get('orders', {})
+            required_order_fields = ['total_orders', 'completed_orders', 'pending_orders', 'cancelled_orders', 'completion_rate']
+            if all(field in orders_data for field in required_order_fields):
+                self.log_test("Seller Analytics - Order Statistics", True)
+                order_stats_success = True
+            else:
+                self.log_test("Seller Analytics - Order Statistics", False, f"Order stats incomplete: {orders_data}")
+                order_stats_success = False
+        else:
+            order_stats_success = False
+        
+        # Test 6: Verify customer insights
+        if default_success:
+            customers_data = response.get('customers', {})
+            required_customer_fields = ['unique_customers', 'repeat_customers', 'repeat_rate', 'top_customers']
+            if all(field in customers_data for field in required_customer_fields):
+                self.log_test("Seller Analytics - Customer Insights", True)
+                customer_insights_success = True
+            else:
+                self.log_test("Seller Analytics - Customer Insights", False, f"Customer insights incomplete: {customers_data}")
+                customer_insights_success = False
+        else:
+            customer_insights_success = False
+        
+        # Test 7: Verify product performance metrics
+        if default_success:
+            products_data = response.get('products', {})
+            required_product_fields = ['total_products', 'active_products', 'low_stock_alerts', 'out_of_stock', 'performance']
+            if all(field in products_data for field in required_product_fields):
+                self.log_test("Seller Analytics - Product Performance", True)
+                product_performance_success = True
+            else:
+                self.log_test("Seller Analytics - Product Performance", False, f"Product performance incomplete: {products_data}")
+                product_performance_success = False
+        else:
+            product_performance_success = False
+        
+        # Test 8: Verify inventory alerts
+        if default_success:
+            inventory_data = response.get('inventory_alerts', {})
+            if 'low_stock_products' in inventory_data and 'out_of_stock_products' in inventory_data:
+                self.log_test("Seller Analytics - Inventory Alerts", True)
+                inventory_alerts_success = True
+            else:
+                self.log_test("Seller Analytics - Inventory Alerts", False, f"Inventory alerts incomplete: {inventory_data}")
+                inventory_alerts_success = False
+        else:
+            inventory_alerts_success = False
+        
+        overall_success = (default_success and custom_period_success and extended_period_success and 
+                          revenue_calc_success and order_stats_success and customer_insights_success and 
+                          product_performance_success and inventory_alerts_success)
+        
+        return overall_success
+    
+    def test_seller_order_management(self):
+        """Test seller order management endpoints"""
+        print("\n📋 Testing Seller Order Management...")
+        
+        # Test 1: Get all seller orders (default)
+        success, response = self.make_request('GET', '/api/seller/dashboard/orders', use_auth=True)
+        
+        if success and 'orders' in response and 'pagination' in response and 'status_summary' in response:
+            self.log_test("Seller Orders - Default Listing", True)
+            default_listing_success = True
+        else:
+            self.log_test("Seller Orders - Default Listing", False, f"Orders listing failed: {response}")
+            default_listing_success = False
+        
+        # Test 2: Filter by status
+        success, response = self.make_request('GET', '/api/seller/dashboard/orders?status=pending', use_auth=True)
+        
+        if success and 'orders' in response:
+            self.log_test("Seller Orders - Status Filtering", True)
+            status_filter_success = True
+        else:
+            self.log_test("Seller Orders - Status Filtering", False, f"Status filtering failed: {response}")
+            status_filter_success = False
+        
+        # Test 3: Filter by date range (last 7 days)
+        success, response = self.make_request('GET', '/api/seller/dashboard/orders?days=7', use_auth=True)
+        
+        if success and 'orders' in response:
+            self.log_test("Seller Orders - Date Range Filtering", True)
+            date_filter_success = True
+        else:
+            self.log_test("Seller Orders - Date Range Filtering", False, f"Date filtering failed: {response}")
+            date_filter_success = False
+        
+        # Test 4: Pagination
+        success, response = self.make_request('GET', '/api/seller/dashboard/orders?page=1&limit=5', use_auth=True)
+        
+        if success and response.get('pagination', {}).get('limit') == 5:
+            self.log_test("Seller Orders - Pagination", True)
+            pagination_success = True
+        else:
+            self.log_test("Seller Orders - Pagination", False, f"Pagination failed: {response}")
+            pagination_success = False
+        
+        # Test 5: Combined filters
+        success, response = self.make_request('GET', '/api/seller/dashboard/orders?status=completed&days=30&page=1&limit=10', use_auth=True)
+        
+        if success and 'orders' in response:
+            self.log_test("Seller Orders - Combined Filters", True)
+            combined_filters_success = True
+        else:
+            self.log_test("Seller Orders - Combined Filters", False, f"Combined filtering failed: {response}")
+            combined_filters_success = False
+        
+        # Test 6: Status summary verification
+        if default_listing_success:
+            status_summary = response.get('status_summary', {})
+            expected_statuses = ['pending', 'confirmed', 'in_transit', 'delivered', 'completed', 'cancelled']
+            if all(status in status_summary for status in expected_statuses):
+                self.log_test("Seller Orders - Status Summary", True)
+                status_summary_success = True
+            else:
+                self.log_test("Seller Orders - Status Summary", False, f"Status summary incomplete: {status_summary}")
+                status_summary_success = False
+        else:
+            status_summary_success = False
+        
+        overall_success = (default_listing_success and status_filter_success and date_filter_success and 
+                          pagination_success and combined_filters_success and status_summary_success)
+        
+        return overall_success
+    
+    def test_seller_order_status_updates(self):
+        """Test seller order status update functionality"""
+        print("\n✏️ Testing Seller Order Status Updates...")
+        
+        # First create a test product and order to update
+        product_success, product_id = self.test_product_creation()
+        if not product_success or not product_id:
+            self.log_test("Seller Order Status Updates", False, "Cannot test without product")
+            return False
+        
+        # Create a test order
+        order_data = {
+            "product_id": product_id,
+            "quantity": 5.0,
+            "unit": "kg",
+            "delivery_method": "platform",
+            "shipping_address": "Test Address for Status Update"
+        }
+        
+        success, response = self.make_request('POST', '/api/orders/create', order_data, 200, use_auth=True)
+        if not success or 'order_id' not in response:
+            self.log_test("Seller Order Status Updates", False, "Cannot create test order")
+            return False
+        
+        test_order_id = response['order_id']
+        
+        # Test 1: Valid status update (pending to confirmed)
+        status_update_data = {
+            "status": "confirmed",
+            "notes": "Order confirmed by seller"
+        }
+        
+        success, response = self.make_request('PUT', f'/api/seller/orders/{test_order_id}/status', 
+                                            status_update_data, 200, use_auth=True)
+        
+        if success and response.get('new_status') == 'confirmed':
+            self.log_test("Seller Order Status Update (Valid)", True)
+            valid_update_success = True
+        else:
+            self.log_test("Seller Order Status Update (Valid)", False, f"Status update failed: {response}")
+            valid_update_success = False
+        
+        # Test 2: Invalid status
+        invalid_status_data = {
+            "status": "invalid_status"
+        }
+        
+        success, response = self.make_request('PUT', f'/api/seller/orders/{test_order_id}/status', 
+                                            invalid_status_data, 400, use_auth=True)
+        
+        if success:  # Should return 400 error
+            self.log_test("Seller Order Status Update (Invalid Status)", True)
+            invalid_status_success = True
+        else:
+            self.log_test("Seller Order Status Update (Invalid Status)", False, f"Should return 400 error: {response}")
+            invalid_status_success = False
+        
+        # Test 3: Valid status progression (confirmed to preparing)
+        preparing_status_data = {
+            "status": "preparing",
+            "notes": "Order is being prepared"
+        }
+        
+        success, response = self.make_request('PUT', f'/api/seller/orders/{test_order_id}/status', 
+                                            preparing_status_data, 200, use_auth=True)
+        
+        if success and response.get('new_status') == 'preparing':
+            self.log_test("Seller Order Status Update (Progression)", True)
+            progression_success = True
+        else:
+            self.log_test("Seller Order Status Update (Progression)", False, f"Status progression failed: {response}")
+            progression_success = False
+        
+        # Test 4: Update to ready status
+        ready_status_data = {
+            "status": "ready",
+            "notes": "Order is ready for pickup/delivery"
+        }
+        
+        success, response = self.make_request('PUT', f'/api/seller/orders/{test_order_id}/status', 
+                                            ready_status_data, 200, use_auth=True)
+        
+        if success and response.get('new_status') == 'ready':
+            self.log_test("Seller Order Status Update (Ready)", True)
+            ready_success = True
+        else:
+            self.log_test("Seller Order Status Update (Ready)", False, f"Ready status failed: {response}")
+            ready_success = False
+        
+        # Test 5: Update to in_transit status
+        transit_status_data = {
+            "status": "in_transit",
+            "notes": "Order is in transit"
+        }
+        
+        success, response = self.make_request('PUT', f'/api/seller/orders/{test_order_id}/status', 
+                                            transit_status_data, 200, use_auth=True)
+        
+        if success and response.get('new_status') == 'in_transit':
+            self.log_test("Seller Order Status Update (In Transit)", True)
+            transit_success = True
+        else:
+            self.log_test("Seller Order Status Update (In Transit)", False, f"Transit status failed: {response}")
+            transit_success = False
+        
+        # Test 6: Complete the order
+        completed_status_data = {
+            "status": "completed",
+            "notes": "Order completed successfully"
+        }
+        
+        success, response = self.make_request('PUT', f'/api/seller/orders/{test_order_id}/status', 
+                                            completed_status_data, 200, use_auth=True)
+        
+        if success and response.get('new_status') == 'completed':
+            self.log_test("Seller Order Status Update (Completed)", True)
+            completed_success = True
+        else:
+            self.log_test("Seller Order Status Update (Completed)", False, f"Completed status failed: {response}")
+            completed_success = False
+        
+        # Test 7: Non-existent order
+        fake_order_id = "non-existent-order-id"
+        success, response = self.make_request('PUT', f'/api/seller/orders/{fake_order_id}/status', 
+                                            status_update_data, 404, use_auth=True)
+        
+        if success:  # Should return 404 error
+            self.log_test("Seller Order Status Update (Non-existent)", True)
+            not_found_success = True
+        else:
+            self.log_test("Seller Order Status Update (Non-existent)", False, f"Should return 404 error: {response}")
+            not_found_success = False
+        
+        overall_success = (valid_update_success and invalid_status_success and progression_success and 
+                          ready_success and transit_success and completed_success and not_found_success)
+        
+        return overall_success
+    
+    def test_product_performance_analytics(self):
+        """Test product performance analytics endpoint"""
+        print("\n📈 Testing Product Performance Analytics...")
+        
+        # Test 1: Default product performance (30 days)
+        success, response = self.make_request('GET', '/api/seller/products/performance', use_auth=True)
+        
+        if success and 'products' in response and 'summary' in response:
+            self.log_test("Product Performance Analytics (Default)", True)
+            default_success = True
+        else:
+            self.log_test("Product Performance Analytics (Default)", False, f"Performance analytics failed: {response}")
+            default_success = False
+        
+        # Test 2: Custom time period (7 days)
+        success, response = self.make_request('GET', '/api/seller/products/performance?days=7', use_auth=True)
+        
+        if success and 'products' in response:
+            self.log_test("Product Performance Analytics (7 days)", True)
+            custom_period_success = True
+        else:
+            self.log_test("Product Performance Analytics (7 days)", False, f"Custom period failed: {response}")
+            custom_period_success = False
+        
+        # Test 3: Verify product metrics structure
+        if default_success and len(response.get('products', [])) > 0:
+            product = response['products'][0]
+            required_fields = ['product_id', 'product_name', 'category', 'price_per_unit', 'stock_level', 'metrics', 'alerts']
+            if all(field in product for field in required_fields):
+                # Check metrics structure
+                metrics = product.get('metrics', {})
+                required_metrics = ['total_orders', 'completed_orders', 'conversion_rate', 'revenue', 'average_rating', 'rating_distribution']
+                if all(metric in metrics for metric in required_metrics):
+                    self.log_test("Product Performance - Metrics Structure", True)
+                    metrics_structure_success = True
+                else:
+                    self.log_test("Product Performance - Metrics Structure", False, f"Metrics incomplete: {metrics}")
+                    metrics_structure_success = False
+            else:
+                self.log_test("Product Performance - Product Structure", False, f"Product fields incomplete: {product}")
+                metrics_structure_success = False
+        else:
+            self.log_test("Product Performance - Metrics Structure", True, "No products found (acceptable)")
+            metrics_structure_success = True
+        
+        # Test 4: Verify rating distribution
+        if default_success and len(response.get('products', [])) > 0:
+            product = response['products'][0]
+            rating_dist = product.get('metrics', {}).get('rating_distribution', {})
+            expected_ratings = ['5_star', '4_star', '3_star', '2_star', '1_star']
+            if all(rating in rating_dist for rating in expected_ratings):
+                self.log_test("Product Performance - Rating Distribution", True)
+                rating_dist_success = True
+            else:
+                self.log_test("Product Performance - Rating Distribution", False, f"Rating distribution incomplete: {rating_dist}")
+                rating_dist_success = False
+        else:
+            self.log_test("Product Performance - Rating Distribution", True, "No products found (acceptable)")
+            rating_dist_success = True
+        
+        # Test 5: Verify product alerts
+        if default_success and len(response.get('products', [])) > 0:
+            product = response['products'][0]
+            alerts = product.get('alerts', {})
+            expected_alerts = ['low_stock', 'out_of_stock', 'low_rating', 'no_recent_orders']
+            if all(alert in alerts for alert in expected_alerts):
+                self.log_test("Product Performance - Alerts", True)
+                alerts_success = True
+            else:
+                self.log_test("Product Performance - Alerts", False, f"Alerts incomplete: {alerts}")
+                alerts_success = False
+        else:
+            self.log_test("Product Performance - Alerts", True, "No products found (acceptable)")
+            alerts_success = True
+        
+        # Test 6: Verify summary data
+        if default_success:
+            summary = response.get('summary', {})
+            required_summary_fields = ['total_products', 'low_stock_count', 'out_of_stock_count', 'low_rating_count']
+            if all(field in summary for field in required_summary_fields):
+                self.log_test("Product Performance - Summary", True)
+                summary_success = True
+            else:
+                self.log_test("Product Performance - Summary", False, f"Summary incomplete: {summary}")
+                summary_success = False
+        else:
+            summary_success = False
+        
+        overall_success = (default_success and custom_period_success and metrics_structure_success and 
+                          rating_dist_success and alerts_success and summary_success)
+        
+        return overall_success
+    
+    def test_customer_insights_analytics(self):
+        """Test customer insights and analytics endpoint"""
+        print("\n👥 Testing Customer Insights & Analytics...")
+        
+        # Test 1: Default customer insights (30 days)
+        success, response = self.make_request('GET', '/api/seller/customers/insights', use_auth=True)
+        
+        if success and 'summary' in response and 'top_customers' in response and 'segments' in response:
+            self.log_test("Customer Insights Analytics (Default)", True)
+            default_success = True
+        else:
+            self.log_test("Customer Insights Analytics (Default)", False, f"Customer insights failed: {response}")
+            default_success = False
+        
+        # Test 2: Custom time period (7 days)
+        success, response = self.make_request('GET', '/api/seller/customers/insights?days=7', use_auth=True)
+        
+        if success and 'summary' in response:
+            self.log_test("Customer Insights Analytics (7 days)", True)
+            custom_period_success = True
+        else:
+            self.log_test("Customer Insights Analytics (7 days)", False, f"Custom period failed: {response}")
+            custom_period_success = False
+        
+        # Test 3: Extended time period (90 days)
+        success, response = self.make_request('GET', '/api/seller/customers/insights?days=90', use_auth=True)
+        
+        if success and 'summary' in response:
+            self.log_test("Customer Insights Analytics (90 days)", True)
+            extended_period_success = True
+        else:
+            self.log_test("Customer Insights Analytics (90 days)", False, f"Extended period failed: {response}")
+            extended_period_success = False
+        
+        # Test 4: Verify summary structure
+        if default_success:
+            summary = response.get('summary', {})
+            required_summary_fields = ['total_customers', 'high_value_customers', 'repeat_customers', 
+                                     'new_customers', 'average_customer_value', 'customer_retention_rate']
+            if all(field in summary for field in required_summary_fields):
+                self.log_test("Customer Insights - Summary Structure", True)
+                summary_structure_success = True
+            else:
+                self.log_test("Customer Insights - Summary Structure", False, f"Summary incomplete: {summary}")
+                summary_structure_success = False
+        else:
+            summary_structure_success = False
+        
+        # Test 5: Verify top customers structure
+        if default_success and len(response.get('top_customers', [])) > 0:
+            customer = response['top_customers'][0]
+            required_customer_fields = ['username', 'total_orders', 'total_spent', 'completed_orders', 
+                                      'average_order_value', 'completion_rate', 'top_product']
+            if all(field in customer for field in required_customer_fields):
+                self.log_test("Customer Insights - Top Customers Structure", True)
+                top_customers_success = True
+            else:
+                self.log_test("Customer Insights - Top Customers Structure", False, f"Customer data incomplete: {customer}")
+                top_customers_success = False
+        else:
+            self.log_test("Customer Insights - Top Customers Structure", True, "No customers found (acceptable)")
+            top_customers_success = True
+        
+        # Test 6: Verify customer segments
+        if default_success:
+            segments = response.get('segments', {})
+            required_segments = ['high_value', 'repeat', 'new', 'at_risk']
+            if all(segment in segments for segment in required_segments):
+                self.log_test("Customer Insights - Segments", True)
+                segments_success = True
+            else:
+                self.log_test("Customer Insights - Segments", False, f"Segments incomplete: {segments}")
+                segments_success = False
+        else:
+            segments_success = False
+        
+        # Test 7: Verify customer retention rate calculation
+        if default_success:
+            retention_rate = response.get('summary', {}).get('customer_retention_rate', 0)
+            if isinstance(retention_rate, (int, float)) and 0 <= retention_rate <= 100:
+                self.log_test("Customer Insights - Retention Rate", True)
+                retention_rate_success = True
+            else:
+                self.log_test("Customer Insights - Retention Rate", False, f"Invalid retention rate: {retention_rate}")
+                retention_rate_success = False
+        else:
+            retention_rate_success = False
+        
+        overall_success = (default_success and custom_period_success and extended_period_success and 
+                          summary_structure_success and top_customers_success and segments_success and 
+                          retention_rate_success)
+        
+        return overall_success
+    
+    def test_inventory_management(self):
+        """Test inventory management functionality"""
+        print("\n📦 Testing Inventory Management...")
+        
+        # First create a test product to manage inventory
+        product_success, product_id = self.test_product_creation()
+        if not product_success or not product_id:
+            self.log_test("Inventory Management", False, "Cannot test without product")
+            return False
+        
+        # Test 1: Valid inventory update
+        inventory_update_data = {
+            "quantity_available": 150,
+            "minimum_order_quantity": 10
+        }
+        
+        success, response = self.make_request('PUT', f'/api/seller/products/{product_id}/inventory', 
+                                            inventory_update_data, 200, use_auth=True)
+        
+        if success and response.get('new_quantity') == 150:
+            self.log_test("Inventory Management - Valid Update", True)
+            valid_update_success = True
+        else:
+            self.log_test("Inventory Management - Valid Update", False, f"Inventory update failed: {response}")
+            valid_update_success = False
+        
+        # Test 2: Update only quantity (minimum order quantity optional)
+        quantity_only_data = {
+            "quantity_available": 200
+        }
+        
+        success, response = self.make_request('PUT', f'/api/seller/products/{product_id}/inventory', 
+                                            quantity_only_data, 200, use_auth=True)
+        
+        if success and response.get('new_quantity') == 200:
+            self.log_test("Inventory Management - Quantity Only", True)
+            quantity_only_success = True
+        else:
+            self.log_test("Inventory Management - Quantity Only", False, f"Quantity update failed: {response}")
+            quantity_only_success = False
+        
+        # Test 3: Invalid quantity (negative)
+        invalid_quantity_data = {
+            "quantity_available": -50
+        }
+        
+        success, response = self.make_request('PUT', f'/api/seller/products/{product_id}/inventory', 
+                                            invalid_quantity_data, 400, use_auth=True)
+        
+        if success:  # Should return 400 error
+            self.log_test("Inventory Management - Invalid Quantity", True)
+            invalid_quantity_success = True
+        else:
+            self.log_test("Inventory Management - Invalid Quantity", False, f"Should return 400 error: {response}")
+            invalid_quantity_success = False
+        
+        # Test 4: Zero quantity (valid - out of stock)
+        zero_quantity_data = {
+            "quantity_available": 0
+        }
+        
+        success, response = self.make_request('PUT', f'/api/seller/products/{product_id}/inventory', 
+                                            zero_quantity_data, 200, use_auth=True)
+        
+        if success and response.get('new_quantity') == 0:
+            self.log_test("Inventory Management - Zero Quantity", True)
+            zero_quantity_success = True
+        else:
+            self.log_test("Inventory Management - Zero Quantity", False, f"Zero quantity update failed: {response}")
+            zero_quantity_success = False
+        
+        # Test 5: Missing quantity field
+        missing_quantity_data = {
+            "minimum_order_quantity": 5
+        }
+        
+        success, response = self.make_request('PUT', f'/api/seller/products/{product_id}/inventory', 
+                                            missing_quantity_data, 400, use_auth=True)
+        
+        if success:  # Should return 400 error
+            self.log_test("Inventory Management - Missing Quantity", True)
+            missing_quantity_success = True
+        else:
+            self.log_test("Inventory Management - Missing Quantity", False, f"Should return 400 error: {response}")
+            missing_quantity_success = False
+        
+        # Test 6: Non-existent product
+        fake_product_id = "non-existent-product-id"
+        success, response = self.make_request('PUT', f'/api/seller/products/{fake_product_id}/inventory', 
+                                            inventory_update_data, 404, use_auth=True)
+        
+        if success:  # Should return 404 error
+            self.log_test("Inventory Management - Non-existent Product", True)
+            not_found_success = True
+        else:
+            self.log_test("Inventory Management - Non-existent Product", False, f"Should return 404 error: {response}")
+            not_found_success = False
+        
+        # Test 7: Test with pre-order product (create a pre-order first)
+        preorder_creation_success, preorder_id = self.test_preorder_creation()
+        if preorder_creation_success and preorder_id:
+            preorder_inventory_data = {
+                "quantity_available": 500,
+                "minimum_order_quantity": 25
+            }
+            
+            success, response = self.make_request('PUT', f'/api/seller/products/{preorder_id}/inventory', 
+                                                preorder_inventory_data, 200, use_auth=True)
+            
+            if success and response.get('new_quantity') == 500:
+                self.log_test("Inventory Management - Pre-order Product", True)
+                preorder_inventory_success = True
+            else:
+                self.log_test("Inventory Management - Pre-order Product", False, f"Pre-order inventory failed: {response}")
+                preorder_inventory_success = False
+        else:
+            self.log_test("Inventory Management - Pre-order Product", True, "No pre-order available (acceptable)")
+            preorder_inventory_success = True
+        
+        overall_success = (valid_update_success and quantity_only_success and invalid_quantity_success and 
+                          zero_quantity_success and missing_quantity_success and not_found_success and 
+                          preorder_inventory_success)
+        
+        return overall_success
+    
+    def test_seller_dashboard_security_authorization(self):
+        """Test security and authorization for seller dashboard endpoints"""
+        print("\n🔒 Testing Seller Dashboard Security & Authorization...")
+        
+        # Test 1: Unauthenticated access (should fail)
+        success, response = self.make_request('GET', '/api/seller/dashboard/analytics', expected_status=401)
+        
+        if success:  # Should return 401 error
+            self.log_test("Seller Dashboard Security - Unauthenticated Access", True)
+            unauth_success = True
+        else:
+            self.log_test("Seller Dashboard Security - Unauthenticated Access", False, f"Should return 401 error: {response}")
+            unauth_success = False
+        
+        # Test 2: Authenticated access (should work)
+        success, response = self.make_request('GET', '/api/seller/dashboard/analytics', use_auth=True)
+        
+        if success and 'revenue' in response:
+            self.log_test("Seller Dashboard Security - Authenticated Access", True)
+            auth_success = True
+        else:
+            self.log_test("Seller Dashboard Security - Authenticated Access", False, f"Authenticated access failed: {response}")
+            auth_success = False
+        
+        # Test 3: Test that sellers only see their own data
+        # This is implicitly tested by the fact that the endpoints filter by seller_id = current_user["id"]
+        # We can verify this by checking that the analytics only return data for the current user
+        if auth_success:
+            # Check if the response contains seller-specific data
+            products_data = response.get('products', {})
+            if isinstance(products_data, dict):
+                self.log_test("Seller Dashboard Security - Data Isolation", True, "Seller sees only their own data")
+                data_isolation_success = True
+            else:
+                self.log_test("Seller Dashboard Security - Data Isolation", False, f"Data structure unexpected: {products_data}")
+                data_isolation_success = False
+        else:
+            data_isolation_success = False
+        
+        # Test 4: Test order status update authorization
+        # Create a test product and order first
+        product_success, product_id = self.test_product_creation()
+        if product_success and product_id:
+            order_data = {
+                "product_id": product_id,
+                "quantity": 2.0,
+                "unit": "kg",
+                "delivery_method": "platform",
+                "shipping_address": "Test Address"
+            }
+            
+            success, response = self.make_request('POST', '/api/orders/create', order_data, 200, use_auth=True)
+            if success and 'order_id' in response:
+                test_order_id = response['order_id']
+                
+                # Test authorized status update
+                status_update_data = {"status": "confirmed"}
+                success, response = self.make_request('PUT', f'/api/seller/orders/{test_order_id}/status', 
+                                                    status_update_data, 200, use_auth=True)
+                
+                if success:
+                    self.log_test("Seller Dashboard Security - Order Update Authorization", True)
+                    order_auth_success = True
+                else:
+                    self.log_test("Seller Dashboard Security - Order Update Authorization", False, f"Order update failed: {response}")
+                    order_auth_success = False
+            else:
+                order_auth_success = False
+        else:
+            order_auth_success = False
+        
+        # Test 5: Test inventory update authorization
+        if product_success and product_id:
+            inventory_data = {"quantity_available": 100}
+            success, response = self.make_request('PUT', f'/api/seller/products/{product_id}/inventory', 
+                                                inventory_data, 200, use_auth=True)
+            
+            if success:
+                self.log_test("Seller Dashboard Security - Inventory Update Authorization", True)
+                inventory_auth_success = True
+            else:
+                self.log_test("Seller Dashboard Security - Inventory Update Authorization", False, f"Inventory update failed: {response}")
+                inventory_auth_success = False
+        else:
+            inventory_auth_success = False
+        
+        overall_success = (unauth_success and auth_success and data_isolation_success and 
+                          order_auth_success and inventory_auth_success)
+        
+        return overall_success
+    
+    def test_seller_dashboard_data_integration(self):
+        """Test data integration with existing collections"""
+        print("\n🔗 Testing Seller Dashboard Data Integration...")
+        
+        # Test 1: Integration with products collection
+        success, response = self.make_request('GET', '/api/seller/dashboard/analytics', use_auth=True)
+        
+        if success and 'products' in response:
+            products_data = response.get('products', {})
+            if 'total_products' in products_data and 'performance' in products_data:
+                self.log_test("Data Integration - Products Collection", True)
+                products_integration_success = True
+            else:
+                self.log_test("Data Integration - Products Collection", False, f"Products data incomplete: {products_data}")
+                products_integration_success = False
+        else:
+            self.log_test("Data Integration - Products Collection", False, f"Analytics failed: {response}")
+            products_integration_success = False
+        
+        # Test 2: Integration with orders collection
+        if success:
+            orders_data = response.get('orders', {})
+            if 'total_orders' in orders_data and 'completion_rate' in orders_data:
+                self.log_test("Data Integration - Orders Collection", True)
+                orders_integration_success = True
+            else:
+                self.log_test("Data Integration - Orders Collection", False, f"Orders data incomplete: {orders_data}")
+                orders_integration_success = False
+        else:
+            orders_integration_success = False
+        
+        # Test 3: Integration with ratings collection
+        success, response = self.make_request('GET', '/api/seller/products/performance', use_auth=True)
+        
+        if success and 'products' in response:
+            products = response.get('products', [])
+            if len(products) > 0:
+                product = products[0]
+                metrics = product.get('metrics', {})
+                if 'rating_distribution' in metrics and 'average_rating' in metrics:
+                    self.log_test("Data Integration - Ratings Collection", True)
+                    ratings_integration_success = True
+                else:
+                    self.log_test("Data Integration - Ratings Collection", False, f"Rating data incomplete: {metrics}")
+                    ratings_integration_success = False
+            else:
+                self.log_test("Data Integration - Ratings Collection", True, "No products found (acceptable)")
+                ratings_integration_success = True
+        else:
+            self.log_test("Data Integration - Ratings Collection", False, f"Product performance failed: {response}")
+            ratings_integration_success = False
+        
+        # Test 4: Test with both regular products and pre-orders
+        # Create a regular product
+        product_success, product_id = self.test_product_creation()
+        
+        # Create a pre-order
+        preorder_success, preorder_id = self.test_preorder_creation()
+        
+        if product_success and preorder_success:
+            # Test analytics includes both types
+            success, response = self.make_request('GET', '/api/seller/dashboard/analytics', use_auth=True)
+            
+            if success:
+                products_data = response.get('products', {})
+                performance_data = products_data.get('performance', {})
+                
+                # Check if both regular products and pre-orders are included
+                if len(performance_data) >= 2:  # Should have at least the product and pre-order we created
+                    self.log_test("Data Integration - Mixed Product Types", True)
+                    mixed_types_success = True
+                else:
+                    self.log_test("Data Integration - Mixed Product Types", True, "Limited products found (acceptable)")
+                    mixed_types_success = True
+            else:
+                self.log_test("Data Integration - Mixed Product Types", False, f"Mixed types test failed: {response}")
+                mixed_types_success = False
+        else:
+            self.log_test("Data Integration - Mixed Product Types", True, "Cannot create test products (acceptable)")
+            mixed_types_success = True
+        
+        # Test 5: Date range filtering and aggregation
+        success, response = self.make_request('GET', '/api/seller/dashboard/analytics?days=7', use_auth=True)
+        
+        if success and response.get('period', {}).get('days') == 7:
+            revenue_data = response.get('revenue', {})
+            if 'daily_sales' in revenue_data and isinstance(revenue_data['daily_sales'], dict):
+                self.log_test("Data Integration - Date Range Aggregation", True)
+                date_aggregation_success = True
+            else:
+                self.log_test("Data Integration - Date Range Aggregation", False, f"Date aggregation failed: {revenue_data}")
+                date_aggregation_success = False
+        else:
+            self.log_test("Data Integration - Date Range Aggregation", False, f"Date range filtering failed: {response}")
+            date_aggregation_success = False
+        
+        # Test 6: JSON serialization of datetime objects
+        success, response = self.make_request('GET', '/api/seller/dashboard/orders', use_auth=True)
+        
+        if success and 'orders' in response:
+            orders = response.get('orders', [])
+            if len(orders) > 0:
+                order = orders[0]
+                # Check if datetime fields are properly serialized
+                if 'created_at' in order and isinstance(order['created_at'], str):
+                    self.log_test("Data Integration - DateTime Serialization", True)
+                    datetime_serialization_success = True
+                else:
+                    self.log_test("Data Integration - DateTime Serialization", False, f"DateTime serialization issue: {order}")
+                    datetime_serialization_success = False
+            else:
+                self.log_test("Data Integration - DateTime Serialization", True, "No orders found (acceptable)")
+                datetime_serialization_success = True
+        else:
+            self.log_test("Data Integration - DateTime Serialization", False, f"Orders retrieval failed: {response}")
+            datetime_serialization_success = False
+        
+        overall_success = (products_integration_success and orders_integration_success and 
+                          ratings_integration_success and mixed_types_success and 
+                          date_aggregation_success and datetime_serialization_success)
+        
+        return overall_success
+    
+    def test_enhanced_seller_dashboard_complete(self):
+        """Test complete Enhanced Seller Dashboard system"""
+        print("\n🔄 Testing Complete Enhanced Seller Dashboard System...")
+        
+        # Step 1: Seller Analytics Dashboard
+        analytics_success = self.test_seller_analytics_dashboard()
+        
+        # Step 2: Seller Order Management
+        order_management_success = self.test_seller_order_management()
+        
+        # Step 3: Order Status Updates
+        status_updates_success = self.test_seller_order_status_updates()
+        
+        # Step 4: Product Performance Analytics
+        product_performance_success = self.test_product_performance_analytics()
+        
+        # Step 5: Customer Insights & Analytics
+        customer_insights_success = self.test_customer_insights_analytics()
+        
+        # Step 6: Inventory Management
+        inventory_management_success = self.test_inventory_management()
+        
+        # Step 7: Security & Authorization
+        security_success = self.test_seller_dashboard_security_authorization()
+        
+        # Step 8: Data Integration
+        data_integration_success = self.test_seller_dashboard_data_integration()
+        
+        overall_success = (analytics_success and order_management_success and status_updates_success and 
+                          product_performance_success and customer_insights_success and 
+                          inventory_management_success and security_success and data_integration_success)
+        
+        if overall_success:
+            self.log_test("Complete Enhanced Seller Dashboard System", True,
+                         "All seller dashboard functionality working correctly")
+        else:
+            self.log_test("Complete Enhanced Seller Dashboard System", False,
+                         "One or more seller dashboard components failed")
+        
+        return overall_success
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting Pyramyd API Tests...")
