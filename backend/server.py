@@ -3241,6 +3241,763 @@ async def get_dropoff_states_cities():
         print(f"Error getting states and cities: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get states and cities")
 
+# ==================== DIGITAL WALLET SYSTEM ENDPOINTS ====================
+
+@app.get("/api/wallet/summary")
+async def get_wallet_summary(current_user: dict = Depends(get_current_user)):
+    """Get comprehensive wallet summary for the current user"""
+    try:
+        user_id = current_user["id"]
+        
+        # Get current balance from user record
+        user = users_collection.find_one({"id": user_id})
+        current_balance = user.get("wallet_balance", 0.0) if user else 0.0
+        
+        # Calculate transaction statistics
+        all_transactions = list(wallet_transactions_collection.find({
+            "user_id": user_id,
+            "status": TransactionStatus.COMPLETED
+        }))
+        
+        total_funded = sum(t["amount"] for t in all_transactions if t["transaction_type"] in [TransactionType.WALLET_FUNDING, TransactionType.GIFT_CARD_REDEMPTION])
+        total_spent = sum(t["amount"] for t in all_transactions if t["transaction_type"] in [TransactionType.ORDER_PAYMENT, TransactionType.GIFT_CARD_PURCHASE])
+        total_withdrawn = sum(t["amount"] for t in all_transactions if t["transaction_type"] == TransactionType.WALLET_WITHDRAWAL)
+        
+        # Pending transactions
+        pending_count = wallet_transactions_collection.count_documents({
+            "user_id": user_id,
+            "status": TransactionStatus.PENDING
+        })
+        
+        # Last transaction
+        last_transaction = wallet_transactions_collection.find_one(
+            {"user_id": user_id},
+            sort=[("created_at", -1)]
+        )
+        
+        # Linked accounts
+        linked_accounts_count = bank_accounts_collection.count_documents({"user_id": user_id})
+        
+        # Gift cards statistics
+        gift_cards_purchased = gift_cards_collection.count_documents({"purchaser_id": user_id})
+        gift_cards_redeemed = gift_cards_collection.count_documents({"redeemed_by_id": user_id})
+        
+        # Security status
+        wallet_security = wallet_security_collection.find_one({"user_id": user_id})
+        security_status = {
+            "pin_set": bool(wallet_security and wallet_security.get("transaction_pin")),
+            "pin_locked": bool(wallet_security and wallet_security.get("pin_locked_until") and wallet_security["pin_locked_until"] > datetime.utcnow()),
+            "two_factor_enabled": bool(wallet_security and wallet_security.get("two_factor_enabled")),
+            "daily_limit": wallet_security.get("daily_limit", 50000.0) if wallet_security else 50000.0,
+            "monthly_limit": wallet_security.get("monthly_limit", 1000000.0) if wallet_security else 1000000.0
+        }
+        
+        return {
+            "user_id": user_id,
+            "username": current_user["username"],
+            "balance": current_balance,
+            "total_funded": total_funded,
+            "total_spent": total_spent,
+            "total_withdrawn": total_withdrawn,
+            "pending_transactions": pending_count,
+            "last_transaction_date": last_transaction["created_at"].isoformat() if last_transaction else None,
+            "security_status": security_status,
+            "linked_accounts": linked_accounts_count,
+            "gift_cards_purchased": gift_cards_purchased,
+            "gift_cards_redeemed": gift_cards_redeemed
+        }
+        
+    except Exception as e:
+        print(f"Error getting wallet summary: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get wallet summary")
+
+@app.post("/api/wallet/fund")
+async def fund_wallet(
+    transaction_data: WalletTransactionCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Fund user wallet (mock implementation)"""
+    try:
+        if transaction_data.transaction_type != TransactionType.WALLET_FUNDING:
+            raise HTTPException(status_code=400, detail="Invalid transaction type for funding")
+        
+        user_id = current_user["id"]
+        amount = transaction_data.amount
+        
+        # Get current balance
+        user = users_collection.find_one({"id": user_id})
+        current_balance = user.get("wallet_balance", 0.0) if user else 0.0
+        
+        # Create transaction record
+        transaction = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "username": current_user["username"],
+            "transaction_type": TransactionType.WALLET_FUNDING,
+            "amount": amount,
+            "balance_before": current_balance,
+            "balance_after": current_balance + amount,
+            "status": TransactionStatus.COMPLETED,  # Mock: instantly successful
+            "reference": f"FUND-{uuid.uuid4().hex[:12].upper()}",
+            "description": transaction_data.description,
+            "funding_method": transaction_data.funding_method,
+            "metadata": transaction_data.metadata or {},
+            "created_at": datetime.utcnow(),
+            "completed_at": datetime.utcnow()
+        }
+        
+        # Insert transaction
+        wallet_transactions_collection.insert_one(transaction)
+        
+        # Update user balance
+        users_collection.update_one(
+            {"id": user_id},
+            {"$set": {"wallet_balance": current_balance + amount}}
+        )
+        
+        return {
+            "message": "Wallet funded successfully",
+            "transaction_id": transaction["id"],
+            "reference": transaction["reference"],
+            "amount": amount,
+            "new_balance": current_balance + amount,
+            "funding_method": transaction_data.funding_method
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error funding wallet: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fund wallet")
+
+@app.post("/api/wallet/withdraw")
+async def withdraw_from_wallet(
+    withdrawal_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Withdraw from wallet to bank account (mock implementation)"""
+    try:
+        amount = withdrawal_data.get("amount")
+        bank_account_id = withdrawal_data.get("bank_account_id")
+        description = withdrawal_data.get("description", "Wallet withdrawal")
+        
+        if not amount or amount <= 0:
+            raise HTTPException(status_code=400, detail="Invalid withdrawal amount")
+        
+        if not bank_account_id:
+            raise HTTPException(status_code=400, detail="Bank account is required for withdrawal")
+        
+        user_id = current_user["id"]
+        
+        # Verify bank account ownership
+        bank_account = bank_accounts_collection.find_one({
+            "id": bank_account_id,
+            "user_id": user_id
+        })
+        
+        if not bank_account:
+            raise HTTPException(status_code=404, detail="Bank account not found")
+        
+        # Get current balance
+        user = users_collection.find_one({"id": user_id})
+        current_balance = user.get("wallet_balance", 0.0) if user else 0.0
+        
+        if current_balance < amount:
+            raise HTTPException(status_code=400, detail="Insufficient wallet balance")
+        
+        # Create transaction record
+        transaction = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "username": current_user["username"],
+            "transaction_type": TransactionType.WALLET_WITHDRAWAL,
+            "amount": amount,
+            "balance_before": current_balance,
+            "balance_after": current_balance - amount,
+            "status": TransactionStatus.COMPLETED,  # Mock: instantly successful
+            "reference": f"WTHD-{uuid.uuid4().hex[:12].upper()}",
+            "description": description,
+            "metadata": {
+                "bank_account": {
+                    "account_name": bank_account["account_name"],
+                    "account_number": bank_account["account_number"],
+                    "bank_name": bank_account["bank_name"]
+                }
+            },
+            "created_at": datetime.utcnow(),
+            "completed_at": datetime.utcnow()
+        }
+        
+        # Insert transaction
+        wallet_transactions_collection.insert_one(transaction)
+        
+        # Update user balance
+        users_collection.update_one(
+            {"id": user_id},
+            {"$set": {"wallet_balance": current_balance - amount}}
+        )
+        
+        return {
+            "message": "Withdrawal successful",
+            "transaction_id": transaction["id"],
+            "reference": transaction["reference"],
+            "amount": amount,
+            "new_balance": current_balance - amount,
+            "bank_account": f"{bank_account['account_name']} - {bank_account['bank_name']}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error processing withdrawal: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process withdrawal")
+
+@app.get("/api/wallet/transactions")
+async def get_wallet_transactions(
+    transaction_type: Optional[TransactionType] = None,
+    status: Optional[TransactionStatus] = None,
+    page: int = 1,
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get user wallet transactions with filtering and pagination"""
+    try:
+        user_id = current_user["id"]
+        
+        # Build query
+        query = {"user_id": user_id}
+        if transaction_type:
+            query["transaction_type"] = transaction_type
+        if status:
+            query["status"] = status
+        
+        # Get total count
+        total_count = wallet_transactions_collection.count_documents(query)
+        
+        # Get transactions
+        skip = (page - 1) * limit
+        transactions = list(wallet_transactions_collection.find(query)
+                          .sort("created_at", -1)
+                          .skip(skip)
+                          .limit(limit))
+        
+        # Clean up response
+        for transaction in transactions:
+            transaction.pop('_id', None)
+            if isinstance(transaction.get("created_at"), datetime):
+                transaction["created_at"] = transaction["created_at"].isoformat()
+            if isinstance(transaction.get("completed_at"), datetime):
+                transaction["completed_at"] = transaction["completed_at"].isoformat()
+        
+        return {
+            "transactions": transactions,
+            "total_count": total_count,
+            "page": page,
+            "limit": limit,
+            "total_pages": (total_count + limit - 1) // limit if total_count > 0 else 0
+        }
+        
+    except Exception as e:
+        print(f"Error getting wallet transactions: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get wallet transactions")
+
+# ==================== BANK ACCOUNT MANAGEMENT ====================
+
+@app.post("/api/wallet/bank-accounts")
+async def add_bank_account(
+    account_data: BankAccountCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add a bank account for wallet withdrawals (mock implementation)"""
+    try:
+        user_id = current_user["id"]
+        
+        # Check if account already exists
+        existing_account = bank_accounts_collection.find_one({
+            "user_id": user_id,
+            "account_number": account_data.account_number
+        })
+        
+        if existing_account:
+            raise HTTPException(status_code=400, detail="Bank account already exists")
+        
+        # If this is set as primary, remove primary status from other accounts
+        if account_data.is_primary:
+            bank_accounts_collection.update_many(
+                {"user_id": user_id},
+                {"$set": {"is_primary": False}}
+            )
+        
+        # Create bank account record
+        bank_account = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "account_name": account_data.account_name,
+            "account_number": account_data.account_number,
+            "bank_name": account_data.bank_name,
+            "bank_code": account_data.bank_code,
+            "is_primary": account_data.is_primary,
+            "is_verified": True,  # Mock: auto-verify for demo
+            "created_at": datetime.utcnow()
+        }
+        
+        bank_accounts_collection.insert_one(bank_account)
+        
+        return {
+            "message": "Bank account added successfully",
+            "account_id": bank_account["id"],
+            "account_name": account_data.account_name,
+            "account_number": account_data.account_number,
+            "bank_name": account_data.bank_name,
+            "is_verified": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error adding bank account: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add bank account")
+
+@app.get("/api/wallet/bank-accounts")
+async def get_user_bank_accounts(current_user: dict = Depends(get_current_user)):
+    """Get user's linked bank accounts"""
+    try:
+        user_id = current_user["id"]
+        
+        accounts = list(bank_accounts_collection.find({"user_id": user_id}))
+        
+        # Clean up response
+        for account in accounts:
+            account.pop('_id', None)
+            if isinstance(account.get("created_at"), datetime):
+                account["created_at"] = account["created_at"].isoformat()
+            
+            # Mask account number for security (show only last 4 digits)
+            if len(account["account_number"]) >= 4:
+                account["masked_account_number"] = "*" * (len(account["account_number"]) - 4) + account["account_number"][-4:]
+            else:
+                account["masked_account_number"] = account["account_number"]
+        
+        return {
+            "accounts": accounts,
+            "total_accounts": len(accounts)
+        }
+        
+    except Exception as e:
+        print(f"Error getting bank accounts: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get bank accounts")
+
+@app.delete("/api/wallet/bank-accounts/{account_id}")
+async def remove_bank_account(
+    account_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Remove a bank account"""
+    try:
+        user_id = current_user["id"]
+        
+        # Find and verify ownership
+        account = bank_accounts_collection.find_one({
+            "id": account_id,
+            "user_id": user_id
+        })
+        
+        if not account:
+            raise HTTPException(status_code=404, detail="Bank account not found")
+        
+        # Delete the account
+        bank_accounts_collection.delete_one({"id": account_id})
+        
+        return {
+            "message": "Bank account removed successfully",
+            "account_id": account_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error removing bank account: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to remove bank account")
+
+# ==================== GIFT CARD SYSTEM ====================
+
+@app.post("/api/wallet/gift-cards")
+async def create_gift_card(
+    gift_card_data: GiftCardCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create/purchase a gift card"""
+    try:
+        user_id = current_user["id"]
+        amount = gift_card_data.amount
+        
+        # Check wallet balance
+        user = users_collection.find_one({"id": user_id})
+        current_balance = user.get("wallet_balance", 0.0) if user else 0.0
+        
+        if current_balance < amount:
+            raise HTTPException(status_code=400, detail="Insufficient wallet balance to purchase gift card")
+        
+        # Create gift card
+        gift_card = {
+            "id": str(uuid.uuid4()),
+            "card_code": f"GIFT-{uuid.uuid4().hex[:8].upper()}",
+            "amount": amount,
+            "balance": amount,
+            "status": GiftCardStatus.ACTIVE,
+            "purchaser_id": user_id,
+            "purchaser_username": current_user["username"],
+            "recipient_email": gift_card_data.recipient_email,
+            "recipient_name": gift_card_data.recipient_name,
+            "message": gift_card_data.message,
+            "expiry_date": datetime.utcnow() + timedelta(days=365),
+            "created_at": datetime.utcnow(),
+            "redeemed_at": None,
+            "redeemed_by_id": None,
+            "redeemed_by_username": None
+        }
+        
+        gift_cards_collection.insert_one(gift_card)
+        
+        # Create transaction record for purchase
+        transaction = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "username": current_user["username"],
+            "transaction_type": TransactionType.GIFT_CARD_PURCHASE,
+            "amount": amount,
+            "balance_before": current_balance,
+            "balance_after": current_balance - amount,
+            "status": TransactionStatus.COMPLETED,
+            "reference": f"GIFT-{uuid.uuid4().hex[:12].upper()}",
+            "description": f"Gift card purchase - {gift_card['card_code']}",
+            "gift_card_id": gift_card["id"],
+            "metadata": {
+                "gift_card_code": gift_card["card_code"],
+                "recipient_email": gift_card_data.recipient_email,
+                "recipient_name": gift_card_data.recipient_name
+            },
+            "created_at": datetime.utcnow(),
+            "completed_at": datetime.utcnow()
+        }
+        
+        wallet_transactions_collection.insert_one(transaction)
+        
+        # Update user balance
+        users_collection.update_one(
+            {"id": user_id},
+            {"$set": {"wallet_balance": current_balance - amount}}
+        )
+        
+        return {
+            "message": "Gift card created successfully",
+            "gift_card": {
+                "id": gift_card["id"],
+                "card_code": gift_card["card_code"],
+                "amount": amount,
+                "expiry_date": gift_card["expiry_date"].isoformat(),
+                "recipient_email": gift_card_data.recipient_email,
+                "recipient_name": gift_card_data.recipient_name,
+                "message": gift_card_data.message
+            },
+            "transaction_id": transaction["id"],
+            "new_balance": current_balance - amount
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error creating gift card: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create gift card")
+
+@app.post("/api/wallet/gift-cards/redeem")
+async def redeem_gift_card(
+    redeem_data: GiftCardRedeem,
+    current_user: dict = Depends(get_current_user)
+):
+    """Redeem a gift card to wallet balance"""
+    try:
+        user_id = current_user["id"]
+        card_code = redeem_data.card_code.upper()
+        
+        # Find gift card
+        gift_card = gift_cards_collection.find_one({"card_code": card_code})
+        
+        if not gift_card:
+            raise HTTPException(status_code=404, detail="Gift card not found")
+        
+        if gift_card["status"] != GiftCardStatus.ACTIVE:
+            raise HTTPException(status_code=400, detail=f"Gift card is {gift_card['status']} and cannot be redeemed")
+        
+        if gift_card["expiry_date"] < datetime.utcnow():
+            # Mark as expired
+            gift_cards_collection.update_one(
+                {"id": gift_card["id"]},
+                {"$set": {"status": GiftCardStatus.EXPIRED}}
+            )
+            raise HTTPException(status_code=400, detail="Gift card has expired")
+        
+        # Check if user is trying to redeem their own gift card
+        if gift_card["purchaser_id"] == user_id and not gift_card.get("recipient_email"):
+            raise HTTPException(status_code=400, detail="Cannot redeem your own gift card unless it was sent to an email")
+        
+        # Determine redemption amount
+        available_balance = gift_card["balance"]
+        redemption_amount = redeem_data.amount if redeem_data.amount else available_balance
+        
+        if redemption_amount > available_balance:
+            raise HTTPException(status_code=400, detail=f"Insufficient gift card balance. Available: ₦{available_balance}")
+        
+        if redemption_amount <= 0:
+            raise HTTPException(status_code=400, detail="Invalid redemption amount")
+        
+        # Get current user balance
+        user = users_collection.find_one({"id": user_id})
+        current_balance = user.get("wallet_balance", 0.0) if user else 0.0
+        
+        # Update gift card
+        new_gift_card_balance = available_balance - redemption_amount
+        gift_card_updates = {
+            "balance": new_gift_card_balance,
+            "redeemed_by_id": user_id,
+            "redeemed_by_username": current_user["username"]
+        }
+        
+        # If fully redeemed, mark as redeemed
+        if new_gift_card_balance == 0:
+            gift_card_updates["status"] = GiftCardStatus.REDEEMED
+            gift_card_updates["redeemed_at"] = datetime.utcnow()
+        
+        gift_cards_collection.update_one(
+            {"id": gift_card["id"]},
+            {"$set": gift_card_updates}
+        )
+        
+        # Create transaction record for redemption
+        transaction = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "username": current_user["username"],
+            "transaction_type": TransactionType.GIFT_CARD_REDEMPTION,
+            "amount": redemption_amount,
+            "balance_before": current_balance,
+            "balance_after": current_balance + redemption_amount,
+            "status": TransactionStatus.COMPLETED,
+            "reference": f"REDEEM-{uuid.uuid4().hex[:12].upper()}",
+            "description": f"Gift card redemption - {card_code}",
+            "gift_card_id": gift_card["id"],
+            "metadata": {
+                "gift_card_code": card_code,
+                "original_purchaser": gift_card["purchaser_username"],
+                "redemption_amount": redemption_amount,
+                "remaining_balance": new_gift_card_balance
+            },
+            "created_at": datetime.utcnow(),
+            "completed_at": datetime.utcnow()
+        }
+        
+        wallet_transactions_collection.insert_one(transaction)
+        
+        # Update user balance
+        users_collection.update_one(
+            {"id": user_id},
+            {"$set": {"wallet_balance": current_balance + redemption_amount}}
+        )
+        
+        return {
+            "message": "Gift card redeemed successfully",
+            "redeemed_amount": redemption_amount,
+            "gift_card_remaining_balance": new_gift_card_balance,
+            "new_wallet_balance": current_balance + redemption_amount,
+            "transaction_id": transaction["id"],
+            "fully_redeemed": new_gift_card_balance == 0
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error redeeming gift card: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to redeem gift card")
+
+@app.get("/api/wallet/gift-cards/my-cards")
+async def get_my_gift_cards(
+    status: Optional[GiftCardStatus] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get gift cards purchased by the current user"""
+    try:
+        user_id = current_user["id"]
+        
+        # Build query
+        query = {"purchaser_id": user_id}
+        if status:
+            query["status"] = status
+        
+        gift_cards = list(gift_cards_collection.find(query).sort("created_at", -1))
+        
+        # Clean up response
+        for card in gift_cards:
+            card.pop('_id', None)
+            if isinstance(card.get("created_at"), datetime):
+                card["created_at"] = card["created_at"].isoformat()
+            if isinstance(card.get("expiry_date"), datetime):
+                card["expiry_date"] = card["expiry_date"].isoformat()
+            if isinstance(card.get("redeemed_at"), datetime):
+                card["redeemed_at"] = card["redeemed_at"].isoformat()
+        
+        return {
+            "gift_cards": gift_cards,
+            "total_cards": len(gift_cards)
+        }
+        
+    except Exception as e:
+        print(f"Error getting gift cards: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get gift cards")
+
+@app.get("/api/wallet/gift-cards/{card_code}")
+async def get_gift_card_details(card_code: str):
+    """Get gift card details (for checking validity before redemption)"""
+    try:
+        card_code = card_code.upper()
+        gift_card = gift_cards_collection.find_one({"card_code": card_code})
+        
+        if not gift_card:
+            raise HTTPException(status_code=404, detail="Gift card not found")
+        
+        # Public information only
+        card_info = {
+            "card_code": gift_card["card_code"],
+            "amount": gift_card["amount"],
+            "balance": gift_card["balance"],
+            "status": gift_card["status"],
+            "expiry_date": gift_card["expiry_date"].isoformat() if isinstance(gift_card.get("expiry_date"), datetime) else None,
+            "is_expired": gift_card["expiry_date"] < datetime.utcnow() if gift_card.get("expiry_date") else False,
+            "recipient_name": gift_card.get("recipient_name"),
+            "message": gift_card.get("message")
+        }
+        
+        return card_info
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting gift card details: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get gift card details")
+
+# ==================== WALLET SECURITY ====================
+
+@app.post("/api/wallet/security/set-pin")
+async def set_transaction_pin(
+    pin_data: WalletPinCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Set transaction PIN for wallet security"""
+    try:
+        user_id = current_user["id"]
+        hashed_pin = hash_password(pin_data.pin)
+        
+        # Check if security record exists
+        existing_security = wallet_security_collection.find_one({"user_id": user_id})
+        
+        if existing_security:
+            # Update existing record
+            wallet_security_collection.update_one(
+                {"user_id": user_id},
+                {"$set": {
+                    "transaction_pin": hashed_pin,
+                    "pin_attempts": 0,
+                    "pin_locked_until": None,
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+        else:
+            # Create new security record
+            security_record = {
+                "id": str(uuid.uuid4()),
+                "user_id": user_id,
+                "transaction_pin": hashed_pin,
+                "pin_attempts": 0,
+                "pin_locked_until": None,
+                "two_factor_enabled": False,
+                "daily_limit": 50000.0,
+                "monthly_limit": 1000000.0,
+                "created_at": datetime.utcnow(),
+                "updated_at": None
+            }
+            
+            wallet_security_collection.insert_one(security_record)
+        
+        return {
+            "message": "Transaction PIN set successfully",
+            "pin_set": True
+        }
+        
+    except Exception as e:
+        print(f"Error setting transaction PIN: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to set transaction PIN")
+
+@app.post("/api/wallet/security/verify-pin")
+async def verify_transaction_pin(
+    pin_data: WalletPinVerify,
+    current_user: dict = Depends(get_current_user)
+):
+    """Verify transaction PIN"""
+    try:
+        user_id = current_user["id"]
+        
+        security_record = wallet_security_collection.find_one({"user_id": user_id})
+        
+        if not security_record or not security_record.get("transaction_pin"):
+            raise HTTPException(status_code=400, detail="Transaction PIN not set")
+        
+        # Check if PIN is locked
+        if security_record.get("pin_locked_until") and security_record["pin_locked_until"] > datetime.utcnow():
+            raise HTTPException(status_code=423, detail="PIN is temporarily locked due to multiple failed attempts")
+        
+        # Verify PIN
+        if verify_password(pin_data.pin, security_record["transaction_pin"]):
+            # Reset failed attempts on successful verification
+            wallet_security_collection.update_one(
+                {"user_id": user_id},
+                {"$set": {
+                    "pin_attempts": 0,
+                    "pin_locked_until": None,
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+            
+            return {
+                "message": "PIN verified successfully",
+                "verified": True
+            }
+        else:
+            # Increment failed attempts
+            attempts = security_record.get("pin_attempts", 0) + 1
+            updates = {
+                "pin_attempts": attempts,
+                "updated_at": datetime.utcnow()
+            }
+            
+            # Lock PIN after 5 failed attempts for 30 minutes
+            if attempts >= 5:
+                updates["pin_locked_until"] = datetime.utcnow() + timedelta(minutes=30)
+            
+            wallet_security_collection.update_one(
+                {"user_id": user_id},
+                {"$set": updates}
+            )
+            
+            if attempts >= 5:
+                raise HTTPException(status_code=423, detail="PIN locked for 30 minutes due to multiple failed attempts")
+            else:
+                raise HTTPException(status_code=400, detail=f"Invalid PIN. {5 - attempts} attempts remaining")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error verifying PIN: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to verify PIN")
+
 # ==================== RATING SYSTEM ENDPOINTS ====================
 
 @app.post("/api/ratings")
