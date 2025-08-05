@@ -705,9 +705,9 @@ class MockBankAccount(BaseModel):
 
 class BankAccountCreate(BaseModel):
     account_name: str
-    account_number: str = Field(..., regex=r'^\d{10}$')
+    account_number: str = Field(..., pattern=r'^\d{10}$')
     bank_name: str
-    bank_code: str = Field(..., regex=r'^\d{3}$')
+    bank_code: str = Field(..., pattern=r'^\d{3}$')
     is_primary: bool = False
 
 # Gift Card System Models
