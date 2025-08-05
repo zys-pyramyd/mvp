@@ -761,7 +761,7 @@ class WalletPinCreate(BaseModel):
     pin: str = Field(..., pattern=r'^\d{4,6}$')  # 4-6 digit PIN
 
 class WalletPinVerify(BaseModel):
-    pin: str = Field(..., regex=r'^\d{4,6}$')
+    pin: str = Field(..., pattern=r'^\d{4,6}$')
 
 # Enhanced User Wallet Summary
 class UserWalletSummary(BaseModel):
