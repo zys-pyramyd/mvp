@@ -403,6 +403,10 @@ function App() {
     if (user && user.role === 'logistics') {
       fetchDriverSlots();
     }
+    // Load wallet data for authenticated users
+    if (user) {
+      fetchWalletSummary();
+    }
   }, [user]);
 
   const fetchUserProfile = async (token) => {
