@@ -417,6 +417,13 @@ function App() {
     }
   }, [currentPlatform, selectedCategory, searchTerm]);
 
+  // Update available locations when products change
+  useEffect(() => {
+    if (products.length > 0) {
+      fetchAvailableLocations();
+    }
+  }, [products]);
+
   // Auto-change slides every 5 seconds
   useEffect(() => {
     const slideInterval = setInterval(() => {
