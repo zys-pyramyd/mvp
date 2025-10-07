@@ -1375,6 +1375,9 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
     if not current_user.get('role'):
         raise HTTPException(status_code=400, detail="Please select a role first")
     
+    # KYC Compliance Check for Product Creation
+    validate_kyc_compliance(current_user, "post_products")
+    
     # Check if user can create products
     allowed_roles = ['farmer', 'agent', 'supplier_farm_inputs', 'supplier_food_produce', 'processor']
     if current_user.get('role') not in allowed_roles:
