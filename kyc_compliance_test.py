@@ -102,7 +102,7 @@ class KYCComplianceTester:
                 "gender": "male",
                 "date_of_birth": "1990-01-01",
                 "user_path": "partner",
-                "partner_type": business_category or "agriculture",  # This becomes the role
+                "partner_type": "business",
                 "business_category": business_category or "agriculture",
                 "business_info": {
                     "business_name": f"Test {business_category or 'Agriculture'} Business",
