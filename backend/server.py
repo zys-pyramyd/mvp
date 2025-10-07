@@ -4676,10 +4676,10 @@ async def add_farmer_to_agent(
     farmer_data: dict,
     current_user: dict = Depends(get_current_user)
 ):
-    """Add a farmer to agent's network"""
+    """Add a farmer to agent's network with KYC validation"""
     try:
-        if current_user.get("role") != "agent":
-            raise HTTPException(status_code=403, detail="Only agents can add farmers")
+        # Validate agent can register farmers (includes KYC check)
+        validate_agent_farmer_registration(current_user, farmer_data)
         
         agent_id = current_user["id"]
         
