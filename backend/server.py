@@ -711,6 +711,95 @@ class EnhancedDriverProfile(BaseModel):
     created_at: datetime
     last_active: Optional[datetime] = None
 
+# Enhanced KYC System Models
+class BusinessType(str, Enum):
+    LIMITED = "ltd"
+    NGO = "ngo"
+    PLC = "plc"
+    PARTNERSHIP = "partnership"
+    SOLE_PROPRIETORSHIP = "sole_proprietorship"
+    
+class IdentificationType(str, Enum):
+    NIN = "nin"
+    BVN = "bvn"
+    NATIONAL_ID = "national_id"
+    VOTERS_CARD = "voters_card"
+    DRIVERS_LICENSE = "drivers_license"
+
+class DocumentType(str, Enum):
+    CERTIFICATE_OF_INCORPORATION = "certificate_of_incorporation"
+    TIN_CERTIFICATE = "tin_certificate"
+    UTILITY_BILL = "utility_bill"
+    NATIONAL_ID_DOC = "national_id_doc"
+    HEADSHOT_PHOTO = "headshot_photo"
+
+class KYCDocument(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    document_type: DocumentType
+    file_name: str
+    file_data: str  # base64 encoded file
+    file_size: int
+    mime_type: str
+    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    verified: bool = False
+    verification_notes: Optional[str] = None
+
+class RegisteredBusinessKYC(BaseModel):
+    business_registration_number: str
+    tax_identification_number: str
+    business_type: BusinessType
+    business_address: str
+    contact_person_name: str
+    contact_person_phone: str
+    contact_person_email: str
+    # Documents will be uploaded separately
+    certificate_of_incorporation_id: Optional[str] = None
+    tin_certificate_id: Optional[str] = None
+    utility_bill_id: Optional[str] = None
+
+class UnregisteredEntityKYC(BaseModel):
+    identification_type: IdentificationType  # NIN or BVN
+    identification_number: str
+    headshot_photo_id: Optional[str] = None  # Camera captured photo
+    national_id_document_id: Optional[str] = None
+    utility_bill_id: Optional[str] = None
+
+class FarmlandRecord(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    farmer_id: str
+    location: str  # Farmland location
+    size_hectares: float
+    crop_types: List[str]  # Types of crops grown
+    soil_type: Optional[str] = None
+    irrigation_method: Optional[str] = None
+    coordinates: Optional[dict] = None  # GPS coordinates
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+class AgentFarmer(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    agent_id: str
+    farmer_id: str
+    farmer_name: str
+    farmer_phone: Optional[str] = None
+    farmer_location: str
+    linked_at: datetime = Field(default_factory=datetime.utcnow)
+    is_active: bool = True
+    total_listings: int = 0
+    total_sales: float = 0.0
+
+class AuditLog(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    action: str  # KYC update, product edit, etc.
+    resource_type: str  # user, product, order, etc.
+    resource_id: Optional[str] = None
+    details: dict  # Action details
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
 # Digital Wallet System Models
 class TransactionType(str, Enum):
     WALLET_FUNDING = "wallet_funding"
