@@ -4161,6 +4161,636 @@ async def verify_transaction_pin(
         print(f"Error verifying PIN: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to verify PIN")
 
+# ==================== ENHANCED KYC SYSTEM ENDPOINTS ====================
+
+@app.post("/api/kyc/documents/upload")
+async def upload_kyc_document(
+    document_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload KYC documents (including camera-captured headshots)"""
+    try:
+        user_id = current_user["id"]
+        
+        # Validate required fields
+        required_fields = ["document_type", "file_data", "file_name", "mime_type"]
+        for field in required_fields:
+            if not document_data.get(field):
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+        
+        # Validate document type
+        if document_data["document_type"] not in [e.value for e in DocumentType]:
+            raise HTTPException(status_code=400, detail="Invalid document type")
+        
+        # Validate file size (max 10MB)
+        file_data = document_data["file_data"]
+        if len(file_data) > 10 * 1024 * 1024:  # 10MB in bytes
+            raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB")
+        
+        # Create document record
+        document = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "document_type": document_data["document_type"],
+            "file_name": document_data["file_name"],
+            "file_data": file_data,
+            "file_size": len(file_data),
+            "mime_type": document_data["mime_type"],
+            "uploaded_at": datetime.utcnow(),
+            "verified": False,
+            "verification_notes": None
+        }
+        
+        kyc_documents_collection.insert_one(document)
+        
+        # Log the action
+        log_audit_action(user_id, "document_upload", "kyc_document", document["id"], {
+            "document_type": document_data["document_type"],
+            "file_name": document_data["file_name"]
+        })
+        
+        return {
+            "message": "Document uploaded successfully",
+            "document_id": document["id"],
+            "document_type": document_data["document_type"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error uploading KYC document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to upload document")
+
+@app.post("/api/kyc/registered-business/submit")
+async def submit_registered_business_kyc(
+    kyc_data: RegisteredBusinessKYC,
+    current_user: dict = Depends(get_current_user)
+):
+    """Submit KYC for registered businesses"""
+    try:
+        user_id = current_user["id"]
+        user_role = current_user.get("role")
+        
+        if user_role != "business":
+            raise HTTPException(status_code=400, detail="This KYC type is only for business accounts")
+        
+        # Check if user has business registration status as "registered"
+        user = users_collection.find_one({"id": user_id})
+        if not user or user.get("business_registration_status") != "registered":
+            raise HTTPException(status_code=400, detail="This KYC type requires a registered business account")
+        
+        # Validate required documents are uploaded
+        required_docs = ["certificate_of_incorporation_id", "tin_certificate_id", "utility_bill_id"]
+        for doc_field in required_docs:
+            doc_id = getattr(kyc_data, doc_field, None)
+            if doc_id:
+                doc = kyc_documents_collection.find_one({"id": doc_id, "user_id": user_id})
+                if not doc:
+                    raise HTTPException(status_code=400, detail=f"Invalid or missing document: {doc_field}")
+        
+        # Update user KYC status and data
+        kyc_update = {
+            "kyc_status": KYCStatus.PENDING,
+            "kyc_submitted_at": datetime.utcnow(),
+            "kyc_type": "registered_business",
+            "registered_business_kyc": kyc_data.dict(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        users_collection.update_one(
+            {"id": user_id},
+            {"$set": kyc_update}
+        )
+        
+        # Log the action
+        log_audit_action(user_id, "kyc_submission", "user", user_id, {
+            "kyc_type": "registered_business",
+            "business_name": user.get("business_name")
+        })
+        
+        return {
+            "message": "Registered business KYC submitted successfully",
+            "status": "pending",
+            "estimated_review_time": "3-7 business days"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error submitting registered business KYC: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to submit KYC")
+
+@app.post("/api/kyc/unregistered-entity/submit")
+async def submit_unregistered_entity_kyc(
+    kyc_data: UnregisteredEntityKYC,
+    current_user: dict = Depends(get_current_user)
+):
+    """Submit KYC for unregistered businesses, agents, and farmers"""
+    try:
+        user_id = current_user["id"]
+        user_role = current_user.get("role")
+        
+        if user_role not in ["business", "agent", "farmer"]:
+            raise HTTPException(status_code=400, detail="This KYC type is for business, agent, or farmer accounts")
+        
+        # For businesses, check if unregistered
+        if user_role == "business":
+            user = users_collection.find_one({"id": user_id})
+            if user and user.get("business_registration_status") == "registered":
+                raise HTTPException(status_code=400, detail="Registered businesses should use the registered business KYC process")
+        
+        # Validate required documents are uploaded
+        required_docs = ["headshot_photo_id", "national_id_document_id", "utility_bill_id"]
+        for doc_field in required_docs:
+            doc_id = getattr(kyc_data, doc_field, None)
+            if doc_id:
+                doc = kyc_documents_collection.find_one({"id": doc_id, "user_id": user_id})
+                if not doc:
+                    raise HTTPException(status_code=400, detail=f"Invalid or missing document: {doc_field}")
+        
+        # Validate identification number format (basic validation)
+        if kyc_data.identification_type == IdentificationType.NIN:
+            if len(kyc_data.identification_number) != 11 or not kyc_data.identification_number.isdigit():
+                raise HTTPException(status_code=400, detail="NIN must be 11 digits")
+        elif kyc_data.identification_type == IdentificationType.BVN:
+            if len(kyc_data.identification_number) != 11 or not kyc_data.identification_number.isdigit():
+                raise HTTPException(status_code=400, detail="BVN must be 11 digits")
+        
+        # Update user KYC status and data
+        kyc_update = {
+            "kyc_status": KYCStatus.PENDING,
+            "kyc_submitted_at": datetime.utcnow(),
+            "kyc_type": "unregistered_entity",
+            "unregistered_entity_kyc": kyc_data.dict(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        users_collection.update_one(
+            {"id": user_id},
+            {"$set": kyc_update}
+        )
+        
+        # Log the action
+        log_audit_action(user_id, "kyc_submission", "user", user_id, {
+            "kyc_type": "unregistered_entity",
+            "identification_type": kyc_data.identification_type,
+            "user_role": user_role
+        })
+        
+        return {
+            "message": f"{user_role.title()} KYC submitted successfully",
+            "status": "pending",
+            "estimated_review_time": "2-5 business days"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error submitting unregistered entity KYC: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to submit KYC")
+
+@app.get("/api/kyc/documents/my-documents")
+async def get_my_kyc_documents(current_user: dict = Depends(get_current_user)):
+    """Get user's uploaded KYC documents"""
+    try:
+        user_id = current_user["id"]
+        
+        documents = list(kyc_documents_collection.find(
+            {"user_id": user_id},
+            {"file_data": 0}  # Exclude file data for performance
+        ).sort("uploaded_at", -1))
+        
+        # Clean up response
+        for doc in documents:
+            doc.pop('_id', None)
+            if isinstance(doc.get("uploaded_at"), datetime):
+                doc["uploaded_at"] = doc["uploaded_at"].isoformat()
+        
+        return {
+            "documents": documents,
+            "total_documents": len(documents)
+        }
+        
+    except Exception as e:
+        print(f"Error getting KYC documents: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get KYC documents")
+
+# ==================== FARMER DASHBOARD ENDPOINTS ====================
+
+@app.post("/api/farmer/farmland")
+async def add_farmland_record(
+    farmland_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add farmland record (farmers only)"""
+    try:
+        if current_user.get("role") != "farmer":
+            raise HTTPException(status_code=403, detail="Only farmers can add farmland records")
+        
+        farmer_id = current_user["id"]
+        
+        # Validate required fields
+        required_fields = ["location", "size_hectares", "crop_types"]
+        for field in required_fields:
+            if not farmland_data.get(field):
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+        
+        farmland = {
+            "id": str(uuid.uuid4()),
+            "farmer_id": farmer_id,
+            "location": farmland_data["location"],
+            "size_hectares": float(farmland_data["size_hectares"]),
+            "crop_types": farmland_data["crop_types"],
+            "soil_type": farmland_data.get("soil_type"),
+            "irrigation_method": farmland_data.get("irrigation_method"),
+            "coordinates": farmland_data.get("coordinates"),
+            "created_at": datetime.utcnow(),
+            "updated_at": None
+        }
+        
+        farmland_records_collection.insert_one(farmland)
+        
+        # Log the action
+        log_audit_action(farmer_id, "farmland_added", "farmland", farmland["id"], {
+            "location": farmland_data["location"],
+            "size_hectares": farmland_data["size_hectares"]
+        })
+        
+        return {
+            "message": "Farmland record added successfully",
+            "farmland_id": farmland["id"],
+            "location": farmland_data["location"],
+            "size_hectares": farmland_data["size_hectares"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error adding farmland record: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add farmland record")
+
+@app.get("/api/farmer/farmland")
+async def get_farmer_farmland(current_user: dict = Depends(get_current_user)):
+    """Get farmer's farmland records"""
+    try:
+        if current_user.get("role") != "farmer":
+            raise HTTPException(status_code=403, detail="Only farmers can access farmland records")
+        
+        farmer_id = current_user["id"]
+        
+        farmlands = list(farmland_records_collection.find({"farmer_id": farmer_id}).sort("created_at", -1))
+        
+        # Clean up response
+        for farmland in farmlands:
+            farmland.pop('_id', None)
+            if isinstance(farmland.get("created_at"), datetime):
+                farmland["created_at"] = farmland["created_at"].isoformat()
+            if isinstance(farmland.get("updated_at"), datetime):
+                farmland["updated_at"] = farmland["updated_at"].isoformat()
+        
+        # Calculate summary statistics
+        total_hectares = sum(f.get("size_hectares", 0) for f in farmlands)
+        unique_crops = set()
+        for farmland in farmlands:
+            unique_crops.update(farmland.get("crop_types", []))
+        
+        return {
+            "farmlands": farmlands,
+            "summary": {
+                "total_farmlands": len(farmlands),
+                "total_hectares": total_hectares,
+                "unique_crop_types": len(unique_crops),
+                "crop_types": list(unique_crops)
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting farmland records: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get farmland records")
+
+@app.get("/api/farmer/dashboard")
+async def get_farmer_dashboard(current_user: dict = Depends(get_current_user)):
+    """Get comprehensive farmer dashboard data"""
+    try:
+        if current_user.get("role") != "farmer":
+            raise HTTPException(status_code=403, detail="Only farmers can access farmer dashboard")
+        
+        farmer_id = current_user["id"]
+        
+        # Get farmer's products
+        products = list(db.products.find({"seller_id": farmer_id}))
+        preorders = list(db.preorders.find({"seller_id": farmer_id}))
+        all_products = products + preorders
+        
+        # Get farmer's orders
+        product_ids = [p["id"] for p in all_products]
+        orders = list(db.orders.find({"product_details.product_id": {"$in": product_ids}}))
+        
+        # Get farmland data
+        farmlands = list(farmland_records_collection.find({"farmer_id": farmer_id}))
+        
+        # Calculate metrics
+        total_revenue = sum(order.get("total_amount", 0) for order in orders if order.get("status") in ["completed", "delivered"])
+        pending_orders = len([o for o in orders if o.get("status") in ["pending", "confirmed"]])
+        total_hectares = sum(f.get("size_hectares", 0) for f in farmlands)
+        
+        # Recent activities (last 10 activities)
+        recent_orders = sorted(orders, key=lambda x: x.get("created_at", datetime.min), reverse=True)[:5]
+        
+        dashboard_data = {
+            "farmer_profile": {
+                "name": f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}".strip(),
+                "username": current_user["username"],
+                "kyc_status": current_user.get("kyc_status", "not_started"),
+                "average_rating": current_user.get("average_rating", 5.0),
+                "total_ratings": current_user.get("total_ratings", 0)
+            },
+            "business_metrics": {
+                "total_products": len(all_products),
+                "active_products": len([p for p in all_products if p.get("quantity_available", 0) > 0]),
+                "total_revenue": total_revenue,
+                "pending_orders": pending_orders,
+                "total_farmlands": len(farmlands),
+                "total_hectares": total_hectares
+            },
+            "recent_orders": [
+                {
+                    "order_id": order.get("order_id"),
+                    "buyer": order.get("buyer_username"),
+                    "product": order.get("product_details", {}).get("name"),
+                    "amount": order.get("total_amount"),
+                    "status": order.get("status"),
+                    "date": order.get("created_at").isoformat() if isinstance(order.get("created_at"), datetime) else None
+                }
+                for order in recent_orders
+            ]
+        }
+        
+        return dashboard_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting farmer dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get farmer dashboard")
+
+# ==================== AGENT DASHBOARD ENDPOINTS ====================
+
+@app.post("/api/agent/farmers/add")
+async def add_farmer_to_agent(
+    farmer_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add a farmer to agent's network"""
+    try:
+        if current_user.get("role") != "agent":
+            raise HTTPException(status_code=403, detail="Only agents can add farmers")
+        
+        agent_id = current_user["id"]
+        
+        # Validate required fields
+        required_fields = ["farmer_name", "farmer_location"]
+        for field in required_fields:
+            if not farmer_data.get(field):
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+        
+        # Check if farmer already exists in agent's network
+        existing = agent_farmers_collection.find_one({
+            "agent_id": agent_id,
+            "farmer_name": farmer_data["farmer_name"],
+            "farmer_location": farmer_data["farmer_location"]
+        })
+        
+        if existing:
+            raise HTTPException(status_code=400, detail="Farmer with this name and location already exists in your network")
+        
+        agent_farmer = {
+            "id": str(uuid.uuid4()),
+            "agent_id": agent_id,
+            "farmer_id": farmer_data.get("farmer_id"),  # Optional if farmer has account
+            "farmer_name": farmer_data["farmer_name"],
+            "farmer_phone": farmer_data.get("farmer_phone"),
+            "farmer_location": farmer_data["farmer_location"],
+            "linked_at": datetime.utcnow(),
+            "is_active": True,
+            "total_listings": 0,
+            "total_sales": 0.0
+        }
+        
+        agent_farmers_collection.insert_one(agent_farmer)
+        
+        # Log the action
+        log_audit_action(agent_id, "farmer_added", "agent_farmer", agent_farmer["id"], {
+            "farmer_name": farmer_data["farmer_name"],
+            "farmer_location": farmer_data["farmer_location"]
+        })
+        
+        return {
+            "message": "Farmer added to your network successfully",
+            "farmer_id": agent_farmer["id"],
+            "farmer_name": farmer_data["farmer_name"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error adding farmer to agent: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add farmer")
+
+@app.get("/api/agent/farmers")
+async def get_agent_farmers(current_user: dict = Depends(get_current_user)):
+    """Get all farmers in agent's network"""
+    try:
+        if current_user.get("role") != "agent":
+            raise HTTPException(status_code=403, detail="Only agents can access farmer network")
+        
+        agent_id = current_user["id"]
+        
+        farmers = list(agent_farmers_collection.find({"agent_id": agent_id}).sort("linked_at", -1))
+        
+        # Clean up response
+        for farmer in farmers:
+            farmer.pop('_id', None)
+            if isinstance(farmer.get("linked_at"), datetime):
+                farmer["linked_at"] = farmer["linked_at"].isoformat()
+        
+        # Calculate summary
+        active_farmers = [f for f in farmers if f.get("is_active")]
+        total_sales = sum(f.get("total_sales", 0) for f in farmers)
+        total_listings = sum(f.get("total_listings", 0) for f in farmers)
+        
+        return {
+            "farmers": farmers,
+            "summary": {
+                "total_farmers": len(farmers),
+                "active_farmers": len(active_farmers),
+                "total_sales": total_sales,
+                "total_listings": total_listings
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting agent farmers: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get farmers")
+
+@app.get("/api/agent/dashboard")
+async def get_agent_dashboard(current_user: dict = Depends(get_current_user)):
+    """Get comprehensive agent dashboard data"""
+    try:
+        if current_user.get("role") != "agent":
+            raise HTTPException(status_code=403, detail="Only agents can access agent dashboard")
+        
+        agent_id = current_user["id"]
+        
+        # Get agent's farmers
+        farmers = list(agent_farmers_collection.find({"agent_id": agent_id}))
+        
+        # Get agent's products (both own and for farmers)
+        products = list(db.products.find({"$or": [
+            {"seller_id": agent_id},
+            {"agent_id": agent_id}
+        ]}))
+        preorders = list(db.preorders.find({"$or": [
+            {"seller_id": agent_id},
+            {"agent_id": agent_id}
+        ]}))
+        all_products = products + preorders
+        
+        # Get orders
+        product_ids = [p["id"] for p in all_products]
+        orders = list(db.orders.find({"product_details.product_id": {"$in": product_ids}}))
+        
+        # Calculate metrics
+        total_revenue = sum(order.get("total_amount", 0) for order in orders if order.get("status") in ["completed", "delivered"])
+        agent_commission = total_revenue * 0.05  # 5% commission
+        pending_orders = len([o for o in orders if o.get("status") in ["pending", "confirmed"]])
+        
+        # Performance metrics
+        active_farmers = [f for f in farmers if f.get("is_active")]
+        top_farmers = sorted(farmers, key=lambda x: x.get("total_sales", 0), reverse=True)[:5]
+        
+        dashboard_data = {
+            "agent_profile": {
+                "name": f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}".strip(),
+                "username": current_user["username"],
+                "kyc_status": current_user.get("kyc_status", "not_started"),
+                "average_rating": current_user.get("average_rating", 5.0),
+                "total_ratings": current_user.get("total_ratings", 0)
+            },
+            "business_metrics": {
+                "total_farmers": len(farmers),
+                "active_farmers": len(active_farmers),
+                "total_products": len(all_products),
+                "active_products": len([p for p in all_products if p.get("quantity_available", 0) > 0]),
+                "total_revenue": total_revenue,
+                "agent_commission": agent_commission,
+                "pending_orders": pending_orders
+            },
+            "top_farmers": [
+                {
+                    "name": farmer.get("farmer_name"),
+                    "location": farmer.get("farmer_location"),
+                    "total_sales": farmer.get("total_sales", 0),
+                    "total_listings": farmer.get("total_listings", 0),
+                    "linked_date": farmer.get("linked_at").isoformat() if isinstance(farmer.get("linked_at"), datetime) else None
+                }
+                for farmer in top_farmers
+            ]
+        }
+        
+        return dashboard_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting agent dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get agent dashboard")
+
+# ==================== AUDIT LOG SYSTEM ====================
+
+def log_audit_action(user_id: str, action: str, resource_type: str, resource_id: str = None, details: dict = None, request = None):
+    """Log audit action"""
+    try:
+        audit_log = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "action": action,
+            "resource_type": resource_type,
+            "resource_id": resource_id,
+            "details": details or {},
+            "ip_address": None,  # Would extract from request in production
+            "user_agent": None,  # Would extract from request in production
+            "timestamp": datetime.utcnow()
+        }
+        
+        audit_logs_collection.insert_one(audit_log)
+    except Exception as e:
+        print(f"Error logging audit action: {str(e)}")
+        # Don't raise exception as this shouldn't break main functionality
+
+@app.get("/api/admin/audit-logs")
+async def get_audit_logs(
+    user_id: Optional[str] = None,
+    action: Optional[str] = None,
+    days: int = 30,
+    page: int = 1,
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get audit logs (admin only)"""
+    try:
+        # In production, check for admin role
+        # if current_user.get("role") not in ["admin", "super_admin"]:
+        #     raise HTTPException(status_code=403, detail="Admin access required")
+        
+        # Build query
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+        if action:
+            query["action"] = action
+        
+        # Date range
+        if days:
+            start_date = datetime.utcnow() - timedelta(days=days)
+            query["timestamp"] = {"$gte": start_date}
+        
+        # Get total count
+        total_count = audit_logs_collection.count_documents(query)
+        
+        # Get logs with pagination
+        skip = (page - 1) * limit
+        logs = list(audit_logs_collection.find(query)
+                   .sort("timestamp", -1)
+                   .skip(skip)
+                   .limit(limit))
+        
+        # Clean up response
+        for log in logs:
+            log.pop('_id', None)
+            if isinstance(log.get("timestamp"), datetime):
+                log["timestamp"] = log["timestamp"].isoformat()
+        
+        return {
+            "logs": logs,
+            "pagination": {
+                "total_count": total_count,
+                "page": page,
+                "limit": limit,
+                "total_pages": (total_count + limit - 1) // limit if total_count > 0 else 0
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting audit logs: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get audit logs")
+
 # ==================== CATEGORY AND BUSINESS MANAGEMENT ENDPOINTS ====================
 
 @app.get("/api/categories/business")
