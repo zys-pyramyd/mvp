@@ -413,8 +413,15 @@ function App() {
     // Load wallet data for authenticated users
     if (user) {
       fetchWalletSummary();
+      fetchKYCStatus();
     }
   }, [user]);
+
+  // Load categories on app initialization
+  useEffect(() => {
+    fetchBusinessCategories();
+    fetchProductCategories();
+  }, []);
 
   const fetchUserProfile = async (token) => {
     try {
