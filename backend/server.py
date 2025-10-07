@@ -4067,6 +4067,283 @@ async def verify_transaction_pin(
         print(f"Error verifying PIN: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to verify PIN")
 
+# ==================== CATEGORY AND BUSINESS MANAGEMENT ENDPOINTS ====================
+
+@app.get("/api/categories/business")
+async def get_business_categories():
+    """Get all available business categories"""
+    try:
+        categories = {}
+        
+        # Food servicing subcategories
+        categories["food_servicing"] = {
+            "name": "Food Servicing",
+            "description": "Hotels, restaurants, cafes and food service businesses",
+            "subcategories": ["hotels", "restaurants", "cafes", "catering", "food_trucks"]
+        }
+        
+        categories["food_processor"] = {
+            "name": "Food Processor", 
+            "description": "Food processing and manufacturing businesses",
+            "subcategories": ["grain_processing", "meat_processing", "dairy_processing", "beverage_production", "packaging"]
+        }
+        
+        categories["farm_input"] = {
+            "name": "Farm Input",
+            "description": "Suppliers of fertilizers, herbicides, seeds and farming materials",
+            "subcategories": ["fertilizers", "herbicides", "seeds", "farming_equipment", "irrigation"]
+        }
+        
+        categories["fintech"] = {
+            "name": "Fintech",
+            "description": "Financial technology and services",
+            "subcategories": ["payments", "lending", "insurance", "digital_banking", "cryptocurrency"]
+        }
+        
+        categories["agriculture"] = {
+            "name": "Agriculture",
+            "description": "Agricultural production and related services",
+            "subcategories": ["crop_farming", "livestock", "aquaculture", "agricultural_consulting", "farm_management"]
+        }
+        
+        categories["supplier"] = {
+            "name": "Supplier",
+            "description": "Wholesalers and retailers",
+            "subcategories": ["wholesale", "retail", "distribution", "import_export", "marketplace"]
+        }
+        
+        categories["others"] = {
+            "name": "Others",
+            "description": "Other business types not listed above",
+            "subcategories": ["logistics", "technology", "consulting", "manufacturing", "services"]
+        }
+        
+        return {
+            "categories": categories,
+            "registration_statuses": ["registered", "unregistered"]
+        }
+        
+    except Exception as e:
+        print(f"Error getting business categories: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get business categories")
+
+@app.get("/api/categories/products")
+async def get_product_categories():
+    """Get all available product categories and subcategories"""
+    try:
+        categories = {}
+        
+        # Farm Input
+        categories["farm_input"] = {
+            "name": "Farm Input",
+            "description": "Agricultural inputs and supplies",
+            "subcategories": {
+                "seeds": "Seeds for planting",
+                "seedlings": "Young plants for transplanting", 
+                "fertilizer": "Soil nutrients and fertilizers",
+                "herbicides": "Weed control chemicals",
+                "pesticides": "Pest control chemicals",
+                "farming_tools": "Agricultural tools and equipment"
+            }
+        }
+        
+        # Raw Food
+        categories["raw_food"] = {
+            "name": "Raw Food",
+            "description": "Unprocessed agricultural produce",
+            "subcategories": {
+                "rice": "All varieties of rice",
+                "grains": "Wheat, corn, millet, sorghum etc",
+                "tubers": "Yam, cassava, potato, sweet potato",
+                "fruits": "Fresh fruits",
+                "nuts": "Groundnuts, cashews, etc",
+                "legumes": "Beans, cowpeas, soybeans"
+            }
+        }
+        
+        # Packaged Food
+        categories["packaged_food"] = {
+            "name": "Packaged Food", 
+            "description": "Processed and packaged food products",
+            "subcategories": {
+                "packaged_rice": "Branded packaged rice",
+                "beans": "Packaged beans and legumes",
+                "pasta": "Spaghetti, noodles, pasta products",
+                "canned_food": "Canned and preserved foods",
+                "snacks": "Packaged snacks and confectionery", 
+                "beverages": "Drinks and beverage products",
+                "flour": "Processed flour products"
+            }
+        }
+        
+        # Fish & Meat
+        categories["fish_meat"] = {
+            "name": "Fish & Meat",
+            "description": "Fish, meat and protein products",
+            "subcategories": {
+                "fresh_fish": "Fresh fish and seafood",
+                "dried_fish": "Dried and smoked fish",
+                "frozen_fish": "Frozen fish products", 
+                "fresh_meat": "Fresh meat (beef, goat, etc)",
+                "processed_meat": "Processed meat products",
+                "poultry": "Chicken, turkey and poultry products"
+            }
+        }
+        
+        # Pepper & Vegetables
+        categories["pepper_vegetables"] = {
+            "name": "Pepper & Vegetables",
+            "description": "Peppers, vegetables and fresh produce",
+            "subcategories": {
+                "peppers": "All varieties of peppers",
+                "leafy_vegetables": "Spinach, lettuce, cabbage etc",
+                "root_vegetables": "Carrots, radish, turnips",
+                "onions_garlic": "Onions, garlic, ginger",
+                "tomatoes": "Fresh and cherry tomatoes", 
+                "herbs_spices": "Fresh herbs and spices"
+            }
+        }
+        
+        # Processing levels
+        processing_levels = {
+            "not_processed": "Raw, natural state - no processing",
+            "semi_processed": "Partially processed - cleaned, cut, or minimally processed",
+            "processed": "Fully processed - packaged, preserved, or manufactured"
+        }
+        
+        return {
+            "categories": categories,
+            "processing_levels": processing_levels
+        }
+        
+    except Exception as e:
+        print(f"Error getting product categories: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get product categories")
+
+@app.put("/api/users/business-profile")
+async def update_business_profile(
+    business_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update business profile information"""
+    try:
+        user_id = current_user["id"]
+        
+        # Validate business category
+        if business_data.get("business_category") not in [e.value for e in BusinessCategory]:
+            raise HTTPException(status_code=400, detail="Invalid business category")
+        
+        # Validate registration status
+        if business_data.get("business_registration_status") not in [e.value for e in BusinessRegistrationStatus]:
+            raise HTTPException(status_code=400, detail="Invalid business registration status")
+        
+        # Build update data
+        update_data = {
+            "business_category": business_data.get("business_category"),
+            "business_registration_status": business_data.get("business_registration_status"),
+            "business_name": business_data.get("business_name", "").strip() or None,
+            "business_description": business_data.get("business_description", "").strip() or None,
+            "other_business_category": business_data.get("other_business_category", "").strip() or None,
+            "updated_at": datetime.utcnow()
+        }
+        
+        # Validate "others" category
+        if business_data.get("business_category") == "others" and not business_data.get("other_business_category"):
+            raise HTTPException(status_code=400, detail="Please specify your business type when selecting 'Others'")
+        
+        # Update user record
+        users_collection.update_one(
+            {"id": user_id},
+            {"$set": update_data}
+        )
+        
+        return {
+            "message": "Business profile updated successfully",
+            "business_category": business_data.get("business_category"),
+            "business_name": business_data.get("business_name")
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating business profile: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update business profile")
+
+@app.post("/api/users/kyc/submit")
+async def submit_kyc(
+    kyc_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Submit KYC information for verification"""
+    try:
+        user_id = current_user["id"]
+        user_role = current_user.get("role")
+        
+        # Only non-personal accounts need KYC
+        if user_role == "personal":
+            raise HTTPException(status_code=400, detail="Personal accounts do not require KYC")
+        
+        # Validate required KYC fields based on role
+        required_fields = ["government_id", "proof_of_address", "phone_verification"]
+        
+        if user_role == "business":
+            required_fields.extend(["business_registration", "tax_identification"])
+        
+        missing_fields = [field for field in required_fields if not kyc_data.get(field)]
+        if missing_fields:
+            raise HTTPException(status_code=400, detail=f"Missing required KYC fields: {', '.join(missing_fields)}")
+        
+        # Update KYC status
+        update_data = {
+            "kyc_status": KYCStatus.PENDING,
+            "kyc_submitted_at": datetime.utcnow(),
+            "kyc_data": kyc_data,  # Store KYC documents/info
+            "updated_at": datetime.utcnow()
+        }
+        
+        users_collection.update_one(
+            {"id": user_id},
+            {"$set": update_data}
+        )
+        
+        return {
+            "message": "KYC submitted successfully",
+            "status": "pending",
+            "estimated_review_time": "2-5 business days"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error submitting KYC: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to submit KYC")
+
+@app.get("/api/users/kyc/status")
+async def get_kyc_status(current_user: dict = Depends(get_current_user)):
+    """Get current KYC status"""
+    try:
+        user_id = current_user["id"]
+        
+        user = users_collection.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        kyc_info = {
+            "status": user.get("kyc_status", "not_started"),
+            "submitted_at": user.get("kyc_submitted_at").isoformat() if user.get("kyc_submitted_at") else None,
+            "approved_at": user.get("kyc_approved_at").isoformat() if user.get("kyc_approved_at") else None,
+            "requires_kyc": user.get("role") != "personal",
+            "can_trade": user.get("role") == "personal" or user.get("kyc_status") == "approved"
+        }
+        
+        return kyc_info
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting KYC status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get KYC status")
+
 # ==================== ENHANCED SELLER DASHBOARD ENDPOINTS ====================
 
 @app.get("/api/seller/dashboard/analytics")
