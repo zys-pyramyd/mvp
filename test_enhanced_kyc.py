@@ -453,9 +453,15 @@ class EnhancedKYCTester:
         overall_success = nin_success and bvn_success and invalid_nin_success and invalid_bvn_success
         return overall_success
     
-    def test_farmer_farmland_management(self):
-        """Test farmer farmland management"""
+    def test_farmer_farmland_management(self, farmer_token, farmer_user_id):
+        """Test farmer farmland management with farmer user"""
         print("\n🚜 Testing Farmer Farmland Management...")
+        
+        # Switch to farmer token
+        original_token = self.token
+        original_user_id = self.user_id
+        self.token = farmer_token
+        self.user_id = farmer_user_id
         
         # Test 1: Add farmland record
         farmland_data = {
@@ -532,12 +538,22 @@ class EnhancedKYCTester:
             self.log_test("Add Farmland - Missing Fields", False, f"Should return 400 error: {response}")
             validation_success = False
         
+        # Restore original token
+        self.token = original_token
+        self.user_id = original_user_id
+        
         overall_success = add_success and add_second_success and get_success and validation_success
         return overall_success
     
-    def test_farmer_dashboard(self):
-        """Test farmer dashboard data retrieval"""
+    def test_farmer_dashboard(self, farmer_token, farmer_user_id):
+        """Test farmer dashboard data retrieval with farmer user"""
         print("\n📊 Testing Farmer Dashboard...")
+        
+        # Switch to farmer token
+        original_token = self.token
+        original_user_id = self.user_id
+        self.token = farmer_token
+        self.user_id = farmer_user_id
         
         # Test farmer dashboard
         success, response = self.make_request('GET', '/api/farmer/dashboard', use_auth=True)
@@ -563,13 +579,19 @@ class EnhancedKYCTester:
             if profile_valid and metrics_valid:
                 self.log_test("Farmer Dashboard", True, 
                              f"Dashboard loaded: {business_metrics['total_farmlands']} farmlands, {business_metrics['total_hectares']} hectares")
-                return True
+                result = True
             else:
                 self.log_test("Farmer Dashboard", False, f"Missing required fields in dashboard data")
-                return False
+                result = False
         else:
             self.log_test("Farmer Dashboard", False, f"Dashboard retrieval failed: {response}")
-            return False
+            result = False
+        
+        # Restore original token
+        self.token = original_token
+        self.user_id = original_user_id
+        
+        return result
     
     def test_agent_farmer_management(self):
         """Test agent farmer network management"""
