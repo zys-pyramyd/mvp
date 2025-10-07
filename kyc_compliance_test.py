@@ -160,8 +160,8 @@ class KYCComplianceTester:
         # Test 1: Create non-KYC compliant farmer user and try to create product (should fail)
         farmer_success, farmer_token = self.create_user_with_role("farmer")
         
-        if not business_success:
-            self.log_test("Product Creation KYC - Business User Setup", False, "Failed to create business user")
+        if not farmer_success:
+            self.log_test("Product Creation KYC - Farmer User Setup", False, "Failed to create farmer user")
             return False
         
         product_data = {
@@ -180,16 +180,16 @@ class KYCComplianceTester:
             "platform": "pyhub"
         }
 
-        success, response = self.make_request('POST', '/api/products', product_data, 403, use_auth=True, token=business_token)
+        success, response = self.make_request('POST', '/api/products', product_data, 403, use_auth=True, token=farmer_token)
         
         if success and response.get('detail', {}).get('error') == 'KYC_REQUIRED':
-            self.log_test("Product Creation KYC - Non-KYC Business User", True, 
+            self.log_test("Product Creation KYC - Non-KYC Farmer User", True, 
                          f"Correctly blocked with KYC_REQUIRED: {response.get('detail', {}).get('message')}")
-            business_test_success = True
+            farmer_test_success = True
         else:
-            self.log_test("Product Creation KYC - Non-KYC Business User", False, 
+            self.log_test("Product Creation KYC - Non-KYC Farmer User", False, 
                          f"Expected KYC_REQUIRED error, got: {response}")
-            business_test_success = False
+            farmer_test_success = False
 
         # Test 2: Create personal user and try to create product (should work or fail for role reasons, not KYC)
         personal_success, personal_token = self.create_user_with_role("personal")
