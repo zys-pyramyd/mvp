@@ -535,7 +535,10 @@ class Product(BaseModel):
     seller_name: str
     title: str
     description: str
+    # Enhanced category structure
     category: ProductCategory
+    subcategory: Optional[str] = None  # Dynamic based on category
+    processing_level: ProcessingLevel = ProcessingLevel.NOT_PROCESSED
     price_per_unit: float
     unit_of_measure: str  # kg, basket, crate, bag, gallon, etc.
     unit_specification: Optional[str] = None  # "100kg", "big", "5 litres", etc.
