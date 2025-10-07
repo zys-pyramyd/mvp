@@ -49,6 +49,11 @@ wallet_transactions_collection = db.wallet_transactions
 bank_accounts_collection = db.bank_accounts
 gift_cards_collection = db.gift_cards
 wallet_security_collection = db.wallet_security
+# Enhanced KYC collections
+kyc_documents_collection = db.kyc_documents
+farmland_records_collection = db.farmland_records
+agent_farmers_collection = db.agent_farmers
+audit_logs_collection = db.audit_logs
 
 # Security
 security = HTTPBearer()
