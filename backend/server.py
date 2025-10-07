@@ -346,17 +346,7 @@ class PreOrderStatus(str, Enum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
-class ProductCategory(str, Enum):
-    SEA_FOOD = "sea_food"
-    GRAIN = "grain"
-    LEGUMES = "legumes"
-    VEGETABLES = "vegetables"
-    SPICES = "spices"
-    CASH_CROP = "cash_crop"
-    FERTILIZER = "fertilizer"
-    HERBICIDES = "herbicides"
-    PESTICIDES = "pesticides"
-    SEEDS = "seeds"
+# Old ProductCategory enum removed - using new structure above
     FISH = "fish"
     MEAT = "meat"
     PACKAGED_GOODS = "packaged_goods"
