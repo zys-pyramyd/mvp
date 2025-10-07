@@ -102,6 +102,13 @@ function App() {
   const [showCreateGiftCard, setShowCreateGiftCard] = useState(false);
   const [showRedeemGiftCard, setShowRedeemGiftCard] = useState(false);
   const [giftCardDetails, setGiftCardDetails] = useState(null);
+
+  // Categories and business profile state
+  const [businessCategories, setBusinessCategories] = useState({});
+  const [productCategories, setProductCategories] = useState({});
+  const [showBusinessProfile, setShowBusinessProfile] = useState(false);
+  const [showKYCPrompt, setShowKYCPrompt] = useState(false);
+  const [kycStatus, setKycStatus] = useState(null);
   
   // Product Detail Page state
   const [showProductDetail, setShowProductDetail] = useState(false);
