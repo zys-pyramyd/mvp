@@ -5985,6 +5985,10 @@ class PyramydAPITester:
         print("\n📊 Testing Enhanced Seller Dashboard System (PRIORITY)...")
         self.test_enhanced_seller_dashboard_complete()
 
+        # ENHANCED KYC SYSTEM & USER DASHBOARDS TESTS - Main focus from current review request
+        print("\n🔐 Testing Enhanced KYC System & User Dashboards (PRIORITY)...")
+        self.test_enhanced_kyc_system_complete()
+
         return True
 
     def print_summary(self):
