@@ -157,8 +157,8 @@ class KYCComplianceTester:
         """Test Product Creation KYC Validation (/api/products POST)"""
         print("\n📦 Testing Product Creation KYC Validation...")
         
-        # Test 1: Create non-KYC compliant business user and try to create product (should fail)
-        business_success, business_token = self.create_user_with_role("business", "agriculture")
+        # Test 1: Create non-KYC compliant farmer user and try to create product (should fail)
+        farmer_success, farmer_token = self.create_user_with_role("farmer")
         
         if not business_success:
             self.log_test("Product Creation KYC - Business User Setup", False, "Failed to create business user")
