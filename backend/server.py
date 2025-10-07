@@ -1958,6 +1958,9 @@ async def get_messages(
 async def create_preorder(preorder_data: PreOrderCreate, current_user: dict = Depends(get_current_user)):
     """Create a new pre-order"""
     try:
+        # KYC Compliance Check for Pre-order Creation
+        validate_kyc_compliance(current_user, "post_products")
+        
         # Validate user can create pre-orders (farmers, suppliers, processors, agents)
         allowed_roles = ['farmer', 'supplier', 'processor', 'agent']
         if current_user.get('role') not in allowed_roles:
