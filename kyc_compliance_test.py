@@ -219,6 +219,13 @@ class KYCComplianceTester:
         """Test Order Creation KYC Validation (/api/orders/create POST)"""
         print("\n🛒 Testing Order Creation KYC Validation...")
         
+        # Create a user for authentication
+        personal_success, personal_token = self.create_user_with_role("personal")
+        
+        if not personal_success:
+            self.log_test("Order Creation KYC - User Setup", False, "Failed to create user for testing")
+            return False
+        
         # Test the endpoint exists and handles non-existent products
         order_data = {
             "product_id": "non-existent-product-id",
@@ -228,7 +235,7 @@ class KYCComplianceTester:
             "delivery_method": "platform"
         }
 
-        success, response = self.make_request('POST', '/api/orders/create', order_data, 404, use_auth=True)
+        success, response = self.make_request('POST', '/api/orders/create', order_data, 404, use_auth=True, token=personal_token)
         
         if success:
             self.log_test("Order Creation KYC - Endpoint Validation", True, 
