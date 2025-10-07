@@ -305,8 +305,14 @@ class KYCComplianceTester:
         """Test Pre-order Creation KYC Validation (/api/preorders/create POST)"""
         print("\n📋 Testing Pre-order Creation KYC Validation...")
         
-        # Create non-KYC compliant farmer user
-        farmer_success, farmer_token = self.create_user_with_role("farmer")
+        # Use existing farmer token from previous test if available, otherwise create new user
+        if hasattr(self, '_farmer_token'):
+            farmer_token = self._farmer_token
+            farmer_success = True
+        else:
+            farmer_success, farmer_token = self.create_user_with_role("farmer")
+            if farmer_success:
+                self._farmer_token = farmer_token
         
         if not farmer_success:
             self.log_test("Pre-order Creation KYC - Farmer User Setup", False, "Failed to create farmer user")
