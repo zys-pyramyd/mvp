@@ -2068,7 +2068,11 @@ function App() {
       
     } catch (error) {
       console.error('Error creating orders:', error);
-      alert(`Error creating orders: ${error.message}`);
+      
+      // Don't show generic error if it was already a KYC error
+      if (!error.message.includes('KYC')) {
+        alert(`Error creating orders: ${error.message}`);
+      }
       return null;
     }
   };
