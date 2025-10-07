@@ -2522,6 +2522,46 @@ function App() {
                         🔍 Find Drivers
                       </button>
 
+                      {/* Farmer Dashboard */}
+                      {user.role === 'farmer' && (
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setShowFarmerDashboard(true);
+                            fetchFarmerDashboard();
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-50 font-medium"
+                        >
+                          🌾 Farmer Dashboard
+                        </button>
+                      )}
+
+                      {/* Agent Dashboard */}
+                      {user.role === 'agent' && (
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setShowAgentDashboard(true);
+                            fetchAgentDashboard();
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-50 font-medium"
+                        >
+                          🤝 Agent Dashboard
+                        </button>
+                      )}
+
+                      {/* Market Prices */}
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          setShowMarketChart(true);
+                          fetchMarketPrices();
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-50 font-medium"
+                      >
+                        📈 Market Prices
+                      </button>
+
                       {/* Driver Portal Access (for drivers) */}
                       {user.role === 'driver' && (
                         <button
