@@ -816,29 +816,48 @@ class EnhancedKYCTester:
         print(f"🌐 Testing against: {self.base_url}")
         print("=" * 80)
 
-        # Setup authentication
+        # Setup authentication with main user
         if not self.setup_authentication():
             print("❌ Authentication failed - stopping tests")
             return False
 
-        # Test 1: KYC Document Upload System
+        # Create test users with appropriate roles
+        farmer_token, farmer_user_id = self.create_farmer_user()
+        agent_token, agent_user_id = self.create_agent_user()
+        business_token, business_user_id = self.create_business_user()
+
+        # Test 1: KYC Document Upload System (with main user)
         upload_success, doc_ids = self.test_kyc_document_upload()
         
-        # Test 2: KYC Documents Retrieval
+        # Test 2: KYC Documents Retrieval (with main user)
         retrieval_success = self.test_kyc_documents_retrieval()
         
-        # Test 3: Unregistered Entity KYC Submission
-        unregistered_kyc_success = self.test_unregistered_entity_kyc_submission()
+        # Test 3: Unregistered Entity KYC Submission (with farmer user)
+        if farmer_token:
+            unregistered_kyc_success = self.test_unregistered_entity_kyc_submission(farmer_token, farmer_user_id)
+        else:
+            print("⚠️ Skipping Unregistered Entity KYC tests - farmer user creation failed")
+            unregistered_kyc_success = False
         
-        # Test 4: Farmer Dashboard System
-        farmer_farmland_success = self.test_farmer_farmland_management()
-        farmer_dashboard_success = self.test_farmer_dashboard()
+        # Test 4: Farmer Dashboard System (with farmer user)
+        if farmer_token:
+            farmer_farmland_success = self.test_farmer_farmland_management(farmer_token, farmer_user_id)
+            farmer_dashboard_success = self.test_farmer_dashboard(farmer_token, farmer_user_id)
+        else:
+            print("⚠️ Skipping Farmer Dashboard tests - farmer user creation failed")
+            farmer_farmland_success = False
+            farmer_dashboard_success = False
         
-        # Test 5: Agent Dashboard System
-        agent_farmer_success = self.test_agent_farmer_management()
-        agent_dashboard_success = self.test_agent_dashboard()
+        # Test 5: Agent Dashboard System (with agent user)
+        if agent_token:
+            agent_farmer_success = self.test_agent_farmer_management(agent_token, agent_user_id)
+            agent_dashboard_success = self.test_agent_dashboard(agent_token, agent_user_id)
+        else:
+            print("⚠️ Skipping Agent Dashboard tests - agent user creation failed")
+            agent_farmer_success = False
+            agent_dashboard_success = False
         
-        # Test 6: Audit Log System
+        # Test 6: Audit Log System (with main user)
         audit_logs_success = self.test_audit_logs()
 
         # Print final results
