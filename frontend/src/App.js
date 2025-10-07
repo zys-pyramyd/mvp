@@ -3081,6 +3081,82 @@ function App() {
           </div>
         </div>
 
+        {/* Enhanced Category Navigation & Filters */}
+        <div className="mb-6 space-y-4">
+          {/* Location Filter */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-medium text-gray-700">📍 Location:</span>
+              <select
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="">All Locations</option>
+                {availableLocations.map(location => (
+                  <option key={location} value={location}>{location}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Enhanced Category Navigation */}
+          <div className="relative">
+            <div className="flex items-center">
+              {/* Left Scroll Button */}
+              <button
+                onClick={() => scrollCategories('left')}
+                className="hidden md:flex items-center justify-center w-10 h-10 bg-white shadow-md rounded-full border hover:bg-gray-50 transition-colors mr-2 z-10"
+              >
+                <span className="text-gray-600">←</span>
+              </button>
+
+              {/* Categories Container */}
+              <div 
+                id="categories-container"
+                className="flex overflow-x-auto space-x-3 scrollbar-hide flex-1 py-2"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                {Object.entries(productCategories).map(([key, category]) => (
+                  <div
+                    key={key}
+                    className="flex-shrink-0 bg-white border border-gray-200 rounded-lg p-3 hover:border-emerald-300 transition-colors cursor-pointer min-w-[120px]"
+                    onClick={() => {
+                      // Filter products by category
+                      const filtered = products.filter(p => p.category === key);
+                      // You could implement category filtering here
+                    }}
+                  >
+                    <div className="text-center">
+                      <div className="text-2xl mb-1">
+                        {key === 'farm_input' ? '🌱' :
+                         key === 'raw_food' ? '🌾' :
+                         key === 'packaged_food' ? '📦' :
+                         key === 'fish_meat' ? '🐟' :
+                         key === 'pepper_vegetables' ? '🌶️' : '📦'}
+                      </div>
+                      <div className="text-xs font-medium text-gray-700">{category.name}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Right Scroll Button */}
+              <button
+                onClick={() => scrollCategories('right')}
+                className="hidden md:flex items-center justify-center w-10 h-10 bg-white shadow-md rounded-full border hover:bg-gray-50 transition-colors ml-2 z-10"
+              >
+                <span className="text-gray-600">→</span>
+              </button>
+            </div>
+
+            {/* Mobile Swipe Hint */}
+            <div className="md:hidden text-center text-xs text-gray-500 mt-2">
+              👆 Swipe to see more categories
+            </div>
+          </div>
+        </div>
+
         {/* Products Grid - Responsive */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 auto-rows-auto items-start">{/* Made responsive and reduced gap for mobile */}
           {products.length === 0 ? (
