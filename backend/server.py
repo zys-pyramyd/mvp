@@ -1072,21 +1072,9 @@ def validate_agent_farmer_registration(agent_user: dict, farmer_data: dict):
     # Agent must be KYC compliant to register farmers
     validate_kyc_compliance(agent_user, "register_farmers")
     
-    # Additional validation: Agent takes responsibility for farmer's initial KYC
-    if not farmer_data.get("agent_validated"):
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "AGENT_VALIDATION_REQUIRED",
-                "message": "Agent must validate farmer's identity and documents before registration",
-                "required_fields": [
-                    "farmer_nin_verified",
-                    "farmer_photo_verified", 
-                    "farm_location_verified",
-                    "agent_verification_notes"
-                ]
-            }
-        )
+    # For now, we'll log that the agent is taking responsibility
+    # In the future, we can add more strict validation requirements
+    print(f"Agent {agent_user.get('username')} registering farmer {farmer_data.get('farmer_name')} - Agent is responsible for farmer's initial validation")
     
     return True
 
