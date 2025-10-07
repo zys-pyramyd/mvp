@@ -93,6 +93,97 @@ class EnhancedKYCTester:
             self.log_test("Authentication Setup", False, f"Login failed: {response}")
             return False
 
+    def create_farmer_user(self):
+        """Create a farmer user for testing"""
+        print("🚜 Creating farmer user for testing...")
+        
+        farmer_data = {
+            "first_name": "Test",
+            "last_name": "Farmer",
+            "username": f"testfarmer_kyc_{datetime.now().strftime('%H%M%S')}",
+            "email_or_phone": f"testfarmer_kyc_{datetime.now().strftime('%H%M%S')}@test.com",
+            "phone": "+2348012345678",
+            "password": "password123",
+            "gender": "male",
+            "date_of_birth": "1990-01-01",
+            "user_path": "partner",
+            "partner_type": "farmer",
+            "business_info": {
+                "farm_name": "Test KYC Farm",
+                "location": "Lagos, Nigeria"
+            }
+        }
+        
+        success, response = self.make_request('POST', '/api/auth/complete-registration', farmer_data, 200)
+        
+        if success and 'token' in response and 'user' in response:
+            self.log_test("Create Farmer User", True)
+            return response['token'], response['user']['id']
+        else:
+            self.log_test("Create Farmer User", False, f"Farmer creation failed: {response}")
+            return None, None
+
+    def create_agent_user(self):
+        """Create an agent user for testing"""
+        print("🤝 Creating agent user for testing...")
+        
+        agent_data = {
+            "first_name": "Test",
+            "last_name": "Agent",
+            "username": f"testagent_kyc_{datetime.now().strftime('%H%M%S')}",
+            "email_or_phone": f"testagent_kyc_{datetime.now().strftime('%H%M%S')}@test.com",
+            "phone": "+2348087654321",
+            "password": "password123",
+            "gender": "female",
+            "date_of_birth": "1985-01-01",
+            "user_path": "partner",
+            "partner_type": "agent",
+            "business_info": {
+                "business_name": "Test KYC Agency",
+                "location": "Abuja, Nigeria"
+            }
+        }
+        
+        success, response = self.make_request('POST', '/api/auth/complete-registration', agent_data, 200)
+        
+        if success and 'token' in response and 'user' in response:
+            self.log_test("Create Agent User", True)
+            return response['token'], response['user']['id']
+        else:
+            self.log_test("Create Agent User", False, f"Agent creation failed: {response}")
+            return None, None
+
+    def create_business_user(self):
+        """Create a business user for testing"""
+        print("🏢 Creating business user for testing...")
+        
+        business_data = {
+            "first_name": "Test",
+            "last_name": "Business",
+            "username": f"testbusiness_kyc_{datetime.now().strftime('%H%M%S')}",
+            "email_or_phone": f"testbusiness_kyc_{datetime.now().strftime('%H%M%S')}@test.com",
+            "phone": "+2348098765432",
+            "password": "password123",
+            "gender": "male",
+            "date_of_birth": "1980-01-01",
+            "user_path": "partner",
+            "partner_type": "business",
+            "business_category": "processor",
+            "business_info": {
+                "business_name": "Test KYC Processing Ltd",
+                "location": "Lagos, Nigeria"
+            }
+        }
+        
+        success, response = self.make_request('POST', '/api/auth/complete-registration', business_data, 200)
+        
+        if success and 'token' in response and 'user' in response:
+            self.log_test("Create Business User", True)
+            return response['token'], response['user']['id']
+        else:
+            self.log_test("Create Business User", False, f"Business creation failed: {response}")
+            return None, None
+
     def test_kyc_document_upload(self):
         """Test KYC document upload functionality"""
         print("\n📄 Testing KYC Document Upload...")
