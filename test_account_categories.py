@@ -83,6 +83,18 @@ class AccountCategoriesAPITester:
             self.token = response['token']
             self.user_id = response['user']['id']
             self.log_test("Existing User Login", True)
+            
+            # Select role if needed
+            role_data = {
+                "role": "farmer",
+                "is_buyer": False
+            }
+            role_success, role_response = self.make_request('POST', '/api/auth/select-role', role_data, 200, use_auth=True)
+            if role_success:
+                self.log_test("Role Selection", True)
+            else:
+                self.log_test("Role Selection", False, f"Role selection failed: {role_response}")
+            
             return True
         else:
             self.log_test("Existing User Login", False, f"Login failed: {response}")
