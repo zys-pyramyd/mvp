@@ -3164,7 +3164,12 @@ function App() {
               <p className="text-gray-500 text-base sm:text-lg">No products found</p>
             </div>
           ) : (
-            products.map((product, index) => (
+            products
+              .filter(product => 
+                // Apply location filter
+                locationFilter === '' || product.location === locationFilter
+              )
+              .map((product, index) => (
               <div key={product.id || product._id || index} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex flex-col min-h-0">
                 {/* Product Image - Responsive */}
                 <div 
