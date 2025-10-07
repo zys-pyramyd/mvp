@@ -2278,6 +2278,38 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* KYC Notification Banner - Only for non-personal accounts who need KYC */}
+      {user && user.role !== 'personal' && kycStatus && kycStatus.status !== 'approved' && (
+        <div className={`${
+          kycStatus.status === 'not_started' 
+            ? 'bg-red-500' 
+            : kycStatus.status === 'pending'
+            ? 'bg-yellow-500'
+            : 'bg-red-500'
+        } text-white px-4 py-2 text-center text-sm`}>
+          <div className="max-w-7xl mx-auto flex items-center justify-center space-x-4">
+            <span>
+              {kycStatus.status === 'not_started' && '⚠️ Complete your KYC verification to start receiving payments'}
+              {kycStatus.status === 'pending' && '⏳ Your KYC is under review. You\'ll be able to receive payments once approved'}
+              {kycStatus.status === 'rejected' && '❌ Your KYC was rejected. Please resubmit with correct documents'}
+            </span>
+            {kycStatus.status !== 'pending' && (
+              <button
+                onClick={() => {
+                  // Navigate to KYC completion
+                  alert('KYC completion form will open here. This includes:\n\n' +
+                        'For Registered Businesses:\n- Business Registration Number\n- TIN Certificate\n- Certificate of Incorporation\n\n' +
+                        'For Others (Farmers/Agents/Unregistered):\n- NIN or BVN\n- Headshot photo (camera)\n- National ID upload\n- Utility bill');
+                }}
+                className="bg-white text-red-600 px-3 py-1 rounded text-xs font-medium hover:bg-gray-100 transition-colors"
+              >
+                Complete Now
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
