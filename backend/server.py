@@ -498,6 +498,16 @@ class User(BaseModel):
     role: Optional[UserRole] = None
     is_verified: bool = False
     wallet_balance: float = 0.0
+    # Business-related fields
+    business_category: Optional[BusinessCategory] = None
+    business_registration_status: Optional[BusinessRegistrationStatus] = None
+    business_name: Optional[str] = None
+    business_description: Optional[str] = None
+    other_business_category: Optional[str] = None  # If business_category is "others"
+    # KYC information
+    kyc_status: KYCStatus = KYCStatus.NOT_STARTED
+    kyc_submitted_at: Optional[datetime] = None
+    kyc_approved_at: Optional[datetime] = None
     # Rating information
     average_rating: float = 5.0  # Overall rating as seller/service provider
     total_ratings: int = 0  # Number of ratings received
