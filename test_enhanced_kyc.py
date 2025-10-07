@@ -354,15 +354,24 @@ class EnhancedKYCTester:
             self.log_test("KYC Documents Retrieval", False, f"Documents retrieval failed: {response}")
             return False
     
-    def test_unregistered_entity_kyc_submission(self):
-        """Test unregistered entity KYC submission"""
+    def test_unregistered_entity_kyc_submission(self, farmer_token, farmer_user_id):
+        """Test unregistered entity KYC submission with farmer user"""
         print("\n👤 Testing Unregistered Entity KYC Submission...")
+        
+        # Switch to farmer token
+        original_token = self.token
+        original_user_id = self.user_id
+        self.token = farmer_token
+        self.user_id = farmer_user_id
         
         # First upload required documents
         upload_success, doc_ids = self.test_kyc_document_upload()
         
         if not upload_success:
             self.log_test("Unregistered Entity KYC", False, "Cannot test without uploaded documents")
+            # Restore original token
+            self.token = original_token
+            self.user_id = original_user_id
             return False
         
         # Test 1: Valid unregistered entity KYC with NIN
@@ -436,6 +445,10 @@ class EnhancedKYCTester:
         else:
             self.log_test("Unregistered Entity KYC - Invalid BVN", False, f"Should return 400 error: {response}")
             invalid_bvn_success = False
+        
+        # Restore original token
+        self.token = original_token
+        self.user_id = original_user_id
         
         overall_success = nin_success and bvn_success and invalid_nin_success and invalid_bvn_success
         return overall_success
