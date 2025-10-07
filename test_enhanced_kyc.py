@@ -593,9 +593,15 @@ class EnhancedKYCTester:
         
         return result
     
-    def test_agent_farmer_management(self):
-        """Test agent farmer network management"""
+    def test_agent_farmer_management(self, agent_token, agent_user_id):
+        """Test agent farmer network management with agent user"""
         print("\n🤝 Testing Agent Farmer Management...")
+        
+        # Switch to agent token
+        original_token = self.token
+        original_user_id = self.user_id
+        self.token = agent_token
+        self.user_id = agent_user_id
         
         # Test 1: Add farmer to agent network
         farmer_data = {
@@ -676,13 +682,23 @@ class EnhancedKYCTester:
             self.log_test("Add Farmer - Missing Fields", False, f"Should return 400 error: {response}")
             validation_success = False
         
+        # Restore original token
+        self.token = original_token
+        self.user_id = original_user_id
+        
         overall_success = (add_success and add_second_success and duplicate_validation_success and 
                           get_success and validation_success)
         return overall_success
     
-    def test_agent_dashboard(self):
-        """Test agent dashboard data retrieval"""
+    def test_agent_dashboard(self, agent_token, agent_user_id):
+        """Test agent dashboard data retrieval with agent user"""
         print("\n📈 Testing Agent Dashboard...")
+        
+        # Switch to agent token
+        original_token = self.token
+        original_user_id = self.user_id
+        self.token = agent_token
+        self.user_id = agent_user_id
         
         # Test agent dashboard
         success, response = self.make_request('GET', '/api/agent/dashboard', use_auth=True)
@@ -708,13 +724,19 @@ class EnhancedKYCTester:
             if profile_valid and metrics_valid:
                 self.log_test("Agent Dashboard", True, 
                              f"Dashboard loaded: {business_metrics['total_farmers']} farmers, ₦{business_metrics['agent_commission']} commission")
-                return True
+                result = True
             else:
                 self.log_test("Agent Dashboard", False, f"Missing required fields in dashboard data")
-                return False
+                result = False
         else:
             self.log_test("Agent Dashboard", False, f"Dashboard retrieval failed: {response}")
-            return False
+            result = False
+        
+        # Restore original token
+        self.token = original_token
+        self.user_id = original_user_id
+        
+        return result
     
     def test_audit_logs(self):
         """Test audit log system"""
