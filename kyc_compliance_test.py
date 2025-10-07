@@ -191,32 +191,23 @@ class KYCComplianceTester:
                          f"Expected KYC_REQUIRED error, got: {response}")
             farmer_test_success = False
 
-        # Test 2: Create personal user and try to create product (should work or fail for role reasons, not KYC)
+        # Test 2: Create personal user and try to create product (should fail for role reasons, not KYC)
         personal_success, personal_token = self.create_user_with_role("personal")
         
         if not personal_success:
             self.log_test("Product Creation KYC - Personal User Setup", False, "Failed to create personal user")
             personal_test_success = False
         else:
-            success, response = self.make_request('POST', '/api/products', product_data, use_auth=True, token=personal_token)
+            success, response = self.make_request('POST', '/api/products', product_data, 403, use_auth=True, token=personal_token)
             
-            if response.get('status_code') == 200:
+            if success and "Not authorized to create products" in str(response.get('detail', '')):
                 self.log_test("Product Creation KYC - Personal User", True, 
-                             "Personal user can create products without KYC")
+                             "Personal user blocked for role reasons, not KYC (expected)")
                 personal_test_success = True
-            elif response.get('status_code') == 403:
-                if "Not authorized to create products" in str(response.get('detail', '')):
-                    self.log_test("Product Creation KYC - Personal User", True, 
-                                 "Personal user blocked for role reasons, not KYC (expected)")
-                    personal_test_success = True
-                elif response.get('detail', {}).get('error') == 'KYC_REQUIRED':
-                    self.log_test("Product Creation KYC - Personal User", False, 
-                                 "Personal user should not require KYC")
-                    personal_test_success = False
-                else:
-                    self.log_test("Product Creation KYC - Personal User", False, 
-                                 f"Unexpected 403 error: {response}")
-                    personal_test_success = False
+            elif success and response.get('detail', {}).get('error') == 'KYC_REQUIRED':
+                self.log_test("Product Creation KYC - Personal User", False, 
+                             "Personal user should not require KYC")
+                personal_test_success = False
             else:
                 self.log_test("Product Creation KYC - Personal User", False, 
                              f"Unexpected response: {response}")
