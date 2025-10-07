@@ -2987,6 +2987,12 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
         
+        # KYC Compliance Check for Sellers (when order is completed, seller receives payment)
+        # Note: We check the seller's KYC, not the buyer's
+        seller = users_collection.find_one({"id": product["seller_id"]})
+        if seller:
+            validate_kyc_compliance(seller, "collect_payments")
+        
         # Validate delivery method against supplier preferences
         if order_data.delivery_method == "dropoff":
             if not product.get("supports_dropoff_delivery", True):
