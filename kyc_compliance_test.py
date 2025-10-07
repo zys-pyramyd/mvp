@@ -76,7 +76,8 @@ class KYCComplianceTester:
 
     def create_user_with_role(self, role: str, business_category: str = None) -> tuple[bool, str]:
         """Create a user with specific role and return success status and token"""
-        timestamp = datetime.now().strftime("%H%M%S")
+        import random
+        timestamp = datetime.now().strftime("%H%M%S") + str(random.randint(1000, 9999))
         
         if role == "personal":
             user_data = {
