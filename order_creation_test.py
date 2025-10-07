@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 
 class OrderCreationTester:
-    def __init__(self, base_url: str = "https://7153c80b-e670-44f1-b4af-554c09ef9392.preview.emergentagent.com"):
+    def __init__(self, base_url: str = "https://cropchain-hub-1.preview.emergentagent.com"):
         self.base_url = base_url
         self.token = None
         self.user_id = None

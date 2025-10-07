@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 class EnhancedKYCTester:
-    def __init__(self, base_url: str = "https://farmbridge-2.preview.emergentagent.com"):
+    def __init__(self, base_url: str = "https://cropchain-hub-1.preview.emergentagent.com"):
         self.base_url = base_url
         self.token = None
         self.user_id = None
