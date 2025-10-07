@@ -969,6 +969,127 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+# KYC Compliance Validation Helper Functions
+def validate_kyc_compliance(user: dict, action: str = "general"):
+    """
+    Validate if user is KYC compliant for specific actions.
+    
+    Args:
+        user: User document from database
+        action: Type of action being performed (e.g., 'sales', 'register_farmers', 'post_products', 'collect_payments')
+    
+    Returns:
+        bool: True if compliant, raises HTTPException if not
+    """
+    # Personal accounts don't require KYC
+    if user.get("role") == "personal":
+        return True
+    
+    # Check if KYC is required and approved
+    kyc_status = user.get("kyc_status", "not_started")
+    
+    if kyc_status != "approved":
+        status_messages = {
+            "not_started": "Please complete your KYC verification to perform this action",
+            "pending": "Your KYC is under review. You can perform this action once approved",
+            "rejected": "Your KYC was rejected. Please resubmit with correct documents to continue"
+        }
+        
+        action_context = {
+            "sales": "receive payments or complete sales",
+            "register_farmers": "register farmers to your network",
+            "post_products": "post products for sale", 
+            "collect_payments": "collect payments from customers"
+        }
+        
+        context = action_context.get(action, "perform this action")
+        message = f"KYC verification required to {context}. {status_messages.get(kyc_status, 'KYC verification required')}"
+        
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "KYC_REQUIRED",
+                "message": message,
+                "kyc_status": kyc_status,
+                "required_actions": get_kyc_requirements(user)
+            }
+        )
+    
+    return True
+
+def get_kyc_requirements(user: dict) -> dict:
+    """Get specific KYC requirements based on user type"""
+    role = user.get("role", "")
+    business_category = user.get("business_category", "")
+    is_registered_business = user.get("is_registered_business", False)
+    
+    requirements = {
+        "registered_business": [
+            "Business Registration Number",
+            "TIN Certificate", 
+            "Certificate of Incorporation",
+            "Business Address Verification"
+        ],
+        "unregistered_entity": [
+            "NIN or BVN",
+            "Headshot Photo (Camera)",
+            "National ID Document",
+            "Utility Bill (Address Verification)"
+        ]
+    }
+    
+    if role == "business" and is_registered_business:
+        return {
+            "type": "registered_business",
+            "documents": requirements["registered_business"],
+            "endpoint": "/api/kyc/registered-business/submit"
+        }
+    else:
+        return {
+            "type": "unregistered_entity", 
+            "documents": requirements["unregistered_entity"],
+            "endpoint": "/api/kyc/unregistered-entity/submit"
+        }
+
+def validate_agent_farmer_registration(agent_user: dict, farmer_data: dict):
+    """
+    Validate that agents can register farmers and are responsible for their KYC.
+    
+    Args:
+        agent_user: Agent user document
+        farmer_data: Farmer registration data
+    
+    Returns:
+        bool: True if valid, raises HTTPException if not
+    """
+    # Only agents can register farmers
+    if agent_user.get("role") != "agent":
+        raise HTTPException(
+            status_code=403,
+            detail="Only verified agents can register farmers to the platform"
+        )
+    
+    # Agent must be KYC compliant to register farmers
+    validate_kyc_compliance(agent_user, "register_farmers")
+    
+    # Additional validation: Agent takes responsibility for farmer's initial KYC
+    if not farmer_data.get("agent_validated"):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "AGENT_VALIDATION_REQUIRED",
+                "message": "Agent must validate farmer's identity and documents before registration",
+                "required_fields": [
+                    "farmer_nin_verified",
+                    "farmer_photo_verified", 
+                    "farm_location_verified",
+                    "agent_verification_notes"
+                ]
+            }
+        )
+    
+    return True
+
 # API Routes
 @app.get("/api/health")
 async def health_check():
