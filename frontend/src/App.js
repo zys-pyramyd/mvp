@@ -2409,6 +2409,45 @@ function App() {
                       <div className="px-4 py-3 border-b border-gray-100">
                         <p className="text-sm font-medium text-gray-900">{user.first_name} {user.last_name}</p>
                         <p className="text-xs text-gray-500">{user.role?.replace('_', ' ').toUpperCase()}</p>
+                        
+                        {/* KYC Status Badge */}
+                        {user.role !== 'personal' && kycStatus && (
+                          <div className="mt-2">
+                            <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              kycStatus.status === 'approved' 
+                                ? 'bg-green-100 text-green-800' 
+                                : kycStatus.status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : kycStatus.status === 'rejected'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {kycStatus.status === 'approved' && '✅ KYC Verified'}
+                              {kycStatus.status === 'pending' && '⏳ KYC Pending'}
+                              {kycStatus.status === 'rejected' && '❌ KYC Rejected'}
+                              {kycStatus.status === 'not_started' && '⚠️ KYC Required'}
+                            </div>
+                            
+                            {/* Payment capability indicator */}
+                            <div className="text-xs text-gray-500 mt-1">
+                              {kycStatus.status === 'approved' 
+                                ? '✅ Can receive payments' 
+                                : '⚠️ Cannot receive payments'}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Personal account badge */}
+                        {user.role === 'personal' && (
+                          <div className="mt-2">
+                            <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              👤 Personal Account
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              ✅ Can purchase products
+                            </div>
+                          </div>
+                        )}
                       </div>
                       
                       <button
