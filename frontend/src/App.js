@@ -1072,7 +1072,7 @@ function App() {
         
         // Show KYC prompt for non-personal accounts that haven't completed KYC
         if (data.requires_kyc && data.status === 'not_started' && !showKYCPrompt) {
-          setTimeout(() => setShowKYCPrompt(true), 2000); // Show after 2 seconds
+          setTimeout(() => setShowKYCPrompt(true), 3000); // Show after 3 seconds
         }
         
         return data;
@@ -1081,6 +1081,119 @@ function App() {
       console.error('Error fetching KYC status:', error);
     }
     return null;
+  };
+
+  // Dashboard functions
+  const fetchFarmerDashboard = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/farmer/dashboard`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setFarmerDashboardData(data);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching farmer dashboard:', error);
+    }
+    return null;
+  };
+
+  const fetchAgentDashboard = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/agent/dashboard`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAgentDashboardData(data);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching agent dashboard:', error);
+    }
+    return null;
+  };
+
+  // Market price functions
+  const fetchMarketPrices = async () => {
+    try {
+      // Mock market price data - in production this would come from market data API
+      const mockMarketData = [
+        { product: 'Rice (50kg bag)', price: 35000, trend: '+5%', category: 'raw_food' },
+        { product: 'Beans (100kg bag)', price: 85000, trend: '+2%', category: 'raw_food' },
+        { product: 'Yam (100kg)', price: 45000, trend: '-3%', category: 'raw_food' },
+        { product: 'Tomatoes (big basket)', price: 8000, trend: '+8%', category: 'pepper_vegetables' },
+        { product: 'Onions (50kg bag)', price: 25000, trend: '+1%', category: 'pepper_vegetables' },
+        { product: 'Garri (50kg bag)', price: 32000, trend: '+4%', category: 'packaged_food' },
+        { product: 'Palm Oil (25L tin)', price: 22000, trend: '+6%', category: 'raw_food' },
+        { product: 'Fresh Fish (kg)', price: 2500, trend: '+3%', category: 'fish_meat' }
+      ];
+      
+      setMarketPrices(mockMarketData);
+      return mockMarketData;
+    } catch (error) {
+      console.error('Error fetching market prices:', error);
+    }
+    return [];
+  };
+
+  // Location functions
+  const fetchAvailableLocations = async () => {
+    try {
+      // Extract unique locations from products
+      const productLocations = [...new Set(products.map(p => p.location))];
+      setAvailableLocations(productLocations);
+      return productLocations;
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+    }
+    return [];
+  };
+
+  // Bulk listings for Buy from Farm
+  const fetchBulkListings = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/products`);
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Filter for bulk listings by farmers and agents
+        const bulk = data.products.filter(product => 
+          (product.listed_by_agent || product.seller_name?.toLowerCase().includes('farmer') || 
+           product.farm_name) && product.minimum_order_quantity >= 10
+        );
+        
+        setBulkListings(bulk);
+        return bulk;
+      }
+    } catch (error) {
+      console.error('Error fetching bulk listings:', error);
+    }
+    return [];
+  };
+
+  // Category navigation functions  
+  const scrollCategories = (direction) => {
+    const container = document.getElementById('categories-container');
+    if (container) {
+      const scrollAmount = 200;
+      const newPosition = direction === 'left' 
+        ? Math.max(0, categoryScrollPosition - scrollAmount)
+        : Math.min(container.scrollWidth - container.clientWidth, categoryScrollPosition + scrollAmount);
+      
+      container.scrollTo({ left: newPosition, behavior: 'smooth' });
+      setCategoryScrollPosition(newPosition);
+    }
   };
 
   const handleBasicRegistration = async (e) => {
