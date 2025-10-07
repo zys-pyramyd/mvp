@@ -2228,12 +2228,24 @@ function App() {
   */
 
   const getUserPlatformAccess = (userRole) => {
-    // All users can access both home page and buy from farm
+    // All users can access both home page and buy from farm for viewing
     return ['home', 'buy_from_farm'];
   };
 
+  const canPostOnPlatform = (userRole, platform) => {
+    // Role-based posting restrictions
+    if (platform === 'home') {
+      // Only businesses can post on home page (main business page)
+      return userRole === 'business';
+    } else if (platform === 'buy_from_farm') {
+      // Only farmers and agents can post on buy from farm page
+      return userRole === 'farmer' || userRole === 'agent';
+    }
+    return false;
+  };
+
   const canSwitchPlatforms = (userRole) => {
-    // All users can switch between main page and buy from farm
+    // All users can switch between main page and buy from farm for viewing
     return true;
   };
 
