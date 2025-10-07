@@ -222,7 +222,7 @@ class KYCComplianceTester:
                              f"Unexpected response: {response}")
                 personal_test_success = False
 
-        return business_test_success and personal_test_success
+        return farmer_test_success and personal_test_success
 
     def test_order_creation_kyc_validation(self):
         """Test Order Creation KYC Validation (/api/orders/create POST)"""
