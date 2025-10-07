@@ -343,13 +343,13 @@ class KYCComplianceTester:
         print("\n📊 Testing KYC Status Endpoint...")
         
         # Create a user to test KYC status
-        business_success, business_token = self.create_user_with_role("business", "agriculture")
+        farmer_success, farmer_token = self.create_user_with_role("farmer")
         
-        if not business_success:
-            self.log_test("KYC Status Endpoint - User Setup", False, "Failed to create business user")
+        if not farmer_success:
+            self.log_test("KYC Status Endpoint - User Setup", False, "Failed to create farmer user")
             return False
 
-        success, response = self.make_request('GET', '/api/users/kyc/status', use_auth=True, token=business_token)
+        success, response = self.make_request('GET', '/api/users/kyc/status', use_auth=True, token=farmer_token)
         
         if not success:
             self.log_test("KYC Status Endpoint", False, f"KYC status endpoint failed: {response}")
