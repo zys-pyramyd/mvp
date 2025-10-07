@@ -5332,6 +5332,7 @@ function App() {
                         <option value="pieces">Pieces</option>
                         <option value="liters">Liters</option>
                         <option value="bags">Bags</option>
+                        <option value="tins">Tins</option>
                         <option value="crates">Crates</option>
                       </select>
                     </div>
