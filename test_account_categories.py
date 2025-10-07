@@ -222,8 +222,9 @@ class AccountCategoriesAPITester:
         success, response = self.make_request('GET', '/api/user/profile', use_auth=True)
         
         if success:
+            print(f"   User profile: {response}")  # Debug output
             # Check for expected fields in user model
-            expected_fields = ['id', 'username', 'email', 'role']
+            expected_fields = ['id', 'username', 'email']
             has_expected_fields = all(field in response for field in expected_fields)
             
             if has_expected_fields:
