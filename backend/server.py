@@ -57,17 +57,80 @@ security = HTTPBearer()
 class UserRole(str, Enum):
     FARMER = "farmer"
     AGENT = "agent"
-    SUPER_AGENT = "super_agent"
-    STORAGE_OWNER = "storage_owner"
-    LOGISTICS_BUSINESS = "logistics_business"
-    SUPPLIER_FARM_INPUTS = "supplier_farm_inputs"  # New: Farm input suppliers (PyHub only)
-    SUPPLIER_FOOD_PRODUCE = "supplier_food_produce"  # New: Food produce suppliers (PyExpress only)
-    PROCESSOR = "processor"
-    GENERAL_BUYER = "general_buyer"
-    RETAILER = "retailer"
-    HOTEL = "hotel"
-    RESTAURANT = "restaurant"
-    CAFE = "cafe"
+    BUSINESS = "business"
+    PERSONAL = "personal"
+
+class BusinessCategory(str, Enum):
+    FOOD_SERVICING = "food_servicing"  # hotels, restaurants, cafe
+    FOOD_PROCESSOR = "food_processor" 
+    FARM_INPUT = "farm_input"  # fertilizers, herbicides, seeds etc
+    FINTECH = "fintech"
+    AGRICULTURE = "agriculture"
+    SUPPLIER = "supplier"  # wholesaler & retailer
+    OTHERS = "others"  # with specification
+
+class BusinessRegistrationStatus(str, Enum):
+    REGISTERED = "registered"
+    UNREGISTERED = "unregistered"
+
+class KYCStatus(str, Enum):
+    NOT_STARTED = "not_started"
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+class ProductCategory(str, Enum):
+    FARM_INPUT = "farm_input"
+    RAW_FOOD = "raw_food" 
+    PACKAGED_FOOD = "packaged_food"
+    FISH_MEAT = "fish_meat"
+    PEPPER_VEGETABLES = "pepper_vegetables"
+
+class FarmInputSubcategory(str, Enum):
+    SEEDS = "seeds"
+    SEEDLINGS = "seedlings"
+    FERTILIZER = "fertilizer"
+    HERBICIDES = "herbicides"
+    PESTICIDES = "pesticides"
+    FARMING_TOOLS = "farming_tools"
+
+class RawFoodSubcategory(str, Enum):
+    RICE = "rice"
+    GRAINS = "grains"
+    TUBERS = "tubers"
+    FRUITS = "fruits"
+    NUTS = "nuts"
+    LEGUMES = "legumes"
+
+class PackagedFoodSubcategory(str, Enum):
+    PACKAGED_RICE = "packaged_rice"
+    BEANS = "beans"
+    PASTA = "pasta"  # spaghetti, noodles
+    CANNED_FOOD = "canned_food"
+    SNACKS = "snacks"
+    BEVERAGES = "beverages"
+    FLOUR = "flour"
+
+class FishMeatSubcategory(str, Enum):
+    FRESH_FISH = "fresh_fish"
+    DRIED_FISH = "dried_fish"
+    FROZEN_FISH = "frozen_fish"
+    FRESH_MEAT = "fresh_meat"
+    PROCESSED_MEAT = "processed_meat"
+    POULTRY = "poultry"
+
+class PepperVegetablesSubcategory(str, Enum):
+    PEPPERS = "peppers"
+    LEAFY_VEGETABLES = "leafy_vegetables"
+    ROOT_VEGETABLES = "root_vegetables"
+    ONIONS_GARLIC = "onions_garlic"
+    TOMATOES = "tomatoes"
+    HERBS_SPICES = "herbs_spices"
+
+class ProcessingLevel(str, Enum):
+    NOT_PROCESSED = "not_processed"  # Raw, natural state
+    SEMI_PROCESSED = "semi_processed"  # Partially processed 
+    PROCESSED = "processed"  # Fully processed/packaged
 
 class OrderStatus(str, Enum):
     PENDING = "pending"
