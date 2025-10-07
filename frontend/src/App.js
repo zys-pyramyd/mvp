@@ -2480,6 +2480,30 @@ function App() {
                         </button>
                       )}
                       
+                      {/* Complete KYC - Only show for non-personal accounts who haven't completed KYC */}
+                      {user.role !== 'personal' && kycStatus && kycStatus.status !== 'approved' && (
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            // Navigate to KYC completion - would implement KYC modal
+                            alert('KYC completion form will open here. This includes:\n\n' +
+                                  'For Registered Businesses:\n- Business Registration Number\n- TIN Certificate\n- Certificate of Incorporation\n\n' +
+                                  'For Others (Farmers/Agents/Unregistered):\n- NIN or BVN\n- Headshot photo (camera)\n- National ID upload\n- Utility bill');
+                          }}
+                          className={`block w-full text-left px-4 py-2 text-sm font-medium border-l-4 ${
+                            kycStatus.status === 'not_started' 
+                              ? 'text-red-600 hover:bg-red-50 border-red-400 bg-red-25' 
+                              : kycStatus.status === 'pending'
+                              ? 'text-yellow-600 hover:bg-yellow-50 border-yellow-400 bg-yellow-25'
+                              : 'text-blue-600 hover:bg-blue-50 border-blue-400 bg-blue-25'
+                          }`}
+                        >
+                          {kycStatus.status === 'not_started' && '🔐 Complete KYC (Required)'}
+                          {kycStatus.status === 'pending' && '⏳ KYC Under Review'}
+                          {kycStatus.status === 'rejected' && '❌ Resubmit KYC'}
+                        </button>
+                      )}
+
                       {/* Digital Wallet */}
                       <button
                         onClick={() => {
