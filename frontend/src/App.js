@@ -2019,6 +2019,14 @@ function App() {
           orders.push(result);
         } else {
           const error = await response.json();
+          
+          // Handle KYC-specific errors
+          if (error.detail && typeof error.detail === 'object' && error.detail.error === 'KYC_REQUIRED') {
+            const kycError = error.detail;
+            alert(`KYC Verification Required\n\n${kycError.message}\n\nRequired Documents:\n${kycError.required_actions.documents.join('\n• ')}\n\nStatus: ${kycError.kyc_status}\n\nPlease complete your KYC verification in your profile settings to continue.`);
+            return;
+          }
+          
           throw new Error(error.detail || 'Failed to create order');
         }
       }
