@@ -4644,6 +4644,7 @@ function App() {
                         <option value="kg">Kilograms</option>
                         <option value="pieces">Pieces</option>
                         <option value="bags">Bags</option>
+                        <option value="tins">Tins</option>
                         <option value="crates">Crates</option>
                         <option value="liters">Liters</option>
                       </select>
