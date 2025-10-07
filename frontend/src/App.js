@@ -109,6 +109,25 @@ function App() {
   const [showBusinessProfile, setShowBusinessProfile] = useState(false);
   const [showKYCPrompt, setShowKYCPrompt] = useState(false);
   const [kycStatus, setKycStatus] = useState(null);
+
+  // Dashboard and trading platform state
+  const [showFarmerDashboard, setShowFarmerDashboard] = useState(false);
+  const [showAgentDashboard, setShowAgentDashboard] = useState(false);
+  const [farmerDashboardData, setFarmerDashboardData] = useState(null);
+  const [agentDashboardData, setAgentDashboardData] = useState(null);
+  const [showMarketChart, setShowMarketChart] = useState(false);
+  const [marketPrices, setMarketPrices] = useState([]);
+  
+  // Location and filtering state
+  const [locationFilter, setLocationFilter] = useState('');
+  const [availableLocations, setAvailableLocations] = useState([]);
+  
+  // Enhanced Buy from Farm state
+  const [bulkListings, setBulkListings] = useState([]);
+  const [showBulkListing, setShowBulkListing] = useState(false);
+  
+  // Category navigation state
+  const [categoryScrollPosition, setCategoryScrollPosition] = useState(0);
   
   // Product Detail Page state
   const [showProductDetail, setShowProductDetail] = useState(false);
