@@ -7449,6 +7449,320 @@ function App() {
         </div>
       )}
 
+      {/* KYC Completion Prompt */}
+      {showKYCPrompt && kycStatus && kycStatus.requires_kyc && kycStatus.status === 'not_started' && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 border-2 border-yellow-200">
+            <div className="text-center">
+              <div className="text-4xl mb-4">🔐</div>
+              <h3 className="text-xl font-semibold mb-2 text-gray-800">Complete Your KYC</h3>
+              <p className="text-gray-600 mb-4">
+                Complete your KYC verification to start receiving payments on the platform.
+              </p>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-yellow-800">
+                  <strong>Important:</strong> KYC completion is required to receive payments from buyers. 
+                  Without KYC, you can browse and purchase but cannot receive funds.
+                </p>
+              </div>
+              
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowKYCPrompt(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Later
+                </button>
+                <button
+                  onClick={() => {
+                    setShowKYCPrompt(false);
+                    // Navigate to KYC completion - would implement KYC modal
+                    alert('KYC completion form will open here. This includes:\n\n' +
+                          'For Registered Businesses:\n- Business Registration Number\n- TIN Certificate\n- Certificate of Incorporation\n\n' +
+                          'For Others (Farmers/Agents/Unregistered):\n- NIN or BVN\n- Headshot photo (camera)\n- National ID upload\n- Utility bill');
+                  }}
+                  className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                >
+                  Complete KYC
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Farmer Dashboard */}
+      {showFarmerDashboard && user && user.role === 'farmer' && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-semibold">🌾 Farmer Dashboard</h2>
+                <button
+                  onClick={() => setShowFarmerDashboard(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            
+            {farmerDashboardData ? (
+              <div className="p-6">
+                {/* Profile Summary */}
+                <div className="mb-8 p-6 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg">
+                  <h3 className="text-lg font-semibold mb-2">Welcome, {farmerDashboardData.farmer_profile.name}!</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <div className="text-green-200">KYC Status</div>
+                      <div className="font-medium capitalize">{farmerDashboardData.farmer_profile.kyc_status}</div>
+                    </div>
+                    <div>
+                      <div className="text-green-200">Rating</div>
+                      <div className="font-medium">⭐ {farmerDashboardData.farmer_profile.average_rating}/5</div>
+                    </div>
+                    <div>
+                      <div className="text-green-200">Products</div>
+                      <div className="font-medium">{farmerDashboardData.business_metrics.total_products}</div>
+                    </div>
+                    <div>
+                      <div className="text-green-200">Revenue</div>
+                      <div className="font-medium">₦{farmerDashboardData.business_metrics.total_revenue.toLocaleString()}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Business Metrics */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="text-2xl text-blue-600 mb-2">📦</div>
+                    <div className="text-2xl font-bold text-blue-600">{farmerDashboardData.business_metrics.active_products}</div>
+                    <div className="text-sm text-blue-600">Active Products</div>
+                  </div>
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="text-2xl text-green-600 mb-2">🌾</div>
+                    <div className="text-2xl font-bold text-green-600">{farmerDashboardData.business_metrics.total_farmlands}</div>
+                    <div className="text-sm text-green-600">Farmlands</div>
+                  </div>
+                  <div className="bg-yellow-50 p-4 rounded-lg">
+                    <div className="text-2xl text-yellow-600 mb-2">📋</div>
+                    <div className="text-2xl font-bold text-yellow-600">{farmerDashboardData.business_metrics.pending_orders}</div>
+                    <div className="text-sm text-yellow-600">Pending Orders</div>
+                  </div>
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <div className="text-2xl text-purple-600 mb-2">📏</div>
+                    <div className="text-2xl font-bold text-purple-600">{farmerDashboardData.business_metrics.total_hectares}</div>
+                    <div className="text-sm text-purple-600">Total Hectares</div>
+                  </div>
+                </div>
+
+                {/* Recent Orders */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
+                  {farmerDashboardData.recent_orders.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No recent orders. Start listing your products to get orders!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {farmerDashboardData.recent_orders.map((order, index) => (
+                        <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                          <div>
+                            <div className="font-medium">{order.product}</div>
+                            <div className="text-sm text-gray-500">Buyer: {order.buyer}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold">₦{order.amount.toLocaleString()}</div>
+                            <div className={`text-xs px-2 py-1 rounded ${
+                              order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {order.status}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="p-6">
+                <div className="text-center py-8 text-gray-500">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+                  <p>Loading dashboard data...</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Agent Dashboard */}
+      {showAgentDashboard && user && user.role === 'agent' && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-semibold">🤝 Agent Dashboard</h2>
+                <button
+                  onClick={() => setShowAgentDashboard(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            
+            {agentDashboardData ? (
+              <div className="p-6">
+                {/* Profile Summary */}
+                <div className="mb-8 p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg">
+                  <h3 className="text-lg font-semibold mb-2">Welcome, {agentDashboardData.agent_profile.name}!</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <div className="text-purple-200">KYC Status</div>
+                      <div className="font-medium capitalize">{agentDashboardData.agent_profile.kyc_status}</div>
+                    </div>
+                    <div>
+                      <div className="text-purple-200">Rating</div>
+                      <div className="font-medium">⭐ {agentDashboardData.agent_profile.average_rating}/5</div>
+                    </div>
+                    <div>
+                      <div className="text-purple-200">Farmers</div>
+                      <div className="font-medium">{agentDashboardData.business_metrics.total_farmers}</div>
+                    </div>
+                    <div>
+                      <div className="text-purple-200">Commission</div>
+                      <div className="font-medium">₦{agentDashboardData.business_metrics.agent_commission.toLocaleString()}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Business Metrics */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="text-2xl text-green-600 mb-2">👨‍🌾</div>
+                    <div className="text-2xl font-bold text-green-600">{agentDashboardData.business_metrics.active_farmers}</div>
+                    <div className="text-sm text-green-600">Active Farmers</div>
+                  </div>
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="text-2xl text-blue-600 mb-2">📦</div>
+                    <div className="text-2xl font-bold text-blue-600">{agentDashboardData.business_metrics.active_products}</div>
+                    <div className="text-sm text-blue-600">Active Products</div>
+                  </div>
+                  <div className="bg-yellow-50 p-4 rounded-lg">
+                    <div className="text-2xl text-yellow-600 mb-2">💰</div>
+                    <div className="text-2xl font-bold text-yellow-600">₦{agentDashboardData.business_metrics.total_revenue.toLocaleString()}</div>
+                    <div className="text-sm text-yellow-600">Total Revenue</div>
+                  </div>
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <div className="text-2xl text-red-600 mb-2">📋</div>
+                    <div className="text-2xl font-bold text-red-600">{agentDashboardData.business_metrics.pending_orders}</div>
+                    <div className="text-sm text-red-600">Pending Orders</div>
+                  </div>
+                </div>
+
+                {/* Top Farmers */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Top Performing Farmers</h3>
+                  {agentDashboardData.top_farmers.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No farmers in your network yet. Start adding farmers to grow your business!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {agentDashboardData.top_farmers.map((farmer, index) => (
+                        <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                          <div>
+                            <div className="font-medium">{farmer.name}</div>
+                            <div className="text-sm text-gray-500">{farmer.location} • Joined: {new Date(farmer.linked_date).toLocaleDateString()}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold">₦{farmer.total_sales.toLocaleString()}</div>
+                            <div className="text-sm text-gray-500">{farmer.total_listings} listings</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="p-6">
+                <div className="text-center py-8 text-gray-500">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+                  <p>Loading dashboard data...</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Market Prices Chart */}
+      {showMarketChart && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-semibold">📈 Market Prices</h2>
+                <button
+                  onClick={() => setShowMarketChart(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-6">
+                <p className="text-gray-600">
+                  Current market prices for agricultural products. Prices are updated regularly based on market conditions.
+                </p>
+              </div>
+              
+              {marketPrices.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                  <p>Loading market prices...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {marketPrices.map((item, index) => (
+                    <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold text-gray-800">{item.product}</h3>
+                          <div className="text-xs text-gray-500 capitalize">{item.category.replace('_', ' ')}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xl font-bold text-gray-900">₦{item.price.toLocaleString()}</div>
+                          <div className={`text-sm font-medium ${
+                            item.trend.startsWith('+') ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {item.trend}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-sm text-blue-800">
+                  <strong>Note:</strong> Prices are indicative and may vary based on quality, location, and market conditions. 
+                  Use these as reference for your pricing decisions.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
