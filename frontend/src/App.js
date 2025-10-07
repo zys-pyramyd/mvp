@@ -3319,45 +3319,95 @@ function App() {
                   </>
                 )}
 
-                {/* Role Path Selection Step */}
+                {/* Account Type Selection Step */}
                 {registrationStep === 'role_path' && (
                   <>
                     <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-2xl font-bold text-center w-full text-emerald-600">Welcome to Pyramyd!</h2>
+                      <h2 className="text-2xl font-bold text-center w-full text-emerald-600">Choose Account Type</h2>
                     </div>
 
                     <div className="bg-gradient-to-br from-emerald-50 to-blue-50 p-6 rounded-2xl">
                       <p className="text-gray-600 mb-6 text-center">
-                        Choose how you'd like to use the platform:
+                        Select the account type that best describes you:
                       </p>
 
-                      <div className="grid grid-cols-1 gap-6">
-                        {/* Buyer Path */}
-                        <div className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-emerald-300 transition-colors cursor-pointer">
-                          <div className="text-center">
-                            <div className="text-4xl mb-3">🛒</div>
-                            <h3 className="text-lg font-semibold mb-2 text-gray-800">Explore as a Buyer</h3>
-                            <p className="text-sm text-gray-600 mb-4">Find fresh produce for your needs!</p>
+                      <div className="grid grid-cols-1 gap-4">
+                        {/* Personal Account */}
+                        <div className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:border-blue-300 transition-colors cursor-pointer">
+                          <div className="flex items-center">
+                            <div className="text-3xl mr-4">👤</div>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-gray-800">Personal</h3>
+                              <p className="text-sm text-gray-600">Individual buyer - shop for personal needs</p>
+                            </div>
                             <button
-                              onClick={() => handleRolePath('buyer')}
-                              className="w-full bg-blue-600 text-white py-3 px-4 rounded-full hover:bg-blue-700 transition-colors font-medium"
+                              onClick={() => {
+                                setAuthForm({...authForm, role: 'personal'});
+                                handleCompleteRegistration();
+                              }}
+                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                             >
-                              Continue as Buyer
+                              Select
                             </button>
                           </div>
                         </div>
 
-                        {/* Partner Path */}
-                        <div className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-emerald-300 transition-colors cursor-pointer">
-                          <div className="text-center">
-                            <div className="text-4xl mb-3">🤝</div>
-                            <h3 className="text-lg font-semibold mb-2 text-gray-800">Register as a Partner</h3>
-                            <p className="text-sm text-gray-600 mb-4">Grow your business with Pyramyd!</p>
+                        {/* Farmer Account */}
+                        <div className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:border-green-300 transition-colors cursor-pointer">
+                          <div className="flex items-center">
+                            <div className="text-3xl mr-4">🌾</div>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-gray-800">Farmer</h3>
+                              <p className="text-sm text-gray-600">Agricultural producer - sell your farm produce</p>
+                            </div>
                             <button
-                              onClick={() => handleRolePath('partner')}
-                              className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
+                              onClick={() => {
+                                setAuthForm({...authForm, role: 'farmer'});
+                                setRegistrationStep('business_profile');
+                              }}
+                              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                             >
-                              Continue as Partner
+                              Select
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Agent Account */}
+                        <div className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:border-purple-300 transition-colors cursor-pointer">
+                          <div className="flex items-center">
+                            <div className="text-3xl mr-4">🤝</div>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-gray-800">Agent</h3>
+                              <p className="text-sm text-gray-600">Market aggregator - connect buyers and sellers</p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setAuthForm({...authForm, role: 'agent'});
+                                setRegistrationStep('business_profile');
+                              }}
+                              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                            >
+                              Select
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Business Account */}
+                        <div className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:border-emerald-300 transition-colors cursor-pointer">
+                          <div className="flex items-center">
+                            <div className="text-3xl mr-4">🏢</div>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-gray-800">Business</h3>
+                              <p className="text-sm text-gray-600">Enterprise buyer/seller - restaurants, suppliers, etc.</p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setAuthForm({...authForm, role: 'business'});
+                                setRegistrationStep('business_profile');
+                              }}
+                              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                            >
+                              Select
                             </button>
                           </div>
                         </div>
