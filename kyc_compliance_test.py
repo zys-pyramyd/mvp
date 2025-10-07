@@ -321,7 +321,7 @@ class KYCComplianceTester:
             "price_per_unit": 500.0,
             "partial_payment_percentage": 0.3,
             "location": "Test Location",
-            "delivery_date": "2025-03-01T10:00:00Z",
+            "delivery_date": "2025-03-01T10:00:00",
             "business_name": "Test Farm",
             "farm_name": "Test Farm"
         }
