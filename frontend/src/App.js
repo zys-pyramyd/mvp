@@ -975,6 +975,88 @@ function App() {
     }
   };
 
+  // Categories and business functions
+  const fetchBusinessCategories = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/categories/business`);
+      if (response.ok) {
+        const data = await response.json();
+        setBusinessCategories(data.categories || {});
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching business categories:', error);
+    }
+    return null;
+  };
+
+  const fetchProductCategories = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/categories/products`);
+      if (response.ok) {
+        const data = await response.json();
+        setProductCategories(data.categories || {});
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching product categories:', error);
+    }
+    return null;
+  };
+
+  const updateBusinessProfile = async (businessData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/business-profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(businessData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        return result;
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to update business profile');
+      }
+    } catch (error) {
+      console.error('Error updating business profile:', error);
+      throw error;
+    }
+  };
+
+  const fetchKYCStatus = async () => {
+    if (!user) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/kyc/status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setKycStatus(data);
+        
+        // Show KYC prompt for non-personal accounts that haven't completed KYC
+        if (data.requires_kyc && data.status === 'not_started' && !showKYCPrompt) {
+          setTimeout(() => setShowKYCPrompt(true), 2000); // Show after 2 seconds
+        }
+        
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching KYC status:', error);
+    }
+    return null;
+  };
+
   const handleBasicRegistration = async (e) => {
     e.preventDefault();
     // Just move to role path selection after basic form
