@@ -1440,6 +1440,9 @@ async def create_order(items: List[CartItem], delivery_address: str, current_use
     if not items:
         raise HTTPException(status_code=400, detail="No items in order")
     
+    # KYC Compliance Check for Order Creation
+    validate_kyc_compliance(current_user, "collect_payments")
+    
     order_items = []
     total_amount = 0.0
     seller_id = None
