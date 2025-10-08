@@ -5217,8 +5217,8 @@ async def get_dynamic_categories():
     """Get categories that have products and available locations/seller types"""
     try:
         # Get all products to determine which categories have products
-        products = db.products.find({}, {"category": 1, "location": 1, "seller_username": 1, "seller_type": 1}).to_list(length=None)
-        preorders = db.preorders.find({}, {"product_category": 1, "location": 1, "seller_username": 1, "seller_type": 1}).to_list(length=None)
+        products = list(db.products.find({}, {"category": 1, "location": 1, "seller_username": 1, "seller_type": 1}))
+        preorders = list(db.preorders.find({}, {"product_category": 1, "location": 1, "seller_username": 1, "seller_type": 1}))
         
         # Collect categories with products
         active_categories = set()
