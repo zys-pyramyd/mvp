@@ -3247,23 +3247,6 @@ function App() {
 
         {/* Enhanced Category Navigation & Filters */}
         <div className="mb-6 space-y-4">
-          {/* Location Filter */}
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium text-gray-700">📍 Location:</span>
-              <select
-                value={locationFilter}
-                onChange={(e) => setLocationFilter(e.target.value)}
-                className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="">All Locations</option>
-                {availableLocations.map(location => (
-                  <option key={location} value={location}>{location}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
           {/* Enhanced Category Navigation */}
           <div className="relative">
             <div className="flex items-center">
