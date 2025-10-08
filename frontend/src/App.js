@@ -3041,6 +3041,25 @@ function App() {
           </div>
         )}
 
+        {/* Location Filter */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-medium text-gray-700">📍 Location:</span>
+              <select
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              >
+                <option value="">All Locations</option>
+                {availableLocations.map(location => (
+                  <option key={location} value={location}>{location}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
         {/* Categories - Swipeable Cards */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-3">Shop by Category</h3>
