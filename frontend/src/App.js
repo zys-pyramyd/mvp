@@ -2240,7 +2240,7 @@ function App() {
   */
 
   const getUserPlatformAccess = (userRole) => {
-    // All users can access both home page and buy from farm for viewing
+    // All users can access both home page and fam deals for viewing
     return ['home', 'buy_from_farm'];
   };
 
