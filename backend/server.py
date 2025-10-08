@@ -1287,6 +1287,7 @@ async def get_products(
     only_preorders: Optional[bool] = None,
     search_term: Optional[str] = None,
     seller_type: Optional[str] = None,
+    platform: Optional[str] = None,  # 'home' or 'fam_deals'
     page: int = 1,
     limit: int = 20
 ):
