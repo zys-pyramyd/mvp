@@ -6071,6 +6071,413 @@ class PyramydAPITester:
         print("\n✅ Enhanced Agent KYC Validation Testing Complete")
         return True
 
+    def test_new_dynamic_categories_endpoint(self):
+        """Test new dynamic categories endpoint (/api/categories/dynamic)"""
+        print("\n🏷️ Testing New Dynamic Categories Endpoint...")
+        
+        success, response = self.make_request('GET', '/api/categories/dynamic')
+        
+        if success and isinstance(response, dict):
+            # Check if response has expected structure
+            expected_keys = ['categories', 'locations', 'seller_types']
+            if all(key in response for key in expected_keys):
+                self.log_test("Dynamic Categories - Structure", True)
+                structure_success = True
+                
+                # Check if new food categories are present
+                categories = response.get('categories', {})
+                new_food_categories = ['grains_legumes', 'fish_meat', 'spices_vegetables', 'tubers_roots']
+                found_categories = [cat for cat in new_food_categories if cat in categories]
+                
+                if len(found_categories) >= 3:  # At least 3 of the 4 new categories
+                    self.log_test("Dynamic Categories - New Food Categories", True, 
+                                 f"Found {len(found_categories)} new food categories: {found_categories}")
+                    categories_success = True
+                else:
+                    self.log_test("Dynamic Categories - New Food Categories", False,
+                                 f"Only found {len(found_categories)} new food categories: {found_categories}")
+                    categories_success = False
+                
+                # Check if subcategories have examples
+                has_examples = False
+                for category, subcats in categories.items():
+                    if isinstance(subcats, dict):
+                        for subcat, examples in subcats.items():
+                            if isinstance(examples, list) and len(examples) > 0:
+                                has_examples = True
+                                break
+                        if has_examples:
+                            break
+                
+                if has_examples:
+                    self.log_test("Dynamic Categories - Subcategory Examples", True)
+                    examples_success = True
+                else:
+                    self.log_test("Dynamic Categories - Subcategory Examples", False, 
+                                 "No subcategory examples found")
+                    examples_success = False
+                
+                # Check locations and seller_types are populated
+                locations = response.get('locations', [])
+                seller_types = response.get('seller_types', [])
+                
+                if len(locations) > 0 and len(seller_types) > 0:
+                    self.log_test("Dynamic Categories - Locations & Seller Types", True,
+                                 f"Found {len(locations)} locations, {len(seller_types)} seller types")
+                    metadata_success = True
+                else:
+                    self.log_test("Dynamic Categories - Locations & Seller Types", False,
+                                 f"Locations: {len(locations)}, Seller Types: {len(seller_types)}")
+                    metadata_success = False
+                
+            else:
+                self.log_test("Dynamic Categories - Structure", False, f"Missing keys: {response}")
+                structure_success = categories_success = examples_success = metadata_success = False
+        else:
+            self.log_test("Dynamic Categories Endpoint", False, f"Request failed: {response}")
+            structure_success = categories_success = examples_success = metadata_success = False
+        
+        overall_success = structure_success and categories_success and examples_success and metadata_success
+        return overall_success
+
+    def test_updated_product_categories_endpoint(self):
+        """Test updated product categories endpoint (/api/categories/products)"""
+        print("\n📦 Testing Updated Product Categories Endpoint...")
+        
+        success, response = self.make_request('GET', '/api/categories/products')
+        
+        if success and isinstance(response, dict):
+            # Check for new food category structure
+            new_categories = ['grains_legumes', 'fish_meat', 'spices_vegetables', 'tubers_roots']
+            old_categories = ['farm_input', 'raw_food', 'packaged_food', 'pepper_vegetables']
+            
+            found_new = [cat for cat in new_categories if cat in response]
+            found_old = [cat for cat in old_categories if cat in response]
+            
+            if len(found_new) >= 3:  # At least 3 new categories
+                self.log_test("Product Categories - New Categories", True,
+                             f"Found new categories: {found_new}")
+                new_categories_success = True
+            else:
+                self.log_test("Product Categories - New Categories", False,
+                             f"Only found {len(found_new)} new categories: {found_new}")
+                new_categories_success = False
+            
+            if len(found_old) == 0:  # Old categories should be replaced
+                self.log_test("Product Categories - Old Categories Replaced", True)
+                old_replaced_success = True
+            else:
+                self.log_test("Product Categories - Old Categories Replaced", False,
+                             f"Still found old categories: {found_old}")
+                old_replaced_success = False
+            
+            # Check for rice subcategory examples
+            rice_examples_found = False
+            if 'grains_legumes' in response and 'rice' in response['grains_legumes']:
+                rice_examples = response['grains_legumes']['rice']
+                expected_rice_examples = ['Local rice', 'Ofada rice', 'Basmati rice']
+                if any(example in str(rice_examples) for example in expected_rice_examples):
+                    rice_examples_found = True
+            
+            if rice_examples_found:
+                self.log_test("Product Categories - Rice Examples", True)
+                examples_success = True
+            else:
+                self.log_test("Product Categories - Rice Examples", False,
+                             "Rice examples not found or incomplete")
+                examples_success = False
+            
+        else:
+            self.log_test("Product Categories Endpoint", False, f"Request failed: {response}")
+            new_categories_success = old_replaced_success = examples_success = False
+        
+        overall_success = new_categories_success and old_replaced_success and examples_success
+        return overall_success
+
+    def test_platform_based_filtering(self):
+        """Test platform-based filtering for products"""
+        print("\n🏠 Testing Platform-Based Filtering...")
+        
+        # Test 1: platform=home (should return business/supplier products and preorders)
+        success, response = self.make_request('GET', '/api/products?platform=home')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            preorders = response.get('preorders', [])
+            
+            # Check if products are from business/supplier
+            home_valid_products = True
+            for product in products:
+                seller_type = product.get('seller_type', '')
+                if seller_type not in ['business', 'supplier']:
+                    home_valid_products = False
+                    break
+            
+            # Check if preorders are from business/supplier
+            home_valid_preorders = True
+            for preorder in preorders:
+                seller_type = preorder.get('seller_type', '')
+                if seller_type not in ['business', 'supplier']:
+                    home_valid_preorders = False
+                    break
+            
+            if home_valid_products and home_valid_preorders:
+                self.log_test("Platform Filtering - Home", True,
+                             f"Found {len(products)} products, {len(preorders)} preorders from business/supplier")
+                home_success = True
+            else:
+                self.log_test("Platform Filtering - Home", False,
+                             "Found products/preorders from non-business/supplier sellers")
+                home_success = False
+        else:
+            self.log_test("Platform Filtering - Home", False, f"Request failed: {response}")
+            home_success = False
+        
+        # Test 2: platform=fam_deals (should return farmer/agent products and preorders)
+        success, response = self.make_request('GET', '/api/products?platform=fam_deals')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            preorders = response.get('preorders', [])
+            
+            # Check if products are from farmer/agent
+            fam_valid_products = True
+            for product in products:
+                seller_type = product.get('seller_type', '')
+                if seller_type not in ['farmer', 'agent']:
+                    fam_valid_products = False
+                    break
+            
+            # Check if preorders are from farmer/agent
+            fam_valid_preorders = True
+            for preorder in preorders:
+                seller_type = preorder.get('seller_type', '')
+                if seller_type not in ['farmer', 'agent']:
+                    fam_valid_preorders = False
+                    break
+            
+            if fam_valid_products and fam_valid_preorders:
+                self.log_test("Platform Filtering - Fam Deals", True,
+                             f"Found {len(products)} products, {len(preorders)} preorders from farmer/agent")
+                fam_success = True
+            else:
+                self.log_test("Platform Filtering - Fam Deals", False,
+                             "Found products/preorders from non-farmer/agent sellers")
+                fam_success = False
+        else:
+            self.log_test("Platform Filtering - Fam Deals", False, f"Request failed: {response}")
+            fam_success = False
+        
+        overall_success = home_success and fam_success
+        return overall_success
+
+    def test_product_creation_new_categories(self):
+        """Test product creation with new category values"""
+        print("\n🆕 Testing Product Creation with New Categories...")
+        
+        new_categories = [
+            {
+                'category': 'grains_legumes',
+                'subcategory': 'rice',
+                'title': 'Premium Basmati Rice',
+                'description': 'High quality basmati rice'
+            },
+            {
+                'category': 'fish_meat',
+                'subcategory': 'fresh_fish',
+                'title': 'Fresh Tilapia',
+                'description': 'Fresh tilapia from local farms'
+            },
+            {
+                'category': 'spices_vegetables',
+                'subcategory': 'peppers',
+                'title': 'Scotch Bonnet Peppers',
+                'description': 'Hot scotch bonnet peppers'
+            },
+            {
+                'category': 'tubers_roots',
+                'subcategory': 'yams',
+                'title': 'White Yam',
+                'description': 'Fresh white yam tubers'
+            }
+        ]
+        
+        successful_creations = 0
+        created_product_ids = []
+        
+        for i, category_data in enumerate(new_categories):
+            product_data = {
+                "title": category_data['title'],
+                "description": category_data['description'],
+                "category": category_data['category'],
+                "subcategory": category_data['subcategory'],
+                "processing_level": "not_processed",
+                "price_per_unit": 500.0 + (i * 100),
+                "unit_of_measure": "kg",
+                "quantity_available": 100,
+                "minimum_order_quantity": 1,
+                "location": "Lagos, Nigeria",
+                "farm_name": "Test Farm",
+                "images": [],
+                "platform": "pyhub"
+            }
+            
+            success, response = self.make_request('POST', '/api/products', product_data, 200, use_auth=True)
+            
+            if success and 'product_id' in response:
+                successful_creations += 1
+                created_product_ids.append(response['product_id'])
+                self.log_test(f"Product Creation - {category_data['category']}", True)
+            else:
+                self.log_test(f"Product Creation - {category_data['category']}", False, 
+                             f"Creation failed: {response}")
+        
+        # Test old category rejection
+        old_category_data = {
+            "title": "Old Category Product",
+            "description": "Product with old category",
+            "category": "raw_food",  # Old category
+            "price_per_unit": 300.0,
+            "unit_of_measure": "kg",
+            "quantity_available": 50,
+            "minimum_order_quantity": 1,
+            "location": "Lagos, Nigeria",
+            "images": [],
+            "platform": "pyhub"
+        }
+        
+        success, response = self.make_request('POST', '/api/products', old_category_data, 422, use_auth=True)
+        
+        if success:  # Should return 422 validation error
+            self.log_test("Product Creation - Old Category Rejection", True)
+            old_category_rejected = True
+        else:
+            self.log_test("Product Creation - Old Category Rejection", False,
+                         f"Should reject old category: {response}")
+            old_category_rejected = False
+        
+        overall_success = (successful_creations >= 3 and old_category_rejected)
+        return overall_success, created_product_ids
+
+    def test_advanced_filtering_new_system(self):
+        """Test advanced filtering with new category system"""
+        print("\n🔍 Testing Advanced Filtering with New System...")
+        
+        # Test 1: Location filtering with actual product locations
+        success, response = self.make_request('GET', '/api/products?location=Lagos')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            preorders = response.get('preorders', [])
+            self.log_test("Advanced Filtering - Location", True,
+                         f"Found {len(products)} products, {len(preorders)} preorders in Lagos")
+            location_success = True
+        else:
+            self.log_test("Advanced Filtering - Location", False, f"Location filtering failed: {response}")
+            location_success = False
+        
+        # Test 2: Seller type filtering with new seller types
+        seller_types = ['farmer', 'agent', 'business']
+        seller_type_success = True
+        
+        for seller_type in seller_types:
+            success, response = self.make_request('GET', f'/api/products?seller_type={seller_type}')
+            
+            if success and isinstance(response, dict):
+                products = response.get('products', [])
+                preorders = response.get('preorders', [])
+                self.log_test(f"Advanced Filtering - Seller Type ({seller_type})", True,
+                             f"Found {len(products)} products, {len(preorders)} preorders")
+            else:
+                self.log_test(f"Advanced Filtering - Seller Type ({seller_type})", False,
+                             f"Seller type filtering failed: {response}")
+                seller_type_success = False
+        
+        # Test 3: Category filtering with new categories
+        new_categories = ['grains_legumes', 'fish_meat', 'spices_vegetables', 'tubers_roots']
+        category_success = True
+        
+        for category in new_categories:
+            success, response = self.make_request('GET', f'/api/products?category={category}')
+            
+            if success and isinstance(response, dict):
+                products = response.get('products', [])
+                preorders = response.get('preorders', [])
+                self.log_test(f"Advanced Filtering - Category ({category})", True,
+                             f"Found {len(products)} products, {len(preorders)} preorders")
+            else:
+                self.log_test(f"Advanced Filtering - Category ({category})", False,
+                             f"Category filtering failed: {response}")
+                category_success = False
+        
+        # Test 4: Price range filtering
+        success, response = self.make_request('GET', '/api/products?min_price=400&max_price=800')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            preorders = response.get('preorders', [])
+            self.log_test("Advanced Filtering - Price Range", True,
+                         f"Found {len(products)} products, {len(preorders)} preorders in price range")
+            price_success = True
+        else:
+            self.log_test("Advanced Filtering - Price Range", False, f"Price filtering failed: {response}")
+            price_success = False
+        
+        # Test 5: Preorder-only filtering
+        success, response = self.make_request('GET', '/api/products?only_preorders=true')
+        
+        if success and isinstance(response, dict):
+            products = response.get('products', [])
+            preorders = response.get('preorders', [])
+            
+            if len(products) == 0 and len(preorders) >= 0:  # Should only return preorders
+                self.log_test("Advanced Filtering - Preorder Only", True,
+                             f"Correctly returned only preorders: {len(preorders)}")
+                preorder_only_success = True
+            else:
+                self.log_test("Advanced Filtering - Preorder Only", False,
+                             f"Should return only preorders, got {len(products)} products, {len(preorders)} preorders")
+                preorder_only_success = False
+        else:
+            self.log_test("Advanced Filtering - Preorder Only", False, f"Preorder filtering failed: {response}")
+            preorder_only_success = False
+        
+        overall_success = (location_success and seller_type_success and category_success and 
+                          price_success and preorder_only_success)
+        return overall_success
+
+    def test_food_category_system_complete(self):
+        """Test complete food category system and platform filtering"""
+        print("\n🍽️ Testing Complete Food Category System...")
+        
+        # Step 1: Test new dynamic categories endpoint
+        dynamic_success = self.test_new_dynamic_categories_endpoint()
+        
+        # Step 2: Test updated product categories endpoint
+        product_categories_success = self.test_updated_product_categories_endpoint()
+        
+        # Step 3: Test platform-based filtering
+        platform_filtering_success = self.test_platform_based_filtering()
+        
+        # Step 4: Test product creation with new categories
+        creation_success, created_ids = self.test_product_creation_new_categories()
+        
+        # Step 5: Test advanced filtering with new system
+        advanced_filtering_success = self.test_advanced_filtering_new_system()
+        
+        overall_success = (dynamic_success and product_categories_success and 
+                          platform_filtering_success and creation_success and 
+                          advanced_filtering_success)
+        
+        if overall_success:
+            self.log_test("Complete Food Category System", True,
+                         "All food category system components working correctly")
+        else:
+            self.log_test("Complete Food Category System", False,
+                         "One or more food category system components failed")
+        
+        return overall_success
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting Pyramyd API Tests...")
