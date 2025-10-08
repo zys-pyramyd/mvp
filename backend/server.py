@@ -1313,6 +1313,17 @@ async def get_products(
                     price_filter["$lte"] = max_price
                 products_query["price_per_unit"] = price_filter
                 
+            if seller_type:
+                products_query["seller_type"] = seller_type
+            
+            # Platform-based filtering
+            if platform == "home":
+                # Home page: Only business and supplier products
+                products_query["seller_type"] = {"$in": ["business", "supplier"]}
+            elif platform == "fam_deals":
+                # Fam Deals page: Only farmer and agent products
+                products_query["seller_type"] = {"$in": ["farmer", "agent"]}
+                
             if search_term:
                 products_query["$or"] = [
                     {"crop_type": {"$regex": search_term, "$options": "i"}},
