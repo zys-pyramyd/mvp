@@ -123,7 +123,6 @@ function App() {
   
   // Location and filtering state
   const [locationFilter, setLocationFilter] = useState('');
-  const [availableLocations, setAvailableLocations] = useState([]);
   
   // Enhanced Fam Deals state
   const [bulkListings, setBulkListings] = useState([]);
