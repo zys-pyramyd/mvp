@@ -3094,7 +3094,8 @@ function App() {
           </div>
         </div>
 
-        {/* Pre-Order Sales Section */}
+        {/* Pre-Order Sales Section - Only show on Home page */}
+        {currentPlatform === 'home' && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
