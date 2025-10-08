@@ -5192,6 +5192,55 @@ async def get_product_categories():
         print(f"Error getting product categories: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get product categories")
 
+@app.get("/api/categories/dynamic")
+async def get_dynamic_categories():
+    """Get categories that have products and available locations/seller types"""
+    try:
+        # Get all products to determine which categories have products
+        products = db.products.find({}, {"category": 1, "location": 1, "seller_username": 1, "seller_type": 1}).to_list(length=None)
+        preorders = db.preorders.find({}, {"product_category": 1, "location": 1, "seller_username": 1, "seller_type": 1}).to_list(length=None)
+        
+        # Collect categories with products
+        active_categories = set()
+        locations = set()
+        seller_types = set()
+        
+        for product in products:
+            if product.get("category"):
+                active_categories.add(product["category"])
+            if product.get("location"):
+                locations.add(product["location"])
+            if product.get("seller_type"):
+                seller_types.add(product["seller_type"])
+        
+        for preorder in preorders:
+            if preorder.get("product_category"):
+                active_categories.add(preorder["product_category"])
+            if preorder.get("location"):
+                locations.add(preorder["location"])
+            if preorder.get("seller_type"):
+                seller_types.add(preorder["seller_type"])
+        
+        # Get full category information for active categories
+        all_categories_response = await get_product_categories()
+        all_categories = all_categories_response["categories"]
+        
+        dynamic_categories = {}
+        for category_key in active_categories:
+            if category_key in all_categories:
+                dynamic_categories[category_key] = all_categories[category_key]
+        
+        return {
+            "categories": dynamic_categories,
+            "locations": sorted(list(locations)),
+            "seller_types": ["farmer", "agent", "business"],  # Standard seller types
+            "processing_levels": all_categories_response["processing_levels"]
+        }
+        
+    except Exception as e:
+        print(f"Error getting dynamic categories: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get dynamic categories")
+
 @app.put("/api/users/business-profile")
 async def update_business_profile(
     business_data: dict,
