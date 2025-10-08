@@ -2021,10 +2021,23 @@ function App() {
           const error = await response.json();
           
           // Handle KYC-specific errors
-          if (error.detail && typeof error.detail === 'object' && error.detail.error === 'KYC_REQUIRED') {
+          if (error.detail && typeof error.detail === 'object') {
             const kycError = error.detail;
-            alert(`KYC Verification Required\n\n${kycError.message}\n\nRequired Documents:\n${kycError.required_actions.documents.join('\n• ')}\n\nStatus: ${kycError.kyc_status}\n\nPlease complete your KYC verification in your profile settings to continue.`);
-            return;
+            
+            // Enhanced error handling for agents
+            if (kycError.error === 'AGENT_KYC_REQUIRED') {
+              alert(`🚨 Agent KYC Required\n\n${kycError.message}\n\nRequired Documents:\n${kycError.required_actions.documents.join('\n• ')}\n\n⏱️ ${kycError.verification_time}\n\n👀 Current Access: ${kycError.access_level.replace('_', ' ')}\n\nPlease complete your KYC verification in your profile settings.`);
+              return;
+            } else if (kycError.error === 'AGENT_KYC_PENDING') {
+              alert(`⏳ Agent KYC Under Review\n\n${kycError.message}\n\n⏱️ ${kycError.verification_time}\n\n👀 Current Access: ${kycError.access_level.replace('_', ' ')}\n\nYou can view the platform but cannot perform transactions until verified.`);
+              return;
+            } else if (kycError.error === 'AGENT_KYC_REJECTED') {
+              alert(`❌ Agent KYC Rejected\n\n${kycError.message}\n\nRequired Documents:\n${kycError.required_actions.documents.join('\n• ')}\n\n👀 Current Access: ${kycError.access_level.replace('_', ' ')}\n\nPlease resubmit with correct documents.`);
+              return;
+            } else if (kycError.error === 'KYC_REQUIRED') {
+              alert(`KYC Verification Required\n\n${kycError.message}\n\nRequired Documents:\n${kycError.required_actions.documents.join('\n• ')}\n\nStatus: ${kycError.kyc_status}\n\nPlease complete your KYC verification in your profile settings to continue.`);
+              return;
+            }
           }
           
           throw new Error(error.detail || 'Failed to create order');
