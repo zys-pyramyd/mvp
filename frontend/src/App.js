@@ -2954,16 +2954,19 @@ function App() {
         {showAdvancedFilters && (
           <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Location Filter */}
+              {/* Location Filter - Dropdown */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Lagos, Kano"
+                <select
                   value={filters.location}
                   onChange={(e) => setFilters(prev => ({ ...prev, location: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                />
+                >
+                  <option value="">All Locations</option>
+                  {availableLocations.map(location => (
+                    <option key={location} value={location}>{location}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Price Range */}
