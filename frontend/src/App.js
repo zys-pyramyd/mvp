@@ -1169,7 +1169,7 @@ function App() {
     return [];
   };
 
-  // Bulk listings for Buy from Farm
+  // Bulk listings for Fam Deals
   const fetchBulkListings = async () => {
     try {
       const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/products`);
