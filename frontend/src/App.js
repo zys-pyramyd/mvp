@@ -1029,16 +1029,22 @@ function App() {
 
   const fetchProductCategories = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/categories/products`);
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/categories/dynamic`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('pyramyd_token')}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
-        setProductCategories(data.categories || {});
-        return data;
+        setProductCategories(data.categories);
+        setProcessingLevels(data.processing_levels);
+        // Store available locations and seller types for filtering
+        setAvailableLocations(data.locations || []);
+        setAvailableSellerTypes(data.seller_types || []);
       }
     } catch (error) {
       console.error('Error fetching product categories:', error);
     }
-    return null;
   };
 
   const updateBusinessProfile = async (businessData) => {
