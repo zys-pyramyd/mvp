@@ -6221,6 +6221,10 @@ class PyramydAPITester:
         print("\n🔐 Testing Enhanced KYC System & User Dashboards (PRIORITY)...")
         self.test_enhanced_kyc_system_complete()
 
+        # ENHANCED AGENT KYC VALIDATION TESTS - Main focus from current review request
+        print("\n🔐 Testing Enhanced Agent KYC Validation (PRIORITY)...")
+        self.test_enhanced_agent_kyc_validation()
+
         return True
 
     def print_summary(self):
