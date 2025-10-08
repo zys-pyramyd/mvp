@@ -5024,50 +5024,47 @@ async def get_business_categories():
 
 @app.get("/api/categories/products")
 async def get_product_categories():
-    """Get all available product categories and subcategories"""
+    """Get all available product categories and subcategories with examples"""
     try:
         categories = {}
         
-        # Farm Input
-        categories["farm_input"] = {
-            "name": "Farm Input",
-            "description": "Agricultural inputs and supplies",
+        # Grains & Legumes
+        categories["grains_legumes"] = {
+            "name": "Grains & Legumes",
+            "description": "Cereals, grains, beans and legume products",
             "subcategories": {
-                "seeds": "Seeds for planting",
-                "seedlings": "Young plants for transplanting", 
-                "fertilizer": "Soil nutrients and fertilizers",
-                "herbicides": "Weed control chemicals",
-                "pesticides": "Pest control chemicals",
-                "farming_tools": "Agricultural tools and equipment"
-            }
-        }
-        
-        # Raw Food
-        categories["raw_food"] = {
-            "name": "Raw Food",
-            "description": "Unprocessed agricultural produce",
-            "subcategories": {
-                "rice": "All varieties of rice",
-                "grains": "Wheat, corn, millet, sorghum etc",
-                "tubers": "Yam, cassava, potato, sweet potato",
-                "fruits": "Fresh fruits",
-                "nuts": "Groundnuts, cashews, etc",
-                "legumes": "Beans, cowpeas, soybeans"
-            }
-        }
-        
-        # Packaged Food
-        categories["packaged_food"] = {
-            "name": "Packaged Food", 
-            "description": "Processed and packaged food products",
-            "subcategories": {
-                "packaged_rice": "Branded packaged rice",
-                "beans": "Packaged beans and legumes",
-                "pasta": "Spaghetti, noodles, pasta products",
-                "canned_food": "Canned and preserved foods",
-                "snacks": "Packaged snacks and confectionery", 
-                "beverages": "Drinks and beverage products",
-                "flour": "Processed flour products"
+                "rice": {
+                    "name": "Rice", 
+                    "examples": ["Local rice", "Ofada rice", "Basmati rice", "Brown rice"]
+                },
+                "wheat": {
+                    "name": "Wheat", 
+                    "examples": ["Wheat grains", "Wheat flour", "Whole wheat"]
+                },
+                "corn_maize": {
+                    "name": "Corn/Maize", 
+                    "examples": ["Yellow corn", "White corn", "Dried corn", "Sweet corn"]
+                },
+                "beans": {
+                    "name": "Beans", 
+                    "examples": ["Black beans", "Brown beans", "White beans", "Kidney beans"]
+                },
+                "cowpeas": {
+                    "name": "Cowpeas", 
+                    "examples": ["Black-eyed peas", "Drum beans", "String beans"]
+                },
+                "groundnuts": {
+                    "name": "Groundnuts", 
+                    "examples": ["Peanuts", "Groundnut paste", "Roasted groundnuts"]
+                },
+                "soybeans": {
+                    "name": "Soybeans", 
+                    "examples": ["Dried soybeans", "Soy flour", "Soy milk"]
+                },
+                "millet": {
+                    "name": "Millet", 
+                    "examples": ["Pearl millet", "Finger millet", "Fonio"]
+                }
             }
         }
         
@@ -5076,26 +5073,106 @@ async def get_product_categories():
             "name": "Fish & Meat",
             "description": "Fish, meat and protein products",
             "subcategories": {
-                "fresh_fish": "Fresh fish and seafood",
-                "dried_fish": "Dried and smoked fish",
-                "frozen_fish": "Frozen fish products", 
-                "fresh_meat": "Fresh meat (beef, goat, etc)",
-                "processed_meat": "Processed meat products",
-                "poultry": "Chicken, turkey and poultry products"
+                "fresh_fish": {
+                    "name": "Fresh Fish", 
+                    "examples": ["Tilapia", "Catfish", "Mackerel", "Salmon"]
+                },
+                "dried_fish": {
+                    "name": "Dried Fish", 
+                    "examples": ["Stockfish", "Dried catfish", "Smoked fish", "Sardines"]
+                },
+                "poultry": {
+                    "name": "Poultry", 
+                    "examples": ["Chicken", "Turkey", "Duck", "Guinea fowl"]
+                },
+                "beef": {
+                    "name": "Beef", 
+                    "examples": ["Fresh beef", "Processed beef", "Beef cuts"]
+                },
+                "goat_mutton": {
+                    "name": "Goat/Mutton", 
+                    "examples": ["Goat meat", "Mutton", "Lamb"]
+                },
+                "pork": {
+                    "name": "Pork", 
+                    "examples": ["Fresh pork", "Processed pork", "Bacon"]
+                },
+                "snails": {
+                    "name": "Snails", 
+                    "examples": ["Giant African snails", "Garden snails"]
+                }
             }
         }
         
-        # Pepper & Vegetables
-        categories["pepper_vegetables"] = {
-            "name": "Pepper & Vegetables",
-            "description": "Peppers, vegetables and fresh produce",
+        # Spices & Vegetables
+        categories["spices_vegetables"] = {
+            "name": "Spices & Vegetables",
+            "description": "Vegetables, herbs, spices and fresh produce",
             "subcategories": {
-                "peppers": "All varieties of peppers",
-                "leafy_vegetables": "Spinach, lettuce, cabbage etc",
-                "root_vegetables": "Carrots, radish, turnips",
-                "onions_garlic": "Onions, garlic, ginger",
-                "tomatoes": "Fresh and cherry tomatoes", 
-                "herbs_spices": "Fresh herbs and spices"
+                "leafy_vegetables": {
+                    "name": "Leafy Vegetables", 
+                    "examples": ["Spinach", "Lettuce", "Cabbage", "Kale", "Ugu leaves"]
+                },
+                "peppers": {
+                    "name": "Peppers", 
+                    "examples": ["Scotch bonnet", "Bell peppers", "Cayenne pepper", "Habanero"]
+                },
+                "tomatoes": {
+                    "name": "Tomatoes", 
+                    "examples": ["Fresh tomatoes", "Cherry tomatoes", "Roma tomatoes"]
+                },
+                "onions": {
+                    "name": "Onions", 
+                    "examples": ["Red onions", "White onions", "Spring onions", "Shallots"]
+                },
+                "ginger_garlic": {
+                    "name": "Ginger & Garlic", 
+                    "examples": ["Fresh ginger", "Garlic", "Ginger powder", "Garlic powder"]
+                },
+                "herbs_spices": {
+                    "name": "Herbs & Spices", 
+                    "examples": ["Basil", "Thyme", "Curry leaves", "Locust beans", "Turmeric"]
+                },
+                "okra": {
+                    "name": "Okra", 
+                    "examples": ["Fresh okra", "Dried okra"]
+                },
+                "cucumber": {
+                    "name": "Cucumber", 
+                    "examples": ["Field cucumber", "Greenhouse cucumber", "Mini cucumber"]
+                }
+            }
+        }
+        
+        # Tubers & Roots
+        categories["tubers_roots"] = {
+            "name": "Tubers & Roots",
+            "description": "Root vegetables, tubers and starchy crops",
+            "subcategories": {
+                "yams": {
+                    "name": "Yams", 
+                    "examples": ["White yam", "Water yam", "Aerial yam", "Pounded yam flour"]
+                },
+                "cassava": {
+                    "name": "Cassava", 
+                    "examples": ["Fresh cassava", "Cassava flour", "Garri", "Fufu flour"]
+                },
+                "sweet_potatoes": {
+                    "name": "Sweet Potatoes", 
+                    "examples": ["Orange flesh sweet potatoes", "White flesh sweet potatoes"]
+                },
+                "irish_potatoes": {
+                    "name": "Irish Potatoes", 
+                    "examples": ["Red potatoes", "White potatoes", "Fingerling potatoes"]
+                },
+                "cocoyams": {
+                    "name": "Cocoyams", 
+                    "examples": ["Taro", "Tannia", "Ede cocoyam"]
+                },
+                "plantains": {
+                    "name": "Plantains", 
+                    "examples": ["Unripe plantains", "Ripe plantains", "Plantain flour"]
+                }
             }
         }
         
