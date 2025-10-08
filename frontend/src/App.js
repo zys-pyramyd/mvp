@@ -108,6 +108,7 @@ function App() {
   const [productCategories, setProductCategories] = useState({});
   const [processingLevels, setProcessingLevels] = useState([]);
   const [availableSellerTypes, setAvailableSellerTypes] = useState([]);
+  const [availableLocations, setAvailableLocations] = useState([]);
   const [showBusinessProfile, setShowBusinessProfile] = useState(false);
   const [showKYCPrompt, setShowKYCPrompt] = useState(false);
   const [kycStatus, setKycStatus] = useState(null);
