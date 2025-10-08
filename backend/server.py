@@ -1374,6 +1374,14 @@ async def get_products(
             if seller_type:
                 preorders_query["seller_type"] = seller_type
             
+            # Platform-based filtering for preorders
+            if platform == "home":
+                # Home page: Only business and supplier preorders
+                preorders_query["seller_type"] = {"$in": ["business", "supplier"]}
+            elif platform == "fam_deals":
+                # Fam Deals page: Only farmer and agent preorders
+                preorders_query["seller_type"] = {"$in": ["farmer", "agent"]}
+            
             # Get pre-orders with improved pagination logic
             skip = (page - 1) * limit if only_preorders else 0
             
