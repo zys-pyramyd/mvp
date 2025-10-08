@@ -106,6 +106,8 @@ function App() {
   // Categories and business profile state
   const [businessCategories, setBusinessCategories] = useState({});
   const [productCategories, setProductCategories] = useState({});
+  const [processingLevels, setProcessingLevels] = useState([]);
+  const [availableSellerTypes, setAvailableSellerTypes] = useState([]);
   const [showBusinessProfile, setShowBusinessProfile] = useState(false);
   const [showKYCPrompt, setShowKYCPrompt] = useState(false);
   const [kycStatus, setKycStatus] = useState(null);
