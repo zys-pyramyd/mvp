@@ -233,9 +233,9 @@ function App() {
   // Slide content with different background colors and CTAs
   const slideContent = [
     {
-      title: currentPlatform === 'buy_from_farm' ? 'PyHub - Buy from Farm' : 'Pyramyd',
+      title: currentPlatform === 'buy_from_farm' ? 'PyHub - Fam Deals' : 'Pyramyd',
       description: currentPlatform === 'buy_from_farm' 
-        ? 'Buy fresh produce directly from farms and get the best quality at source prices'
+        ? 'Direct trade platform for bulk agricultural produce. Connect with farmers and agents for wholesale family deals.'
         : 'Your comprehensive agricultural marketplace connecting farmers, suppliers, and buyers',
       bgGradient: 'from-emerald-100 to-emerald-50',
       cta: null
