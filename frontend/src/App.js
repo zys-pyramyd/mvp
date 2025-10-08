@@ -3103,12 +3103,14 @@ function App() {
             </div>
             <button
               onClick={() => {
+                // Go to Fam Deals page with preorder filter
+                setCurrentPlatform('buy_from_farm');
                 setFilters(prev => ({ ...prev, only_preorders: true }));
-                fetchProducts();
+                setTimeout(() => fetchProducts(), 100); // Small delay to ensure platform is set
               }}
               className="px-3 sm:px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-medium text-xs sm:text-sm"
             >
-              See More →
+              See More in Fam Deals →
             </button>
           </div>
 
