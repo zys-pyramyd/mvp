@@ -3290,13 +3290,19 @@ function App() {
                   >
                     <div className="text-center">
                       <div className="text-2xl mb-1">
-                        {key === 'farm_input' ? '🌱' :
-                         key === 'raw_food' ? '🌾' :
-                         key === 'packaged_food' ? '📦' :
+                        {key === 'grains_legumes' ? '🌾' :
                          key === 'fish_meat' ? '🐟' :
-                         key === 'pepper_vegetables' ? '🌶️' : '📦'}
+                         key === 'spices_vegetables' ? '🌶️' :
+                         key === 'tubers_roots' ? '🥔' : '📦'}
                       </div>
-                      <div className="text-xs font-medium text-gray-700">{category.name}</div>
+                      <div className="text-xs font-medium text-gray-700 mb-1">{category.name}</div>
+                      {/* Show example products */}
+                      <div className="text-xs text-gray-500">
+                        {Object.values(category.subcategories || {}).slice(0, 2).map((sub, idx) => (
+                          sub.examples ? sub.examples[0] : sub.name || sub
+                        )).join(', ')}
+                        {Object.keys(category.subcategories || {}).length > 2 && '...'}
+                      </div>
                     </div>
                   </div>
                 ))}
