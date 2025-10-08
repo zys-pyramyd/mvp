@@ -6225,6 +6225,10 @@ class PyramydAPITester:
         print("\n🔐 Testing Enhanced Agent KYC Validation (PRIORITY)...")
         self.test_enhanced_agent_kyc_validation()
 
+        # FOOD CATEGORY SYSTEM & PLATFORM FILTERING TESTS - Main focus from current review request
+        print("\n🍽️ Testing Food Category System & Platform Filtering (PRIORITY)...")
+        self.test_food_category_system_complete()
+
         return True
 
     def print_summary(self):
