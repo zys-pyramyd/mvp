@@ -85,11 +85,10 @@ class KYCStatus(str, Enum):
     REJECTED = "rejected"
 
 class ProductCategory(str, Enum):
-    FARM_INPUT = "farm_input"
-    RAW_FOOD = "raw_food" 
-    PACKAGED_FOOD = "packaged_food"
+    GRAINS_LEGUMES = "grains_legumes"
     FISH_MEAT = "fish_meat"
-    PEPPER_VEGETABLES = "pepper_vegetables"
+    SPICES_VEGETABLES = "spices_vegetables" 
+    TUBERS_ROOTS = "tubers_roots"
 
 class FarmInputSubcategory(str, Enum):
     SEEDS = "seeds"
