@@ -3233,6 +3233,7 @@ function App() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Enhanced Category Navigation & Filters */}
         <div className="mb-6 space-y-4">
