@@ -90,33 +90,42 @@ class ProductCategory(str, Enum):
     SPICES_VEGETABLES = "spices_vegetables" 
     TUBERS_ROOTS = "tubers_roots"
 
-class FarmInputSubcategory(str, Enum):
-    SEEDS = "seeds"
-    SEEDLINGS = "seedlings"
-    FERTILIZER = "fertilizer"
-    HERBICIDES = "herbicides"
-    PESTICIDES = "pesticides"
-    FARMING_TOOLS = "farming_tools"
-
-class RawFoodSubcategory(str, Enum):
-    RICE = "rice"
-    GRAINS = "grains"
-    TUBERS = "tubers"
-    FRUITS = "fruits"
-    NUTS = "nuts"
-    LEGUMES = "legumes"
-
-class PackagedFoodSubcategory(str, Enum):
-    PACKAGED_RICE = "packaged_rice"
-    BEANS = "beans"
-    PASTA = "pasta"  # spaghetti, noodles
-    CANNED_FOOD = "canned_food"
-    SNACKS = "snacks"
-    BEVERAGES = "beverages"
-    FLOUR = "flour"
+class GrainsLegumesSubcategory(str, Enum):
+    RICE = "rice"  # e.g. local rice, ofada rice, basmati rice
+    WHEAT = "wheat"  # e.g. wheat grains, wheat flour
+    CORN_MAIZE = "corn_maize"  # e.g. yellow corn, white corn, dried corn
+    BEANS = "beans"  # e.g. black beans, brown beans, white beans
+    COWPEAS = "cowpeas"  # e.g. black-eyed peas, drum beans
+    GROUNDNUTS = "groundnuts"  # e.g. peanuts, groundnut paste
+    SOYBEANS = "soybeans"  # e.g. dried soybeans, soy flour
+    MILLET = "millet"  # e.g. pearl millet, finger millet
 
 class FishMeatSubcategory(str, Enum):
-    FRESH_FISH = "fresh_fish"
+    FRESH_FISH = "fresh_fish"  # e.g. tilapia, catfish, mackerel
+    DRIED_FISH = "dried_fish"  # e.g. stockfish, dried catfish, smoked fish
+    POULTRY = "poultry"  # e.g. chicken, turkey, duck
+    BEEF = "beef"  # e.g. fresh beef, processed beef
+    GOAT_MUTTON = "goat_mutton"  # e.g. goat meat, mutton
+    PORK = "pork"  # e.g. fresh pork, processed pork
+    SNAILS = "snails"  # e.g. giant African snails
+
+class SpicesVegetablesSubcategory(str, Enum):
+    LEAFY_VEGETABLES = "leafy_vegetables"  # e.g. spinach, lettuce, cabbage, kale
+    PEPPERS = "peppers"  # e.g. scotch bonnet, bell peppers, cayenne pepper
+    TOMATOES = "tomatoes"  # e.g. fresh tomatoes, cherry tomatoes, Roma tomatoes
+    ONIONS = "onions"  # e.g. red onions, white onions, spring onions
+    GINGER_GARLIC = "ginger_garlic"  # e.g. fresh ginger, garlic, ginger powder
+    HERBS_SPICES = "herbs_spices"  # e.g. basil, thyme, curry leaves, locust beans
+    OKRA = "okra"  # e.g. fresh okra, dried okra
+    CUCUMBER = "cucumber"  # e.g. field cucumber, greenhouse cucumber
+
+class TubersRootsSubcategory(str, Enum):
+    YAMS = "yams"  # e.g. white yam, water yam, aerial yam
+    CASSAVA = "cassava"  # e.g. fresh cassava, cassava flour, garri
+    SWEET_POTATOES = "sweet_potatoes"  # e.g. orange flesh, white flesh sweet potatoes
+    IRISH_POTATOES = "irish_potatoes"  # e.g. red potatoes, white potatoes
+    COCOYAMS = "cocoyams"  # e.g. taro, tannia
+    PLANTAINS = "plantains"  # e.g. unripe plantains, ripe plantains
     DRIED_FISH = "dried_fish"
     FROZEN_FISH = "frozen_fish"
     FRESH_MEAT = "fresh_meat"
