@@ -987,11 +987,50 @@ def validate_kyc_compliance(user: dict, action: str = "general"):
     
     # Check if KYC is required and approved
     kyc_status = user.get("kyc_status", "not_started")
+    user_role = user.get("role", "")
     
+    # Enhanced restrictions for agents - they must complete KYC before ANY platform actions
+    if user_role == "agent":
+        if kyc_status == "not_started":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "AGENT_KYC_REQUIRED",
+                    "message": "Agents must complete their KYC verification before performing any actions on the platform. Please submit your KYC documents to get started.",
+                    "kyc_status": kyc_status,
+                    "verification_time": "Verification takes within 24 hours to verify",
+                    "access_level": "view_only",
+                    "required_actions": get_kyc_requirements(user)
+                }
+            )
+        elif kyc_status == "pending":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "AGENT_KYC_PENDING", 
+                    "message": "Your KYC is under review. You can access the platform to view but cannot onboard farmers or publish farm produce until your status changes to verified.",
+                    "kyc_status": kyc_status,
+                    "verification_time": "Verification typically completes within 24 hours",
+                    "access_level": "view_only"
+                }
+            )
+        elif kyc_status == "rejected":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "AGENT_KYC_REJECTED",
+                    "message": "Your KYC was rejected. Please resubmit with correct documents. You can only view the platform until verification is completed.",
+                    "kyc_status": kyc_status,
+                    "access_level": "view_only",
+                    "required_actions": get_kyc_requirements(user)
+                }
+            )
+    
+    # For other roles (business, farmer, etc.) - standard KYC validation
     if kyc_status != "approved":
         status_messages = {
             "not_started": "Please complete your KYC verification to perform this action",
-            "pending": "Your KYC is under review. You can perform this action once approved",
+            "pending": "Your KYC is under review. You can perform this action once approved", 
             "rejected": "Your KYC was rejected. Please resubmit with correct documents to continue"
         }
         
