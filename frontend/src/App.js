@@ -122,7 +122,7 @@ function App() {
   const [locationFilter, setLocationFilter] = useState('');
   const [availableLocations, setAvailableLocations] = useState([]);
   
-  // Enhanced Buy from Farm state
+  // Enhanced Fam Deals state
   const [bulkListings, setBulkListings] = useState([]);
   const [showBulkListing, setShowBulkListing] = useState(false);
   
