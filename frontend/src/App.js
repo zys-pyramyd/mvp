@@ -3247,6 +3247,36 @@ function App() {
 
         {/* Enhanced Category Navigation & Filters */}
         <div className="mb-6 space-y-4">
+          {/* Pre-Order Filter for Fam Deals */}
+          {currentPlatform === 'buy_from_farm' && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="text-orange-600">🕐</span>
+                  <span className="text-sm font-medium text-orange-800">Filter by Pre-Orders:</span>
+                </div>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={filters.only_preorders}
+                    onChange={(e) => {
+                      setFilters(prev => ({ ...prev, only_preorders: e.target.checked }));
+                      // Auto-apply filter
+                      setTimeout(() => fetchProducts(), 100);
+                    }}
+                    className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                  />
+                  <span className="text-sm text-orange-700">Show only pre-order products</span>
+                </label>
+              </div>
+              {filters.only_preorders && (
+                <div className="mt-2 text-xs text-orange-600">
+                  Showing products available for advance booking with future delivery dates
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Enhanced Category Navigation */}
           <div className="relative">
             <div className="flex items-center">
