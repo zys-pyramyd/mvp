@@ -2851,35 +2851,6 @@ function App() {
                       >
                         Report an Issue
                       </button>
-
-                      {/* Demo Mode Options */}
-                      <div className="border-t border-gray-100 pt-2 mt-2">
-                        <div className="px-4 py-2">
-                          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Demo Mode</span>
-                        </div>
-                        {!isDemoMode && (
-                          <button
-                            onClick={() => {
-                              setShowProfileMenu(false);
-                              startDemoOnboarding();
-                            }}
-                            className="block w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-gray-50 font-medium"
-                          >
-                            🎯 Try Agent Demo
-                          </button>
-                        )}
-                        {isDemoMode && (
-                          <button
-                            onClick={() => {
-                              setShowProfileMenu(false);
-                              setShowDemoAgentDashboard(true);
-                            }}
-                            className="block w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-gray-50 font-medium"
-                          >
-                            🎯 Demo Dashboard
-                          </button>
-                        )}
-                      </div>
                       
                       <div className="border-t border-gray-100">
                         <button
