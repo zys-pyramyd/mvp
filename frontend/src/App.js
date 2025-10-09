@@ -1456,6 +1456,47 @@ function App() {
     setShowProfileMenu(false);
   };
 
+  // Demo Mode Functions
+  const toggleDemoMode = () => {
+    if (isDemoMode) {
+      DemoModeManager.disableDemoMode();
+      setIsDemoMode(false);
+      setUser(null);
+      setKycStatus(null);
+      setShowDemoAgentDashboard(false);
+      alert('Demo mode disabled. Please refresh the page.');
+    } else {
+      DemoModeManager.enableDemoMode();
+      setIsDemoMode(true);
+      const demoUser = DemoModeManager.getDemoUser();
+      const demoKYCStatus = DemoModeManager.getDemoKYCStatus();
+      setUser(demoUser);
+      setKycStatus(demoKYCStatus);
+      alert('Demo mode enabled! You are now logged in as a demo agent.');
+    }
+  };
+
+  const startDemoOnboarding = () => {
+    if (!isDemoMode) {
+      DemoModeManager.enableDemoMode();
+      setIsDemoMode(true);
+    }
+    
+    // Reset to clean state for demo
+    setUser(null);
+    setKycStatus(null);
+    setShowDemoKYC(true);
+  };
+
+  const completeDemoKYC = () => {
+    const demoUser = DemoModeManager.getDemoUser();
+    const demoKYCStatus = DemoModeManager.getDemoKYCStatus();
+    setUser(demoUser);
+    setKycStatus(demoKYCStatus);
+    setShowDemoKYC(false);
+    setShowDemoAgentDashboard(true);
+  };
+
   // Audio recording functions
   const startRecording = async () => {
     try {
