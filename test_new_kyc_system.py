@@ -251,7 +251,7 @@ class NewKYCSystemTester:
         valid_farmer_kyc_data = {
             "full_name": "Mary Jane Farmer",
             "phone_number": "+2348123456790",
-            "identification_type": "NIN",
+            "identification_type": "nin",  # lowercase
             "identification_number": "98765432109",
             "farm_location": "Ibadan, Oyo State",
             "farm_size_hectares": 5.5,
