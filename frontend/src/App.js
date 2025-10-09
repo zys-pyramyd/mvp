@@ -113,11 +113,6 @@ function App() {
   const [showKYCPrompt, setShowKYCPrompt] = useState(false);
   const [kycStatus, setKycStatus] = useState(null);
 
-  // Demo Mode state
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [showDemoKYC, setShowDemoKYC] = useState(false);
-  const [showDemoAgentDashboard, setShowDemoAgentDashboard] = useState(false);
-
   // Dashboard and trading platform state
   const [showFarmerDashboard, setShowFarmerDashboard] = useState(false);
   const [showAgentDashboard, setShowAgentDashboard] = useState(false);
