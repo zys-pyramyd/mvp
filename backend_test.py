@@ -7306,6 +7306,10 @@ class PyramydAPITester:
         print("\n🍽️ Testing Food Category System & Platform Filtering (PRIORITY)...")
         self.test_food_category_system_complete()
 
+        # NEW KYC SYSTEM AND PRE-ORDER FILTER TESTS - Main focus from current review request
+        print("\n🔄 Testing New KYC System and Pre-order Filter (PRIORITY)...")
+        self.test_new_kyc_system_complete()
+
         return True
 
     def print_summary(self):
