@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-import DemoModeToggle, { DemoModeManager } from './DemoMode';
-import DemoKYCSubmission from './DemoKYC';
-import DemoAgentDashboard from './DemoAgentDashboard';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
 
