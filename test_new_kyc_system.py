@@ -168,7 +168,7 @@ class NewKYCSystemTester:
             "full_name": "John Doe Agent",
             "phone_number": "+2348123456789",
             "email_address": "john.agent@greenvalley.com",
-            "identification_type": "NIN",
+            "identification_type": "nin",  # lowercase
             "identification_number": "12345678901",
             "agricultural_experience_years": 5,
             "target_locations": ["Lagos", "Ogun", "Oyo"],
