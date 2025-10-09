@@ -4594,6 +4594,184 @@ async def submit_unregistered_entity_kyc(
         print(f"Error submitting unregistered entity KYC: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to submit KYC")
 
+@app.post("/api/kyc/agent/submit")
+async def submit_agent_kyc(kyc_data: AgentKYC, current_user: dict = Depends(get_current_user)):
+    """Submit KYC for agents with specialized requirements"""
+    try:
+        user_id = current_user["id"]
+        
+        # Ensure user is an agent
+        if current_user.get("role") != "agent":
+            raise HTTPException(status_code=403, detail="Only agents can submit agent KYC")
+        
+        # Validate identification number format
+        if kyc_data.identification_type == "NIN" and len(kyc_data.identification_number) != 11:
+            raise HTTPException(status_code=400, detail="NIN must be exactly 11 digits")
+        elif kyc_data.identification_type == "BVN" and len(kyc_data.identification_number) != 11:
+            raise HTTPException(status_code=400, detail="BVN must be exactly 11 digits")
+        
+        # Store KYC data
+        kyc_record = kyc_data.dict()
+        kyc_record["user_id"] = user_id
+        kyc_record["submission_date"] = datetime.utcnow().isoformat()
+        kyc_record["status"] = "pending"
+        kyc_record["kyc_type"] = "agent"
+        
+        # Determine if registered or unregistered business
+        if kyc_data.business_registration_number and kyc_data.tax_identification_number:
+            kyc_record["business_status"] = "registered"
+        else:
+            kyc_record["business_status"] = "unregistered"
+        
+        agent_kyc_collection.insert_one(kyc_record)
+        
+        # Update user KYC status
+        users_collection.update_one(
+            {"id": user_id},
+            {
+                "$set": {
+                    "kyc_status": "pending",
+                    "kyc_submission_date": datetime.utcnow().isoformat(),
+                    "kyc_type": "agent"
+                }
+            }
+        )
+        
+        # Log audit trail
+        audit_logs_collection.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "action": "kyc_submission",
+            "resource_type": "agent_kyc",
+            "details": {
+                "kyc_type": "agent",
+                "business_status": kyc_record["business_status"],
+                "target_locations": kyc_data.target_locations
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        
+        return {
+            "message": "Agent KYC submitted successfully",
+            "status": "pending",
+            "business_status": kyc_record["business_status"],
+            "estimated_review_time": "1-3 business days for agents",
+            "next_steps": [
+                "Upload required documents (headshot, national ID, utility bill)",
+                "If registered business: Upload incorporation certificate and TIN certificate",
+                "Await verification from our team",
+                "Start building your farmer network once approved"
+            ]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error submitting agent KYC: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to submit agent KYC")
+
+@app.post("/api/kyc/farmer/submit")
+async def submit_farmer_kyc(kyc_data: FarmerKYC, current_user: dict = Depends(get_current_user)):
+    """Submit KYC for farmers (self-registering or agent-verified)"""
+    try:
+        user_id = current_user["id"]
+        
+        # Ensure user is a farmer
+        if current_user.get("role") != "farmer":
+            raise HTTPException(status_code=403, detail="Only farmers can submit farmer KYC")
+        
+        # Validate identification number format
+        if kyc_data.identification_type == "NIN" and len(kyc_data.identification_number) != 11:
+            raise HTTPException(status_code=400, detail="NIN must be exactly 11 digits")
+        elif kyc_data.identification_type == "BVN" and len(kyc_data.identification_number) != 11:
+            raise HTTPException(status_code=400, detail="BVN must be exactly 11 digits")
+        
+        # If agent-verified, validate the agent
+        if kyc_data.verification_method == "agent_verified":
+            if not kyc_data.verifying_agent_id:
+                raise HTTPException(status_code=400, detail="Verifying agent ID required for agent verification")
+            
+            # Check if the agent exists and is KYC approved
+            verifying_agent = users_collection.find_one({"id": kyc_data.verifying_agent_id})
+            if not verifying_agent:
+                raise HTTPException(status_code=404, detail="Verifying agent not found")
+            
+            if verifying_agent.get("role") != "agent":
+                raise HTTPException(status_code=400, detail="Verifying user must be an agent")
+            
+            if verifying_agent.get("kyc_status") != "approved":
+                raise HTTPException(status_code=400, detail="Verifying agent must have approved KYC status")
+        
+        # Store KYC data
+        kyc_record = kyc_data.dict()
+        kyc_record["user_id"] = user_id
+        kyc_record["submission_date"] = datetime.utcnow().isoformat()
+        
+        # Set status based on verification method
+        if kyc_data.verification_method == "agent_verified":
+            kyc_record["status"] = "agent_pending"  # Faster processing for agent-verified farmers
+            estimated_time = "24-48 hours (agent-verified)"
+        else:
+            kyc_record["status"] = "pending"  # Standard processing for self-verified
+            estimated_time = "2-5 business days (self-verified)"
+        
+        kyc_record["kyc_type"] = "farmer"
+        
+        farmer_kyc_collection.insert_one(kyc_record)
+        
+        # Update user KYC status
+        users_collection.update_one(
+            {"id": user_id},
+            {
+                "$set": {
+                    "kyc_status": kyc_record["status"],
+                    "kyc_submission_date": datetime.utcnow().isoformat(),
+                    "kyc_type": "farmer",
+                    "verifying_agent_id": kyc_data.verifying_agent_id if kyc_data.verification_method == "agent_verified" else None
+                }
+            }
+        )
+        
+        # Log audit trail
+        audit_logs_collection.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "action": "kyc_submission",
+            "resource_type": "farmer_kyc",
+            "details": {
+                "kyc_type": "farmer",
+                "verification_method": kyc_data.verification_method,
+                "verifying_agent_id": kyc_data.verifying_agent_id,
+                "farm_size_hectares": kyc_data.farm_size_hectares,
+                "primary_crops": kyc_data.primary_crops
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        
+        return {
+            "message": "Farmer KYC submitted successfully",
+            "status": kyc_record["status"],
+            "verification_method": kyc_data.verification_method,
+            "estimated_review_time": estimated_time,
+            "next_steps": [
+                "Upload required documents (headshot, national ID, farm photo)",
+                "Upload land ownership documents if applicable",
+                "Await verification from our team",
+                "Start listing your produce once approved"
+            ] if kyc_data.verification_method == "self_verified" else [
+                "Documents verified by your agent",
+                "Faster processing due to agent verification", 
+                "Await final approval from our team",
+                "Start listing your produce once approved"
+            ]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error submitting farmer KYC: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to submit farmer KYC")
+
 @app.get("/api/kyc/documents/my-documents")
 async def get_my_kyc_documents(current_user: dict = Depends(get_current_user)):
     """Get user's uploaded KYC documents"""
