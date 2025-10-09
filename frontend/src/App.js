@@ -7909,26 +7909,6 @@ function App() {
         </div>
       )}
 
-      {/* Demo Mode Components */}
-      {showDemoKYC && (
-        <DemoKYCSubmission
-          onComplete={completeDemoKYC}
-          onCancel={() => setShowDemoKYC(false)}
-        />
-      )}
-
-      {showDemoAgentDashboard && (
-        <DemoAgentDashboard
-          onClose={() => setShowDemoAgentDashboard(false)}
-        />
-      )}
-
-      {/* Demo Mode Toggle */}
-      <DemoModeToggle
-        isDemoMode={isDemoMode}
-        onToggle={toggleDemoMode}
-      />
-
     </div>
   );
 }
