@@ -490,6 +490,35 @@ function App() {
 
   const fetchProducts = async () => {
     try {
+      // Handle demo mode data
+      if (isDemoMode) {
+        const demoProducts = DemoModeManager.getDemoProducts();
+        const platform = currentPlatform === 'buy_from_farm' ? 'fam_deals' : 'home';
+        
+        // Filter demo products by platform
+        let filteredProducts = demoProducts;
+        if (platform === 'home') {
+          filteredProducts = demoProducts.filter(p => ['business', 'supplier'].includes(p.seller_type));
+        } else {
+          filteredProducts = demoProducts.filter(p => ['farmer', 'agent'].includes(p.seller_type));
+        }
+        
+        // Apply additional filters if any
+        if (selectedCategory) {
+          filteredProducts = filteredProducts.filter(p => p.category === selectedCategory);
+        }
+        if (searchTerm) {
+          filteredProducts = filteredProducts.filter(p => 
+            p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.location.toLowerCase().includes(searchTerm.toLowerCase())
+          );
+        }
+        
+        setProducts(filteredProducts);
+        return;
+      }
+
       const platform = currentPlatform === 'buy_from_farm' ? 'fam_deals' : 'home';
       let url = `${process.env.REACT_APP_BACKEND_URL}/api/products?platform=${platform}`;
       
