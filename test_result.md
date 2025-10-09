@@ -525,7 +525,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Enhanced Agent KYC Validation Testing"
+    - "New KYC System and Pre-order Filter Testing Complete"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
