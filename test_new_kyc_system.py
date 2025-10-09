@@ -300,10 +300,12 @@ class NewKYCSystemTester:
         
         if success and isinstance(response, dict):
             # Check if response has expected structure for product categories
-            if len(response) > 0:
+            if 'categories' in response and len(response['categories']) > 0:
+                categories = response['categories']
+                
                 # Check if new food categories are present
                 new_food_categories = ['grains_legumes', 'fish_meat', 'spices_vegetables', 'tubers_roots']
-                found_categories = [cat for cat in new_food_categories if cat in response]
+                found_categories = [cat for cat in new_food_categories if cat in categories]
                 
                 if len(found_categories) >= 3:  # At least 3 of the 4 new categories
                     self.log_test("Categories/Products - New Food Categories", True, 
@@ -316,9 +318,9 @@ class NewKYCSystemTester:
                 
                 # Check if subcategories have examples
                 has_examples = False
-                for category, subcats in response.items():
-                    if isinstance(subcats, dict) and 'subcategories' in subcats:
-                        subcategories = subcats['subcategories']
+                for category, cat_data in categories.items():
+                    if isinstance(cat_data, dict) and 'subcategories' in cat_data:
+                        subcategories = cat_data['subcategories']
                         for subcat, details in subcategories.items():
                             if isinstance(details, dict) and 'examples' in details:
                                 examples = details['examples']
@@ -335,16 +337,28 @@ class NewKYCSystemTester:
                     self.log_test("Categories/Products - Subcategory Examples", False, 
                                  "No subcategory examples found")
                     examples_success = False
+                
+                # Check if processing levels are present
+                if 'processing_levels' in response:
+                    self.log_test("Categories/Products - Processing Levels", True, 
+                                 f"Found processing levels: {list(response['processing_levels'].keys())}")
+                    processing_success = True
+                else:
+                    self.log_test("Categories/Products - Processing Levels", False, 
+                                 "No processing levels found")
+                    processing_success = False
             else:
-                self.log_test("Categories/Products - Structure", False, "Empty response")
+                self.log_test("Categories/Products - Structure", False, "Invalid response structure")
                 categories_success = False
                 examples_success = False
+                processing_success = False
         else:
             self.log_test("Categories/Products - Structure", False, f"API call failed: {response}")
             categories_success = False
             examples_success = False
+            processing_success = False
         
-        overall_success = categories_success and examples_success
+        overall_success = categories_success and examples_success and processing_success
         return overall_success
     
     def run_tests(self):
