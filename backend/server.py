@@ -1126,31 +1126,118 @@ def get_kyc_requirements(user: dict) -> dict:
     business_category = user.get("business_category", "")
     is_registered_business = user.get("is_registered_business", False)
     
-    requirements = {
-        "registered_business": [
-            "Business Registration Number",
-            "TIN Certificate", 
-            "Certificate of Incorporation",
-            "Business Address Verification"
-        ],
-        "unregistered_entity": [
-            "NIN or BVN",
-            "Headshot Photo (Camera)",
-            "National ID Document",
-            "Utility Bill (Address Verification)"
-        ]
-    }
-    
-    if role == "business" and is_registered_business:
+    # Agent-specific KYC requirements
+    if role == "agent":
         return {
-            "type": "registered_business",
-            "documents": requirements["registered_business"],
-            "endpoint": "/api/kyc/registered-business/submit"
+            "type": "agent",
+            "title": "Agent KYC Requirements",
+            "description": "Specialized requirements for agricultural agents",
+            "review_time": "1-3 business days",
+            "documents": [
+                "Headshot Photo (Camera captured)",
+                "National ID Document (NIN or BVN)",
+                "Utility Bill (Address verification)",
+                "Bank Statement (Financial verification)",
+                "Certificate of Incorporation (If registered business)",
+                "TIN Certificate (If registered business)"
+            ],
+            "information_required": [
+                "Business name and address",
+                "Personal identification details",
+                "Agricultural experience",
+                "Target operation locations",
+                "Expected farmer network size"
+            ],
+            "endpoint": "/api/kyc/agent/submit",
+            "benefits_after_approval": [
+                "Register and verify farmers",
+                "Earn commission on farmer sales",
+                "Access agent dashboard",
+                "Build farmer network"
+            ]
         }
+    
+    # Farmer-specific KYC requirements  
+    elif role == "farmer":
+        return {
+            "type": "farmer",
+            "title": "Farmer KYC Requirements", 
+            "description": "Verification requirements for farmers",
+            "review_time": "24-48 hours (agent-verified) or 2-5 business days (self-verified)",
+            "documents": [
+                "Headshot Photo (Camera captured)",
+                "National ID Document (NIN or BVN)", 
+                "Farm Photo (Show your farming area)",
+                "Land Ownership Document (Certificate or lease agreement)"
+            ],
+            "information_required": [
+                "Personal identification details",
+                "Farm location and size",
+                "Primary crops grown",
+                "Farming experience",
+                "Land ownership status"
+            ],
+            "verification_options": [
+                {
+                    "method": "agent_verified",
+                    "title": "Agent Verification (Recommended)",
+                    "description": "Get verified by a registered agent for faster processing",
+                    "processing_time": "24-48 hours",
+                    "benefits": ["Faster approval", "Agent support", "Market access guidance"]
+                },
+                {
+                    "method": "self_verified", 
+                    "title": "Self Verification",
+                    "description": "Submit documents directly for verification",
+                    "processing_time": "2-5 business days",
+                    "benefits": ["Direct submission", "Full document control"]
+                }
+            ],
+            "endpoint": "/api/kyc/farmer/submit"
+        }
+    
+    # Business KYC requirements (existing)
+    elif role == "business":
+        if is_registered_business:
+            return {
+                "type": "registered_business",
+                "title": "Registered Business KYC",
+                "description": "Requirements for registered businesses",
+                "review_time": "2-5 business days",
+                "documents": [
+                    "Business Registration Number",
+                    "TIN Certificate", 
+                    "Certificate of Incorporation",
+                    "Business Address Verification (Utility Bill)"
+                ],
+                "endpoint": "/api/kyc/registered-business/submit"
+            }
+        else:
+            return {
+                "type": "unregistered_business",
+                "title": "Unregistered Business KYC", 
+                "description": "Requirements for unregistered businesses",
+                "review_time": "2-5 business days",
+                "documents": [
+                    "NIN or BVN",
+                    "Headshot Photo (Camera)",
+                    "National ID Document",
+                    "Utility Bill (Address Verification)"
+                ],
+                "endpoint": "/api/kyc/unregistered-entity/submit"
+            }
+    
+    # Default for other roles
     else:
         return {
             "type": "unregistered_entity", 
-            "documents": requirements["unregistered_entity"],
+            "title": "Standard KYC Requirements",
+            "documents": [
+                "NIN or BVN",
+                "Headshot Photo (Camera)",
+                "National ID Document", 
+                "Utility Bill (Address Verification)"
+            ],
             "endpoint": "/api/kyc/unregistered-entity/submit"
         }
 
