@@ -394,6 +394,9 @@ function App() {
   }, [user]);
 
   useEffect(() => {
+    // Check demo mode status
+    setIsDemoMode(DemoModeManager.isDemoMode());
+    
     // Check for saved token
     const token = localStorage.getItem('token');
     if (token) {
@@ -409,6 +412,16 @@ function App() {
     // Migrate existing cart items to ensure proper structure
     if (cart.length > 0) {
       migrateCartItems();
+    }
+    
+    // Load demo data if in demo mode
+    if (DemoModeManager.isDemoMode()) {
+      const demoUser = DemoModeManager.getDemoUser();
+      const demoKYCStatus = DemoModeManager.getDemoKYCStatus();
+      if (demoUser) {
+        setUser(demoUser);
+        setKycStatus(demoKYCStatus);
+      }
     }
   }, [currentPlatform, selectedCategory, searchTerm]);
 
