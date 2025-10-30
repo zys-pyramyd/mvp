@@ -2568,28 +2568,28 @@ function App() {
 
   const CommunityBrowser = () => {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
         <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Find Communities</h2>
+          <div className="p-4 sm:p-6">
+            <div className="flex justify-between items-center mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900">Find Communities</h2>
               <button
                 onClick={() => setShowCommunityBrowser(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 text-xl sm:text-2xl p-1"
               >
                 ✕
               </button>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {communities.map((community) => (
-                <div key={community.id} className="border border-gray-200 rounded-lg p-4 hover:border-emerald-300 transition-colors">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{community.name}</h3>
-                      <p className="text-sm text-gray-600">{community.category}</p>
+                <div key={community.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-emerald-300 transition-colors">
+                  <div className="flex items-start justify-between mb-2 sm:mb-3">
+                    <div className="flex-1 min-w-0 pr-2">
+                      <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">{community.name}</h3>
+                      <p className="text-xs sm:text-sm text-gray-600">{community.category}</p>
                     </div>
-                    <span className={`px-2 py-1 text-xs rounded-full ${
+                    <span className={`px-2 py-0.5 sm:py-1 text-xs rounded-full flex-shrink-0 ${
                       community.privacy_type === 'public' 
                         ? 'bg-green-100 text-green-700' 
                         : 'bg-orange-100 text-orange-700'
@@ -2598,11 +2598,11 @@ function App() {
                     </span>
                   </div>
                   
-                  <p className="text-sm text-gray-700 mb-3 line-clamp-2">{community.description}</p>
+                  <p className="text-xs sm:text-sm text-gray-700 mb-2 sm:mb-3 line-clamp-2">{community.description}</p>
                   
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
+                  <div className="flex items-center justify-between text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
                     <span>{community.member_count || 0} members</span>
-                    {community.location && <span>{community.location}</span>}
+                    {community.location && <span className="truncate ml-2">{community.location}</span>}
                   </div>
 
                   <button
@@ -2614,7 +2614,7 @@ function App() {
                         alert('Failed to join community: ' + error.message);
                       }
                     }}
-                    className="w-full px-3 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                    className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
                   >
                     Join Community
                   </button>
@@ -2623,7 +2623,7 @@ function App() {
             </div>
 
             {communities.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-6 sm:py-8 text-sm sm:text-base text-gray-500">
                 No communities found. Be the first to create one!
               </div>
             )}
