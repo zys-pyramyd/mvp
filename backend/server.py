@@ -615,6 +615,10 @@ class ProductCreate(BaseModel):
     subcategory: Optional[str] = None  # Dynamic based on category
     processing_level: ProcessingLevel = ProcessingLevel.NOT_PROCESSED
     price_per_unit: float
+    # Discount options
+    has_discount: bool = False
+    discount_type: Optional[str] = None  # "percentage" or "fixed"
+    discount_value: Optional[float] = None  # Percentage (e.g., 10 for 10%) or fixed amount (e.g., 500)
     unit_of_measure: str
     unit_specification: Optional[str] = None  # "100kg", "big", "5 litres", etc.
     quantity_available: int
@@ -623,6 +627,9 @@ class ProductCreate(BaseModel):
     farm_name: Optional[str] = None
     images: List[str] = []
     platform: str = "pyhub"
+    # Logistics Management
+    logistics_managed_by: str = "pyramyd"  # "pyramyd" or "seller"
+    seller_delivery_fee: Optional[float] = None  # If seller manages logistics
     # Enhanced delivery options for suppliers
     supports_dropoff_delivery: bool = True  # Whether supplier accepts drop-off locations  
     supports_shipping_delivery: bool = True  # Whether supplier accepts shipping addresses
