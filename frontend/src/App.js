@@ -142,6 +142,10 @@ function App() {
   const [showProductDetail, setShowProductDetail] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   
+  // Profile Picture state
+  const [showProfilePictureUpload, setShowProfilePictureUpload] = useState(false);
+  const [uploadingPicture, setUploadingPicture] = useState(false);
+  
   const [filters, setFilters] = useState({
     category: '',
     location: '',
