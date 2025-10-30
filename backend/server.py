@@ -2,7 +2,7 @@ import os
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional, List
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
@@ -13,6 +13,8 @@ from enum import Enum
 from cryptography.fernet import Fernet
 import base64
 import hashlib
+import hmac
+import requests
 
 # Environment variables - ALL SENSITIVE DATA MUST BE IN ENV
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
