@@ -113,6 +113,13 @@ function App() {
   const [showKYCPrompt, setShowKYCPrompt] = useState(false);
   const [kycStatus, setKycStatus] = useState(null);
 
+  // Communities state
+  const [communities, setCommunities] = useState([]);
+  const [showCreateCommunity, setShowCreateCommunity] = useState(false);
+  const [showCommunityBrowser, setShowCommunityBrowser] = useState(false);
+  const [selectedCommunity, setSelectedCommunity] = useState(null);
+  const [userCommunities, setUserCommunities] = useState([]);
+
   // Dashboard and trading platform state
   const [showFarmerDashboard, setShowFarmerDashboard] = useState(false);
   const [showAgentDashboard, setShowAgentDashboard] = useState(false);
