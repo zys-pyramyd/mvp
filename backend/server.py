@@ -106,6 +106,13 @@ farmland_records_collection = db.farmland_records
 agent_farmers_collection = db.agent_farmers
 audit_logs_collection = db.audit_logs
 
+# Paystack Payment collections
+paystack_subaccounts_collection = db.paystack_subaccounts
+paystack_transactions_collection = db.paystack_transactions
+paystack_transfer_recipients_collection = db.paystack_transfer_recipients
+paystack_transfers_collection = db.paystack_transfers
+commission_payouts_collection = db.commission_payouts
+
 # Security
 security = HTTPBearer()
 
