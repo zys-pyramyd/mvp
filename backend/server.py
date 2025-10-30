@@ -77,6 +77,7 @@ wallet_transactions_collection = db.wallet_transactions
 bank_accounts_collection = db.bank_accounts
 gift_cards_collection = db.gift_cards
 wallet_security_collection = db.wallet_security
+secure_account_details_collection = db.secure_account_details  # Encrypted account details
 # Enhanced KYC collections
 kyc_documents_collection = db.kyc_documents
 agent_kyc_collection = db.agent_kyc
