@@ -149,6 +149,11 @@ function App() {
   const [showProfilePictureUpload, setShowProfilePictureUpload] = useState(false);
   const [uploadingPicture, setUploadingPicture] = useState(false);
   
+  // Seller Details Modal state
+  const [showSellerDetails, setShowSellerDetails] = useState(false);
+  const [sellerDetails, setSellerDetails] = useState(null);
+  const [loadingSellerDetails, setLoadingSellerDetails] = useState(false);
+  
   const [filters, setFilters] = useState({
     category: '',
     location: '',
