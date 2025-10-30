@@ -913,6 +913,7 @@ class CommunityMember(BaseModel):
 class CommunityProduct(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     community_id: str
+    community_name: str  # For easier display
     title: str
     description: str
     price: float
