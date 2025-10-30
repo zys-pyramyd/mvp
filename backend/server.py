@@ -4986,7 +4986,7 @@ async def create_community(community_data: dict, current_user: dict = Depends(ge
             "created_at": datetime.utcnow().isoformat()
         }
         
-        communities_collection.insert_one(community)
+        result = communities_collection.insert_one(community)
         
         # Add creator as first member with creator role
         creator_member = {
@@ -5000,6 +5000,9 @@ async def create_community(community_data: dict, current_user: dict = Depends(ge
         }
         
         community_members_collection.insert_one(creator_member)
+        
+        # Remove MongoDB _id field before returning (it's not JSON serializable)
+        community.pop('_id', None)
         
         return {
             "message": "Community created successfully",
