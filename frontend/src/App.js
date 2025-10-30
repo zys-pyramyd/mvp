@@ -8969,6 +8969,7 @@ function App() {
       {/* Communities Modals */}
       {showCreateCommunity && <CreateCommunityModal />}
       {showCommunityBrowser && <CommunityBrowser />}
+      {showCommunityDetails && <CommunityDetailsModal />}
 
       {/* Profile Picture Upload Modal */}
       {showProfilePictureUpload && <ProfilePictureUploadModal />}
