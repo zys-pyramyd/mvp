@@ -480,7 +480,8 @@ function App() {
       
       // Add search term
       if (searchTerm) {
-        url += `&search_term=${searchTerm}`;
+        // Global search: search across all platforms and communities
+        url += `&search_term=${encodeURIComponent(searchTerm)}&global_search=true`;
       }
       
       // Add advanced filters
