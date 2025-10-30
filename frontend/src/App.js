@@ -2859,6 +2859,117 @@ function App() {
     );
   };
 
+  const CommunityDetailsModal = () => {
+    if (!communityDetails) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6">
+            {/* Header */}
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center gap-4">
+                {/* Community Profile Picture */}
+                {communityDetails.profile_picture ? (
+                  <img 
+                    src={communityDetails.profile_picture} 
+                    alt={communityDetails.name}
+                    className="w-16 h-16 rounded-full object-cover border-4 border-emerald-500"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-2xl border-4 border-emerald-600">
+                    {communityDetails.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">{communityDetails.name}</h2>
+                  <p className="text-sm text-gray-600">{communityDetails.category}</p>
+                  <div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
+                    <span>{communityDetails.member_count || 0} members</span>
+                    {communityDetails.location && <span>📍 {communityDetails.location}</span>}
+                  </div>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => setShowCommunityDetails(false)}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Description */}
+            <div className="mb-6">
+              <p className="text-gray-700">{communityDetails.description}</p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 mb-6">
+              <button
+                onClick={async () => {
+                  try {
+                    await joinCommunity(communityDetails.id);
+                    alert('Successfully joined community!');
+                    fetchCommunityDetails(communityDetails.id); // Refresh
+                  } catch (error) {
+                    alert('Failed to join: ' + error.message);
+                  }
+                }}
+                className="px-6 py-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors font-medium"
+              >
+                Join Community
+              </button>
+            </div>
+
+            {/* Recent Products */}
+            {communityDetails.recent_products && communityDetails.recent_products.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Products</h3>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {communityDetails.recent_products.map((product) => (
+                    <div key={product.id} className="border border-gray-200 rounded-lg p-4 hover:border-emerald-300 transition-colors">
+                      <h4 className="font-semibold text-gray-900 mb-2">{product.title}</h4>
+                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">{product.description}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-bold text-emerald-600">₦{product.price}</span>
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <span>❤️ {product.likes_count || 0}</span>
+                          <span>💬 {product.comments_count || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recent Members */}
+            {communityDetails.recent_members && communityDetails.recent_members.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Members</h3>
+                <div className="flex flex-wrap gap-3">
+                  {communityDetails.recent_members.map((member) => (
+                    <div key={member.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-semibold text-xs">
+                        {member.username?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                      <span className="text-sm font-medium text-gray-700">{member.username}</span>
+                      {member.role === 'admin' && (
+                        <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Admin</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* KYC Notification Banner - Only for non-personal accounts who need KYC */}
