@@ -888,6 +888,7 @@ class Community(BaseModel):
     description: str
     creator_id: str
     creator_username: str
+    profile_picture: Optional[str] = None  # Community profile picture
     privacy: CommunityPrivacy = CommunityPrivacy.PUBLIC
     category: str  # e.g., "farming", "business", "trading"
     location: Optional[str] = None  # Community focus location
