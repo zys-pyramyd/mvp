@@ -8691,6 +8691,9 @@ function App() {
       {showCreateCommunity && <CreateCommunityModal />}
       {showCommunityBrowser && <CommunityBrowser />}
 
+      {/* Profile Picture Upload Modal */}
+      {showProfilePictureUpload && <ProfilePictureUploadModal />}
+
     </div>
   );
 }
