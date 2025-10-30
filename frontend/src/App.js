@@ -1093,6 +1093,118 @@ function App() {
     return null;
   };
 
+  // Communities functions
+  const fetchCommunities = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/communities`);
+      if (response.ok) {
+        const data = await response.json();
+        setCommunities(data.communities || []);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching communities:', error);
+    }
+    return null;
+  };
+
+  const fetchUserCommunities = async () => {
+    if (!user) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/communities/my-communities`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setUserCommunities(data.communities || []);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching user communities:', error);
+    }
+    return null;
+  };
+
+  const createCommunity = async (communityData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/communities`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(communityData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        await fetchCommunities(); // Refresh communities list
+        await fetchUserCommunities(); // Refresh user communities
+        return result;
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to create community');
+      }
+    } catch (error) {
+      console.error('Error creating community:', error);
+      throw error;
+    }
+  };
+
+  const joinCommunity = async (communityId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/communities/${communityId}/join`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        await fetchUserCommunities(); // Refresh user communities
+        return result;
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to join community');
+      }
+    } catch (error) {
+      console.error('Error joining community:', error);
+      throw error;
+    }
+  };
+
+  const leaveCommunity = async (communityId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/communities/${communityId}/leave`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        await fetchUserCommunities(); // Refresh user communities
+        return result;
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to leave community');
+      }
+    } catch (error) {
+      console.error('Error leaving community:', error);
+      throw error;
+    }
+  };
+
   // Dashboard functions
   const fetchFarmerDashboard = async () => {
     try {
