@@ -2416,6 +2416,223 @@ function App() {
     }
   };
 
+  // Communities Components
+  const CreateCommunityModal = () => {
+    const [communityForm, setCommunityForm] = useState({
+      name: '',
+      description: '',
+      category: 'general',
+      privacy_type: 'public',
+      location: '',
+      rules: ''
+    });
+
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await createCommunity(communityForm);
+        setShowCreateCommunity(false);
+        setCommunityForm({
+          name: '',
+          description: '',
+          category: 'general',
+          privacy_type: 'public',
+          location: '',
+          rules: ''
+        });
+        alert('Community created successfully!');
+      } catch (error) {
+        alert('Failed to create community: ' + error.message);
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Create Community</h2>
+              <button
+                onClick={() => setShowCreateCommunity(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Community Name *
+                </label>
+                <input
+                  type="text"
+                  value={communityForm.name}
+                  onChange={(e) => setCommunityForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description *
+                </label>
+                <textarea
+                  value={communityForm.description}
+                  onChange={(e) => setCommunityForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  rows="3"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category
+                </label>
+                <select
+                  value={communityForm.category}
+                  onChange={(e) => setCommunityForm(prev => ({ ...prev, category: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                >
+                  <option value="general">General</option>
+                  <option value="farming">Farming</option>
+                  <option value="trading">Trading</option>
+                  <option value="logistics">Logistics</option>
+                  <option value="processing">Processing</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Privacy Type
+                </label>
+                <select
+                  value={communityForm.privacy_type}
+                  onChange={(e) => setCommunityForm(prev => ({ ...prev, privacy_type: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                >
+                  <option value="public">Public</option>
+                  <option value="private">Private</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Location
+                </label>
+                <input
+                  type="text"
+                  value={communityForm.location}
+                  onChange={(e) => setCommunityForm(prev => ({ ...prev, location: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="e.g., Lagos, Nigeria"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Community Rules
+                </label>
+                <textarea
+                  value={communityForm.rules}
+                  onChange={(e) => setCommunityForm(prev => ({ ...prev, rules: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  rows="3"
+                  placeholder="Community guidelines and rules..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateCommunity(false)}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                >
+                  Create Community
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const CommunityBrowser = () => {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Browse Communities</h2>
+              <button
+                onClick={() => setShowCommunityBrowser(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {communities.map((community) => (
+                <div key={community.id} className="border border-gray-200 rounded-lg p-4 hover:border-emerald-300 transition-colors">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{community.name}</h3>
+                      <p className="text-sm text-gray-600">{community.category}</p>
+                    </div>
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      community.privacy_type === 'public' 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-orange-100 text-orange-700'
+                    }`}>
+                      {community.privacy_type}
+                    </span>
+                  </div>
+                  
+                  <p className="text-sm text-gray-700 mb-3 line-clamp-2">{community.description}</p>
+                  
+                  <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
+                    <span>{community.member_count || 0} members</span>
+                    {community.location && <span>{community.location}</span>}
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      try {
+                        await joinCommunity(community.id);
+                        alert('Successfully joined community!');
+                      } catch (error) {
+                        alert('Failed to join community: ' + error.message);
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                  >
+                    Join Community
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {communities.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                No communities found. Be the first to create one!
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* KYC Notification Banner - Only for non-personal accounts who need KYC */}
