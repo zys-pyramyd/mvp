@@ -4109,6 +4109,21 @@ function App() {
                       {product.seller_type}
                     </div>
                   )}
+                  
+                  {/* Discount Badge - Show percentage on product card */}
+                  {product.has_discount && product.discount_value && (
+                    <div className="absolute top-12 right-2 bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-lg animate-pulse">
+                      {product.discount_type === 'percentage' && `${product.discount_value}% OFF`}
+                      {product.discount_type === 'fixed' && `₦${product.discount_value} OFF`}
+                    </div>
+                  )}
+                  
+                  {/* Free Delivery Badge */}
+                  {product.logistics_managed_by === 'seller' && product.seller_delivery_fee === 0 && (
+                    <div className="absolute bottom-2 left-2 bg-red-600 text-white px-2 py-1 rounded-lg text-xs font-bold">
+                      🚚 FREE DELIVERY
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-3 sm:p-4 flex-1 flex flex-col">{/* Responsive padding */}
