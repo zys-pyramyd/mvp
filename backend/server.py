@@ -1769,6 +1769,7 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
         seller_name=current_user['username'],
         seller_type=current_user.get('role'),
         seller_profile_picture=current_user.get('profile_picture'),  # Include seller's profile picture
+        business_name=current_user.get('business_name'),  # Include business name for transparency
         platform=product_platform,
         **{k: v for k, v in product_data.dict().items() if k != 'platform'}
     )
