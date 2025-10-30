@@ -5923,6 +5923,14 @@ async def get_dynamic_categories():
         print(f"Error getting dynamic categories: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get dynamic categories")
 
+@app.get("/api/locations/nigerian-states")
+async def get_nigerian_states():
+    """Get all Nigerian states including FCT Abuja"""
+    return {
+        "states": NIGERIAN_STATES,
+        "total": len(NIGERIAN_STATES)
+    }
+
 @app.put("/api/users/business-profile")
 async def update_business_profile(
     business_data: dict,
