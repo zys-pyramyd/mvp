@@ -7192,6 +7192,11 @@ class PyramydAPITester:
         # Test 6: User Profile
         self.test_user_profile()
 
+        # NEW PRIORITY TESTS: Communities System and Platform Filtering (from review request)
+        print("\n🎯 COMMUNITIES SYSTEM AND PLATFORM FILTERING TESTS (HIGH PRIORITY)")
+        print("-" * 60)
+        self.test_communities_system_complete()
+
         # PRIORITY TEST: Pre-order Visibility Debug (from review request)
         print("\n🎯 PRE-ORDER VISIBILITY DEBUG (HIGH PRIORITY)")
         print("-" * 60)
