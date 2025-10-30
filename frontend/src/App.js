@@ -2256,7 +2256,7 @@ function App() {
       // Only businesses can post on home page (main business page)
       return userRole === 'business';
     } else if (platform === 'buy_from_farm') {
-      // Only farmers and agents can post on fam deals page
+      // Only farmers and agents can post on farm deals page
       return userRole === 'farmer' || userRole === 'agent';
     }
     return false;
