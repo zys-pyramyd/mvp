@@ -6424,6 +6424,93 @@ async def delete_account_details(current_user: dict = Depends(get_current_user))
         print(f"Error deleting account details: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete account details")
 
+# ============================================
+# PAYSTACK PAYMENT INTEGRATION  
+# ============================================
+
+@app.post("/api/paystack/subaccount/create")
+async def create_paystack_subaccount(
+    account_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create Paystack subaccount for vendor/farmer/community"""
+    try:
+        user_id = current_user["id"]
+        
+        # Check if subaccount already exists
+        existing = paystack_subaccounts_collection.find_one({"user_id": user_id})
+        if existing and existing.get("is_active"):
+            return {
+                "message": "Subaccount already exists",
+                "subaccount_code": existing["subaccount_code"]
+            }
+        
+        # Validate required fields
+        required = ["business_name", "account_number", "bank_code", "bank_name"]
+        if not all(k in account_data for k in required):
+            raise HTTPException(status_code=400, detail="Missing required fields")
+        
+        # Create subaccount in Paystack
+        paystack_data = {
+            "business_name": account_data["business_name"],
+            "account_number": account_data["account_number"],
+            "bank_code": account_data["bank_code"],
+            "percentage_charge": 0.0,  # Always 0.0 for fixed split
+            "description": f"Pyramyd vendor: {account_data['business_name']}"
+        }
+        
+        response = paystack_request("POST", "/subaccount", paystack_data)
+        
+        if not response.get("status"):
+            raise HTTPException(status_code=400, detail=response.get("message", "Failed to create subaccount"))
+        
+        subaccount_code = response["data"]["subaccount_code"]
+        
+        # Save to database
+        subaccount = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "subaccount_code": subaccount_code,
+            "business_name": account_data["business_name"],
+            "account_number": account_data["account_number"],
+            "bank_code": account_data["bank_code"],
+            "bank_name": account_data["bank_name"],
+            "percentage_charge": 0.0,
+            "is_active": True,
+            "created_at": datetime.utcnow()
+        }
+        
+        paystack_subaccounts_collection.insert_one(subaccount)
+        
+        return {
+            "message": "Subaccount created successfully",
+            "subaccount_code": subaccount_code
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error creating subaccount: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create subaccount")
+
+@app.get("/api/paystack/banks")
+async def get_banks():
+    """Get list of Nigerian banks"""
+    try:
+        response = paystack_request("GET", "/bank")
+        
+        if response.get("status"):
+            return {
+                "status": True,
+                "banks": response["data"]
+            }
+        else:
+            raise HTTPException(status_code=400, detail="Failed to get banks")
+        
+    except Exception as e:
+        print(f"Error getting banks: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get banks")
+
 @app.post("/api/users/kyc/submit")
 async def submit_kyc(
     kyc_data: dict,
