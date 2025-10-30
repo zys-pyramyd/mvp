@@ -567,6 +567,8 @@ class Product(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     seller_id: str
     seller_name: str
+    seller_type: Optional[str] = None  # "farmer", "agent", "business", "supplier"
+    seller_profile_picture: Optional[str] = None  # Seller's profile picture for transparency
     title: str
     description: str
     # Enhanced category structure
