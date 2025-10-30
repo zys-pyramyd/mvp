@@ -5112,6 +5112,25 @@ async def get_communities(
         print(f"Error getting communities: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get communities")
 
+@app.get("/api/communities/featured/products")
+async def get_featured_community_products(limit: int = 6):
+    """Get featured products from communities"""
+    try:
+        # Get products from active communities, sorted by likes and recent
+        products = list(community_products_collection.find(
+            {"is_active": True}
+        ).sort([("likes_count", -1), ("created_at", -1)]).limit(limit))
+        
+        # Remove MongoDB _id field
+        for product in products:
+            product.pop('_id', None)
+        
+        return {"products": products}
+        
+    except Exception as e:
+        print(f"Error getting featured community products: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get featured products")
+
 @app.get("/api/communities/{community_id}")
 async def get_community_details(community_id: str):
     """Get detailed community information"""
