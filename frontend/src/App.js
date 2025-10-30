@@ -4438,16 +4438,46 @@ function App() {
                     )}
                   </div>
 
-                  {/* Business/Farm Info - Responsive */}
-                  <div className="text-xs sm:text-sm text-gray-600 mb-2">
+                  {/* Business/Farm/Agent Info - Clickable for Transparency */}
+                  <div className="text-xs sm:text-sm mb-2 space-y-1">
                     {product.business_name && (
-                      <div className="font-medium line-clamp-1">{product.business_name}</div>
+                      <div 
+                        className="font-medium text-emerald-600 hover:text-emerald-700 cursor-pointer flex items-center gap-1"
+                        onClick={() => fetchSellerDetails(product.seller_name)}
+                        title="Click to view business owner details"
+                      >
+                        🏢 {product.business_name}
+                      </div>
                     )}
                     {product.farm_name && (
-                      <div className="line-clamp-1">{product.farm_name}</div>
+                      <div 
+                        className="text-green-600 hover:text-green-700 cursor-pointer flex items-center gap-1"
+                        onClick={() => fetchSellerDetails(product.seller_name)}
+                        title="Click to view farmer details"
+                      >
+                        🌾 {product.farm_name}
+                      </div>
                     )}
-                    {product.agent_username && (
-                      <div className="text-blue-600 line-clamp-1">Agent: @{product.agent_username}</div>
+                    {product.agent_username && product.agent_name && (
+                      <div 
+                        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 cursor-pointer"
+                        onClick={() => fetchSellerDetails(product.agent_name)}
+                        title="Click to view agent details"
+                      >
+                        {/* Agent Profile Picture */}
+                        {product.agent_profile_picture ? (
+                          <img 
+                            src={product.agent_profile_picture} 
+                            alt={product.agent_name}
+                            className="w-5 h-5 rounded-full object-cover border border-blue-500"
+                          />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-semibold">
+                            {product.agent_name?.charAt(0).toUpperCase() || 'A'}
+                          </div>
+                        )}
+                        <span>Agent: @{product.agent_username}</span>
+                      </div>
                     )}
                   </div>
 
