@@ -4136,14 +4136,35 @@ function App() {
                     {product.description || 'Fresh organic produce from certified farms'}
                   </p>
 
-                  {/* Price with Enhanced Specification Display - Responsive */}
-                  <div className="text-lg sm:text-xl font-bold text-emerald-600 mb-2">
-                    ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
-                    {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) && 
-                      <span className="text-xs sm:text-sm font-medium text-gray-600 ml-1">
-                        ({product.unit_specification || product.unit_of_measure || 'standard'})
-                      </span>
-                    }
+                  {/* Price with Discount Display - Responsive */}
+                  <div className="mb-2">
+                    {product.has_discount && product.original_price ? (
+                      <div>
+                        <div className="text-xs sm:text-sm text-gray-500 line-through">
+                          ₦{product.original_price}/{product.unit || product.unit_of_measure || 'kg'}
+                        </div>
+                        <div className="text-lg sm:text-xl font-bold text-red-600">
+                          ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
+                          {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) && 
+                            <span className="text-xs sm:text-sm font-medium text-gray-600 ml-1">
+                              ({product.unit_specification || product.unit_of_measure || 'standard'})
+                            </span>
+                          }
+                        </div>
+                        <div className="text-xs text-green-600 font-medium">
+                          You save ₦{product.discount_amount}!
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-lg sm:text-xl font-bold text-emerald-600">
+                        ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
+                        {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) && 
+                          <span className="text-xs sm:text-sm font-medium text-gray-600 ml-1">
+                            ({product.unit_specification || product.unit_of_measure || 'standard'})
+                          </span>
+                        }
+                      </div>
+                    )}
                   </div>
 
                   {/* Stock Info - Responsive */}
