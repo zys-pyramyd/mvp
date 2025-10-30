@@ -119,6 +119,9 @@ function App() {
   const [showCommunityBrowser, setShowCommunityBrowser] = useState(false);
   const [selectedCommunity, setSelectedCommunity] = useState(null);
   const [userCommunities, setUserCommunities] = useState([]);
+  const [featuredCommunityProducts, setFeaturedCommunityProducts] = useState([]);
+  const [showCommunityDetails, setShowCommunityDetails] = useState(false);
+  const [communityDetails, setCommunityDetails] = useState(null);
 
   // Dashboard and trading platform state
   const [showFarmerDashboard, setShowFarmerDashboard] = useState(false);
