@@ -2361,8 +2361,8 @@ function App() {
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                <span className="hidden sm:inline">Fam Deals</span>
-                <span className="sm:hidden">Fam</span>
+                <span className="hidden sm:inline">Farm Deals</span>
+                <span className="sm:hidden">Farm</span>
               </button>
             </div>
 
