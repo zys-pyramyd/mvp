@@ -1463,8 +1463,8 @@ async def get_products(
             if platform == "home":
                 # Home page: Only business and supplier products
                 products_query["seller_type"] = {"$in": ["business", "supplier"]}
-            elif platform == "fam_deals":
-                # Fam Deals page: Only farmer and agent products
+            elif platform == "farm_deals":
+                # Farm Deals page: Only farmer and agent products
                 products_query["seller_type"] = {"$in": ["farmer", "agent"]}
                 
             if search_term:
