@@ -4956,6 +4956,244 @@ async def submit_farmer_kyc(kyc_data: FarmerKYC, current_user: dict = Depends(ge
         print(f"Error submitting farmer KYC: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to submit farmer KYC")
 
+# Communities API Endpoints
+@app.post("/api/communities")
+async def create_community(community_data: dict, current_user: dict = Depends(get_current_user)):
+    """Create a new community"""
+    try:
+        # Validate required fields
+        required_fields = ["name", "description", "category"]
+        for field in required_fields:
+            if field not in community_data:
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+        
+        # Create community record
+        community = {
+            "id": str(uuid.uuid4()),
+            "name": community_data["name"],
+            "description": community_data["description"],
+            "creator_id": current_user["id"],
+            "creator_username": current_user["username"],
+            "privacy": community_data.get("privacy", "public"),
+            "category": community_data["category"],
+            "location": community_data.get("location"),
+            "cover_image": community_data.get("cover_image"),
+            "member_count": 1,  # Creator is first member
+            "product_count": 0,
+            "is_active": True,
+            "community_rules": community_data.get("community_rules", []),
+            "tags": community_data.get("tags", []),
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        communities_collection.insert_one(community)
+        
+        # Add creator as first member with creator role
+        creator_member = {
+            "id": str(uuid.uuid4()),
+            "community_id": community["id"],
+            "user_id": current_user["id"],
+            "username": current_user["username"],
+            "role": "creator",
+            "joined_at": datetime.utcnow().isoformat(),
+            "is_active": True
+        }
+        
+        community_members_collection.insert_one(creator_member)
+        
+        return {
+            "message": "Community created successfully",
+            "community": community
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error creating community: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create community")
+
+@app.get("/api/communities")
+async def get_communities(
+    category: Optional[str] = None,
+    location: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20
+):
+    """Get list of communities with filtering"""
+    try:
+        query = {"is_active": True}
+        
+        if category:
+            query["category"] = category
+        if location:
+            query["location"] = {"$regex": location, "$options": "i"}
+        if search:
+            query["$or"] = [
+                {"name": {"$regex": search, "$options": "i"}},
+                {"description": {"$regex": search, "$options": "i"}},
+                {"tags": {"$in": [search]}}
+            ]
+        
+        skip = (page - 1) * limit
+        communities = list(communities_collection.find(query).skip(skip).limit(limit))
+        
+        # Remove MongoDB _id field
+        for community in communities:
+            community.pop('_id', None)
+        
+        return {
+            "communities": communities,
+            "page": page,
+            "limit": limit,
+            "total": communities_collection.count_documents(query)
+        }
+        
+    except Exception as e:
+        print(f"Error getting communities: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get communities")
+
+@app.get("/api/communities/{community_id}")
+async def get_community_details(community_id: str):
+    """Get detailed community information"""
+    try:
+        community = communities_collection.find_one({"id": community_id})
+        if not community:
+            raise HTTPException(status_code=404, detail="Community not found")
+        
+        community.pop('_id', None)
+        
+        # Get recent members
+        members = list(community_members_collection.find(
+            {"community_id": community_id, "is_active": True}
+        ).limit(10))
+        
+        for member in members:
+            member.pop('_id', None)
+        
+        # Get recent products
+        products = list(community_products_collection.find(
+            {"community_id": community_id, "is_active": True}
+        ).limit(6))
+        
+        for product in products:
+            product.pop('_id', None)
+        
+        community["recent_members"] = members
+        community["recent_products"] = products
+        
+        return community
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting community details: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get community details")
+
+@app.post("/api/communities/{community_id}/join")
+async def join_community(community_id: str, current_user: dict = Depends(get_current_user)):
+    """Join a community"""
+    try:
+        # Check if community exists
+        community = communities_collection.find_one({"id": community_id})
+        if not community:
+            raise HTTPException(status_code=404, detail="Community not found")
+        
+        # Check if already a member
+        existing_member = community_members_collection.find_one({
+            "community_id": community_id,
+            "user_id": current_user["id"]
+        })
+        
+        if existing_member:
+            if existing_member["is_active"]:
+                raise HTTPException(status_code=400, detail="Already a member of this community")
+            else:
+                # Reactivate membership
+                community_members_collection.update_one(
+                    {"id": existing_member["id"]},
+                    {"$set": {"is_active": True, "joined_at": datetime.utcnow().isoformat()}}
+                )
+        else:
+            # Add as new member
+            member = {
+                "id": str(uuid.uuid4()),
+                "community_id": community_id,
+                "user_id": current_user["id"],
+                "username": current_user["username"],
+                "role": "member",
+                "joined_at": datetime.utcnow().isoformat(),
+                "is_active": True
+            }
+            
+            community_members_collection.insert_one(member)
+        
+        # Update community member count
+        active_members_count = community_members_collection.count_documents({
+            "community_id": community_id,
+            "is_active": True
+        })
+        
+        communities_collection.update_one(
+            {"id": community_id},
+            {"$set": {"member_count": active_members_count}}
+        )
+        
+        return {"message": "Successfully joined community"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error joining community: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to join community")
+
+@app.post("/api/communities/{community_id}/members/{user_id}/promote")
+async def promote_member(
+    community_id: str, 
+    user_id: str, 
+    promotion_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Promote a member to admin (only creators can do this)"""
+    try:
+        # Check if current user is creator
+        current_member = community_members_collection.find_one({
+            "community_id": community_id,
+            "user_id": current_user["id"],
+            "is_active": True
+        })
+        
+        if not current_member or current_member["role"] != "creator":
+            raise HTTPException(status_code=403, detail="Only community creators can promote members")
+        
+        # Check if target user is a member
+        target_member = community_members_collection.find_one({
+            "community_id": community_id,
+            "user_id": user_id,
+            "is_active": True
+        })
+        
+        if not target_member:
+            raise HTTPException(status_code=404, detail="User is not a member of this community")
+        
+        new_role = promotion_data.get("role", "admin")
+        if new_role not in ["admin", "member"]:
+            raise HTTPException(status_code=400, detail="Invalid role. Must be 'admin' or 'member'")
+        
+        # Update member role
+        community_members_collection.update_one(
+            {"id": target_member["id"]},
+            {"$set": {"role": new_role}}
+        )
+        
+        return {"message": f"Member {new_role} role updated successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error promoting member: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to promote member")
+
 @app.get("/api/kyc/documents/my-documents")
 async def get_my_kyc_documents(current_user: dict = Depends(get_current_user)):
     """Get user's uploaded KYC documents"""
