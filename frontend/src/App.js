@@ -8465,6 +8465,10 @@ function App() {
         </div>
       )}
 
+      {/* Communities Modals */}
+      {showCreateCommunity && <CreateCommunityModal />}
+      {showCommunityBrowser && <CommunityBrowser />}
+
     </div>
   );
 }
