@@ -1544,6 +1544,38 @@ async def get_profile(current_user: dict = Depends(get_current_user)):
     }
     return user_data
 
+@app.get("/api/users/public/{username}")
+async def get_public_user_profile(username: str):
+    """Get public user profile information for transparency"""
+    try:
+        user = users_collection.find_one({"username": username})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Return only public information
+        public_profile = {
+            "username": user.get("username"),
+            "first_name": user.get("first_name"),
+            "last_name": user.get("last_name"),
+            "role": user.get("role"),
+            "profile_picture": user.get("profile_picture"),
+            "business_name": user.get("business_name"),
+            "business_category": user.get("business_category"),
+            "business_description": user.get("business_description"),
+            "average_rating": user.get("average_rating", 5.0),
+            "total_ratings": user.get("total_ratings", 0),
+            "kyc_status": user.get("kyc_status"),
+            "is_verified": user.get("is_verified", False)
+        }
+        
+        return public_profile
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting public user profile: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get user profile")
+
 @app.get("/api/products")
 async def get_products(
     category: Optional[str] = None,
