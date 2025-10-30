@@ -3247,7 +3247,7 @@ function App() {
 
         {/* Enhanced Category Navigation & Filters */}
         <div className="mb-6 space-y-4">
-          {/* Pre-Order Filter for Fam Deals */}
+          {/* Pre-Order Filter for Farm Deals */}
           {currentPlatform === 'buy_from_farm' && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
