@@ -5041,7 +5041,7 @@ async def get_communities(
         skip = (page - 1) * limit
         communities = list(communities_collection.find(query).skip(skip).limit(limit))
         
-        # Remove MongoDB _id field
+        # Remove MongoDB _id field from all communities
         for community in communities:
             community.pop('_id', None)
         
