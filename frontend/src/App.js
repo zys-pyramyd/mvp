@@ -2716,19 +2716,19 @@ function App() {
               </button>
             </div>
 
-            {/* Right side navigation icons - Responsive Priority */}
-            <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-              {/* Cart - Always Visible */}
+            {/* Right side navigation icons - Responsive Priority: Cart & Profile always visible */}
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+              {/* Cart - Always Visible (Priority 1) */}
               <button
                 onClick={() => setShowCart(true)}
-                className="nav-button icon-button relative p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                className="nav-button icon-button relative p-1 sm:p-1.5 md:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 flex-shrink-0"
                 title="Shopping Cart"
               >
-                <div className="w-5 h-5 sm:w-6 sm:h-6">
+                <div className="w-5 h-5">
                   <AddToCartIcon />
                 </div>
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-semibold text-xs">
+                  <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-semibold text-[10px] sm:text-xs">
                     {cartItemCount}
                   </span>
                 )}
@@ -2743,20 +2743,20 @@ function App() {
                     setShowMessaging(true);
                   }
                 }}
-                className="nav-button icon-button relative p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 hidden md:flex"
+                className="nav-button icon-button relative p-1.5 md:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 hidden md:flex flex-shrink-0"
                 title="Messages"
               >
-                <div className="w-5 h-5 sm:w-6 sm:h-6">
+                <div className="w-5 h-5">
                   <MessageIcon />
                 </div>
                 {user && messages.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-semibold text-xs">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-semibold text-[10px] sm:text-xs">
                     {messages.length}
                   </span>
                 )}
               </button>
 
-              {/* Order Tracking - Hidden on mobile, shown in profile menu */}
+              {/* Order Tracking - Hidden on mobile/tablet, shown in profile menu */}
               <button
                 onClick={() => {
                   if (!user) {
@@ -2766,37 +2766,37 @@ function App() {
                     fetchOrders();
                   }
                 }}
-                className="nav-button icon-button p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 hidden md:flex"
+                className="nav-button icon-button p-1.5 md:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 hidden md:flex flex-shrink-0"
                 title="Track Orders / Find Drivers"
               >
-                <div className="w-5 h-5 sm:w-6 sm:h-6">
+                <div className="w-5 h-5">
                   <TruckIcon />
                 </div>
               </button>
 
-              {/* Profile Icon with Dropdown - Always Visible */}
-              <div className="relative">
+              {/* Profile Icon with Dropdown - Always Visible (Priority 2) */}
+              <div className="relative flex-shrink-0">
                 {!user ? (
                   <button
                     onClick={() => setShowAuthModal(true)}
-                    className="nav-button icon-button flex items-center space-x-1 sm:space-x-2 p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                    className="nav-button icon-button flex items-center gap-1 sm:gap-2 p-1 sm:p-1.5 md:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
                     title="Sign In"
                   >
-                    <div className="w-5 h-5 sm:w-6 sm:h-6">
+                    <div className="w-5 h-5 flex-shrink-0">
                       <ProfileIcon />
                     </div>
-                    <span className="hidden md:block text-sm font-medium">Sign In</span>
+                    <span className="hidden md:inline text-xs md:text-sm font-medium whitespace-nowrap">Sign In</span>
                   </button>
                 ) : (
                   <button
                     onClick={() => setShowProfileMenu(!showProfileMenu)}
-                    className="nav-button icon-button flex items-center space-x-1 sm:space-x-2 p-1.5 sm:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                    className="nav-button icon-button flex items-center gap-1 sm:gap-2 p-1 sm:p-1.5 md:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
                     title="Profile Menu"
                   >
-                    <div className="w-5 h-5 sm:w-6 sm:h-6">
+                    <div className="w-5 h-5 flex-shrink-0">
                       <ProfileIcon />
                     </div>
-                    <span className="hidden md:block text-sm font-medium">
+                    <span className="hidden md:inline text-xs md:text-sm font-medium whitespace-nowrap">
                       {user.first_name}
                     </span>
                   </button>
