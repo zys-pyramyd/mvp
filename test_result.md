@@ -411,6 +411,18 @@ backend:
         agent: "main"
         comment: "✅ ENHANCED PRICING DISPLAY SUCCESSFULLY IMPLEMENTED: Added unit_specification field to Product and ProductCreate models in backend. Updated frontend to display pricing in enhanced format like '₦450/bag (100kg)', '₦800/gallon (5 litres)', '₦300/crate (big)'. Backend testing confirmed 100% success rate (15/15 tests) with proper API handling. Frontend displays enhanced pricing beautifully with specifications in gray parentheses for clarity. Cart modal also updated to show enhanced pricing format."
 
+  - task: "New Communities System and Updated Platform Filtering"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "❌ COMMUNITIES SYSTEM AND PLATFORM FILTERING TESTING: Platform filtering working perfectly (100% success) but community creation has critical ObjectId serialization bug. PLATFORM FILTERING SUCCESS: 1) ✅ Home platform correctly returns only business/supplier products 2) ✅ Farm Deals platform correctly returns only farmer/agent products 3) ✅ Global search successfully searches across all platforms 4) ✅ Category filtering with platform separation working correctly. COMMUNITY SYSTEM RESULTS (20% success): 1) ✅ Community Listing - All filtering working perfectly 2) ❌ Community Creation - CRITICAL BUG: 500 error due to ObjectId serialization (ValueError: ObjectId object is not iterable) 3) ❌ Community Details - Cannot test without valid community 4) ❌ Joining Communities - Cannot test without valid community 5) ❌ Member Promotion - Cannot test without valid community. ROOT CAUSE: Backend community creation endpoint has ObjectId serialization issue in JSON response. IMPACT: Platform filtering is production-ready, but community system is blocked by creation bug."
+
 frontend:
   - task: "JSX Syntax Error Fix"
     implemented: true
