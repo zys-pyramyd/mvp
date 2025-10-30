@@ -5889,22 +5889,17 @@ async def get_dynamic_categories():
         
         # Collect categories with products
         active_categories = set()
-        locations = set()
         seller_types = set()
         
         for product in products:
             if product.get("category"):
                 active_categories.add(product["category"])
-            if product.get("location"):
-                locations.add(product["location"])
             if product.get("seller_type"):
                 seller_types.add(product["seller_type"])
         
         for preorder in preorders:
             if preorder.get("product_category"):
                 active_categories.add(preorder["product_category"])
-            if preorder.get("location"):
-                locations.add(preorder["location"])
             if preorder.get("seller_type"):
                 seller_types.add(preorder["seller_type"])
         
@@ -5919,7 +5914,7 @@ async def get_dynamic_categories():
         
         return {
             "categories": dynamic_categories,
-            "locations": sorted(list(locations)),
+            "locations": NIGERIAN_STATES,  # Return all Nigerian states
             "seller_types": ["farmer", "agent", "business"],  # Standard seller types
             "processing_levels": all_categories_response["processing_levels"]
         }
