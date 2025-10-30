@@ -452,6 +452,8 @@ function App() {
   useEffect(() => {
     fetchBusinessCategories();
     fetchProductCategories();
+    fetchCommunities();
+    fetchFeaturedCommunityProducts();
   }, []);
 
   const fetchUserProfile = async (token) => {
