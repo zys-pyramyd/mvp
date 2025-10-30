@@ -3196,23 +3196,23 @@ function App() {
           /* Communities Platform Content */
           <div>
             {/* Communities Header */}
-            <div className="mb-8">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="mb-6 sm:mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Communities</h1>
-                  <p className="text-gray-600 mt-1">Connect with farmers, traders, and agricultural professionals</p>
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Communities</h1>
+                  <p className="text-sm sm:text-base text-gray-600 mt-1">Connect with farmers, traders, and agricultural professionals</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2 sm:gap-3 flex-wrap">
                   <button
                     onClick={() => setShowCommunityBrowser(true)}
-                    className="px-4 py-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors font-medium"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors font-medium"
                   >
                     Find Communities
                   </button>
                   {user && (
                     <button
                       onClick={() => setShowCreateCommunity(true)}
-                      className="px-4 py-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors font-medium"
+                      className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors font-medium"
                     >
                       Create Community
                     </button>
@@ -3223,17 +3223,17 @@ function App() {
 
             {/* My Communities */}
             {user && userCommunities.length > 0 && (
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">My Communities</h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="mb-6 sm:mb-8">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">My Communities</h2>
+                <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {userCommunities.map((community) => (
-                    <div key={community.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:border-emerald-300 transition-colors">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{community.name}</h3>
-                          <p className="text-sm text-gray-600">{community.category}</p>
+                    <div key={community.id} className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-emerald-300 transition-colors">
+                      <div className="flex items-start justify-between mb-2 sm:mb-3">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">{community.name}</h3>
+                          <p className="text-xs sm:text-sm text-gray-600">{community.category}</p>
                         </div>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
+                        <span className={`px-2 py-0.5 sm:py-1 text-xs rounded-full flex-shrink-0 ${
                           community.privacy_type === 'public' 
                             ? 'bg-green-100 text-green-700' 
                             : 'bg-orange-100 text-orange-700'
@@ -3242,11 +3242,11 @@ function App() {
                         </span>
                       </div>
                       
-                      <p className="text-sm text-gray-700 mb-3 line-clamp-2">{community.description}</p>
+                      <p className="text-xs sm:text-sm text-gray-700 mb-2 sm:mb-3 line-clamp-2">{community.description}</p>
                       
-                      <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
+                      <div className="flex items-center justify-between text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
                         <span>{community.member_count || 0} members</span>
-                        {community.location && <span>{community.location}</span>}
+                        {community.location && <span className="truncate ml-2">{community.location}</span>}
                       </div>
 
                       <div className="flex gap-2">
@@ -3255,7 +3255,7 @@ function App() {
                             setSelectedCommunity(community);
                             // Here you would navigate to community details
                           }}
-                          className="flex-1 px-3 py-2 text-sm text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+                          className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
                         >
                           View
                         </button>
@@ -3270,7 +3270,7 @@ function App() {
                               }
                             }
                           }}
-                          className="px-3 py-2 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                          className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                         >
                           Leave
                         </button>
@@ -3282,17 +3282,17 @@ function App() {
             )}
 
             {/* Featured Communities */}
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Featured Communities</h2>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="mb-6 sm:mb-8">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Featured Communities</h2>
+              <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {communities.slice(0, 6).map((community) => (
-                  <div key={community.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:border-emerald-300 transition-colors">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{community.name}</h3>
-                        <p className="text-sm text-gray-600">{community.category}</p>
+                  <div key={community.id} className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-emerald-300 transition-colors">
+                    <div className="flex items-start justify-between mb-2 sm:mb-3">
+                      <div className="flex-1 min-w-0 pr-2">
+                        <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">{community.name}</h3>
+                        <p className="text-xs sm:text-sm text-gray-600">{community.category}</p>
                       </div>
-                      <span className={`px-2 py-1 text-xs rounded-full ${
+                      <span className={`px-2 py-0.5 sm:py-1 text-xs rounded-full flex-shrink-0 ${
                         community.privacy_type === 'public' 
                           ? 'bg-green-100 text-green-700' 
                           : 'bg-orange-100 text-orange-700'
@@ -3301,11 +3301,11 @@ function App() {
                       </span>
                     </div>
                     
-                    <p className="text-sm text-gray-700 mb-3 line-clamp-2">{community.description}</p>
+                    <p className="text-xs sm:text-sm text-gray-700 mb-2 sm:mb-3 line-clamp-2">{community.description}</p>
                     
-                    <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
+                    <div className="flex items-center justify-between text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
                       <span>{community.member_count || 0} members</span>
-                      {community.location && <span>{community.location}</span>}
+                      {community.location && <span className="truncate ml-2">{community.location}</span>}
                     </div>
 
                     <button
@@ -3317,7 +3317,7 @@ function App() {
                           alert('Failed to join community: ' + error.message);
                         }
                       }}
-                      className="w-full px-3 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
                     >
                       Join Community
                     </button>
@@ -3326,18 +3326,18 @@ function App() {
               </div>
 
               {communities.length === 0 && (
-                <div className="text-center py-12 bg-gray-50 rounded-lg">
-                  <div className="text-gray-500 mb-4">
-                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="text-center py-8 sm:py-12 bg-gray-50 rounded-lg">
+                  <div className="text-gray-500 mb-3 sm:mb-4">
+                    <svg className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No communities yet</h3>
-                  <p className="text-gray-600 mb-4">Be the first to create a community and connect with others!</p>
+                  <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No communities yet</h3>
+                  <p className="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4 px-4">Be the first to create a community and connect with others!</p>
                   {user && (
                     <button
                       onClick={() => setShowCreateCommunity(true)}
-                      className="px-4 py-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors font-medium"
+                      className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors font-medium"
                     >
                       Create First Community
                     </button>
