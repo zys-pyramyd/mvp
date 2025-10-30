@@ -2572,7 +2572,7 @@ function App() {
         <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Browse Communities</h2>
+              <h2 className="text-xl font-bold text-gray-900">Find Communities</h2>
               <button
                 onClick={() => setShowCommunityBrowser(false)}
                 className="text-gray-400 hover:text-gray-600"
