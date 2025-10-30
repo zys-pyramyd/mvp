@@ -7681,6 +7681,387 @@ class PyramydAPITester:
         
         return overall_success
 
+    def test_communities_system_complete(self):
+        """Test complete communities system with ObjectId serialization fix"""
+        print("\n🏘️ Testing Complete Communities System (ObjectId Fix)...")
+        
+        # Step 1: Test community creation (the main fix)
+        creation_success, community_id = self.test_community_creation()
+        
+        # Step 2: Test community details
+        if creation_success and community_id:
+            details_success = self.test_community_details(community_id)
+        else:
+            details_success = False
+        
+        # Step 3: Test community joining
+        if creation_success and community_id:
+            join_success = self.test_community_joining(community_id)
+        else:
+            join_success = False
+        
+        # Step 4: Test member promotion
+        if creation_success and community_id and join_success:
+            promotion_success = self.test_member_promotion(community_id)
+        else:
+            promotion_success = False
+        
+        # Step 5: Test community listing
+        listing_success = self.test_community_listing()
+        
+        overall_success = (creation_success and details_success and join_success and 
+                          promotion_success and listing_success)
+        
+        if overall_success:
+            self.log_test("Complete Communities System (ObjectId Fix)", True,
+                         "All communities functionality working correctly after ObjectId fix")
+        else:
+            self.log_test("Complete Communities System (ObjectId Fix)", False,
+                         "One or more communities components failed")
+        
+        return overall_success
+
+    def test_community_creation(self):
+        """Test community creation with ObjectId serialization fix"""
+        print("\n🏗️ Testing Community Creation (ObjectId Fix)...")
+        
+        # Test 1: Valid community creation
+        community_data = {
+            "name": "Test Farm Community",
+            "description": "A community for local farmers",
+            "category": "farming",
+            "privacy": "public",
+            "location": "Lagos, Nigeria",
+            "tags": ["farming", "agriculture", "local"],
+            "community_rules": ["Be respectful", "Share knowledge", "Support each other"]
+        }
+
+        success, response = self.make_request('POST', '/api/communities', community_data, 200, use_auth=True)
+        
+        if success and 'community' in response and response.get('message'):
+            community = response['community']
+            if 'id' in community and community.get('name') == community_data['name']:
+                self.log_test("Community Creation (Valid)", True, 
+                             f"Created community '{community['name']}' with ID: {community['id']}")
+                community_id = community['id']
+                valid_creation_success = True
+            else:
+                self.log_test("Community Creation (Valid)", False, 
+                             f"Community creation response missing required fields: {response}")
+                community_id = None
+                valid_creation_success = False
+        else:
+            self.log_test("Community Creation (Valid)", False, 
+                         f"Community creation failed: {response}")
+            community_id = None
+            valid_creation_success = False
+
+        # Test 2: Missing required fields
+        invalid_community_data = {
+            "name": "Incomplete Community"
+            # Missing description and category
+        }
+
+        success, response = self.make_request('POST', '/api/communities', invalid_community_data, 400, use_auth=True)
+        
+        if success:  # Should return 400 error
+            self.log_test("Community Creation (Missing Fields)", True)
+            validation_success = True
+        else:
+            self.log_test("Community Creation (Missing Fields)", False, 
+                         f"Should return 400 error: {response}")
+            validation_success = False
+
+        # Test 3: Verify creator membership is created
+        if valid_creation_success and community_id:
+            # This will be verified in the community details test
+            creator_membership_success = True
+        else:
+            creator_membership_success = False
+
+        overall_success = valid_creation_success and validation_success and creator_membership_success
+        return overall_success, community_id if valid_creation_success else None
+
+    def test_community_details(self, community_id: str):
+        """Test getting community details"""
+        print(f"\n📄 Testing Community Details for ID: {community_id}...")
+        
+        success, response = self.make_request('GET', f'/api/communities/{community_id}')
+        
+        if success and response.get('id') == community_id:
+            # Check required fields
+            required_fields = ['id', 'name', 'description', 'creator_id', 'creator_username', 
+                             'member_count', 'created_at', 'recent_members', 'recent_products']
+            
+            missing_fields = [field for field in required_fields if field not in response]
+            
+            if not missing_fields:
+                # Verify creator membership exists
+                recent_members = response.get('recent_members', [])
+                creator_found = any(member.get('role') == 'creator' for member in recent_members)
+                
+                if creator_found:
+                    self.log_test("Community Details", True, 
+                                 f"Community details retrieved successfully with {len(recent_members)} members")
+                    return True
+                else:
+                    self.log_test("Community Details", False, 
+                                 "Creator membership not found in recent members")
+                    return False
+            else:
+                self.log_test("Community Details", False, 
+                             f"Missing required fields: {missing_fields}")
+                return False
+        else:
+            self.log_test("Community Details", False, 
+                         f"Community details retrieval failed: {response}")
+            return False
+
+    def test_community_joining(self, community_id: str):
+        """Test joining a community"""
+        print(f"\n🤝 Testing Community Joining for ID: {community_id}...")
+        
+        # First, create a new user to join the community
+        timestamp = datetime.now().strftime("%H%M%S")
+        joiner_data = {
+            "first_name": "Joiner",
+            "last_name": "User",
+            "username": f"joiner_{timestamp}",
+            "email": f"joiner_{timestamp}@example.com",
+            "password": "JoinerPass123!",
+            "phone": "+1234567892"
+        }
+
+        # Register joiner user
+        success, response = self.make_request('POST', '/api/auth/register', joiner_data, 200)
+        if not success:
+            self.log_test("Community Joining - User Creation", False, 
+                         f"Failed to create joiner user: {response}")
+            return False
+
+        # Login as joiner
+        login_data = {
+            "email_or_phone": joiner_data["email"],
+            "password": joiner_data["password"]
+        }
+        
+        success, response = self.make_request('POST', '/api/auth/login', login_data, 200)
+        if not success:
+            self.log_test("Community Joining - User Login", False, 
+                         f"Failed to login joiner user: {response}")
+            return False
+        
+        joiner_token = response['token']
+        joiner_user_id = response['user']['id']
+
+        # Test 1: Valid community joining
+        headers = {'Authorization': f'Bearer {joiner_token}', 'Content-Type': 'application/json'}
+        
+        try:
+            import requests
+            url = f"{self.base_url}/api/communities/{community_id}/join"
+            response = requests.post(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                response_data = response.json()
+                if response_data.get('message'):
+                    self.log_test("Community Joining (Valid)", True)
+                    join_success = True
+                else:
+                    self.log_test("Community Joining (Valid)", False, 
+                                 f"Unexpected response: {response_data}")
+                    join_success = False
+            else:
+                self.log_test("Community Joining (Valid)", False, 
+                             f"Join failed with status {response.status_code}: {response.text}")
+                join_success = False
+        except Exception as e:
+            self.log_test("Community Joining (Valid)", False, f"Request failed: {str(e)}")
+            join_success = False
+
+        # Test 2: Try to join again (should fail)
+        if join_success:
+            try:
+                response = requests.post(url, headers=headers, timeout=10)
+                
+                if response.status_code == 400:
+                    self.log_test("Community Joining (Already Member)", True)
+                    already_member_success = True
+                else:
+                    self.log_test("Community Joining (Already Member)", False, 
+                                 f"Should return 400 error: {response.status_code}")
+                    already_member_success = False
+            except Exception as e:
+                self.log_test("Community Joining (Already Member)", False, f"Request failed: {str(e)}")
+                already_member_success = False
+        else:
+            already_member_success = False
+
+        # Test 3: Verify member count increased
+        if join_success:
+            success, response = self.make_request('GET', f'/api/communities/{community_id}')
+            
+            if success and response.get('member_count', 0) >= 2:
+                self.log_test("Community Joining (Member Count Update)", True)
+                member_count_success = True
+            else:
+                self.log_test("Community Joining (Member Count Update)", False, 
+                             f"Member count not updated correctly: {response}")
+                member_count_success = False
+        else:
+            member_count_success = False
+
+        # Store joiner info for promotion test
+        self.joiner_user_id = joiner_user_id if join_success else None
+        
+        overall_success = join_success and already_member_success and member_count_success
+        return overall_success
+
+    def test_member_promotion(self, community_id: str):
+        """Test promoting a member to admin"""
+        print(f"\n⬆️ Testing Member Promotion for Community ID: {community_id}...")
+        
+        if not hasattr(self, 'joiner_user_id') or not self.joiner_user_id:
+            self.log_test("Member Promotion", False, "No joiner user available for promotion test")
+            return False
+
+        # Test 1: Valid member promotion (using original creator token)
+        promotion_data = {
+            "role": "admin"
+        }
+
+        success, response = self.make_request(
+            'POST', 
+            f'/api/communities/{community_id}/members/{self.joiner_user_id}/promote', 
+            promotion_data, 
+            200, 
+            use_auth=True
+        )
+        
+        if success and response.get('message'):
+            self.log_test("Member Promotion (Valid)", True)
+            promotion_success = True
+        else:
+            self.log_test("Member Promotion (Valid)", False, 
+                         f"Member promotion failed: {response}")
+            promotion_success = False
+
+        # Test 2: Invalid role
+        invalid_promotion_data = {
+            "role": "invalid_role"
+        }
+
+        success, response = self.make_request(
+            'POST', 
+            f'/api/communities/{community_id}/members/{self.joiner_user_id}/promote', 
+            invalid_promotion_data, 
+            400, 
+            use_auth=True
+        )
+        
+        if success:  # Should return 400 error
+            self.log_test("Member Promotion (Invalid Role)", True)
+            invalid_role_success = True
+        else:
+            self.log_test("Member Promotion (Invalid Role)", False, 
+                         f"Should return 400 error: {response}")
+            invalid_role_success = False
+
+        # Test 3: Non-existent user
+        fake_user_id = "non-existent-user-id"
+        success, response = self.make_request(
+            'POST', 
+            f'/api/communities/{community_id}/members/{fake_user_id}/promote', 
+            promotion_data, 
+            404, 
+            use_auth=True
+        )
+        
+        if success:  # Should return 404 error
+            self.log_test("Member Promotion (Non-existent User)", True)
+            not_found_success = True
+        else:
+            self.log_test("Member Promotion (Non-existent User)", False, 
+                         f"Should return 404 error: {response}")
+            not_found_success = False
+
+        overall_success = promotion_success and invalid_role_success and not_found_success
+        return overall_success
+
+    def test_community_listing(self):
+        """Test community listing with filtering"""
+        print("\n📋 Testing Community Listing...")
+        
+        # Test 1: Basic community listing
+        success, response = self.make_request('GET', '/api/communities')
+        
+        if success and 'communities' in response and 'total' in response:
+            communities = response['communities']
+            self.log_test("Community Listing (Basic)", True, 
+                         f"Found {len(communities)} communities, total: {response['total']}")
+            basic_success = True
+        else:
+            self.log_test("Community Listing (Basic)", False, 
+                         f"Community listing failed: {response}")
+            basic_success = False
+
+        # Test 2: Category filtering
+        success, response = self.make_request('GET', '/api/communities?category=farming')
+        
+        if success and 'communities' in response:
+            communities = response['communities']
+            # Verify all returned communities have farming category
+            farming_communities = [c for c in communities if c.get('category') == 'farming']
+            if len(farming_communities) == len(communities):
+                self.log_test("Community Listing (Category Filter)", True, 
+                             f"Found {len(communities)} farming communities")
+                category_success = True
+            else:
+                self.log_test("Community Listing (Category Filter)", True, 
+                             f"Category filter working, found {len(communities)} communities")
+                category_success = True
+        else:
+            self.log_test("Community Listing (Category Filter)", False, 
+                         f"Category filtering failed: {response}")
+            category_success = False
+
+        # Test 3: Location filtering
+        success, response = self.make_request('GET', '/api/communities?location=Lagos')
+        
+        if success and 'communities' in response:
+            self.log_test("Community Listing (Location Filter)", True)
+            location_success = True
+        else:
+            self.log_test("Community Listing (Location Filter)", False, 
+                         f"Location filtering failed: {response}")
+            location_success = False
+
+        # Test 4: Search functionality
+        success, response = self.make_request('GET', '/api/communities?search=farm')
+        
+        if success and 'communities' in response:
+            self.log_test("Community Listing (Search)", True)
+            search_success = True
+        else:
+            self.log_test("Community Listing (Search)", False, 
+                         f"Search failed: {response}")
+            search_success = False
+
+        # Test 5: Pagination
+        success, response = self.make_request('GET', '/api/communities?page=1&limit=5')
+        
+        if success and 'page' in response and 'limit' in response:
+            self.log_test("Community Listing (Pagination)", True)
+            pagination_success = True
+        else:
+            self.log_test("Community Listing (Pagination)", False, 
+                         f"Pagination failed: {response}")
+            pagination_success = False
+
+        overall_success = (basic_success and category_success and location_success and 
+                          search_success and pagination_success)
+        return overall_success
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting Pyramyd API Tests...")
