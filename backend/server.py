@@ -1745,6 +1745,29 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
         # 10% service charge deduction for PyExpress suppliers
         product.price_per_unit = product_data.price_per_unit * 0.90
     
+    # Calculate discount if applicable
+    if product_data.has_discount and product_data.discount_value:
+        product.original_price = product.price_per_unit
+        
+        if product_data.discount_type == "percentage":
+            # Calculate percentage discount
+            discount_amount = product.price_per_unit * (product_data.discount_value / 100)
+            product.discount_amount = round(discount_amount, 2)
+            product.price_per_unit = round(product.price_per_unit - discount_amount, 2)
+        elif product_data.discount_type == "fixed":
+            # Apply fixed discount
+            product.discount_amount = product_data.discount_value
+            product.price_per_unit = round(product.price_per_unit - product_data.discount_value, 2)
+            
+        # Ensure price doesn't go negative
+        if product.price_per_unit < 0:
+            raise HTTPException(status_code=400, detail="Discount cannot exceed product price")
+    
+    # Validate logistics management
+    if product_data.logistics_managed_by == "seller":
+        if product_data.seller_delivery_fee is None:
+            raise HTTPException(status_code=400, detail="Delivery fee is required when seller manages logistics")
+    
     product_dict = product.dict()
     db.products.insert_one(product_dict)
     
