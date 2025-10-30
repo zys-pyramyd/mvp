@@ -9,7 +9,7 @@ from datetime import datetime
 
 class NewKYCSystemTester:
     def __init__(self):
-        self.base_url = "https://cropchain-hub-1.preview.emergentagent.com"
+        self.base_url = "https://pyramyd-markets.preview.emergentagent.com"
         self.token = None
         self.user_id = None
         self.tests_run = 0
