@@ -10,13 +10,41 @@ from pymongo import MongoClient
 import bcrypt
 import jwt
 from enum import Enum
+from cryptography.fernet import Fernet
+import base64
+import hashlib
 
-# Environment variables
+# Environment variables - ALL SENSITIVE DATA MUST BE IN ENV
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
-JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-here')
+JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-here-change-in-production')
+ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')  # For encrypting sensitive user data
 PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_dummy_paystack_key')
 TWILIO_SID = os.environ.get('TWILIO_ACCOUNT_SID', 'dummy_twilio_sid')
 TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'dummy_twilio_token')
+
+# Generate encryption key if not provided (for development only)
+if not ENCRYPTION_KEY:
+    ENCRYPTION_KEY = Fernet.generate_key().decode()
+    print(f"⚠️ WARNING: Using auto-generated encryption key. Set ENCRYPTION_KEY in production!")
+
+# Initialize Fernet cipher for encryption
+cipher_suite = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
+
+def encrypt_data(data: str) -> str:
+    """Encrypt sensitive data"""
+    if not data:
+        return None
+    return cipher_suite.encrypt(data.encode()).decode()
+
+def decrypt_data(encrypted_data: str) -> str:
+    """Decrypt sensitive data"""
+    if not encrypted_data:
+        return None
+    try:
+        return cipher_suite.decrypt(encrypted_data.encode()).decode()
+    except Exception as e:
+        print(f"Decryption error: {str(e)}")
+        return None
 
 # Commission structure for agents (updated rates)
 AGENT_COMMISSION_RATES = {
