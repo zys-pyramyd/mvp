@@ -1236,6 +1236,27 @@ function App() {
     return null;
   };
 
+  const fetchSellerDetails = async (username) => {
+    setLoadingSellerDetails(true);
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/public/${username}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSellerDetails(data);
+        setShowSellerDetails(true);
+        return data;
+      } else {
+        alert('Unable to fetch seller details');
+      }
+    } catch (error) {
+      console.error('Error fetching seller details:', error);
+      alert('Failed to load seller information');
+    } finally {
+      setLoadingSellerDetails(false);
+    }
+    return null;
+  };
+
   const createCommunity = async (communityData) => {
     try {
       const token = localStorage.getItem('token');
