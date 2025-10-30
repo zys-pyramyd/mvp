@@ -3294,13 +3294,28 @@ function App() {
                 className="flex overflow-x-auto space-x-3 scrollbar-hide flex-1 py-2"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
               >
-                {Object.entries(productCategories).map(([key, category]) => (
+                {Object.entries(productCategories).map(([key, category]) => {
+                  // Filter products by platform for category display
+                  const platform = currentPlatform === 'buy_from_farm' ? 'farm_deals' : 'home';
+                  let platformProducts = products;
+                  
+                  // Apply platform filtering for category counts
+                  if (platform === 'home') {
+                    platformProducts = products.filter(p => ['business', 'supplier'].includes(p.seller_type));
+                  } else {
+                    platformProducts = products.filter(p => ['farmer', 'agent'].includes(p.seller_type));
+                  }
+                  
+                  const filtered = platformProducts.filter(p => p.category === key);
+                  if (filtered.length === 0) return null;
+                  
+                  return (
                   <div
                     key={key}
                     className="flex-shrink-0 bg-white border border-gray-200 rounded-lg p-3 hover:border-emerald-300 transition-colors cursor-pointer min-w-[120px]"
                     onClick={() => {
                       // Filter products by category
-                      const filtered = products.filter(p => p.category === key);
+                      const filtered = platformProducts.filter(p => p.category === key);
                       // You could implement category filtering here
                     }}
                   >
