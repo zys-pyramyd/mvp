@@ -6189,6 +6189,117 @@ async def delete_profile_picture(current_user: dict = Depends(get_current_user))
         print(f"Error deleting profile picture: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete profile picture")
 
+@app.post("/api/users/account-details")
+async def save_account_details(
+    account_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Save encrypted account details (bank account, mobile money)"""
+    try:
+        user_id = current_user["id"]
+        
+        # Check if account details already exist
+        existing = secure_account_details_collection.find_one({"user_id": user_id})
+        
+        # Prepare encrypted data
+        encrypted_details = {
+            "user_id": user_id,
+            "bank_name": account_data.get("bank_name"),
+            "account_name": account_data.get("account_name"),
+            "mobile_money_provider": account_data.get("mobile_money_provider"),
+            "is_verified": False,
+            "updated_at": datetime.utcnow()
+        }
+        
+        # Encrypt sensitive fields
+        if account_data.get("account_number"):
+            encrypted_details["account_number"] = encrypt_data(account_data["account_number"])
+        
+        if account_data.get("mobile_money_number"):
+            encrypted_details["mobile_money_number"] = encrypt_data(account_data["mobile_money_number"])
+        
+        if existing:
+            # Update existing
+            secure_account_details_collection.update_one(
+                {"user_id": user_id},
+                {"$set": encrypted_details}
+            )
+            message = "Account details updated successfully"
+        else:
+            # Create new
+            encrypted_details["id"] = str(uuid.uuid4())
+            encrypted_details["created_at"] = datetime.utcnow()
+            secure_account_details_collection.insert_one(encrypted_details)
+            message = "Account details saved successfully"
+        
+        return {"message": message, "success": True}
+        
+    except Exception as e:
+        print(f"Error saving account details: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save account details")
+
+@app.get("/api/users/account-details")
+async def get_account_details(current_user: dict = Depends(get_current_user)):
+    """Get decrypted account details for current user"""
+    try:
+        user_id = current_user["id"]
+        
+        details = secure_account_details_collection.find_one({"user_id": user_id})
+        
+        if not details:
+            return {"has_details": False}
+        
+        # Decrypt sensitive fields
+        decrypted = {
+            "has_details": True,
+            "bank_name": details.get("bank_name"),
+            "account_name": details.get("account_name"),
+            "mobile_money_provider": details.get("mobile_money_provider"),
+            "is_verified": details.get("is_verified", False)
+        }
+        
+        # Only decrypt if needed (show masked version for display)
+        if details.get("account_number"):
+            full_account = decrypt_data(details["account_number"])
+            # Mask account number (show last 4 digits only)
+            if full_account and len(full_account) > 4:
+                decrypted["account_number_masked"] = "****" + full_account[-4:]
+            else:
+                decrypted["account_number_masked"] = "****"
+        
+        if details.get("mobile_money_number"):
+            full_mobile = decrypt_data(details["mobile_money_number"])
+            # Mask mobile number
+            if full_mobile and len(full_mobile) > 4:
+                decrypted["mobile_money_masked"] = "****" + full_mobile[-4:]
+            else:
+                decrypted["mobile_money_masked"] = "****"
+        
+        return decrypted
+        
+    except Exception as e:
+        print(f"Error getting account details: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get account details")
+
+@app.delete("/api/users/account-details")
+async def delete_account_details(current_user: dict = Depends(get_current_user)):
+    """Delete saved account details"""
+    try:
+        user_id = current_user["id"]
+        
+        result = secure_account_details_collection.delete_one({"user_id": user_id})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="No account details found")
+        
+        return {"message": "Account details deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting account details: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete account details")
+
 @app.post("/api/users/kyc/submit")
 async def submit_kyc(
     kyc_data: dict,
