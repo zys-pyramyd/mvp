@@ -1201,6 +1201,34 @@ function App() {
     return null;
   };
 
+  const fetchFeaturedCommunityProducts = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/communities/featured/products?limit=6`);
+      if (response.ok) {
+        const data = await response.json();
+        setFeaturedCommunityProducts(data.products || []);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching featured community products:', error);
+    }
+    return null;
+  };
+
+  const fetchCommunityDetails = async (communityId) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/communities/${communityId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setCommunityDetails(data);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching community details:', error);
+    }
+    return null;
+  };
+
   const createCommunity = async (communityData) => {
     try {
       const token = localStorage.getItem('token');
