@@ -1,0 +1,114 @@
+# Digital Ocean App Platform Specification
+# Deploy at: https://cloud.digitalocean.com/apps
+
+name: pyramyd-platform
+region: nyc  # nyc, sfo, fra, sgp, blr
+
+# Database
+databases:
+  - name: pyramyd-db
+    engine: MONGODB
+    version: "7"
+    size: basic-xs  # basic-xs, basic-s, basic-m, basic-l
+    num_nodes: 1
+    production: true
+
+# Services
+services:
+  # Backend API
+  - name: backend
+    github:
+      repo: your-username/pyramyd  # Update with your repo
+      branch: main
+      deploy_on_push: true
+    source_dir: /backend
+    dockerfile_path: backend/Dockerfile
+    http_port: 8001
+    instance_count: 1
+    instance_size_slug: basic-xxs  # basic-xxs, basic-xs, basic-s
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 10
+      period_seconds: 30
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 3
+    routes:
+      - path: /api
+    envs:
+      - key: MONGO_URL
+        scope: RUN_TIME
+        type: SECRET
+        value: ${pyramyd-db.DATABASE_URL}
+      - key: JWT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+        value: "CHANGE_THIS_IN_PRODUCTION"
+      - key: ENCRYPTION_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: "GENERATE_NEW_KEY"
+      - key: ENVIRONMENT
+        scope: RUN_TIME
+        value: "production"
+      - key: PAYSTACK_SECRET_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: TWILIO_ACCOUNT_SID
+        scope: RUN_TIME
+        type: SECRET
+      - key: TWILIO_AUTH_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+
+  # Frontend
+  - name: frontend
+    github:
+      repo: your-username/pyramyd
+      branch: main
+      deploy_on_push: true
+    source_dir: /frontend
+    dockerfile_path: frontend/Dockerfile
+    http_port: 3000
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    health_check:
+      http_path: /
+      initial_delay_seconds: 10
+      period_seconds: 30
+      timeout_seconds: 5
+    routes:
+      - path: /
+    envs:
+      - key: REACT_APP_BACKEND_URL
+        scope: BUILD_TIME
+        value: ${backend.PUBLIC_URL}
+
+# Deployment Instructions:
+# 1. Create a Digital Ocean account
+# 2. Install doctl CLI: https://docs.digitalocean.com/reference/doctl/how-to/install/
+# 3. Authenticate: doctl auth init
+# 4. Update this file:
+#    - Replace 'your-username/pyramyd' with your GitHub repo
+#    - Generate new JWT_SECRET and ENCRYPTION_KEY
+# 5. Create app: doctl apps create --spec app.yaml
+# 6. Or use Digital Ocean web interface:
+#    - Go to Apps → Create App
+#    - Connect GitHub repository
+#    - Digital Ocean will auto-detect this app.yaml
+# 7. Set environment variables in the dashboard:
+#    - JWT_SECRET (generate: openssl rand -base64 32)
+#    - ENCRYPTION_KEY (generate with Python: from cryptography.fernet import Fernet; print(Fernet.generate_key().decode()))
+#    - PAYSTACK_SECRET_KEY
+#    - TWILIO credentials
+# 8. Deploy!
+
+# Estimated Costs (as of 2024):
+# - basic-xxs (2 services): ~$10/month
+# - basic-xs MongoDB: ~$15/month
+# Total: ~$25/month (for starter setup)
+
+# Scaling Options:
+# - Increase instance_count for horizontal scaling
+# - Increase instance_size_slug for vertical scaling
+# - Add load balancer for high availability
