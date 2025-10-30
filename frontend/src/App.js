@@ -437,6 +437,7 @@ function App() {
     if (user) {
       fetchWalletSummary();
       fetchKYCStatus();
+      fetchUserCommunities();
     }
   }, [user]);
 
