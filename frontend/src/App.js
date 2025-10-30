@@ -3447,6 +3447,52 @@ function App() {
               </div>
             </div>
 
+            {/* Featured Community Products */}
+            {featuredCommunityProducts.length > 0 && (
+              <div className="mb-6 sm:mb-8">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Featured Products from Communities</h2>
+                <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+                  {featuredCommunityProducts.map((product) => (
+                    <div 
+                      key={product.id} 
+                      className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-emerald-300 transition-colors cursor-pointer"
+                      onClick={() => {
+                        // View product or community
+                        fetchCommunityDetails(product.community_id);
+                        setShowCommunityDetails(true);
+                      }}
+                    >
+                      {/* Product Image */}
+                      {product.images && product.images.length > 0 ? (
+                        <img 
+                          src={product.images[0]} 
+                          alt={product.title}
+                          className="w-full h-24 sm:h-32 object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-24 sm:h-32 bg-gray-200 flex items-center justify-center">
+                          <span className="text-gray-400 text-xs">📦</span>
+                        </div>
+                      )}
+                      
+                      {/* Product Info */}
+                      <div className="p-2 sm:p-3">
+                        <h3 className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
+                          {product.title}
+                        </h3>
+                        <p className="text-xs text-emerald-600 truncate mt-0.5">
+                          {product.community_name}
+                        </p>
+                        <p className="text-sm sm:text-base font-bold text-gray-900 mt-1">
+                          ₦{product.price}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* My Communities */}
             {user && userCommunities.length > 0 && (
               <div className="mb-6 sm:mb-8">
