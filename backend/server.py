@@ -576,6 +576,12 @@ class Product(BaseModel):
     subcategory: Optional[str] = None  # Dynamic based on category
     processing_level: ProcessingLevel = ProcessingLevel.NOT_PROCESSED
     price_per_unit: float
+    original_price: Optional[float] = None  # Original price before discount
+    # Discount system
+    has_discount: bool = False
+    discount_type: Optional[str] = None  # "percentage" or "fixed"
+    discount_value: Optional[float] = None  # Percentage (e.g., 10 for 10%) or fixed amount (e.g., 500)
+    discount_amount: Optional[float] = None  # Calculated discount amount in currency
     unit_of_measure: str  # kg, basket, crate, bag, gallon, etc.
     unit_specification: Optional[str] = None  # "100kg", "big", "5 litres", etc.
     quantity_available: int
@@ -587,6 +593,9 @@ class Product(BaseModel):
     agent_name: Optional[str] = None
     images: List[str] = []
     platform: str  # "pyhub" or "pyexpress"
+    # Logistics Management
+    logistics_managed_by: str = "pyramyd"  # "pyramyd" or "seller"
+    seller_delivery_fee: Optional[float] = None  # If seller manages logistics, their delivery fee (0 = free)
     # Enhanced delivery options for suppliers
     supports_dropoff_delivery: bool = True  # Whether supplier accepts drop-off locations
     supports_shipping_delivery: bool = True  # Whether supplier accepts shipping addresses
