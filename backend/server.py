@@ -155,6 +155,16 @@ class ProcessingLevel(str, Enum):
     SEMI_PROCESSED = "semi_processed"  # Partially processed 
     PROCESSED = "processed"  # Fully processed/packaged
 
+# All 36 Nigerian States + FCT Abuja
+NIGERIAN_STATES = [
+    "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa",
+    "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo",
+    "Ekiti", "Enugu", "FCT Abuja", "Gombe", "Imo", "Jigawa",
+    "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara",
+    "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun",
+    "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
+]
+
 class OrderStatus(str, Enum):
     PENDING = "pending"
     CONFIRMED = "confirmed"
