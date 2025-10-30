@@ -4201,6 +4201,20 @@ function App() {
                     📍 {product.location}
                   </div>
 
+                  {/* Delivery Information */}
+                  {product.logistics_managed_by === 'seller' && (
+                    <div className={`text-xs sm:text-sm mb-2 p-2 rounded-lg ${
+                      product.seller_delivery_fee === 0 
+                        ? 'bg-red-100 text-red-700 font-bold' 
+                        : 'bg-blue-50 text-blue-700'
+                    }`}>
+                      {product.seller_delivery_fee === 0 
+                        ? '🚚 FREE DELIVERY by Seller' 
+                        : `🚚 Delivery: ₦${product.seller_delivery_fee} (Seller Managed)`
+                      }
+                    </div>
+                  )}
+
                   {/* Rating Display - New */}
                   <div className="flex items-center mb-3">
                     <div className="flex items-center">
