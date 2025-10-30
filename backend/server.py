@@ -5985,6 +5985,67 @@ async def update_business_profile(
         print(f"Error updating business profile: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to update business profile")
 
+@app.post("/api/users/profile-picture")
+async def upload_profile_picture(
+    picture_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload or update user profile picture (base64 encoded)"""
+    try:
+        user_id = current_user["id"]
+        
+        # Validate picture_data contains base64 string
+        if not picture_data.get("profile_picture"):
+            raise HTTPException(status_code=400, detail="Profile picture data is required")
+        
+        profile_picture = picture_data["profile_picture"]
+        
+        # Basic validation for base64 image (should start with data:image/)
+        if not profile_picture.startswith("data:image/"):
+            raise HTTPException(status_code=400, detail="Invalid image format. Must be base64 encoded image")
+        
+        # Update user profile picture
+        result = users_collection.update_one(
+            {"id": user_id},
+            {"$set": {"profile_picture": profile_picture, "updated_at": datetime.utcnow()}}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {
+            "message": "Profile picture updated successfully",
+            "profile_picture": profile_picture
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error uploading profile picture: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to upload profile picture")
+
+@app.delete("/api/users/profile-picture")
+async def delete_profile_picture(current_user: dict = Depends(get_current_user)):
+    """Remove user profile picture"""
+    try:
+        user_id = current_user["id"]
+        
+        result = users_collection.update_one(
+            {"id": user_id},
+            {"$set": {"profile_picture": None, "updated_at": datetime.utcnow()}}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {"message": "Profile picture removed successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting profile picture: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete profile picture")
+
 @app.post("/api/users/kyc/submit")
 async def submit_kyc(
     kyc_data: dict,
