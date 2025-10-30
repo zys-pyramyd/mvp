@@ -3558,18 +3558,44 @@ function App() {
               <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Featured Communities</h2>
               <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {communities.slice(0, 6).map((community) => (
-                  <div key={community.id} className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-emerald-300 transition-colors">
-                    <div className="flex items-start justify-between mb-2 sm:mb-3">
-                      <div className="flex-1 min-w-0 pr-2">
+                  <div 
+                    key={community.id} 
+                    className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-emerald-300 transition-colors cursor-pointer"
+                    onClick={() => {
+                      fetchCommunityDetails(community.id);
+                      setShowCommunityDetails(true);
+                    }}
+                  >
+                    {/* Community Header with Profile Picture */}
+                    <div className="flex items-start gap-3 mb-2 sm:mb-3">
+                      {/* Profile Picture */}
+                      <div className="flex-shrink-0">
+                        {community.profile_picture ? (
+                          <img 
+                            src={community.profile_picture} 
+                            alt={community.name}
+                            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border-2 border-emerald-500"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-base sm:text-lg border-2 border-emerald-600">
+                            {community.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Community Name and Category */}
+                      <div className="flex-1 min-w-0">
                         <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">{community.name}</h3>
                         <p className="text-xs sm:text-sm text-gray-600">{community.category}</p>
                       </div>
+                      
+                      {/* Privacy Badge */}
                       <span className={`px-2 py-0.5 sm:py-1 text-xs rounded-full flex-shrink-0 ${
                         community.privacy_type === 'public' 
                           ? 'bg-green-100 text-green-700' 
                           : 'bg-orange-100 text-orange-700'
                       }`}>
-                        {community.privacy_type}
+                        {community.privacy_type || 'public'}
                       </span>
                     </div>
                     
@@ -3580,19 +3606,32 @@ function App() {
                       {community.location && <span className="truncate ml-2">{community.location}</span>}
                     </div>
 
-                    <button
-                      onClick={async () => {
-                        try {
-                          await joinCommunity(community.id);
-                          alert('Successfully joined community!');
-                        } catch (error) {
-                          alert('Failed to join community: ' + error.message);
-                        }
-                      }}
-                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
-                    >
-                      Join Community
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent card click
+                          fetchCommunityDetails(community.id);
+                          setShowCommunityDetails(true);
+                        }}
+                        className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+                      >
+                        View Details
+                      </button>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation(); // Prevent card click
+                          try {
+                            await joinCommunity(community.id);
+                            alert('Successfully joined community!');
+                          } catch (error) {
+                            alert('Failed to join community: ' + error.message);
+                          }
+                        }}
+                        className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                      >
+                        Join
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
