@@ -3314,9 +3314,10 @@ function App() {
                     key={key}
                     className="flex-shrink-0 bg-white border border-gray-200 rounded-lg p-3 hover:border-emerald-300 transition-colors cursor-pointer min-w-[120px]"
                     onClick={() => {
-                      // Filter products by category
-                      const filtered = platformProducts.filter(p => p.category === key);
-                      // You could implement category filtering here
+                      // Set category filter and apply platform-specific filtering
+                      setSelectedCategory(key);
+                      setFilters(prev => ({ ...prev, category: key }));
+                      setTimeout(() => fetchProducts(), 100);
                     }}
                   >
                     <div className="text-center">
