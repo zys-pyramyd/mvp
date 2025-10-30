@@ -9167,6 +9167,9 @@ function App() {
       {/* Profile Picture Upload Modal */}
       {showProfilePictureUpload && <ProfilePictureUploadModal />}
 
+      {/* Seller Details Modal */}
+      {showSellerDetails && <SellerDetailsModal />}
+
     </div>
   );
 }
