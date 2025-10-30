@@ -58,6 +58,50 @@ def decrypt_data(encrypted_data: str) -> str:
         print(f"Decryption error: {str(e)}")
         return None
 
+# Paystack Helper Functions
+def paystack_request(method: str, endpoint: str, data: dict = None) -> dict:
+    """Make authenticated request to Paystack API"""
+    headers = {
+        "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
+        "Content-Type": "application/json"
+    }
+    url = f"{PAYSTACK_API_URL}{endpoint}"
+    
+    try:
+        if method == "GET":
+            response = requests.get(url, headers=headers)
+        elif method == "POST":
+            response = requests.post(url, headers=headers, json=data)
+        elif method == "PUT":
+            response = requests.put(url, headers=headers, json=data)
+        else:
+            raise ValueError(f"Unsupported method: {method}")
+        
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Paystack API error: {str(e)}")
+        if hasattr(e.response, 'text'):
+            print(f"Response: {e.response.text}")
+        raise HTTPException(status_code=500, detail=f"Paystack API error: {str(e)}")
+
+def verify_paystack_signature(payload: bytes, signature: str) -> bool:
+    """Verify Paystack webhook signature"""
+    computed_signature = hmac.new(
+        PAYSTACK_SECRET_KEY.encode('utf-8'),
+        payload,
+        hashlib.sha512
+    ).hexdigest()
+    return hmac.compare_digest(computed_signature, signature)
+
+def naira_to_kobo(amount: float) -> int:
+    """Convert Naira to Kobo (sub-unit)"""
+    return int(amount * 100)
+
+def kobo_to_naira(amount: int) -> float:
+    """Convert Kobo to Naira"""
+    return amount / 100
+
 # Commission structure for agents (updated rates)
 AGENT_COMMISSION_RATES = {
     'purchase': 0.05,  # 5% commission for agent purchases
