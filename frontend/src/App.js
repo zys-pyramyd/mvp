@@ -2699,6 +2699,133 @@ function App() {
     );
   };
 
+  const ProfilePictureUploadModal = () => {
+    const [previewImage, setPreviewImage] = useState(user?.profile_picture || null);
+
+    const handleFileSelect = (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image size must be less than 5MB');
+        return;
+      }
+
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+    };
+
+    const handleUpload = async () => {
+      if (!previewImage) {
+        alert('Please select an image first');
+        return;
+      }
+      await uploadProfilePicture(previewImage);
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-md w-full">
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Profile Picture</h2>
+              <button
+                onClick={() => setShowProfilePictureUpload(false)}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Current/Preview Picture */}
+            <div className="flex flex-col items-center mb-6">
+              <div className="relative">
+                {previewImage ? (
+                  <img
+                    src={previewImage}
+                    alt="Profile"
+                    className="w-32 h-32 rounded-full object-cover border-4 border-emerald-500"
+                  />
+                ) : (
+                  <div className="w-32 h-32 rounded-full bg-emerald-500 flex items-center justify-center text-white text-4xl font-bold border-4 border-emerald-600">
+                    {user?.first_name?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                )}
+              </div>
+              <p className="text-sm text-gray-600 mt-3">
+                {user?.first_name} {user?.last_name}
+              </p>
+              <p className="text-xs text-gray-500 capitalize">
+                {user?.role?.replace('_', ' ')}
+              </p>
+            </div>
+
+            {/* Upload Section */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Choose New Picture
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  className="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-lg file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-emerald-50 file:text-emerald-700
+                    hover:file:bg-emerald-100
+                    cursor-pointer"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Max size: 5MB. Formats: JPG, PNG, GIF
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleUpload}
+                  disabled={uploadingPicture || !previewImage}
+                  className="flex-1 px-4 py-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {uploadingPicture ? 'Uploading...' : 'Upload Picture'}
+                </button>
+                
+                {user?.profile_picture && (
+                  <button
+                    onClick={deleteProfilePicture}
+                    className="px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors font-medium"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-800">
+                  <strong>🔒 Transparency:</strong> Your profile picture will appear on all products you post, helping buyers know who they're purchasing from.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* KYC Notification Banner - Only for non-personal accounts who need KYC */}
