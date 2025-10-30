@@ -531,6 +531,7 @@ class User(BaseModel):
     role: Optional[UserRole] = None
     is_verified: bool = False
     wallet_balance: float = 0.0
+    profile_picture: Optional[str] = None  # Base64 encoded image or URL
     # Business-related fields
     business_category: Optional[BusinessCategory] = None
     business_registration_status: Optional[BusinessRegistrationStatus] = None
