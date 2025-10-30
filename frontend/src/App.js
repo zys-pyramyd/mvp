@@ -1099,6 +1099,68 @@ function App() {
     return null;
   };
 
+  // Profile Picture functions
+  const uploadProfilePicture = async (base64Image) => {
+    if (!user) return;
+    
+    setUploadingPicture(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile-picture`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ profile_picture: base64Image })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Update user object with new profile picture
+        setUser({...user, profile_picture: data.profile_picture});
+        alert('Profile picture updated successfully! ✅');
+        setShowProfilePictureUpload(false);
+        return true;
+      } else {
+        const error = await response.json();
+        alert(`Failed to upload: ${error.detail || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error uploading profile picture:', error);
+      alert('Failed to upload profile picture. Please try again.');
+    } finally {
+      setUploadingPicture(false);
+    }
+    return false;
+  };
+
+  const deleteProfilePicture = async () => {
+    if (!user) return;
+    
+    if (!window.confirm('Are you sure you want to remove your profile picture?')) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile-picture`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        setUser({...user, profile_picture: null});
+        alert('Profile picture removed successfully! ✅');
+        return true;
+      }
+    } catch (error) {
+      console.error('Error deleting profile picture:', error);
+      alert('Failed to delete profile picture. Please try again.');
+    }
+    return false;
+  };
+
   // Communities functions
   const fetchCommunities = async () => {
     try {
