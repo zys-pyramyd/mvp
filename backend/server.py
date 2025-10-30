@@ -53,6 +53,14 @@ wallet_security_collection = db.wallet_security
 kyc_documents_collection = db.kyc_documents
 agent_kyc_collection = db.agent_kyc
 farmer_kyc_collection = db.farmer_kyc
+
+# Communities collections
+communities_collection = db.communities
+community_members_collection = db.community_members
+community_products_collection = db.community_products
+community_product_likes_collection = db.community_product_likes
+community_product_comments_collection = db.community_product_comments
+group_buy_participants_collection = db.group_buy_participants
 farmland_records_collection = db.farmland_records
 agent_farmers_collection = db.agent_farmers
 audit_logs_collection = db.audit_logs
