@@ -2996,6 +2996,143 @@ function App() {
     );
   };
 
+  const SellerDetailsModal = () => {
+    if (!sellerDetails) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-md w-full">
+          <div className="p-6">
+            {/* Header */}
+            <div className="flex justify-between items-start mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Seller Information</h2>
+              <button
+                onClick={() => setShowSellerDetails(false)}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Profile Picture and Name */}
+            <div className="flex flex-col items-center mb-6">
+              {sellerDetails.profile_picture ? (
+                <img 
+                  src={sellerDetails.profile_picture} 
+                  alt={sellerDetails.username}
+                  className="w-24 h-24 rounded-full object-cover border-4 border-emerald-500 mb-4"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-3xl border-4 border-emerald-600 mb-4">
+                  {sellerDetails.first_name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+              )}
+              
+              <h3 className="text-lg font-semibold text-gray-900">
+                {sellerDetails.first_name} {sellerDetails.last_name}
+              </h3>
+              <p className="text-sm text-gray-600">@{sellerDetails.username}</p>
+            </div>
+
+            {/* Details Grid */}
+            <div className="space-y-3">
+              {/* Role/Type */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-600">Type</span>
+                <span className="text-sm font-medium text-gray-900 capitalize">
+                  {sellerDetails.role === 'farmer' && '👨‍🌾 Farmer'}
+                  {sellerDetails.role === 'agent' && '🤝 Agent'}
+                  {sellerDetails.role === 'business' && '🏢 Business'}
+                  {sellerDetails.role === 'supplier' && '📦 Supplier'}
+                  {!['farmer', 'agent', 'business', 'supplier'].includes(sellerDetails.role) && sellerDetails.role}
+                </span>
+              </div>
+
+              {/* Business Name */}
+              {sellerDetails.business_name && (
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Business</span>
+                  <span className="text-sm font-medium text-gray-900">{sellerDetails.business_name}</span>
+                </div>
+              )}
+
+              {/* Business Category */}
+              {sellerDetails.business_category && (
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Category</span>
+                  <span className="text-sm font-medium text-gray-900 capitalize">
+                    {sellerDetails.business_category.replace('_', ' ')}
+                  </span>
+                </div>
+              )}
+
+              {/* Business Description */}
+              {sellerDetails.business_description && (
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-600 block mb-1">About</span>
+                  <p className="text-sm text-gray-900">{sellerDetails.business_description}</p>
+                </div>
+              )}
+
+              {/* Rating */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-600">Rating</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex">
+                    {[...Array(5)].map((_, i) => (
+                      <span
+                        key={i}
+                        className={`text-sm ${
+                          i < Math.floor(sellerDetails.average_rating || 5)
+                            ? 'text-yellow-400'
+                            : 'text-gray-300'
+                        }`}
+                      >
+                        ⭐
+                      </span>
+                    ))}
+                  </div>
+                  <span className="text-sm font-medium text-gray-900">
+                    {sellerDetails.average_rating?.toFixed(1) || '5.0'}
+                  </span>
+                  {sellerDetails.total_ratings > 0 && (
+                    <span className="text-xs text-gray-500">
+                      ({sellerDetails.total_ratings} reviews)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Verification Status */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-600">Status</span>
+                <div className="flex items-center gap-2">
+                  {sellerDetails.is_verified && (
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                      ✓ Verified
+                    </span>
+                  )}
+                  {sellerDetails.kyc_status === 'approved' && (
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                      ✓ KYC Approved
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Transparency Notice */}
+            <div className="mt-6 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <p className="text-xs text-emerald-800">
+                <strong>🔒 Transparency:</strong> All seller information is verified through Pyramyd's KYC process to ensure safe transactions.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* KYC Notification Banner - Only for non-personal accounts who need KYC */}
