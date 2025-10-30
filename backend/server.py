@@ -1711,10 +1711,12 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
     elif user_role == 'processor':
         product_platform = 'pyexpress'
     
-    # Create product
+    # Create product with seller profile picture
     product = Product(
         seller_id=current_user['id'],
         seller_name=current_user['username'],
+        seller_type=current_user.get('role'),
+        seller_profile_picture=current_user.get('profile_picture'),  # Include seller's profile picture
         platform=product_platform,
         **{k: v for k, v in product_data.dict().items() if k != 'platform'}
     )
