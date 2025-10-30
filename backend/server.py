@@ -591,6 +591,8 @@ class Product(BaseModel):
     listed_by_agent: bool = False
     agent_id: Optional[str] = None
     agent_name: Optional[str] = None
+    agent_profile_picture: Optional[str] = None  # Agent's profile picture for transparency
+    business_name: Optional[str] = None  # Business name for transparency
     images: List[str] = []
     platform: str  # "pyhub" or "pyexpress"
     # Logistics Management
