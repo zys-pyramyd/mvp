@@ -2263,7 +2263,7 @@ function App() {
   };
 
   const canSwitchPlatforms = (userRole) => {
-    // All users can switch between main page and fam deals for viewing
+    // All users can switch between main page and farm deals for viewing
     return true;
   };
 
