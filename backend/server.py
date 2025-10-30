@@ -575,6 +575,25 @@ class User(BaseModel):
     total_ratings: int = 0  # Number of ratings received
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+class SecureAccountDetails(BaseModel):
+    """Encrypted storage for sensitive financial information"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    # Bank account details (encrypted)
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None  # Will be encrypted
+    account_name: Optional[str] = None
+    # Payment card details (encrypted) - Store only if absolutely necessary
+    # Note: In production, use payment gateway tokenization instead
+    # Mobile money details
+    mobile_money_provider: Optional[str] = None
+    mobile_money_number: Optional[str] = None  # Will be encrypted
+    # Metadata
+    is_verified: bool = False
+    verified_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
 class CompleteRegistration(BaseModel):
     first_name: str
     last_name: str
