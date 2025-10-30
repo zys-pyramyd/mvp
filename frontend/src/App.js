@@ -4008,9 +4008,38 @@ function App() {
                     </div>
                   )}
 
-                  {/* Seller Info - Responsive */}
-                  <div className="text-xs text-gray-500 mb-3 line-clamp-1">
-                    Seller: {product.seller_username || `agent_${Math.random().toString().substr(2, 6)}`}
+                  {/* Seller Info with Profile Picture - Responsive */}
+                  <div className="flex items-center gap-2 mb-3 p-2 bg-gray-50 rounded-lg">
+                    {/* Profile Picture */}
+                    <div className="flex-shrink-0">
+                      {product.seller_profile_picture ? (
+                        <img 
+                          src={product.seller_profile_picture} 
+                          alt={product.seller_name || 'Seller'}
+                          className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-emerald-500"
+                          title={`Posted by ${product.seller_name || 'seller'}`}
+                        />
+                      ) : (
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-semibold text-xs sm:text-sm border-2 border-emerald-600">
+                          {(product.seller_name || product.seller_username || 'S').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    {/* Seller Name and Type */}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs sm:text-sm font-medium text-gray-900 truncate">
+                        {product.seller_name || product.seller_username || 'Seller'}
+                      </div>
+                      {product.seller_type && (
+                        <div className="text-xs text-gray-600 capitalize">
+                          {product.seller_type === 'farmer' && '👨‍🌾 Farmer'}
+                          {product.seller_type === 'agent' && '🤝 Agent'}
+                          {product.seller_type === 'business' && '🏢 Business'}
+                          {product.seller_type === 'supplier' && '📦 Supplier'}
+                          {!['farmer', 'agent', 'business', 'supplier'].includes(product.seller_type) && product.seller_type}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Enhanced Add to Cart - Buyer Interface */}
