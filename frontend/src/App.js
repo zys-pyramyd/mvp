@@ -124,7 +124,7 @@ function App() {
   // Location and filtering state
   const [locationFilter, setLocationFilter] = useState('');
   
-  // Enhanced Fam Deals state
+  // Enhanced Farm Deals state
   const [bulkListings, setBulkListings] = useState([]);
   const [showBulkListing, setShowBulkListing] = useState(false);
   
