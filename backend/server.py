@@ -1521,8 +1521,8 @@ async def get_products(
             if platform == "home":
                 # Home page: Only business and supplier preorders
                 preorders_query["seller_type"] = {"$in": ["business", "supplier"]}
-            elif platform == "fam_deals":
-                # Fam Deals page: Only farmer and agent preorders
+            elif platform == "farm_deals":
+                # Farm Deals page: Only farmer and agent preorders
                 preorders_query["seller_type"] = {"$in": ["farmer", "agent"]}
             
             # Get pre-orders with improved pagination logic
