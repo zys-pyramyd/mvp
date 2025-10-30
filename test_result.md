@@ -413,15 +413,18 @@ backend:
 
   - task: "New Communities System and Updated Platform Filtering"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 1
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: false
         agent: "testing"
         comment: "❌ COMMUNITIES SYSTEM AND PLATFORM FILTERING TESTING: Platform filtering working perfectly (100% success) but community creation has critical ObjectId serialization bug. PLATFORM FILTERING SUCCESS: 1) ✅ Home platform correctly returns only business/supplier products 2) ✅ Farm Deals platform correctly returns only farmer/agent products 3) ✅ Global search successfully searches across all platforms 4) ✅ Category filtering with platform separation working correctly. COMMUNITY SYSTEM RESULTS (20% success): 1) ✅ Community Listing - All filtering working perfectly 2) ❌ Community Creation - CRITICAL BUG: 500 error due to ObjectId serialization (ValueError: ObjectId object is not iterable) 3) ❌ Community Details - Cannot test without valid community 4) ❌ Joining Communities - Cannot test without valid community 5) ❌ Member Promotion - Cannot test without valid community. ROOT CAUSE: Backend community creation endpoint has ObjectId serialization issue in JSON response. IMPACT: Platform filtering is production-ready, but community system is blocked by creation bug."
+      - working: true
+        agent: "testing"
+        comment: "✅ COMMUNITIES SYSTEM OBJECTID FIX SUCCESSFUL: Comprehensive testing of the complete communities system achieved 100% success rate (15/15 tests passed). The ObjectId serialization issue has been completely resolved. COMMUNITY CREATION SUCCESS: 1) ✅ Community Creation - Successfully created 'Test Farm Community' with proper JSON response and no ObjectId errors 2) ✅ Community Details - Retrieved community details with all required fields (id, name, description, creator_id, creator_username, member_count, created_at, recent_members, recent_products) 3) ✅ Community Joining - Successfully tested user joining community, duplicate join prevention, and member count updates 4) ✅ Member Promotion - Successfully tested promoting member to admin role with proper validation and error handling 5) ✅ Community Listing - All filtering options working perfectly (basic listing, category filtering, location filtering, search functionality, pagination). END-TO-END FLOW VERIFIED: Created community → Retrieved details → User joined → Member promoted → Listed communities. All ObjectId serialization issues are resolved and the complete community system is fully functional and ready for production use."
 
 frontend:
   - task: "JSX Syntax Error Fix"
