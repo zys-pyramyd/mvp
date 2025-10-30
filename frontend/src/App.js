@@ -404,6 +404,7 @@ function App() {
     fetchDropOffLocations();
     fetchMarketPrices();
     fetchBulkListings();
+    fetchCommunities();
     
     // Migrate existing cart items to ensure proper structure
     if (cart.length > 0) {
