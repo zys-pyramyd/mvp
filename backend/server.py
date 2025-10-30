@@ -1430,7 +1430,8 @@ async def get_products(
     only_preorders: Optional[bool] = None,
     search_term: Optional[str] = None,
     seller_type: Optional[str] = None,
-    platform: Optional[str] = None,  # 'home' or 'fam_deals'
+    platform: Optional[str] = None,  # 'home' or 'farm_deals'
+    global_search: Optional[bool] = None,  # Search across all platforms
     page: int = 1,
     limit: int = 20
 ):
