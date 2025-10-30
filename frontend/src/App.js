@@ -469,7 +469,7 @@ function App() {
 
   const fetchProducts = async () => {
     try {
-      const platform = currentPlatform === 'buy_from_farm' ? 'fam_deals' : 'home';
+      const platform = currentPlatform === 'buy_from_farm' ? 'farm_deals' : 'home';
       let url = `${process.env.REACT_APP_BACKEND_URL}/api/products?platform=${platform}`;
       
       // Add category filter
