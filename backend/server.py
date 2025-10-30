@@ -19,8 +19,18 @@ MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
 JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-here-change-in-production')
 ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')  # For encrypting sensitive user data
 PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_dummy_paystack_key')
+PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY', 'pk_test_dummy_paystack_key')
 TWILIO_SID = os.environ.get('TWILIO_ACCOUNT_SID', 'dummy_twilio_sid')
 TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'dummy_twilio_token')
+
+# Paystack API Base URL
+PAYSTACK_API_URL = "https://api.paystack.co"
+
+# Commission rates
+AGENT_BUYER_COMMISSION_RATE = 0.04  # 4% for agent buyers
+FARMHUB_SERVICE_CHARGE = 0.10  # 10% service charge
+COMMUNITY_COMMISSION = 0.025  # 2.5% commission
+COMMUNITY_SERVICE = 0.10  # 10% service charge
 
 # Generate encryption key if not provided (for development only)
 if not ENCRYPTION_KEY:
