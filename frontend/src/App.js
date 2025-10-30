@@ -4108,6 +4108,8 @@ function App() {
             ))
           )}
         </div>
+          </div>
+        )}
       </main>
 
       {/* Enhanced Registration Modal */}
