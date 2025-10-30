@@ -2714,6 +2714,17 @@ function App() {
                 <span className="hidden sm:inline">Communities</span>
                 <span className="sm:hidden">Groups</span>
               </button>
+              <button
+                onClick={() => setCurrentPlatform('communities')}
+                className={`px-2 sm:px-3 py-1 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+                  currentPlatform === 'communities'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <span className="hidden sm:inline">Communities</span>
+                <span className="sm:hidden">Groups</span>
+              </button>
             </div>
 
             {/* Right side navigation icons - Responsive Priority */}
