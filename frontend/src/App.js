@@ -3218,7 +3218,7 @@ function App() {
                     onClick={() => setShowCommunityBrowser(true)}
                     className="px-4 py-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors font-medium"
                   >
-                    Browse Communities
+                    Find Communities
                   </button>
                   {user && (
                     <button
