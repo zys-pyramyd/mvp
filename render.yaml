@@ -1,0 +1,81 @@
+# Render Blueprint for Pyramyd Platform
+# Deploy at: https://render.com
+
+services:
+  # Backend API Service
+  - type: web
+    name: pyramyd-backend
+    runtime: python
+    region: oregon  # Choose: oregon, frankfurt, singapore
+    plan: starter  # free, starter, standard, pro
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT --workers 4
+    healthCheckPath: /health
+    envVars:
+      - key: MONGO_URL
+        sync: false  # Set in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+    autoDeploy: true
+
+  # Frontend Service
+  - type: web
+    name: pyramyd-frontend
+    runtime: node
+    region: oregon
+    plan: starter
+    rootDir: frontend
+    buildCommand: yarn install --frozen-lockfile && yarn build
+    staticPublishPath: ./build
+    pullRequestPreviewsEnabled: true
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-XSS-Protection
+        value: 1; mode=block
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_BACKEND_URL
+        fromService:
+          type: web
+          name: pyramyd-backend
+          property: url
+    autoDeploy: true
+
+# Database
+databases:
+  - name: pyramyd-mongodb
+    plan: starter  # free (limited), starter, standard
+    region: oregon
+    ipAllowList: []  # Empty = accessible from all Render services
+
+# Notes for deployment:
+# 1. Fork/push this repository to GitHub
+# 2. Connect your GitHub repo to Render
+# 3. Render will automatically detect this render.yaml
+# 4. Set required environment variables in Render dashboard:
+#    - MONGO_URL (get from database service)
+#    - PAYSTACK_SECRET_KEY
+#    - TWILIO_ACCOUNT_SID
+#    - TWILIO_AUTH_TOKEN
+# 5. JWT_SECRET and ENCRYPTION_KEY are auto-generated
+# 6. Deploy!
