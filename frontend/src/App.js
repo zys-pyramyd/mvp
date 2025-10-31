@@ -5972,20 +5972,55 @@ function App() {
                     
                     <div className="space-y-3">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Subtotal ({orderSummary.item_count} items)</span>
-                        <span className="font-medium">₦{orderSummary.subtotal?.toLocaleString()}</span>
+                        <span className="text-gray-600">Product Total ({orderSummary.item_count} items)</span>
+                        <span className="font-medium">₦{orderSummary.product_total?.toLocaleString() || 0}</span>
                       </div>
+                      
+                      {orderSummary.platform_service_charge > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Service Charge (10%)</span>
+                          <span className="font-medium">₦{orderSummary.platform_service_charge?.toLocaleString() || 0}</span>
+                        </div>
+                      )}
+                      
+                      {orderSummary.platform_commission > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Platform Commission (2.5%)</span>
+                          <span className="font-medium">₦{orderSummary.platform_commission?.toLocaleString() || 0}</span>
+                        </div>
+                      )}
                       
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Delivery Fees</span>
-                        <span className="font-medium">₦{orderSummary.delivery_total?.toLocaleString()}</span>
+                        <span className="font-medium">₦{orderSummary.delivery_total?.toLocaleString() || 0}</span>
                       </div>
+                      
+                      {orderSummary.is_agent && orderSummary.agent_commission > 0 && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 -mx-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-emerald-700 font-medium">🎁 Your Agent Commission (4%)</span>
+                            <span className="font-semibold text-emerald-700">₦{orderSummary.agent_commission?.toLocaleString() || 0}</span>
+                          </div>
+                          <p className="text-xs text-emerald-600 mt-1">
+                            Paid separately to your account after order completion
+                          </p>
+                        </div>
+                      )}
                       
                       <div className="border-t border-gray-200 pt-3">
                         <div className="flex justify-between">
-                          <span className="text-lg font-semibold text-gray-900">Total</span>
-                          <span className="text-lg font-semibold text-emerald-600">₦{orderSummary.total?.toLocaleString()}</span>
+                          <span className="text-lg font-semibold text-gray-900">Total to Pay</span>
+                          <span className="text-lg font-semibold text-emerald-600">₦{orderSummary.total?.toLocaleString() || 0}</span>
                         </div>
+                      </div>
+                      
+                      {/* Breakdown Info */}
+                      <div className="text-xs text-gray-500 mt-2 space-y-1">
+                        <div>• Vendor receives: ₦{orderSummary.product_total?.toLocaleString() || 0}</div>
+                        <div>• Platform fee: ₦{orderSummary.platform_cut?.toLocaleString() || 0}</div>
+                        {orderSummary.is_agent && (
+                          <div className="text-emerald-600 font-medium">• Your commission: ₦{orderSummary.agent_commission?.toLocaleString() || 0}</div>
+                        )}
                       </div>
                     </div>
                     
