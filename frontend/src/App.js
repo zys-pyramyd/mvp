@@ -2116,37 +2116,93 @@ function App() {
 
   // Checkout and cart management functions
   const calculateOrderSummary = () => {
-    let subtotal = 0;
+    let productTotal = 0;
     let deliveryTotal = 0;
     let itemCount = 0;
+    let platformServiceCharge = 0;
+    let platformCommission = 0;
+    let agentCommission = 0;
+
+    // Detect if buyer is an agent
+    const isAgent = user && (user.role === 'agent' || user.role === 'purchasing_agent');
 
     cart.forEach(item => {
       const itemTotal = item.product.price_per_unit * item.quantity;
-      subtotal += itemTotal;
+      productTotal += itemTotal;
       itemCount += item.quantity;
+      
+      // Determine platform type from product
+      const isFarmHub = item.product.platform === 'pyhub' || 
+                        item.product.seller_type === 'farmer' || 
+                        item.product.seller_type === 'agent';
+      
+      const isCommunity = item.product.community_id || item.product.source === 'community';
+      
+      // Calculate platform charges based on type
+      if (isCommunity) {
+        // Community: 2.5% commission + 10% service
+        platformCommission += itemTotal * 0.025;
+        platformServiceCharge += itemTotal * 0.10;
+      } else if (isFarmHub) {
+        // FarmHub: 10% service charge only
+        platformServiceCharge += itemTotal * 0.10;
+      } else {
+        // Home/PyExpress: 2.5% commission + 10% service
+        platformCommission += itemTotal * 0.025;
+        platformServiceCharge += itemTotal * 0.10;
+      }
       
       // Calculate delivery fees based on method
       if (item.delivery_method === 'platform') {
-        // Platform delivery fee calculation (could be based on distance, weight, etc.)
+        // Platform delivery fee calculation
         const baseDeliveryFee = 500; // Base fee of ₦500
         const weightMultiplier = (item.product.weight_kg || 1) * 50; // ₦50 per kg
         deliveryTotal += baseDeliveryFee + weightMultiplier;
-      } else {
-        // Offline delivery - might have different fee structure or be free
-        deliveryTotal += 200; // Minimal handling fee for offline delivery
+      } else if (item.delivery_method === 'offline') {
+        // Offline delivery - minimal handling fee
+        deliveryTotal += 200;
+      } else if (item.product.logistics_managed_by === 'seller') {
+        // Seller manages logistics
+        deliveryTotal += item.product.seller_delivery_fee || 0;
       }
     });
 
-    const total = subtotal + deliveryTotal;
+    // Calculate agent commission if applicable (4% of product total)
+    if (isAgent) {
+      agentCommission = productTotal * 0.04;
+    }
+
+    // Total platform cut
+    const platformCut = platformServiceCharge + platformCommission + deliveryTotal;
+    
+    // Total amount customer pays
+    const total = productTotal + platformCut;
     
     setOrderSummary({
-      subtotal,
+      product_total: productTotal,
+      platform_service_charge: platformServiceCharge,
+      platform_commission: platformCommission,
       delivery_total: deliveryTotal,
+      platform_cut: platformCut,
+      agent_commission: agentCommission,
+      subtotal: productTotal,  // For backward compatibility
       total,
-      item_count: itemCount
+      item_count: itemCount,
+      is_agent: isAgent
     });
     
-    return { subtotal, delivery_total: deliveryTotal, total, item_count: itemCount };
+    return {
+      product_total: productTotal,
+      platform_service_charge: platformServiceCharge,
+      platform_commission: platformCommission,
+      delivery_total: deliveryTotal,
+      platform_cut: platformCut,
+      agent_commission: agentCommission,
+      subtotal: productTotal,
+      total,
+      item_count: itemCount,
+      is_agent: isAgent
+    };
   };
 
   const updateCartItemQuantity = (itemId, newQuantity) => {
