@@ -6575,6 +6575,196 @@ async def get_banks():
         print(f"Error getting banks: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get banks")
 
+@app.post("/api/delivery/calculate-fee")
+async def calculate_delivery_fee(request_data: dict):
+    """Calculate delivery fee based on state and platform"""
+    try:
+        state = request_data.get("state")
+        platform_type = request_data.get("platform_type", "home")  # farmhub, home, community
+        product_weight = request_data.get("weight_kg", 1)
+        
+        if not state:
+            raise HTTPException(status_code=400, detail="State is required")
+        
+        # Get base delivery fee by state
+        base_fee = get_delivery_fee_by_state(state)
+        
+        # Add weight surcharge for heavy items (>5kg)
+        weight_surcharge = 0
+        if product_weight > 5:
+            weight_surcharge = (product_weight - 5) * 100  # ₦100 per kg above 5kg
+        
+        total_delivery_fee = base_fee + weight_surcharge
+        
+        return {
+            "status": True,
+            "state": state,
+            "base_fee": base_fee,
+            "weight_surcharge": weight_surcharge,
+            "total_delivery_fee": total_delivery_fee,
+            "weight_kg": product_weight
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error calculating delivery fee: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to calculate delivery fee")
+
+@app.post("/api/paystack/transaction/initialize")
+async def initialize_payment(
+    payment_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Initialize payment with proper split logic:
+    - FarmHub: Uses split group SPL_dCqIOTFNRu  
+    - Home/Community: Uses dynamic subaccount code
+    """
+    try:
+        user_id = current_user["id"]
+        buyer_email = current_user.get("email")
+        buyer_role = current_user.get("role")
+        
+        # Extract payment details
+        product_total = payment_data.get("product_total", 0)  # In Naira
+        customer_state = payment_data.get("customer_state")  # For delivery fee calculation
+        product_weight = payment_data.get("product_weight", 1)  # In kg
+        subaccount_code = payment_data.get("subaccount_code")  # For Home/Community
+        product_id = payment_data.get("product_id")
+        order_id = payment_data.get("order_id")
+        platform_type = payment_data.get("platform_type", "home")  # farmhub, home, or community
+        
+        if not customer_state:
+            raise HTTPException(status_code=400, detail="Customer state is required for delivery calculation")
+        
+        # Calculate state-based delivery fee
+        delivery_fee = get_delivery_fee_by_state(customer_state)
+        if product_weight > 5:
+            delivery_fee += (product_weight - 5) * 100  # Weight surcharge
+        
+        # Convert to kobo
+        product_total_kobo = naira_to_kobo(product_total)
+        delivery_fee_kobo = naira_to_kobo(delivery_fee)
+        
+        # Calculate platform cut based on type
+        if platform_type == "farmhub":
+            # FarmHub: 10% service + delivery
+            platform_cut_kobo = int(product_total_kobo * FARMHUB_SERVICE_CHARGE) + delivery_fee_kobo
+        else:
+            # Community/Home: 2.5% commission + 10% service + delivery
+            commission_kobo = int(product_total_kobo * COMMUNITY_COMMISSION)
+            service_kobo = int(product_total_kobo * COMMUNITY_SERVICE)
+            platform_cut_kobo = commission_kobo + service_kobo + delivery_fee_kobo
+        
+        # Check if buyer is an agent
+        buyer_is_agent = buyer_role in ["agent", "purchasing_agent"]
+        agent_commission_kobo = 0
+        
+        if buyer_is_agent:
+            agent_commission_kobo = int(product_total_kobo * AGENT_BUYER_COMMISSION_RATE)
+        
+        # Total amount customer pays
+        total_amount_kobo = product_total_kobo + platform_cut_kobo
+        
+        # Generate unique reference
+        reference = f"PYR_{uuid.uuid4().hex[:12].upper()}"
+        
+        # Prepare Paystack payload based on platform type
+        if platform_type == "farmhub":
+            # Farm Deals: Use split group (NO subaccount parameter)
+            paystack_data = {
+                "email": buyer_email,
+                "amount": total_amount_kobo,
+                "split_code": FARMHUB_SPLIT_GROUP,  # Use split group SPL_dCqIOTFNRu
+                "reference": reference,
+                "callback_url": payment_data.get("callback_url", ""),
+                "metadata": {
+                    "product_id": product_id,
+                    "order_id": order_id,
+                    "platform_type": platform_type,
+                    "buyer_id": user_id,
+                    "customer_state": customer_state,
+                    "delivery_fee": delivery_fee
+                }
+            }
+        else:
+            # Home/Community: Use dynamic subaccount
+            if not subaccount_code:
+                raise HTTPException(status_code=400, detail="Subaccount code is required for Home/Community transactions")
+            
+            paystack_data = {
+                "email": buyer_email,
+                "amount": total_amount_kobo,
+                "subaccount": subaccount_code,  # Dynamic vendor subaccount
+                "transaction_charge": platform_cut_kobo,  # Platform's fixed cut
+                "bearer": "account",  # Platform pays Paystack fees
+                "reference": reference,
+                "callback_url": payment_data.get("callback_url", ""),
+                "metadata": {
+                    "product_id": product_id,
+                    "order_id": order_id,
+                    "platform_type": platform_type,
+                    "buyer_id": user_id,
+                    "customer_state": customer_state,
+                    "delivery_fee": delivery_fee
+                }
+            }
+        
+        response = paystack_request("POST", "/transaction/initialize", paystack_data)
+        
+        if not response.get("status"):
+            raise HTTPException(status_code=400, detail=response.get("message", "Failed to initialize payment"))
+        
+        # Save transaction record
+        transaction = {
+            "id": str(uuid.uuid4()),
+            "reference": reference,
+            "buyer_id": user_id,
+            "buyer_email": buyer_email,
+            "product_id": product_id,
+            "order_id": order_id,
+            "product_total": product_total_kobo,
+            "delivery_fee": delivery_fee_kobo,
+            "platform_cut": platform_cut_kobo,
+            "total_amount": total_amount_kobo,
+            "subaccount_code": subaccount_code if platform_type != "farmhub" else FARMHUB_SUBACCOUNT,
+            "split_code": FARMHUB_SPLIT_GROUP if platform_type == "farmhub" else None,
+            "vendor_share": product_total_kobo,
+            "buyer_is_agent": buyer_is_agent,
+            "agent_commission": agent_commission_kobo,
+            "customer_state": customer_state,
+            "platform_type": platform_type,
+            "payment_status": "pending",
+            "authorization_url": response["data"]["authorization_url"],
+            "access_code": response["data"]["access_code"],
+            "created_at": datetime.utcnow()
+        }
+        
+        paystack_transactions_collection.insert_one(transaction)
+        
+        return {
+            "status": True,
+            "message": "Payment initialized",
+            "authorization_url": response["data"]["authorization_url"],
+            "access_code": response["data"]["access_code"],
+            "reference": reference,
+            "amount": kobo_to_naira(total_amount_kobo),
+            "breakdown": {
+                "product_total": kobo_to_naira(product_total_kobo),
+                "delivery_fee": kobo_to_naira(delivery_fee_kobo),
+                "delivery_state": customer_state,
+                "platform_cut": kobo_to_naira(platform_cut_kobo),
+                "agent_commission": kobo_to_naira(agent_commission_kobo) if buyer_is_agent else 0
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error initializing payment: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to initialize payment: {str(e)}")
+
 @app.post("/api/users/kyc/submit")
 async def submit_kyc(
     kyc_data: dict,
