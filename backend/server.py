@@ -25,6 +25,15 @@ PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY', 'pk_test_dummy_payst
 TWILIO_SID = os.environ.get('TWILIO_ACCOUNT_SID', 'dummy_twilio_sid')
 TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'dummy_twilio_token')
 
+# Kwik Delivery API
+KWIK_API_KEY = os.environ.get('KWIK_API_KEY', 'dummy_kwik_key')
+KWIK_API_URL = "https://api.kwik.delivery/v1"
+KWIK_ENABLED_STATES = ["Lagos", "Oyo", "FCT Abuja"]  # States where Kwik operates
+
+# Admin credentials
+ADMIN_EMAIL = "abdulazeezshakrullah@gmail.com"
+ADMIN_PASSWORD_HASH = os.environ.get('ADMIN_PASSWORD_HASH')  # Will be generated on first setup
+
 # Paystack API Base URL
 PAYSTACK_API_URL = "https://api.paystack.co"
 
