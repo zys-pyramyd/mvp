@@ -28,11 +28,75 @@ TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'dummy_twilio_token')
 # Paystack API Base URL
 PAYSTACK_API_URL = "https://api.paystack.co"
 
+# Farm Deals Fixed Split Group (Sophie Farms Investment Ltd)
+FARMHUB_SPLIT_GROUP = os.environ.get('FARMHUB_SPLIT_GROUP', 'SPL_dCqIOTFNRu')
+FARMHUB_SUBACCOUNT = os.environ.get('FARMHUB_SUBACCOUNT', 'ACCT_c94r8ia2jeg41lx')
+
 # Commission rates
 AGENT_BUYER_COMMISSION_RATE = 0.04  # 4% for agent buyers
 FARMHUB_SERVICE_CHARGE = 0.10  # 10% service charge
 COMMUNITY_COMMISSION = 0.025  # 2.5% commission
 COMMUNITY_SERVICE = 0.10  # 10% service charge
+
+# State-based delivery fees (in Naira)
+STATE_DELIVERY_FEES = {
+    # Lagos and neighbors - Tier 1
+    "Lagos": 1500,
+    "Ogun": 2000,
+    
+    # South West - Tier 2
+    "Oyo": 2500,
+    "Osun": 2500,
+    "Ondo": 3000,
+    "Ekiti": 3000,
+    
+    # South South - Tier 2
+    "Rivers": 2500,
+    "Delta": 2500,
+    "Edo": 2500,
+    "Bayelsa": 3000,
+    "Cross River": 3000,
+    "Akwa Ibom": 3000,
+    
+    # South East - Tier 2  
+    "Anambra": 2500,
+    "Enugu": 2500,
+    "Imo": 2500,
+    "Abia": 2500,
+    "Ebonyi": 3000,
+    
+    # FCT - Tier 1
+    "FCT Abuja": 1500,
+    
+    # North Central - Tier 3
+    "Nasarawa": 3000,
+    "Niger": 3500,
+    "Kogi": 3000,
+    "Benue": 3500,
+    "Plateau": 3500,
+    "Kwara": 3000,
+    
+    # North West - Tier 3
+    "Kaduna": 3500,
+    "Kano": 3500,
+    "Katsina": 4000,
+    "Sokoto": 4000,
+    "Zamfara": 4000,
+    "Kebbi": 4000,
+    "Jigawa": 4000,
+    
+    # North East - Tier 4
+    "Borno": 4500,
+    "Yobe": 4500,
+    "Adamawa": 4000,
+    "Gombe": 4000,
+    "Bauchi": 4000,
+    "Taraba": 4000,
+}
+
+def get_delivery_fee_by_state(state: str) -> float:
+    """Get delivery fee based on customer's state"""
+    return STATE_DELIVERY_FEES.get(state, 3000)  # Default 3000 if state not found
 
 # Generate encryption key if not provided (for development only)
 if not ENCRYPTION_KEY:
