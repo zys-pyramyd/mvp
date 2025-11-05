@@ -414,6 +414,9 @@ paystack_transfer_recipients_collection = db.paystack_transfer_recipients
 paystack_transfers_collection = db.paystack_transfers
 commission_payouts_collection = db.commission_payouts
 
+# Kwik Delivery collection
+kwik_deliveries_collection = db.kwik_deliveries
+
 # Security
 security = HTTPBearer()
 
