@@ -32,7 +32,8 @@ KWIK_ENABLED_STATES = ["Lagos", "Oyo", "FCT Abuja"]  # States where Kwik operate
 
 # Admin credentials
 ADMIN_EMAIL = "abdulazeezshakrullah@gmail.com"
-ADMIN_PASSWORD_HASH = os.environ.get('ADMIN_PASSWORD_HASH')  # Will be generated on first setup
+ADMIN_PASSWORD = "Admin@2024"  # Default password - change after first login
+ADMIN_PASSWORD_HASH = "$2b$12$l33jL2mlvwZvbSbj4Ywhx.0X/5T6sg7ruYukwpV4GcoW9iZSdNp4K"
 
 # Paystack API Base URL
 PAYSTACK_API_URL = "https://api.paystack.co"
