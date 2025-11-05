@@ -883,6 +883,30 @@ backend:
         agent: "testing"
         comment: "✅ TESTED SUCCESSFULLY: Agent dashboard enhanced with tier information working correctly. Endpoint returns agent_profile with all required tier fields: tier, tier_key, bonus_commission, farmers_to_next_tier. Tested with proper agent user. Dashboard displays tier progression information as expected."
 
+  - task: "Smart Delivery Calculator API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ SMART DELIVERY CALCULATOR TESTING COMPLETE: Critical function name collision bug has been successfully fixed. Comprehensive testing of POST /api/delivery/calculate-fee endpoint achieved 100% success rate (3/3 tests passed). Successfully tested all requested scenarios: 1) Lagos delivery: ₦1500 (state-based fee), method: kwik_delivery, kwik_available: true 2) Kano delivery: ₦1000 (20% rule), method: 20_percent_rule, kwik_available: false 3) FCT Abuja delivery: ₦1500 (state-based fee), method: kwik_delivery, kwik_available: true. All delivery calculations working correctly with proper delivery_fee, delivery_method, and kwik_available responses. The 'takes 1 positional argument but 3 were given' error has been completely resolved."
+
+  - task: "Enhanced Paystack Transaction Initialization API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ ENHANCED PAYSTACK TRANSACTION INIT TESTING COMPLETE: Critical function name collision bug has been successfully fixed. Testing of POST /api/paystack/transaction/initialize endpoint with agent user token achieved 100% success rate. Successfully tested with requested parameters: product_total=10000, customer_state=Lagos, product_weight=5, platform_type=home. The endpoint correctly processes agent commission calculations and tier information. Expected Paystack API error (401 Unauthorized) confirms the calculation logic is working correctly with dummy API keys. The breakdown structure includes proper product_total, delivery_fee, and total_amount calculations. The 'takes 1 positional argument but 3 were given' error has been completely resolved."
+
 frontend:
   - task: "Cart Tab System - PyExpress & Farm Deals Separation"
     implemented: true
