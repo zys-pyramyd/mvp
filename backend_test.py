@@ -8543,6 +8543,10 @@ class PyramydAPITester:
         print("\n🆕 Testing New Features (Kwik Delivery, Agent Gamification, Paystack Enhancement)...")
         self.test_new_features_comprehensive()
 
+        # CRITICAL BUG FIXES TESTING - Smart Delivery & Paystack (PRIORITY FROM REVIEW REQUEST)
+        print("\n🔧 Testing Critical Bug Fixes - Smart Delivery & Paystack (PRIORITY)...")
+        self.test_critical_bug_fixes()
+
         return True
 
     def print_summary(self):
