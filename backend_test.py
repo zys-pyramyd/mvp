@@ -8754,11 +8754,17 @@ class PyramydAPITester:
 
 def main():
     """Main test execution"""
+    import sys
+    
     tester = PyramydAPITester()
     
     try:
-        success = tester.run_all_tests()
-        tester.print_summary()
+        # Check if we should run only critical tests
+        if len(sys.argv) > 1 and sys.argv[1] == "--critical-only":
+            success = tester.run_critical_bug_fix_tests_only()
+        else:
+            success = tester.run_all_tests()
+            tester.print_summary()
         
         return 0 if success else 1
         
