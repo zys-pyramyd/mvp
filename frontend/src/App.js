@@ -2274,10 +2274,13 @@ function App() {
   };
 
   const proceedToCheckout = () => {
-    if (cart.length === 0) {
+    if (getActiveCartItems().length === 0) {
       alert('Your cart is empty!');
       return;
     }
+    
+    // Set checkout platform based on active cart tab
+    setCheckoutPlatform(activeCartTab);
     
     calculateOrderSummary();
     setCheckoutStep('review');
