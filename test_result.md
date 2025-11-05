@@ -540,7 +540,8 @@ metadata:
 
 test_plan:
   current_focus:
-    - "New KYC System and Pre-order Filter Testing Complete"
+    - "Comprehensive Frontend Testing - Cart & Checkout System Complete"
+    - "Communities Search & PWA Features Testing Complete"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
