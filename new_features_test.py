@@ -154,12 +154,7 @@ class NewFeaturesAPITester:
         print("\n🚚 Testing Smart Delivery Calculator...")
         
         # Test 1: Lagos state (should use Kwik if vendor doesn't manage)
-        lagos_data = {
-            "product_total": 5000,
-            "buyer_state": "Lagos"
-        }
-        
-        success, response = self.make_request('POST', '/api/delivery/calculate-fee', lagos_data, 200)
+        success, response = self.make_request('POST', '/api/delivery/calculate-fee?product_total=5000&buyer_state=Lagos', None, 200)
         
         if success and 'delivery_fee' in response and 'delivery_method' in response:
             self.log_test("Smart Delivery Calculator (Lagos)", True, 
@@ -170,12 +165,7 @@ class NewFeaturesAPITester:
             lagos_success = False
 
         # Test 2: Other state (should use 20% rule)
-        kano_data = {
-            "product_total": 5000,
-            "buyer_state": "Kano"
-        }
-        
-        success, response = self.make_request('POST', '/api/delivery/calculate-fee', kano_data, 200)
+        success, response = self.make_request('POST', '/api/delivery/calculate-fee?product_total=5000&buyer_state=Kano', None, 200)
         
         if success and 'delivery_fee' in response and 'delivery_method' in response:
             expected_fee = 5000 * 0.20  # 20% rule
@@ -194,13 +184,7 @@ class NewFeaturesAPITester:
             kano_success = False
 
         # Test 3: Vendor-managed logistics (with product_id)
-        vendor_data = {
-            "product_total": 5000,
-            "buyer_state": "Lagos",
-            "product_id": "test_product_with_vendor_logistics"
-        }
-        
-        success, response = self.make_request('POST', '/api/delivery/calculate-fee', vendor_data, 200)
+        success, response = self.make_request('POST', '/api/delivery/calculate-fee?product_total=5000&buyer_state=Lagos&product_id=test_product_with_vendor_logistics', None, 200)
         
         if success and 'delivery_fee' in response and 'delivery_method' in response:
             self.log_test("Smart Delivery Calculator (Vendor Managed)", True, 
