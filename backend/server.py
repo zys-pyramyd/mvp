@@ -6378,6 +6378,308 @@ async def get_audit_logs(
         raise
     except Exception as e:
         print(f"Error getting audit logs: {str(e)}")
+
+
+# ==================== ADMIN DASHBOARD ====================
+
+@app.post("/api/admin/login")
+async def admin_login(credentials: dict):
+    """Admin login endpoint"""
+    try:
+        email = credentials.get("email")
+        password = credentials.get("password")
+        
+        if not email or not password:
+            raise HTTPException(status_code=400, detail="Email and password required")
+        
+        # Check if email matches admin email
+        if email != ADMIN_EMAIL:
+            raise HTTPException(status_code=401, detail="Invalid admin credentials")
+        
+        # Verify password
+        if not bcrypt.checkpw(password.encode('utf-8'), ADMIN_PASSWORD_HASH.encode('utf-8')):
+            raise HTTPException(status_code=401, detail="Invalid admin credentials")
+        
+        # Create admin token
+        admin_data = {
+            "id": "admin_001",
+            "email": ADMIN_EMAIL,
+            "role": "admin",
+            "username": "Admin",
+            "first_name": "Abdulazeez",
+            "last_name": "Shakrullah"
+        }
+        
+        token = create_token(admin_data)
+        
+        # Log admin login
+        audit_log = {
+            "id": str(uuid.uuid4()),
+            "user_id": "admin_001",
+            "action": "admin_login",
+            "details": {"email": email},
+            "timestamp": datetime.utcnow()
+        }
+        audit_logs_collection.insert_one(audit_log)
+        
+        return {
+            "token": token,
+            "user": admin_data,
+            "message": "Admin login successful"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in admin login: {str(e)}")
+        raise HTTPException(status_code=500, detail="Admin login failed")
+
+@app.get("/api/admin/dashboard")
+async def get_admin_dashboard(current_user: dict = Depends(get_current_user)):
+    """Get admin dashboard statistics"""
+    try:
+        # Verify admin access
+        if current_user.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        # Get user statistics
+        total_users = users_collection.count_documents({})
+        active_users = users_collection.count_documents({"is_active": True})
+        users_by_role = {}
+        for role in ["farmer", "agent", "business", "personal", "logistics"]:
+            users_by_role[role] = users_collection.count_documents({"role": role})
+        
+        # Get product statistics
+        total_products = products_collection.count_documents({})
+        products_by_platform = {
+            "pyexpress": products_collection.count_documents({"platform": "pyexpress"}),
+            "pyhub": products_collection.count_documents({"platform": "pyhub"})
+        }
+        
+        # Get order statistics
+        total_orders = orders_collection.count_documents({})
+        pending_orders = orders_collection.count_documents({"status": "pending"})
+        completed_orders = orders_collection.count_documents({"status": "completed"})
+        
+        # Get community statistics
+        total_communities = communities_collection.count_documents({})
+        public_communities = communities_collection.count_documents({"privacy_type": "public"})
+        private_communities = communities_collection.count_documents({"privacy_type": "private"})
+        
+        # Get KYC statistics
+        kyc_pending = users_collection.count_documents({"kyc_status": "pending"})
+        kyc_approved = users_collection.count_documents({"kyc_status": "approved"})
+        kyc_rejected = users_collection.count_documents({"kyc_status": "rejected"})
+        kyc_not_started = users_collection.count_documents({"kyc_status": "not_started"})
+        
+        # Get payment statistics
+        total_transactions = paystack_transactions_collection.count_documents({})
+        successful_transactions = paystack_transactions_collection.count_documents({"payment_status": "success"})
+        
+        # Calculate total revenue (sum of successful transactions)
+        revenue_pipeline = [
+            {"$match": {"payment_status": "success"}},
+            {"$group": {"_id": None, "total": {"$sum": "$total_amount"}}}
+        ]
+        revenue_result = list(paystack_transactions_collection.aggregate(revenue_pipeline))
+        total_revenue = revenue_result[0]["total"] / 100 if revenue_result else 0  # Convert from kobo to naira
+        
+        # Get recent activities (last 10)
+        recent_logs = list(audit_logs_collection.find()
+                          .sort("timestamp", -1)
+                          .limit(10))
+        
+        for log in recent_logs:
+            log.pop('_id', None)
+            if isinstance(log.get("timestamp"), datetime):
+                log["timestamp"] = log["timestamp"].isoformat()
+        
+        # Get agent tier distribution
+        agent_tiers = {
+            "starter": 0,
+            "pro": 0,
+            "expert": 0,
+            "master": 0,
+            "elite": 0
+        }
+        
+        agents = list(users_collection.find({"role": "agent"}))
+        for agent in agents:
+            farmer_count = agent_farmers_collection.count_documents({'agent_id': agent.get('id')})
+            tier_info = get_agent_tier(farmer_count)
+            agent_tiers[tier_info['tier']] += 1
+        
+        return {
+            "users": {
+                "total": total_users,
+                "active": active_users,
+                "by_role": users_by_role
+            },
+            "products": {
+                "total": total_products,
+                "by_platform": products_by_platform
+            },
+            "orders": {
+                "total": total_orders,
+                "pending": pending_orders,
+                "completed": completed_orders
+            },
+            "communities": {
+                "total": total_communities,
+                "public": public_communities,
+                "private": private_communities
+            },
+            "kyc": {
+                "pending": kyc_pending,
+                "approved": kyc_approved,
+                "rejected": kyc_rejected,
+                "not_started": kyc_not_started
+            },
+            "payments": {
+                "total_transactions": total_transactions,
+                "successful_transactions": successful_transactions,
+                "total_revenue_naira": total_revenue
+            },
+            "agent_tiers": agent_tiers,
+            "recent_activities": recent_logs
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting admin dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get admin dashboard")
+
+@app.get("/api/admin/users")
+async def get_all_users(
+    role: Optional[str] = None,
+    kyc_status: Optional[str] = None,
+    page: int = 1,
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all users with filtering (admin only)"""
+    try:
+        if current_user.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        query = {}
+        if role:
+            query["role"] = role
+        if kyc_status:
+            query["kyc_status"] = kyc_status
+        
+        total_count = users_collection.count_documents(query)
+        skip = (page - 1) * limit
+        
+        users = list(users_collection.find(query)
+                    .skip(skip)
+                    .limit(limit)
+                    .sort("created_at", -1))
+        
+        for user in users:
+            user.pop('_id', None)
+            user.pop('password', None)  # Never send password
+            if isinstance(user.get("created_at"), datetime):
+                user["created_at"] = user["created_at"].isoformat()
+        
+        return {
+            "users": users,
+            "pagination": {
+                "total_count": total_count,
+                "page": page,
+                "limit": limit,
+                "total_pages": (total_count + limit - 1) // limit if total_count > 0 else 0
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting users: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get users")
+
+@app.post("/api/admin/users/{user_id}/kyc/approve")
+async def approve_kyc(user_id: str, current_user: dict = Depends(get_current_user)):
+    """Approve user KYC (admin only)"""
+    try:
+        if current_user.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        result = users_collection.update_one(
+            {"id": user_id},
+            {"$set": {
+                "kyc_status": "approved",
+                "kyc_approved_at": datetime.utcnow(),
+                "kyc_approved_by": current_user.get("id")
+            }}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Log action
+        audit_log = {
+            "id": str(uuid.uuid4()),
+            "user_id": current_user.get("id"),
+            "action": "kyc_approved",
+            "details": {"target_user_id": user_id},
+            "timestamp": datetime.utcnow()
+        }
+        audit_logs_collection.insert_one(audit_log)
+        
+        return {"message": "KYC approved successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error approving KYC: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to approve KYC")
+
+@app.post("/api/admin/users/{user_id}/kyc/reject")
+async def reject_kyc(
+    user_id: str,
+    rejection_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Reject user KYC with reason (admin only)"""
+    try:
+        if current_user.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        reason = rejection_data.get("reason", "KYC documents rejected")
+        
+        result = users_collection.update_one(
+            {"id": user_id},
+            {"$set": {
+                "kyc_status": "rejected",
+                "kyc_rejection_reason": reason,
+                "kyc_rejected_at": datetime.utcnow(),
+                "kyc_rejected_by": current_user.get("id")
+            }}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Log action
+        audit_log = {
+            "id": str(uuid.uuid4()),
+            "user_id": current_user.get("id"),
+            "action": "kyc_rejected",
+            "details": {"target_user_id": user_id, "reason": reason},
+            "timestamp": datetime.utcnow()
+        }
+        audit_logs_collection.insert_one(audit_log)
+        
+        return {"message": "KYC rejected successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error rejecting KYC: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to reject KYC")
+
         raise HTTPException(status_code=500, detail="Failed to get audit logs")
 
 # ==================== CATEGORY AND BUSINESS MANAGEMENT ENDPOINTS ====================
