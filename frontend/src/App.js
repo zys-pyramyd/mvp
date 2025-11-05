@@ -3539,6 +3539,7 @@ function App() {
             )}
           </div>
         </div>
+      )}
 
       {/* Offline Indicator */}
       {showOfflineIndicator && (
