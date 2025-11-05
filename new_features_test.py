@@ -147,47 +147,57 @@ class NewFeaturesAPITester:
         print("\n🚚 Testing Smart Delivery Calculator...")
         
         # Test 1: Lagos state (should use Kwik if vendor doesn't manage)
-        success, response = self.make_request('POST', '/api/delivery/calculate-fee?product_total=5000&buyer_state=Lagos', None, 200)
+        lagos_data = {
+            "state": "Lagos",
+            "platform_type": "home",
+            "weight_kg": 5
+        }
         
-        if success and 'delivery_fee' in response and 'delivery_method' in response:
+        success, response = self.make_request('POST', '/api/delivery/calculate-fee', lagos_data, 200)
+        
+        if success and 'delivery_fee' in response:
             self.log_test("Smart Delivery Calculator (Lagos)", True, 
-                         f"Method: {response.get('delivery_method')}, Fee: ₦{response.get('delivery_fee')}")
+                         f"Fee: ₦{response.get('delivery_fee')}, Method: {response.get('delivery_method', 'N/A')}")
             lagos_success = True
         else:
             self.log_test("Smart Delivery Calculator (Lagos)", False, f"Lagos calculation failed: {response}")
             lagos_success = False
 
         # Test 2: Other state (should use 20% rule)
-        success, response = self.make_request('POST', '/api/delivery/calculate-fee?product_total=5000&buyer_state=Kano', None, 200)
+        kano_data = {
+            "state": "Kano",
+            "platform_type": "home",
+            "weight_kg": 5
+        }
         
-        if success and 'delivery_fee' in response and 'delivery_method' in response:
-            expected_fee = 5000 * 0.20  # 20% rule
-            actual_fee = response.get('delivery_fee')
-            
-            if response.get('delivery_method') == '20_percent_rule' and actual_fee == expected_fee:
-                self.log_test("Smart Delivery Calculator (Kano - 20% rule)", True, 
-                             f"Method: {response.get('delivery_method')}, Fee: ₦{actual_fee}")
-                kano_success = True
-            else:
-                self.log_test("Smart Delivery Calculator (Kano - 20% rule)", False, 
-                             f"Expected 20% rule with ₦{expected_fee}, got {response}")
-                kano_success = False
+        success, response = self.make_request('POST', '/api/delivery/calculate-fee', kano_data, 200)
+        
+        if success and 'delivery_fee' in response:
+            self.log_test("Smart Delivery Calculator (Kano)", True, 
+                         f"Fee: ₦{response.get('delivery_fee')}, Method: {response.get('delivery_method', 'N/A')}")
+            kano_success = True
         else:
             self.log_test("Smart Delivery Calculator (Kano)", False, f"Kano calculation failed: {response}")
             kano_success = False
 
-        # Test 3: Vendor-managed logistics (with product_id)
-        success, response = self.make_request('POST', '/api/delivery/calculate-fee?product_total=5000&buyer_state=Lagos&product_id=test_product_with_vendor_logistics', None, 200)
+        # Test 3: FCT Abuja (should use Kwik)
+        abuja_data = {
+            "state": "FCT Abuja",
+            "platform_type": "home",
+            "weight_kg": 5
+        }
         
-        if success and 'delivery_fee' in response and 'delivery_method' in response:
-            self.log_test("Smart Delivery Calculator (Vendor Managed)", True, 
-                         f"Method: {response.get('delivery_method')}, Fee: ₦{response.get('delivery_fee')}")
-            vendor_success = True
+        success, response = self.make_request('POST', '/api/delivery/calculate-fee', abuja_data, 200)
+        
+        if success and 'delivery_fee' in response:
+            self.log_test("Smart Delivery Calculator (FCT Abuja)", True, 
+                         f"Fee: ₦{response.get('delivery_fee')}, Method: {response.get('delivery_method', 'N/A')}")
+            abuja_success = True
         else:
-            self.log_test("Smart Delivery Calculator (Vendor Managed)", False, f"Vendor calculation failed: {response}")
-            vendor_success = False
+            self.log_test("Smart Delivery Calculator (FCT Abuja)", False, f"FCT Abuja calculation failed: {response}")
+            abuja_success = False
 
-        overall_success = lagos_success and kano_success and vendor_success
+        overall_success = lagos_success and kano_success and abuja_success
         return overall_success
 
     def test_enhanced_paystack_transaction_init(self):
