@@ -4,14 +4,56 @@ Pyramyd is a comprehensive agricultural trading platform that connects farmers, 
 
 ## 🌟 Key Features
 
-- **Multi-Platform Trading**: Home (Business marketplace) and Buy from Farm (Bulk trading)
-- **Role-Based Access Control**: Farmer, Agent, Business, and Personal account types
-- **KYC Verification System**: Comprehensive compliance for registered/unregistered businesses
+### Core Marketplace
+- **Multi-Platform Trading**: 
+  - **PyExpress (Home)**: Business marketplace for processed goods
+  - **Farm Deals**: Bulk trading platform for farmers and agents
+  - **Communities**: Group buying and social features for agricultural communities
+- **Role-Based Access Control**: Farmer, Agent, Business, Personal, and Logistics accounts
+- **Advanced Product Filtering**: Category, location, price range, seller type
+- **Nigerian States Support**: All 36 states + FCT Abuja
+
+### Payment & Commission System
+- **Paystack Integration**: Secure payment gateway with split payments
+- **Agent Gamification System**: 5-tier commission structure
+  - Starter (< 100 farmers): 4% base commission
+  - Pro (100-999 farmers): 4.5% total (4% + 0.5% bonus)
+  - Expert (1000-4999 farmers): 5% total (4% + 1% bonus)
+  - Master (5000-9999 farmers): 6% total (4% + 2% bonus)
+  - Elite (10000+ farmers): 8% total (4% + 4% bonus)
+- **Smart Delivery System**: 
+  - Vendor-managed logistics (FREE or custom fee)
+  - Kwik Delivery integration (Lagos, Oyo, FCT Abuja)
+  - 20% delivery fee for other states
+- **Platform-Specific Checkout**: Separate flows for PyExpress and Farm Deals
+
+### User Experience
+- **Cart Tab System**: Separate PyExpress and Farm Deals carts with color coding
+- **Communities Search**: Real-time filtering across name, description, category, location
+- **Profile Pictures**: User and product seller profile images
+- **Discount System**: Fixed or percentage discounts with visual badges
+- **Seller Transparency**: Clickable seller profiles with detailed information
+
+### Progressive Web App (PWA)
+- **Offline Functionality**: Browse products and communities without internet
+- **Service Worker**: Smart caching for optimal performance
+- **Background Sync**: Auto-sync vendor posts when connection returns
+- **Install to Home Screen**: Native app-like experience
+- **Offline Indicator**: Clear status when browsing cached content
+
+### Security & Compliance
+- **KYC Verification System**: Comprehensive compliance for all seller types
+- **Enhanced Agent Validation**: Strict KYC requirements with 24-hour verification
+- **Secure Account Storage**: Encrypted payment details
+- **JWT Authentication**: Token-based security with bcrypt hashing
+
+### Other Features
 - **Digital Wallet**: Mock wallet system with transaction history and gift cards
 - **Rating & Review System**: 5-star ratings for users, products, and drivers
 - **Driver Management**: Uber-like driver platform for logistics businesses
 - **Real-Time Market Prices**: Agricultural commodity price tracking
-- **Advanced Filtering**: Location-based and category filtering
+- **Pre-order System**: Future delivery with partial payments
+- **Enhanced Messaging**: Text and audio messages between users
 - **Responsive Design**: Mobile-first approach with desktop optimization
 
 ## 🏗️ Architecture
