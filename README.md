@@ -500,20 +500,74 @@ db.products.find().explain("executionStats")
 
 ### Authentication
 - `POST /api/auth/register` - User registration
+- `POST /api/auth/complete-registration` - Complete multi-step registration
 - `POST /api/auth/login` - User login
-- `GET /api/auth/me` - Get current user profile
+- `GET /api/user/profile` - Get current user profile
+- `GET /api/auth/me` - Get authenticated user details
 
 ### Products & Trading
-- `GET /api/products` - List products with filtering
+- `GET /api/products` - List products with advanced filtering
+  - Query params: `category`, `location`, `min_price`, `max_price`, `only_preorders`, `seller_type`, `platform`, `global_search`
 - `POST /api/products` - Create new product (authenticated)
-- `GET /api/categories/products` - Get product categories
+- `GET /api/categories/products` - Get product categories with subcategories
 - `GET /api/categories/business` - Get business categories
+- `GET /api/states/nigerian` - Get all 36 Nigerian states + FCT
+
+### Communities
+- `GET /api/communities` - List all communities
+- `POST /api/communities` - Create new community (authenticated)
+- `GET /api/communities/{id}` - Get community details
+- `POST /api/communities/{id}/join` - Join a community
+- `GET /api/communities/{id}/products` - Get community products
+- `POST /api/communities/{id}/products` - Add product to community
+
+### Agent Gamification System
+- `GET /api/agent/tier` - Get agent tier information (Starter/Pro/Expert/Master/Elite)
+  - Returns: tier name, farmer count, commission rates, next tier progression
+- `GET /api/agent/dashboard` - Enhanced agent dashboard with tier info
+- `POST /api/agent/farmers/add` - Add farmer to agent network
+
+### Smart Delivery & Logistics
+- `POST /api/delivery/calculate-fee` - Calculate smart delivery fee
+  - Body: `{"product_total": 5000, "buyer_state": "Lagos", "product_id": "optional"}`
+  - Returns: delivery_fee, delivery_method (vendor/kwik/20_percent_rule), vendor_managed
+- `POST /api/delivery/kwik/create` - Create Kwik delivery request
+- `GET /api/delivery/kwik/track/{id}` - Track Kwik delivery status
+
+### Paystack Payment Integration
+- `POST /api/paystack/transaction/initialize` - Initialize payment with tier bonuses
+  - Body: `{"product_total": 10000, "customer_state": "Lagos", "platform_type": "home"}`
+  - Returns: authorization_url, breakdown (includes agent tier bonus)
+- `GET /api/paystack/transaction/verify/{reference}` - Verify payment transaction
+- `POST /api/paystack/subaccounts` - Create vendor subaccount
+- `GET /api/paystack/banks` - Get list of Nigerian banks
+
+### Secure Account Management
+- `POST /api/users/account-details` - Store encrypted account details
+- `GET /api/users/account-details` - Retrieve account details (decrypted)
+- `DELETE /api/users/account-details` - Delete account details
 
 ### KYC System
-- `GET /api/users/kyc/status` - Get KYC status
+- `GET /api/users/kyc/status` - Get KYC status with trade restrictions
 - `POST /api/kyc/documents/upload` - Upload KYC documents
 - `POST /api/kyc/registered-business/submit` - Submit business KYC
-- `POST /api/kyc/unregistered-entity/submit` - Submit individual KYC
+- `POST /api/kyc/agent/submit` - Submit agent KYC
+- `POST /api/kyc/farmer/submit` - Submit farmer KYC
+
+### Pre-Orders
+- `GET /api/preorders` - List pre-orders with filtering
+- `POST /api/preorders/create` - Create pre-order
+- `POST /api/preorders/{id}/publish` - Publish pre-order
+- `GET /api/preorders/{id}` - Get pre-order details
+- `POST /api/preorders/{id}/order` - Place order on pre-order
+- `GET /api/my-preorders` - Get user's created pre-orders
+- `GET /api/my-preorder-orders` - Get user's pre-order purchases
+
+### Enhanced Messaging
+- `GET /api/users/search-messaging` - Search users for messaging (min 2 chars)
+- `POST /api/messages/send` - Send text or audio message
+- `GET /api/messages/conversations` - Get user's conversations
+- `GET /api/messages/{conversation_id}` - Get messages for conversation
 
 ### Digital Wallet
 - `GET /api/wallet/summary` - Wallet balance and statistics
@@ -523,9 +577,12 @@ db.products.find().explain("executionStats")
 
 ### Dashboards
 - `GET /api/farmer/dashboard` - Farmer business metrics
-- `GET /api/agent/dashboard` - Agent performance data
+- `GET /api/agent/dashboard` - Agent performance data with tier info
 - `POST /api/farmer/farmland` - Add farmland records
-- `POST /api/agent/farmers/add` - Add farmer to agent network
+
+### Profile Management
+- `POST /api/users/profile-picture` - Upload profile picture (base64)
+- `GET /api/users/{user_id}/profile` - Get user profile with picture
 
 ## 👥 User Roles & Permissions
 
