@@ -40,6 +40,7 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
+  const [activeCartTab, setActiveCartTab] = useState('pyexpress'); // 'pyexpress' or 'farmdeals'
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
