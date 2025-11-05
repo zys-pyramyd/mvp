@@ -7051,12 +7051,16 @@ async def initialize_payment(
             service_kobo = int(product_total_kobo * COMMUNITY_SERVICE)
             platform_cut_kobo = commission_kobo + service_kobo + delivery_fee_kobo
         
-        # Check if buyer is an agent
+        # Check if buyer is an agent and calculate commission with tier bonus
         buyer_is_agent = buyer_role in ["agent", "purchasing_agent"]
         agent_commission_kobo = 0
+        agent_tier_info = None
         
         if buyer_is_agent:
-            agent_commission_kobo = int(product_total_kobo * AGENT_BUYER_COMMISSION_RATE)
+            # Calculate commission with tier bonus
+            commission_result = calculate_agent_commission(kobo_to_naira(product_total_kobo), user_id, db)
+            agent_commission_kobo = naira_to_kobo(commission_result['total_commission'])
+            agent_tier_info = commission_result['tier_info']
         
         # Total amount customer pays
         total_amount_kobo = product_total_kobo + platform_cut_kobo
