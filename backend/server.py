@@ -7131,6 +7131,8 @@ async def initialize_payment(
             "vendor_share": product_total_kobo,
             "buyer_is_agent": buyer_is_agent,
             "agent_commission": agent_commission_kobo,
+            "agent_tier": agent_tier_info['tier_name'] if agent_tier_info else None,
+            "agent_tier_bonus": naira_to_kobo(agent_tier_info['bonus_commission'] * kobo_to_naira(product_total_kobo)) if agent_tier_info else 0,
             "customer_state": customer_state,
             "platform_type": platform_type,
             "payment_status": "pending",
