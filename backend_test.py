@@ -8539,6 +8539,10 @@ class PyramydAPITester:
         print("\n🔄 Testing New KYC System and Pre-order Filter (PRIORITY)...")
         self.test_new_kyc_system_complete()
 
+        # NEW FEATURES TESTING - Kwik Delivery, Agent Gamification, Paystack Enhancement
+        print("\n🆕 Testing New Features (Kwik Delivery, Agent Gamification, Paystack Enhancement)...")
+        self.test_new_features_comprehensive()
+
         return True
 
     def print_summary(self):
