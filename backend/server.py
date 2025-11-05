@@ -7155,7 +7155,9 @@ async def initialize_payment(
                 "delivery_fee": kobo_to_naira(delivery_fee_kobo),
                 "delivery_state": customer_state,
                 "platform_cut": kobo_to_naira(platform_cut_kobo),
-                "agent_commission": kobo_to_naira(agent_commission_kobo) if buyer_is_agent else 0
+                "agent_commission": kobo_to_naira(agent_commission_kobo) if buyer_is_agent else 0,
+                "agent_tier": agent_tier_info['tier_name'] if agent_tier_info else None,
+                "tier_bonus": f"{agent_tier_info['bonus_commission'] * 100}%" if agent_tier_info else None
             }
         }
         
