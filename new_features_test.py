@@ -74,9 +74,9 @@ class NewFeaturesAPITester:
 
     def create_agent_user(self):
         """Create or login as agent user for testing"""
-        # Try to login with existing agent user first
+        # Try to login with the newly created agent user
         login_data = {
-            "email_or_phone": "testagent@pyramyd.com",
+            "email_or_phone": "testagent_new_110945@pyramyd.com",
             "password": "password123"
         }
         
@@ -85,56 +85,33 @@ class NewFeaturesAPITester:
         if success and 'token' in response:
             self.token = response['token']
             self.user_id = response['user']['id']
-            print(f"   ✅ Logged in as existing agent user")
+            print(f"   ✅ Logged in as agent user: {response['user'].get('role', 'unknown role')}")
             return True
         
-        # Try another existing agent user
-        login_data2 = {
-            "email_or_phone": "testagent123@pyramyd.com",
-            "password": "password123"
-        }
+        # If that fails, try other known agent users
+        agent_emails = [
+            "testagent@pyramyd.com",
+            "testagent123@pyramyd.com",
+            "agent@pyramyd.com"
+        ]
         
-        success, response = self.make_request('POST', '/api/auth/login', login_data2, 200)
-        
-        if success and 'token' in response:
-            self.token = response['token']
-            self.user_id = response['user']['id']
-            print(f"   ✅ Logged in as existing agent user (testagent123)")
-            return True
-        
-        # If login fails, try basic registration first
-        timestamp = datetime.now().strftime("%H%M%S")
-        basic_user_data = {
-            "first_name": "Test",
-            "last_name": "Agent",
-            "username": f"testagent_tier_{timestamp}",
-            "email": f"testagent_tier_{timestamp}@pyramyd.com",
-            "password": "password123",
-            "phone": "+2348012345678"
-        }
-        
-        success, response = self.make_request('POST', '/api/auth/register', basic_user_data, 200)
-        
-        if success and 'token' in response:
-            self.token = response['token']
-            self.user_id = response['user']['id']
-            
-            # Now set role to agent
-            role_data = {
-                "role": "agent",
-                "is_buyer": False
+        for email in agent_emails:
+            login_data = {
+                "email_or_phone": email,
+                "password": "password123"
             }
             
-            role_success, role_response = self.make_request('POST', '/api/auth/select-role', role_data, 200, use_auth=True)
+            success, response = self.make_request('POST', '/api/auth/login', login_data, 200)
             
-            if role_success:
-                print(f"   ✅ Created new agent user: {basic_user_data['username']}")
-                return True
-            else:
-                print(f"   ⚠️ Created user but failed to set agent role: {role_response}")
-                return True  # Still return True as we have a user
+            if success and 'token' in response:
+                user_role = response['user'].get('role', 'unknown')
+                if user_role == 'agent':
+                    self.token = response['token']
+                    self.user_id = response['user']['id']
+                    print(f"   ✅ Logged in as agent user: {email}")
+                    return True
         
-        print(f"   ❌ Failed to create agent user: {response}")
+        print(f"   ❌ Failed to login as agent user")
         return False
 
     def test_agent_tier_system(self):
