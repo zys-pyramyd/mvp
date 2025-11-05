@@ -546,10 +546,6 @@ function App() {
     setShowInstallPrompt(false);
   };
 
-    fetchCommunities();
-    fetchFeaturedCommunityProducts();
-  }, []);
-
   const fetchUserProfile = async (token) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/user/profile`, {
