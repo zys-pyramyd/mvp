@@ -2924,6 +2924,18 @@ function App() {
   };
 
   const CommunityBrowser = () => {
+    // Filter communities based on search
+    const filteredCommunities = communities.filter(community => {
+      if (!communitySearchTerm) return true;
+      const searchLower = communitySearchTerm.toLowerCase();
+      return (
+        community.name?.toLowerCase().includes(searchLower) ||
+        community.description?.toLowerCase().includes(searchLower) ||
+        community.category?.toLowerCase().includes(searchLower) ||
+        community.location?.toLowerCase().includes(searchLower)
+      );
+    });
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
         <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -2931,15 +2943,55 @@ function App() {
             <div className="flex justify-between items-center mb-4 sm:mb-6">
               <h2 className="text-lg sm:text-xl font-bold text-gray-900">Find Communities</h2>
               <button
-                onClick={() => setShowCommunityBrowser(false)}
+                onClick={() => {
+                  setShowCommunityBrowser(false);
+                  setCommunitySearchTerm('');
+                }}
                 className="text-gray-400 hover:text-gray-600 text-xl sm:text-2xl p-1"
               >
                 ✕
               </button>
             </div>
 
+            {/* Search Bar */}
+            <div className="mb-4 sm:mb-6">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={communitySearchTerm}
+                  onChange={(e) => setCommunitySearchTerm(e.target.value)}
+                  placeholder="Search communities by name, description, category, or location..."
+                  className="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                />
+                <svg
+                  className="absolute left-3 top-3 w-5 h-5 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+                {communitySearchTerm && (
+                  <button
+                    onClick={() => setCommunitySearchTerm('')}
+                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                {filteredCommunities.length} {filteredCommunities.length === 1 ? 'community' : 'communities'} found
+              </p>
+            </div>
+
             <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {communities.map((community) => (
+              {filteredCommunities.map((community) => (
                 <div key={community.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-emerald-300 transition-colors">
                   <div className="flex items-start justify-between mb-2 sm:mb-3">
                     <div className="flex-1 min-w-0 pr-2">
