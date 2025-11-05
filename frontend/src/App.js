@@ -1649,6 +1649,33 @@ function App() {
     );
   };
 
+  // Cart separation helper functions
+  const getPyExpressCartItems = () => {
+    return cart.filter(item => {
+      const product = item.product;
+      const isPyExpress = product.platform === 'pyexpress' || 
+                          product.seller_type === 'business' || 
+                          product.seller_type === 'supplier';
+      return isPyExpress;
+    });
+  };
+
+  const getFarmDealsCartItems = () => {
+    return cart.filter(item => {
+      const product = item.product;
+      const isFarmDeals = product.platform === 'pyhub' || 
+                          product.seller_type === 'farmer' || 
+                          product.seller_type === 'agent' ||
+                          product.community_id;
+      return isFarmDeals;
+    });
+  };
+
+  const getActiveCartItems = () => {
+    return activeCartTab === 'pyexpress' ? getPyExpressCartItems() : getFarmDealsCartItems();
+  };
+
+
   // Product Detail functions
   const openProductDetail = async (product) => {
     setSelectedProduct(product);
