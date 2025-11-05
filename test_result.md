@@ -849,15 +849,18 @@ backend:
 
   - task: "Enhanced Paystack Transaction Init - POST /api/paystack/transaction/initialize"
     implemented: true
-    working: "NA"
+    working: false
     file: "/app/backend/server.py"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Enhanced with smart delivery fee calculation and agent tier bonus commission. Calculates total commission (base 4% + tier bonus up to 4%). Returns authorization_url with breakdown including tier info. Needs testing with agent users and different states."
+      - working: false
+        agent: "testing"
+        comment: "❌ CRITICAL BUG: Same function name collision as delivery calculator. Paystack initialization fails with 'calculate_delivery_fee() takes 1 positional argument but 3 were given' error when trying to calculate delivery fees. The endpoint exists and accepts requests but crashes during delivery fee calculation due to function override. REQUIRES SAME FIX: Rename conflicting function."
 
   - task: "Agent Dashboard with Tier Info - GET /api/agent/dashboard"
     implemented: true
