@@ -3031,9 +3031,24 @@ function App() {
               ))}
             </div>
 
-            {communities.length === 0 && (
-              <div className="text-center py-6 sm:py-8 text-sm sm:text-base text-gray-500">
-                No communities found. Be the first to create one!
+            {filteredCommunities.length === 0 && (
+              <div className="text-center py-6 sm:py-8">
+                <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <p className="text-sm sm:text-base text-gray-500">
+                  {communitySearchTerm 
+                    ? `No communities found matching "${communitySearchTerm}"`
+                    : 'No communities found. Be the first to create one!'}
+                </p>
+                {communitySearchTerm && (
+                  <button
+                    onClick={() => setCommunitySearchTerm('')}
+                    className="mt-3 text-sm text-emerald-600 hover:text-emerald-700"
+                  >
+                    Clear search
+                  </button>
+                )}
               </div>
             )}
           </div>
