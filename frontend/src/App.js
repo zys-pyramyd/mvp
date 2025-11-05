@@ -7116,9 +7116,13 @@ function App() {
                     calculateOrderSummary();
                     proceedToCheckout();
                   }}
-                  className="w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 font-medium transition-colors"
+                  className={`w-full text-white py-3 px-4 rounded-lg font-medium transition-colors ${
+                    activeCartTab === 'pyexpress'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-orange-600 hover:bg-orange-700'
+                  }`}
                 >
-                  Proceed to Checkout
+                  Checkout {activeCartTab === 'pyexpress' ? 'PyExpress' : 'Farm Deals'} ({getActiveCartItems().length} items)
                 </button>
                 
                 <button
