@@ -6967,13 +6967,37 @@ function App() {
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
           <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-lg flex flex-col">
             <div className="p-4 border-b border-gray-200">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center mb-3">
                 <h2 className="text-lg font-semibold">🛒 Shopping Cart ({cart.length})</h2>
                 <button
                   onClick={() => setShowCart(false)}
                   className="text-gray-500 hover:text-gray-700"
                 >
                   ×
+                </button>
+              </div>
+              
+              {/* Cart Tabs */}
+              <div className="flex space-x-2 mt-3">
+                <button
+                  onClick={() => setActiveCartTab('pyexpress')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                    activeCartTab === 'pyexpress'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  PyExpress ({getPyExpressCartItems().length})
+                </button>
+                <button
+                  onClick={() => setActiveCartTab('farmdeals')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                    activeCartTab === 'farmdeals'
+                      ? 'bg-orange-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Farm Deals ({getFarmDealsCartItems().length})
                 </button>
               </div>
             </div>
