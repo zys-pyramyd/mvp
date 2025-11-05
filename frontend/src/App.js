@@ -157,6 +157,15 @@ function App() {
   const [sellerDetails, setSellerDetails] = useState(null);
   const [loadingSellerDetails, setLoadingSellerDetails] = useState(false);
   
+
+  // PWA and Offline state
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingSync, setPendingSync] = useState(false);
+  const [offlineQueue, setOfflineQueue] = useState([]);
+  const [showOfflineIndicator, setShowOfflineIndicator] = useState(false);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
   const [filters, setFilters] = useState({
     category: '',
     location: '',
