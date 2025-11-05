@@ -16,8 +16,8 @@ import hashlib
 import hmac
 import requests
 
-# Environment variables - ALL SENSITIVE DATA MUST BE IN ENV
-MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
+# Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
+MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/') //
 JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-here-change-in-production')
 ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')  # For encrypting sensitive user data
 PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_dummy_paystack_key')
@@ -27,13 +27,13 @@ TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'dummy_twilio_token')
 
 # Kwik Delivery API
 KWIK_API_KEY = os.environ.get('KWIK_API_KEY', 'dummy_kwik_key')
-KWIK_API_URL = "https://api.kwik.delivery/v1"
+KWIK_API_URL = "https://api.kwik.delivery/v1" #input the right url
 KWIK_ENABLED_STATES = ["Lagos", "Oyo", "FCT Abuja"]  # States where Kwik operates
 
 # Admin credentials
-ADMIN_EMAIL = "abdulazeezshakrullah@gmail.com"
-ADMIN_PASSWORD = "Admin@2024"  # Default password - change after first login
-ADMIN_PASSWORD_HASH = "$2b$12$l33jL2mlvwZvbSbj4Ywhx.0X/5T6sg7ruYukwpV4GcoW9iZSdNp4K"
+ADMIN_EMAIL = "a**********@gmail.com"
+ADMIN_PASSWORD = "******"  # Default password - change after first login
+ADMIN_PASSWORD_HASH = "**********"
 
 # Paystack API Base URL
 PAYSTACK_API_URL = "https://api.paystack.co"
