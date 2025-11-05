@@ -477,6 +477,72 @@ function App() {
   useEffect(() => {
     fetchBusinessCategories();
     fetchProductCategories();
+
+  // PWA: Online/Offline detection and Service Worker communication
+  useEffect(() => {
+    // Online/Offline listeners
+    const handleOnline = () => {
+      console.log('App is online');
+      setIsOnline(true);
+      setShowOfflineIndicator(false);
+      
+      // Trigger sync of offline queue
+      if ('serviceWorker' in navigator && 'sync' in navigator.serviceWorker) {
+        navigator.serviceWorker.ready.then(registration => {
+          registration.sync.register('sync-offline-requests');
+        });
+      }
+    };
+
+    const handleOffline = () => {
+      console.log('App is offline');
+      setIsOnline(false);
+      setShowOfflineIndicator(true);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Listen for service worker messages
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data.type === 'SYNC_SUCCESS') {
+          console.log('Synced offline request:', event.data.url);
+          setPendingSync(false);
+          // Optionally refresh data after sync
+          fetchProducts();
+        }
+      });
+    }
+
+    // PWA Install prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallPrompt(true);
+    });
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // PWA: Install App function
+  const installPWA = async () => {
+    if (!deferredPrompt) return;
+    
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      console.log('User accepted PWA install');
+    }
+    
+    setDeferredPrompt(null);
+    setShowInstallPrompt(false);
+  };
+
     fetchCommunities();
     fetchFeaturedCommunityProducts();
   }, []);
