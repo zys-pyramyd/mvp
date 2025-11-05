@@ -7093,7 +7093,8 @@ async def initialize_payment(
                     "platform_type": platform_type,
                     "buyer_id": user_id,
                     "customer_state": customer_state,
-                    "delivery_fee": delivery_fee
+                    "delivery_fee": delivery_fee,
+                    "delivery_method": delivery_method
                 }
             }
         else:
