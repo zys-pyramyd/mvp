@@ -6114,42 +6114,69 @@ function App() {
                   {/* Step 3: Payment */}
                   {checkoutStep === 'payment' && (
                     <div className="space-y-6">
-                      <h3 className="text-lg font-semibold text-gray-900">💳 Payment</h3>
+                      <h3 className="text-lg font-semibold text-gray-900">💳 Payment with Paystack</h3>
                       
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div className="flex items-center">
-                          <svg className="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <div className={`border rounded-lg p-4 ${
+                        checkoutPlatform === 'pyexpress' 
+                          ? 'bg-emerald-50 border-emerald-200' 
+                          : 'bg-orange-50 border-orange-200'
+                      }`}>
+                        <div className="flex items-start">
+                          <svg className={`w-5 h-5 mr-2 flex-shrink-0 mt-0.5 ${
+                            checkoutPlatform === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600'
+                          }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                           <div>
-                            <div className="font-medium text-blue-900">Payment Integration Ready</div>
-                            <div className="text-sm text-blue-700">Paystack payment gateway will be integrated here</div>
+                            <div className={`font-medium ${
+                              checkoutPlatform === 'pyexpress' ? 'text-emerald-900' : 'text-orange-900'
+                            }`}>
+                              {checkoutPlatform === 'pyexpress' ? 'PyExpress Checkout' : 'Farm Deals Checkout'}
+                            </div>
+                            <div className={`text-sm mt-1 ${
+                              checkoutPlatform === 'pyexpress' ? 'text-emerald-700' : 'text-orange-700'
+                            }`}>
+                              {checkoutPlatform === 'pyexpress' 
+                                ? 'Payment will be split: Vendor receives product payment, platform handles service charges' 
+                                : 'Payment via Fixed Split Group - Sophie Farms Investment Ltd manages farmer payouts'}
+                            </div>
+                            {user && (user.role === 'agent' || user.role === 'purchasing_agent') && (
+                              <div className="mt-2 text-sm font-medium text-blue-700">
+                                ✨ As an agent, you'll earn commission on this purchase!
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
                       
                       <div className="space-y-4">
-                        <div className="font-medium text-gray-900">Payment Methods Available:</div>
+                        <div className="font-medium text-gray-900">Secure Payment via Paystack</div>
                         <div className="space-y-2">
-                          <div className="flex items-center p-3 border border-gray-200 rounded-lg">
-                            <input type="radio" name="payment_method" defaultChecked className="w-4 h-4 text-emerald-600" />
-                            <div className="ml-3">
-                              <div className="font-medium">💳 Card Payment</div>
-                              <div className="text-sm text-gray-600">Visa, Mastercard, Verve</div>
+                          <div className="flex items-center p-3 border border-gray-200 rounded-lg bg-white">
+                            <svg className="w-8 h-8 text-emerald-600 mr-3" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>
+                            </svg>
+                            <div>
+                              <div className="font-medium">Debit/Credit Card</div>
+                              <div className="text-sm text-gray-600">Visa, Mastercard, Verve supported</div>
                             </div>
                           </div>
-                          <div className="flex items-center p-3 border border-gray-200 rounded-lg">
-                            <input type="radio" name="payment_method" className="w-4 h-4 text-emerald-600" />
-                            <div className="ml-3">
-                              <div className="font-medium">🏦 Bank Transfer</div>
-                              <div className="text-sm text-gray-600">Direct bank transfer</div>
+                          <div className="flex items-center p-3 border border-gray-200 rounded-lg bg-white">
+                            <svg className="w-8 h-8 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                            </svg>
+                            <div>
+                              <div className="font-medium">Bank Transfer & USSD</div>
+                              <div className="text-sm text-gray-600">Transfer directly from your bank</div>
                             </div>
                           </div>
-                          <div className="flex items-center p-3 border border-gray-200 rounded-lg">
-                            <input type="radio" name="payment_method" className="w-4 h-4 text-emerald-600" />
-                            <div className="ml-3">
-                              <div className="font-medium">📱 Mobile Money</div>
-                              <div className="text-sm text-gray-600">MTN, Airtel, etc.</div>
+                          <div className="flex items-center p-3 border border-gray-200 rounded-lg bg-white">
+                            <svg className="w-8 h-8 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                            <div>
+                              <div className="font-medium">Mobile Money</div>
+                              <div className="text-sm text-gray-600">MTN, Airtel, and other providers</div>
                             </div>
                           </div>
                         </div>
@@ -6163,10 +6190,25 @@ function App() {
                           Back to Address
                         </button>
                         <button
-                          onClick={createOrder}
-                          className="px-8 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
+                          onClick={initializePayment}
+                          disabled={paymentProcessing}
+                          className={`px-8 py-2 text-white rounded-lg font-medium flex items-center ${
+                            checkoutPlatform === 'pyexpress'
+                              ? 'bg-emerald-600 hover:bg-emerald-700'
+                              : 'bg-orange-600 hover:bg-orange-700'
+                          } ${paymentProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                          Place Order (₦{orderSummary.total?.toLocaleString() || 0})
+                          {paymentProcessing ? (
+                            <>
+                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Processing...
+                            </>
+                          ) : (
+                            `Pay ₦${orderSummary.total?.toLocaleString() || 0} Securely`
+                          )}
                         </button>
                       </div>
                     </div>
