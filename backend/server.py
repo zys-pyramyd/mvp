@@ -183,6 +183,190 @@ AGENT_COMMISSION_RATES = {
     'verification': 0.02  # 2% farmer verification fee
 }
 
+# Agent Tier System (Gamification)
+AGENT_TIERS = {
+    'starter': {'min_farmers': 0, 'max_farmers': 99, 'bonus_commission': 0.00, 'name': 'Starter'},
+    'pro': {'min_farmers': 100, 'max_farmers': 999, 'bonus_commission': 0.005, 'name': 'Pro'},
+    'expert': {'min_farmers': 1000, 'max_farmers': 4999, 'bonus_commission': 0.01, 'name': 'Expert'},
+    'master': {'min_farmers': 5000, 'max_farmers': 9999, 'bonus_commission': 0.02, 'name': 'Master'},
+    'elite': {'min_farmers': 10000, 'max_farmers': float('inf'), 'bonus_commission': 0.04, 'name': 'Elite'}
+}
+
+def get_agent_tier(farmer_count: int) -> dict:
+    """Calculate agent tier based on farmer count"""
+    for tier_key, tier_data in AGENT_TIERS.items():
+        if tier_data['min_farmers'] <= farmer_count <= tier_data['max_farmers']:
+            return {
+                'tier': tier_key,
+                'tier_name': tier_data['name'],
+                'farmer_count': farmer_count,
+                'bonus_commission': tier_data['bonus_commission'],
+                'next_tier': get_next_tier(tier_key),
+                'farmers_to_next_tier': get_farmers_to_next_tier(farmer_count, tier_key)
+            }
+    return {
+        'tier': 'starter',
+        'tier_name': 'Starter',
+        'farmer_count': farmer_count,
+        'bonus_commission': 0.00,
+        'next_tier': 'pro',
+        'farmers_to_next_tier': 100 - farmer_count
+    }
+
+def get_next_tier(current_tier: str) -> str:
+    """Get the next tier name"""
+    tier_order = ['starter', 'pro', 'expert', 'master', 'elite']
+    try:
+        current_index = tier_order.index(current_tier)
+        if current_index < len(tier_order) - 1:
+            return tier_order[current_index + 1]
+        return 'elite'  # Already at max
+    except ValueError:
+        return 'pro'
+
+def get_farmers_to_next_tier(farmer_count: int, current_tier: str) -> int:
+    """Calculate how many more farmers needed for next tier"""
+    next_tier = get_next_tier(current_tier)
+    if next_tier == current_tier:  # Already at elite
+        return 0
+    next_tier_data = AGENT_TIERS.get(next_tier)
+    if next_tier_data:
+        return max(0, next_tier_data['min_farmers'] - farmer_count)
+    return 0
+
+def calculate_agent_commission(product_total: float, agent_user_id: str, db) -> dict:
+    """Calculate agent commission with tier bonus"""
+    # Get agent's farmer count
+    farmer_count = agent_farmers_collection.count_documents({'agent_id': agent_user_id})
+    
+    # Get agent tier
+    tier_info = get_agent_tier(farmer_count)
+    
+    # Base commission (4%)
+    base_commission = product_total * AGENT_BUYER_COMMISSION_RATE
+    
+    # Tier bonus commission
+    bonus_commission = product_total * tier_info['bonus_commission']
+    
+    # Total commission
+    total_commission = base_commission + bonus_commission
+    
+    return {
+        'base_commission': base_commission,
+        'bonus_commission': bonus_commission,
+        'total_commission': total_commission,
+        'tier_info': tier_info
+    }
+
+# Kwik Delivery Integration
+def kwik_request(method: str, endpoint: str, data: dict = None) -> dict:
+    """Make authenticated request to Kwik Delivery API"""
+    headers = {
+        "Authorization": f"Bearer {KWIK_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    url = f"{KWIK_API_URL}{endpoint}"
+    
+    try:
+        if method == "GET":
+            response = requests.get(url, headers=headers)
+        elif method == "POST":
+            response = requests.post(url, headers=headers, json=data)
+        else:
+            raise ValueError(f"Unsupported method: {method}")
+        
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Kwik API error: {str(e)}")
+        if hasattr(e.response, 'text'):
+            print(f"Response: {e.response.text}")
+        # Don't raise exception, return None to fallback to 20% rule
+        return None
+
+def calculate_delivery_fee(product_total: float, buyer_state: str, product_data: dict = None) -> dict:
+    """
+    Smart delivery fee calculator with vendor priority
+    Priority: Vendor logistics > Kwik API > 20% rule
+    """
+    delivery_info = {
+        'delivery_fee': 0.0,
+        'delivery_method': 'unknown',
+        'kwik_available': False,
+        'vendor_managed': False
+    }
+    
+    # Priority 1: Check if vendor manages logistics
+    if product_data and product_data.get('logistics_managed_by') == 'seller':
+        vendor_fee = product_data.get('seller_delivery_fee', 0.0)
+        delivery_info.update({
+            'delivery_fee': vendor_fee,
+            'delivery_method': 'vendor_managed',
+            'vendor_managed': True,
+            'is_free': vendor_fee == 0.0
+        })
+        return delivery_info
+    
+    # Priority 2: Check if Kwik is available for the state
+    if buyer_state in KWIK_ENABLED_STATES:
+        # Note: In production, you would call Kwik API to get actual quote
+        # For now, we'll use state-based fees for Kwik-enabled states
+        kwik_fee = STATE_DELIVERY_FEES.get(buyer_state, 3000)
+        delivery_info.update({
+            'delivery_fee': kwik_fee,
+            'delivery_method': 'kwik_delivery',
+            'kwik_available': True
+        })
+        return delivery_info
+    
+    # Priority 3: Use 20% of product value for other states
+    twenty_percent_fee = product_total * 0.20
+    delivery_info.update({
+        'delivery_fee': twenty_percent_fee,
+        'delivery_method': '20_percent_rule',
+        'state': buyer_state
+    })
+    
+    return delivery_info
+
+def create_kwik_delivery(pickup_address: dict, delivery_address: dict, order_details: dict) -> dict:
+    """
+    Create a delivery request on Kwik API
+    Returns tracking info or None if failed
+    """
+    kwik_payload = {
+        "pickup_details": {
+            "name": order_details.get('seller_name', 'Pyramyd Vendor'),
+            "phone": order_details.get('seller_phone', '+234'),
+            "address": pickup_address.get('address', ''),
+            "latitude": pickup_address.get('lat'),
+            "longitude": pickup_address.get('lng')
+        },
+        "delivery_details": {
+            "name": order_details.get('buyer_name', ''),
+            "phone": order_details.get('buyer_phone', ''),
+            "address": delivery_address.get('address', ''),
+            "latitude": delivery_address.get('lat'),
+            "longitude": delivery_address.get('lng')
+        },
+        "order_info": {
+            "order_id": order_details.get('order_id', ''),
+            "description": order_details.get('description', 'Product delivery'),
+            "amount": order_details.get('amount', 0)
+        }
+    }
+    
+    result = kwik_request("POST", "/deliveries", kwik_payload)
+    
+    if result and result.get('status') == 'success':
+        return {
+            'kwik_delivery_id': result.get('delivery_id'),
+            'tracking_url': result.get('tracking_url'),
+            'estimated_time': result.get('estimated_time')
+        }
+    
+    return None
+
 app = FastAPI(title="Pyramyd API", version="1.0.0")
 
 # CORS middleware
