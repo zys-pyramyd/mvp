@@ -5922,6 +5922,21 @@ function App() {
                                     <strong>Seller:</strong> {item.product.seller_username}
                                     {item.product.business_name && ` (${item.product.business_name})`}
                                   </div>
+                                  
+                                  {/* Vendor Logistics Display */}
+                                  {item.product.logistics_managed_by === 'seller' && (
+                                    <div className="mt-2">
+                                      {item.product.seller_delivery_fee === 0 ? (
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                          🎉 FREE Delivery (Vendor Managed)
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                          🚚 Vendor Delivery: ₦{item.product.seller_delivery_fee?.toLocaleString()}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                                 
                                 <div className="text-right">
