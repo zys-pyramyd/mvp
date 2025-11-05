@@ -6969,41 +6969,7 @@ async def get_banks():
         print(f"Error getting banks: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get banks")
 
-@app.post("/api/delivery/calculate-fee")
-async def calculate_delivery_fee(request_data: dict):
-    """Calculate delivery fee based on state and platform"""
-    try:
-        state = request_data.get("state")
-        platform_type = request_data.get("platform_type", "home")  # farmhub, home, community
-        product_weight = request_data.get("weight_kg", 1)
-        
-        if not state:
-            raise HTTPException(status_code=400, detail="State is required")
-        
-        # Get base delivery fee by state
-        base_fee = get_delivery_fee_by_state(state)
-        
-        # Add weight surcharge for heavy items (>5kg)
-        weight_surcharge = 0
-        if product_weight > 5:
-            weight_surcharge = (product_weight - 5) * 100  # ₦100 per kg above 5kg
-        
-        total_delivery_fee = base_fee + weight_surcharge
-        
-        return {
-            "status": True,
-            "state": state,
-            "base_fee": base_fee,
-            "weight_surcharge": weight_surcharge,
-            "total_delivery_fee": total_delivery_fee,
-            "weight_kg": product_weight
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error calculating delivery fee: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to calculate delivery fee")
+# Note: /api/delivery/calculate-fee endpoint is defined above in KWIK DELIVERY section
 
 @app.post("/api/paystack/transaction/initialize")
 async def initialize_payment(
