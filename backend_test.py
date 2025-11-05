@@ -8396,12 +8396,7 @@ class PyramydAPITester:
             lagos_success = False
 
         # Test 2: Kano delivery (should use 20% rule = 1000)
-        kano_data = {
-            "product_total": 5000,
-            "buyer_state": "Kano"
-        }
-        
-        success, response = self.make_request('POST', '/api/delivery/calculate-fee', kano_data, 200)
+        success, response = self.make_request('POST', '/api/delivery/calculate-fee?product_total=5000&buyer_state=Kano', None, 200)
         
         if success and 'delivery_fee' in response and 'delivery_method' in response and 'kwik_available' in response:
             expected_fee = 3500  # Kano state fee from STATE_DELIVERY_FEES (not 20% rule)
