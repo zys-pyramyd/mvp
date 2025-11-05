@@ -8457,7 +8457,8 @@ class PyramydAPITester:
             "product_total": 10000,
             "customer_state": "Lagos", 
             "product_weight": 5,
-            "platform_type": "home"
+            "platform_type": "home",
+            "subaccount_code": "ACCT_test_subaccount"  # Required for home/community transactions
         }
         
         success, response = self.make_request('POST', '/api/paystack/transaction/initialize', transaction_data, 200, use_auth=True)
