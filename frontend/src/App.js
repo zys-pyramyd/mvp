@@ -5884,13 +5884,13 @@ function App() {
                     <div className="space-y-6">
                       <h3 className="text-lg font-semibold text-gray-900">📦 Review Your Order</h3>
                       
-                      {cart.length === 0 ? (
+                      {getActiveCartItems().length === 0 ? (
                         <div className="text-center py-8">
                           <div className="text-gray-500">Your cart is empty</div>
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          {cart.map((item) => (
+                          {getActiveCartItems().map((item) => (
                             <div key={item.id} className="bg-gray-50 rounded-lg p-4">
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
