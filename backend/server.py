@@ -7032,10 +7032,20 @@ async def initialize_payment(
         if not customer_state:
             raise HTTPException(status_code=400, detail="Customer state is required for delivery calculation")
         
-        # Calculate state-based delivery fee
-        delivery_fee = get_delivery_fee_by_state(customer_state)
-        if product_weight > 5:
-            delivery_fee += (product_weight - 5) * 100  # Weight surcharge
+        # Get product data for smart delivery calculation
+        product_data = None
+        if product_id:
+            product = db.products.find_one({"id": product_id})
+            if product:
+                product_data = {
+                    'logistics_managed_by': product.get('logistics_managed_by', 'pyramyd'),
+                    'seller_delivery_fee': product.get('seller_delivery_fee', 0.0)
+                }
+        
+        # Use smart delivery fee calculation
+        delivery_info = calculate_delivery_fee(product_total, customer_state, product_data)
+        delivery_fee = delivery_info['delivery_fee']
+        delivery_method = delivery_info['delivery_method']
         
         # Convert to kobo
         product_total_kobo = naira_to_kobo(product_total)
