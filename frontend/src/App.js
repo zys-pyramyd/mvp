@@ -123,6 +123,8 @@ function App() {
   const [featuredCommunityProducts, setFeaturedCommunityProducts] = useState([]);
   const [showCommunityDetails, setShowCommunityDetails] = useState(false);
   const [communityDetails, setCommunityDetails] = useState(null);
+  const [communitySearchTerm, setCommunitySearchTerm] = useState('');
+  const [communitySearchType, setCommunitySearchType] = useState('communities'); // 'communities' or 'products'
 
   // Dashboard and trading platform state
   const [showFarmerDashboard, setShowFarmerDashboard] = useState(false);
