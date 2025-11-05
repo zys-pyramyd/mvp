@@ -6100,6 +6100,196 @@ async def get_agent_dashboard(current_user: dict = Depends(get_current_user)):
         print(f"Error getting agent dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get agent dashboard")
 
+
+# ==================== AGENT TIER SYSTEM (GAMIFICATION) ====================
+
+@app.get("/api/agent/tier")
+async def get_agent_tier_info(current_user: dict = Depends(get_current_user)):
+    """Get agent tier information with gamification details"""
+    try:
+        if current_user.get("role") != "agent":
+            raise HTTPException(status_code=403, detail="Only agents can access tier information")
+        
+        agent_id = current_user["id"]
+        
+        # Count agent's farmers
+        farmer_count = agent_farmers_collection.count_documents({'agent_id': agent_id})
+        
+        # Get tier info
+        tier_info = get_agent_tier(farmer_count)
+        
+        # Calculate total commission rate (base + bonus)
+        base_rate = AGENT_BUYER_COMMISSION_RATE * 100  # Convert to percentage
+        bonus_rate = tier_info['bonus_commission'] * 100
+        total_rate = base_rate + bonus_rate
+        
+        return {
+            "success": True,
+            "tier": tier_info['tier'],
+            "tier_name": tier_info['tier_name'],
+            "farmer_count": tier_info['farmer_count'],
+            "base_commission_rate": f"{base_rate}%",
+            "bonus_commission_rate": f"{bonus_rate}%",
+            "total_commission_rate": f"{total_rate}%",
+            "next_tier": tier_info['next_tier'],
+            "farmers_to_next_tier": tier_info['farmers_to_next_tier'],
+            "tier_benefits": {
+                "starter": "Base 4% commission on sales",
+                "pro": "4% base + 0.5% bonus = 4.5% total commission",
+                "expert": "4% base + 1% bonus = 5% total commission",
+                "master": "4% base + 2% bonus = 6% total commission",
+                "elite": "4% base + 4% bonus = 8% total commission"
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting agent tier: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get agent tier information")
+
+# ==================== KWIK DELIVERY & SMART DELIVERY LOGIC ====================
+
+@app.post("/api/delivery/calculate-fee")
+async def calculate_delivery_fee_endpoint(
+    product_total: float,
+    buyer_state: str,
+    product_id: Optional[str] = None
+):
+    """
+    Calculate delivery fee with smart logic:
+    1. Vendor logistics (if managed by seller)
+    2. Kwik Delivery (for Lagos, Oyo, FCT Abuja)
+    3. 20% rule (for other states)
+    """
+    try:
+        product_data = None
+        
+        # Get product details if product_id provided
+        if product_id:
+            product = db.products.find_one({"id": product_id})
+            if product:
+                product_data = {
+                    'logistics_managed_by': product.get('logistics_managed_by', 'pyramyd'),
+                    'seller_delivery_fee': product.get('seller_delivery_fee', 0.0)
+                }
+        
+        # Calculate delivery fee
+        delivery_info = calculate_delivery_fee(product_total, buyer_state, product_data)
+        
+        return {
+            "success": True,
+            "delivery_fee": delivery_info['delivery_fee'],
+            "delivery_method": delivery_info['delivery_method'],
+            "kwik_available": delivery_info.get('kwik_available', False),
+            "vendor_managed": delivery_info.get('vendor_managed', False),
+            "is_free_delivery": delivery_info.get('is_free', False),
+            "buyer_state": buyer_state,
+            "details": delivery_info
+        }
+        
+    except Exception as e:
+        print(f"Error calculating delivery fee: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to calculate delivery fee")
+
+@app.post("/api/delivery/kwik/create")
+async def create_kwik_delivery_endpoint(
+    order_id: str,
+    pickup_address: dict,
+    delivery_address: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a Kwik delivery request for an order"""
+    try:
+        # Get order details
+        order = db.orders.find_one({"order_id": order_id})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Prepare order details for Kwik
+        order_details = {
+            'seller_name': order.get('seller_username', 'Pyramyd Vendor'),
+            'buyer_name': current_user.get('username', ''),
+            'buyer_phone': current_user.get('phone', ''),
+            'order_id': order_id,
+            'description': f"Order {order_id} - {order.get('product_details', {}).get('product_name', 'Product')}",
+            'amount': order.get('total_amount', 0)
+        }
+        
+        # Create Kwik delivery
+        kwik_result = create_kwik_delivery(pickup_address, delivery_address, order_details)
+        
+        if kwik_result:
+            # Save Kwik delivery info
+            kwik_delivery_doc = {
+                "id": str(uuid.uuid4()),
+                "order_id": order_id,
+                "kwik_delivery_id": kwik_result['kwik_delivery_id'],
+                "tracking_url": kwik_result['tracking_url'],
+                "estimated_time": kwik_result.get('estimated_time'),
+                "pickup_address": pickup_address,
+                "delivery_address": delivery_address,
+                "status": "pending",
+                "created_at": datetime.utcnow()
+            }
+            kwik_deliveries_collection.insert_one(kwik_delivery_doc)
+            
+            # Update order with Kwik delivery info
+            db.orders.update_one(
+                {"order_id": order_id},
+                {"$set": {
+                    "kwik_delivery_id": kwik_result['kwik_delivery_id'],
+                    "tracking_url": kwik_result['tracking_url'],
+                    "delivery_method": "kwik_delivery"
+                }}
+            )
+            
+            return {
+                "success": True,
+                "message": "Kwik delivery created successfully",
+                "kwik_delivery_id": kwik_result['kwik_delivery_id'],
+                "tracking_url": kwik_result['tracking_url'],
+                "estimated_time": kwik_result.get('estimated_time')
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create Kwik delivery. Falling back to standard delivery.")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error creating Kwik delivery: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create Kwik delivery")
+
+@app.get("/api/delivery/kwik/track/{kwik_delivery_id}")
+async def track_kwik_delivery(kwik_delivery_id: str):
+    """Track a Kwik delivery"""
+    try:
+        # Get tracking info from Kwik API
+        tracking_info = kwik_request("GET", f"/deliveries/{kwik_delivery_id}")
+        
+        if tracking_info:
+            # Update local delivery status
+            kwik_deliveries_collection.update_one(
+                {"kwik_delivery_id": kwik_delivery_id},
+                {"$set": {
+                    "status": tracking_info.get('status', 'unknown'),
+                    "last_updated": datetime.utcnow()
+                }}
+            )
+            
+            return {
+                "success": True,
+                "tracking_info": tracking_info
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Tracking information not available")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error tracking Kwik delivery: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to track delivery")
+
 # ==================== AUDIT LOG SYSTEM ====================
 
 def log_audit_action(user_id: str, action: str, resource_type: str, resource_id: str = None, details: dict = None, request = None):
