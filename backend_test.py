@@ -8421,12 +8421,7 @@ class PyramydAPITester:
             kano_success = False
 
         # Test 3: FCT Abuja delivery
-        abuja_data = {
-            "product_total": 10000,
-            "buyer_state": "FCT Abuja"
-        }
-        
-        success, response = self.make_request('POST', '/api/delivery/calculate-fee', abuja_data, 200)
+        success, response = self.make_request('POST', '/api/delivery/calculate-fee?product_total=10000&buyer_state=FCT Abuja', None, 200)
         
         if success and 'delivery_fee' in response and 'delivery_method' in response and 'kwik_available' in response:
             expected_fee = 1500  # FCT Abuja state fee from STATE_DELIVERY_FEES
