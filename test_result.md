@@ -810,15 +810,18 @@ backend:
 
   - task: "Smart Delivery Fee Calculator - POST /api/delivery/calculate-fee"
     implemented: true
-    working: "NA"
+    working: false
     file: "/app/backend/server.py"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Implemented 3-tier priority: 1) Vendor logistics (seller_delivery_fee, 0=free), 2) Kwik API for Lagos/Oyo/FCT Abuja, 3) 20% of product value for other states. Needs testing with different states and vendor logistics scenarios."
+      - working: false
+        agent: "testing"
+        comment: "❌ CRITICAL BUG: Function name collision detected. Two functions named 'calculate_delivery_fee' exist - utility function (line 287) and endpoint function (line 6973). The endpoint function overrides the utility function, causing 'calculate_delivery_fee() takes 1 positional argument but 3 were given' error. Endpoint exists but fails with 500 Internal Server Error. REQUIRES IMMEDIATE FIX: Rename one of the functions to resolve collision."
 
   - task: "Kwik Delivery Creation - POST /api/delivery/kwik/create"
     implemented: true
