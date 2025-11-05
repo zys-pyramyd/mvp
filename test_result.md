@@ -1001,6 +1001,14 @@ test_plan:
     - "Platform-Specific Checkout Flows"
     - "Communities Search Functionality"
     - "PWA Offline Detection & Indicator"
-  stuck_tasks: []
+  stuck_tasks:
+    - "Smart Delivery Fee Calculator - POST /api/delivery/calculate-fee"
+    - "Enhanced Paystack Transaction Init - POST /api/paystack/transaction/initialize"
   test_all: true
   test_priority: "high_first"
+
+agent_communication:
+  - agent: "testing"
+    message: "CRITICAL BUG FOUND: Function name collision in backend/server.py. There are two functions named 'calculate_delivery_fee' - one utility function (line 287) and one endpoint function (line 6973). The endpoint function is overriding the utility function, causing 'calculate_delivery_fee() takes 1 positional argument but 3 were given' errors in Paystack initialization and delivery fee calculation. This affects both delivery calculator and payment processing. REQUIRES IMMEDIATE FIX by renaming one of the functions."
+  - agent: "testing"
+    message: "NEW FEATURES TEST RESULTS: ✅ Agent Tier System working (returns tier info with all required fields). ✅ Agent Dashboard Enhanced working (includes tier progression info). ✅ Kwik Delivery endpoints exist and validate properly (expected failures with dummy data). ❌ Smart Delivery Calculator failing due to function name collision. ❌ Enhanced Paystack Transaction Init failing due to same function name collision. Success rate: 66.7% (4/6 features working)."
