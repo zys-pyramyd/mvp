@@ -795,15 +795,18 @@ test_plan:
 backend:
   - task: "Agent Tier System - GET /api/agent/tier"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Implemented 5-tier gamification system (Starter, Pro, Expert, Master, Elite) with bonus commission rates. Returns tier name, farmer count, commission rates, next tier progression. Needs testing with agent user."
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED SUCCESSFULLY: Agent tier system working correctly. Endpoint returns all required fields: tier, tier_name, farmer_count, base_commission_rate, bonus_commission_rate, total_commission_rate, next_tier, farmers_to_next_tier. Tested with proper agent user. Shows Starter tier with 0 farmers initially as expected."
 
   - task: "Smart Delivery Fee Calculator - POST /api/delivery/calculate-fee"
     implemented: true
