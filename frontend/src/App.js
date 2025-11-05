@@ -5824,9 +5824,18 @@ function App() {
       {showCheckout && (
         <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
+            <div className={`p-6 border-b ${checkoutPlatform === 'pyexpress' ? 'border-emerald-200 bg-emerald-50' : 'border-orange-200 bg-orange-50'}`}>
               <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-semibold text-gray-900">🛒 Checkout</h2>
+                <div>
+                  <h2 className="text-2xl font-semibold text-gray-900">
+                    {checkoutPlatform === 'pyexpress' ? '🛒 PyExpress Checkout' : '🌾 Farm Deals Checkout'}
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {checkoutPlatform === 'pyexpress' 
+                      ? 'Business & Supplier Products' 
+                      : 'Farm Fresh Products with Fixed Split'}
+                  </p>
+                </div>
                 <button
                   onClick={() => setShowCheckout(false)}
                   className="text-gray-500 hover:text-gray-700 text-2xl"
@@ -5837,23 +5846,29 @@ function App() {
               
               {/* Progress Steps */}
               <div className="mt-4 flex items-center space-x-4">
-                <div className={`flex items-center ${checkoutStep === 'review' ? 'text-emerald-600' : 'text-gray-400'}`}>
+                <div className={`flex items-center ${checkoutStep === 'review' ? (checkoutPlatform === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600') : 'text-gray-400'}`}>
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                    checkoutStep === 'review' ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'
+                    checkoutStep === 'review' 
+                      ? (checkoutPlatform === 'pyexpress' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600')
+                      : 'bg-gray-100 text-gray-400'
                   }`}>1</div>
                   <span className="ml-2 text-sm font-medium">Review Order</span>
                 </div>
                 <div className="h-px bg-gray-200 flex-1"></div>
-                <div className={`flex items-center ${checkoutStep === 'address' ? 'text-emerald-600' : 'text-gray-400'}`}>
+                <div className={`flex items-center ${checkoutStep === 'address' ? (checkoutPlatform === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600') : 'text-gray-400'}`}>
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                    checkoutStep === 'address' ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'
+                    checkoutStep === 'address' 
+                      ? (checkoutPlatform === 'pyexpress' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600')
+                      : 'bg-gray-100 text-gray-400'
                   }`}>2</div>
                   <span className="ml-2 text-sm font-medium">Shipping Address</span>
                 </div>
                 <div className="h-px bg-gray-200 flex-1"></div>
-                <div className={`flex items-center ${checkoutStep === 'payment' ? 'text-emerald-600' : 'text-gray-400'}`}>
+                <div className={`flex items-center ${checkoutStep === 'payment' ? (checkoutPlatform === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600') : 'text-gray-400'}`}>
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                    checkoutStep === 'payment' ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'
+                    checkoutStep === 'payment' 
+                      ? (checkoutPlatform === 'pyexpress' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600')
+                      : 'bg-gray-100 text-gray-400'
                   }`}>3</div>
                   <span className="ml-2 text-sm font-medium">Payment</span>
                 </div>
