@@ -201,6 +201,7 @@ function App() {
   // Checkout and cart management state
   const [showCheckout, setShowCheckout] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState('review'); // 'review', 'address', 'payment'
+  const [checkoutPlatform, setCheckoutPlatform] = useState('pyexpress'); // 'pyexpress' or 'farmdeals'
   const [shippingAddress, setShippingAddress] = useState({
     full_name: '',
     phone: '',
@@ -220,6 +221,13 @@ function App() {
     total: 0,
     item_count: 0
   });
+  
+  // Payment processing state
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [paymentReference, setPaymentReference] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState(null); // 'success', 'failed', 'pending'
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+  const [orderConfirmation, setOrderConfirmation] = useState(null);
   
   const [enhancedDeliveryForm, setEnhancedDeliveryForm] = useState({
     order_id: '',
