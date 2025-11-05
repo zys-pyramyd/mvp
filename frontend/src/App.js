@@ -7092,20 +7092,22 @@ function App() {
             </div>
 
             {/* Cart Footer */}
-            {cart.length > 0 && (
+            {getActiveCartItems().length > 0 && (
               <div className="p-4 border-t border-gray-200 bg-white">
                 <div className="space-y-2 mb-4">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Items ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span>
-                    <span className="font-medium">₦{cart.reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0).toLocaleString()}</span>
+                    <span className="text-gray-600">Items ({getActiveCartItems().reduce((sum, item) => sum + item.quantity, 0)})</span>
+                    <span className="font-medium">₦{getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Est. Delivery</span>
-                    <span className="font-medium">₦{Math.round(cart.length * 350).toLocaleString()}</span>
+                    <span className="font-medium">₦{Math.round(getActiveCartItems().length * 350).toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between font-semibold text-emerald-600 pt-2 border-t border-gray-200">
+                  <div className={`flex justify-between font-semibold pt-2 border-t border-gray-200 ${
+                    activeCartTab === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600'
+                  }`}>
                     <span>Total</span>
-                    <span>₦{(cart.reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0) + Math.round(cart.length * 350)).toLocaleString()}</span>
+                    <span>₦{(getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0) + Math.round(getActiveCartItems().length * 350)).toLocaleString()}</span>
                   </div>
                 </div>
                 
