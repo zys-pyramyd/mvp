@@ -477,6 +477,9 @@ function App() {
   useEffect(() => {
     fetchBusinessCategories();
     fetchProductCategories();
+    fetchCommunities();
+    fetchFeaturedCommunityProducts();
+  }, []);
 
   // PWA: Online/Offline detection and Service Worker communication
   useEffect(() => {
