@@ -8377,12 +8377,8 @@ class PyramydAPITester:
         print("\n🚚 Testing Smart Delivery Calculator (POST /api/delivery/calculate-fee)...")
         
         # Test 1: Lagos delivery (should use state-based fee)
-        lagos_data = {
-            "product_total": 5000,
-            "buyer_state": "Lagos"
-        }
-        
-        success, response = self.make_request('POST', '/api/delivery/calculate-fee', lagos_data, 200)
+        # Note: This endpoint expects query parameters, not JSON body
+        success, response = self.make_request('POST', '/api/delivery/calculate-fee?product_total=5000&buyer_state=Lagos', None, 200)
         
         if success and 'delivery_fee' in response and 'delivery_method' in response and 'kwik_available' in response:
             expected_fee = 1500  # Lagos state fee from STATE_DELIVERY_FEES
