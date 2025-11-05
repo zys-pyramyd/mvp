@@ -6063,13 +6063,21 @@ async def get_agent_dashboard(current_user: dict = Depends(get_current_user)):
         active_farmers = [f for f in farmers if f.get("is_active")]
         top_farmers = sorted(farmers, key=lambda x: x.get("total_sales", 0), reverse=True)[:5]
         
+        # Get agent tier information
+        farmer_count = len(farmers)
+        tier_info = get_agent_tier(farmer_count)
+        
         dashboard_data = {
             "agent_profile": {
                 "name": f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}".strip(),
                 "username": current_user["username"],
                 "kyc_status": current_user.get("kyc_status", "not_started"),
                 "average_rating": current_user.get("average_rating", 5.0),
-                "total_ratings": current_user.get("total_ratings", 0)
+                "total_ratings": current_user.get("total_ratings", 0),
+                "tier": tier_info['tier_name'],
+                "tier_key": tier_info['tier'],
+                "bonus_commission": f"{tier_info['bonus_commission'] * 100}%",
+                "farmers_to_next_tier": tier_info['farmers_to_next_tier']
             },
             "business_metrics": {
                 "total_farmers": len(farmers),
