@@ -864,15 +864,18 @@ backend:
 
   - task: "Agent Dashboard with Tier Info - GET /api/agent/dashboard"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Enhanced agent dashboard now includes tier information in agent_profile: tier name, tier key, bonus commission, farmers_to_next_tier. Needs testing with agent user to verify tier data displays correctly."
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED SUCCESSFULLY: Agent dashboard enhanced with tier information working correctly. Endpoint returns agent_profile with all required tier fields: tier, tier_key, bonus_commission, farmers_to_next_tier. Tested with proper agent user. Dashboard displays tier progression information as expected."
 
 frontend:
   - task: "Cart Tab System - PyExpress & Farm Deals Separation"
