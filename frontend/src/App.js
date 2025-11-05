@@ -2425,6 +2425,141 @@ function App() {
     }
   };
 
+
+  // Payment initialization with Paystack
+  const initializePayment = async () => {
+    if (!validateAddress()) return;
+    
+    setPaymentProcessing(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const cartItems = getActiveCartItems();
+      
+      if (cartItems.length === 0) {
+        alert('No items in cart for checkout');
+        return;
+      }
+      
+      // Calculate product total from active cart
+      const productTotal = cartItems.reduce((sum, item) => 
+        sum + (item.product.price_per_unit * item.quantity), 0
+      );
+      
+      // Determine platform type
+      const platformType = checkoutPlatform === 'pyexpress' ? 'home' : 'farmhub';
+      
+      // Get first product for vendor info (for PyExpress)
+      const firstProduct = cartItems[0].product;
+      let subaccountCode = null;
+      
+      // For PyExpress/Home, we need the vendor's subaccount
+      if (platformType === 'home') {
+        // TODO: Fetch vendor's subaccount code from backend
+        // For now, we'll let backend handle this
+        subaccountCode = firstProduct.seller_subaccount_code || null;
+      }
+      
+      // Prepare payment data
+      const paymentData = {
+        product_total: productTotal,
+        customer_state: shippingAddress.state,
+        product_weight: cartItems.reduce((sum, item) => sum + (item.quantity * 1), 0), // Approximate weight
+        subaccount_code: subaccountCode,
+        product_id: cartItems.map(item => item.product.id).join(','), // Multiple products
+        platform_type: platformType,
+        callback_url: `${window.location.origin}/payment-callback`
+      };
+      
+      // Initialize payment
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/paystack/transaction/initialize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(paymentData)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Store payment reference
+        setPaymentReference(result.reference);
+        
+        // Show payment breakdown
+        const breakdown = result.breakdown;
+        const confirmPayment = window.confirm(
+          `Payment Breakdown:\n\n` +
+          `Product Total: ₦${breakdown.product_total.toLocaleString()}\n` +
+          `Delivery Fee (${breakdown.delivery_state}): ₦${breakdown.delivery_fee.toLocaleString()}\n` +
+          `Platform Charges: ₦${breakdown.platform_cut.toLocaleString()}\n` +
+          (breakdown.agent_commission > 0 ? `Your Commission (${breakdown.agent_tier || ''}): ₦${breakdown.agent_commission.toLocaleString()}\n` : '') +
+          `\nTotal Amount: ₦${result.amount.toLocaleString()}\n\n` +
+          `Proceed to payment gateway?`
+        );
+        
+        if (confirmPayment) {
+          // Redirect to Paystack authorization URL
+          window.location.href = result.authorization_url;
+        } else {
+          setPaymentProcessing(false);
+        }
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to initialize payment');
+      }
+      
+    } catch (error) {
+      console.error('Payment initialization error:', error);
+      alert(`Payment initialization failed: ${error.message}`);
+      setPaymentProcessing(false);
+    }
+  };
+  
+  // Handle payment callback
+  const verifyPayment = async (reference) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(
+        `${process.env.REACT_APP_BACKEND_URL}/api/paystack/transaction/verify/${reference}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      
+      if (response.ok) {
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+          setPaymentStatus('success');
+          setOrderConfirmation(result);
+          setShowPaymentSuccess(true);
+          
+          // Clear cart
+          setCart([]);
+          setShowCheckout(false);
+          
+          alert(`Payment Successful! ✅\n\nReference: ${reference}\n\nYour order has been confirmed and will be processed shortly.`);
+        } else {
+          setPaymentStatus('failed');
+          alert(`Payment Failed ❌\n\n${result.message || 'Payment could not be completed'}`);
+        }
+      } else {
+        throw new Error('Failed to verify payment');
+      }
+      
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      setPaymentStatus('failed');
+      alert(`Payment verification failed: ${error.message}`);
+    }
+  };
+
+
   const startConversation = (targetUser) => {
     const conversation = {
       id: `conv_${user.username}_${targetUser.username}`,
