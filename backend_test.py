@@ -8752,6 +8752,66 @@ class PyramydAPITester:
 
         return self.tests_passed == self.tests_run
 
+    def run_critical_bug_fix_tests_only(self):
+        """Run only the critical bug fix tests as requested in review"""
+        print("🔧 CRITICAL BUG FIX TESTING - Smart Delivery & Paystack")
+        print("=" * 60)
+        print("Testing for 'takes 1 positional argument but 3 were given' error fix")
+        print(f"🌐 Base URL: {self.base_url}")
+        print("=" * 60)
+
+        # Test 1: Health Check
+        if not self.test_health_check():
+            print("❌ Health check failed - API may be down")
+            return False
+
+        # Test 2: Get agent user token (required for Paystack test)
+        if not self.test_existing_user_login():
+            print("❌ Could not login with existing agent user - trying registration")
+            reg_success, user_data = self.test_user_registration()
+            if not reg_success:
+                print("❌ Registration failed - cannot test Paystack endpoint")
+                return False
+
+        # Test 3: Critical Bug Fix Tests
+        print("\n🎯 PRIORITY HIGH: Testing Critical Endpoints After Bug Fix")
+        
+        # Test Smart Delivery Calculator
+        delivery_success = self.test_smart_delivery_calculator()
+        
+        # Test Enhanced Paystack Transaction Init
+        paystack_success = self.test_enhanced_paystack_transaction_init()
+        
+        # Overall result
+        overall_success = delivery_success and paystack_success
+        
+        print("\n" + "=" * 60)
+        print("🔧 CRITICAL BUG FIX TEST RESULTS")
+        print("=" * 60)
+        
+        if overall_success:
+            print("✅ SUCCESS: Both critical endpoints working correctly")
+            print("✅ Smart Delivery Calculator: WORKING")
+            print("✅ Enhanced Paystack Transaction Init: WORKING")
+            print("✅ Function name collision bug appears to be FIXED")
+        else:
+            print("❌ FAILURE: One or both critical endpoints have issues")
+            if not delivery_success:
+                print("❌ Smart Delivery Calculator: FAILED")
+            else:
+                print("✅ Smart Delivery Calculator: WORKING")
+            
+            if not paystack_success:
+                print("❌ Enhanced Paystack Transaction Init: FAILED")
+            else:
+                print("✅ Enhanced Paystack Transaction Init: WORKING")
+        
+        print(f"\n📊 Tests Run: {self.tests_run}")
+        print(f"📊 Tests Passed: {self.tests_passed}")
+        print(f"📊 Success Rate: {(self.tests_passed/self.tests_run*100):.1f}%")
+        
+        return overall_success
+
 def main():
     """Main test execution"""
     import sys
