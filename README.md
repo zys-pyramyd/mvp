@@ -168,6 +168,313 @@ tail -f /var/log/supervisor/backend.out.log
 tail -f /var/log/supervisor/backend.err.log
 ```
 
+## 🧪 Local Testing Guide
+
+### Prerequisites Check
+Before testing locally, ensure you have:
+```bash
+# Check Python version (3.8+)
+python --version
+
+# Check Node.js version (16+)
+node --version
+
+# Check Yarn
+yarn --version
+
+# Check MongoDB status
+sudo service mongod status
+```
+
+### Step 1: Clone and Setup Environment
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd pyramyd
+
+# Create backend .env file
+cat > backend/.env << EOL
+MONGO_URL=mongodb://localhost:27017
+DB_NAME=pyramyd_local_test
+JWT_SECRET_KEY=$(openssl rand -hex 32)
+PAYSTACK_SECRET_KEY=sk_test_your_paystack_secret_key
+PAYSTACK_PUBLIC_KEY=pk_test_your_paystack_public_key
+FARMHUB_SUBACCOUNT=ACCT_your_farmhub_subaccount
+FARMHUB_SPLIT_GROUP=SPL_your_split_group_code
+KWIK_API_KEY=your_kwik_api_key
+KWIK_API_URL=https://api.kwik.delivery/v1
+EOL
+
+# Create frontend .env file
+cat > frontend/.env << EOL
+REACT_APP_BACKEND_URL=http://localhost:8001
+WDS_SOCKET_PORT=3000
+EOL
+```
+
+### Step 2: Install Dependencies
+
+```bash
+# Backend dependencies
+cd backend
+pip install -r requirements.txt
+cd ..
+
+# Frontend dependencies
+cd frontend
+yarn install
+cd ..
+```
+
+### Step 3: Start MongoDB
+
+```bash
+# Start MongoDB service
+sudo service mongod start
+
+# Verify MongoDB is running
+sudo service mongod status
+
+# Optional: Connect to MongoDB shell to verify
+mongosh
+# In mongo shell:
+# show dbs
+# use pyramyd_local_test
+# exit
+```
+
+### Step 4: Start Backend Server
+
+```bash
+# Open a new terminal window/tab
+cd backend
+python server.py
+
+# You should see:
+# "INFO:     Uvicorn running on http://0.0.0.0:8001"
+# "INFO:     Application startup complete"
+
+# Test backend is running:
+curl http://localhost:8001/api/health
+# Expected: {"status": "healthy"}
+```
+
+### Step 5: Start Frontend Server
+
+```bash
+# Open another terminal window/tab
+cd frontend
+yarn start
+
+# The app will automatically open at http://localhost:3000
+# You should see the Pyramyd homepage with:
+# - Header with navigation
+# - Slide shows
+# - Product categories
+# - Featured products
+```
+
+### Step 6: Test Core Functionality
+
+#### A. User Registration & Authentication
+1. Click "Sign In" in the header
+2. Click "Don't have an account? Sign up"
+3. Fill registration form:
+   - First Name: Test
+   - Last Name: User
+   - Email: testuser@pyramyd.com
+   - Password: password123
+   - Select role (Personal, Farmer, Agent, or Business)
+4. Complete registration
+5. Login with credentials
+
+#### B. Browse Products
+1. Scroll through homepage
+2. Click on category to filter products
+3. Use location filter dropdown (top right)
+4. Click on a product to view details
+5. Verify product information displays correctly
+
+#### C. Cart & Checkout System
+1. Add products to cart (click "Add to Cart" button)
+2. Click cart icon in header
+3. **Verify Cart Tabs:**
+   - See "PyExpress" tab (emerald/green)
+   - See "Farm Deals" tab (orange)
+   - Each tab shows correct item count
+   - Switch between tabs
+4. **Test Checkout:**
+   - Click "Checkout PyExpress" or "Checkout Farm Deals"
+   - Verify platform-specific colors:
+     - PyExpress: Emerald green theme
+     - Farm Deals: Orange theme
+   - Fill shipping address (include a Nigerian state)
+   - Proceed to payment step
+   - See Paystack payment options
+
+#### D. Communities Search
+1. Click "Find Communities" in header
+2. See communities browser modal
+3. **Test Search:**
+   - Type in search bar (e.g., "farm", "rice")
+   - Verify results filter in real-time
+   - See result count update
+   - Click "X" button to clear search
+4. Click on a community to view details
+5. Join a community
+
+#### E. Agent Features (Agent users only)
+1. Login as agent user
+2. Click profile icon → "Agent Dashboard"
+3. **Verify Agent Tier System:**
+   - See tier badge (Starter, Pro, Expert, Master, or Elite)
+   - See farmer count
+   - See bonus commission rate
+   - See progression to next tier
+4. Test agent-specific features
+
+#### F. PWA Features
+1. Open Chrome DevTools (F12)
+2. Go to "Application" tab
+3. **Verify Service Worker:**
+   - Click "Service Workers" in left sidebar
+   - See service-worker.js registered and activated
+4. **Test Offline Mode:**
+   - Open Network tab in DevTools
+   - Select "Offline" from throttling dropdown
+   - Refresh page
+   - See offline indicator banner (gray with WiFi-off icon)
+   - Verify you can still browse cached products
+   - Go back online
+   - Offline indicator should disappear
+5. **Test Install Prompt:**
+   - Look for emerald install banner at top
+   - Click "Install Now" to install as PWA
+   - Or use Chrome menu → "Install Pyramyd..."
+
+### Step 7: Test API Endpoints (Optional)
+
+```bash
+# Test agent tier endpoint (requires agent user token)
+curl -X GET http://localhost:8001/api/agent/tier \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# Test delivery fee calculator
+curl -X POST http://localhost:8001/api/delivery/calculate-fee \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product_total": 5000,
+    "buyer_state": "Lagos"
+  }'
+
+# Test communities search
+curl http://localhost:8001/api/communities
+
+# Test product categories
+curl http://localhost:8001/api/categories/products
+```
+
+### Step 8: Verify Key Features
+
+✅ **Cart System:**
+- [ ] Cart icon shows item count
+- [ ] Two tabs: PyExpress (green) and Farm Deals (orange)
+- [ ] Tab switching works
+- [ ] Items correctly filtered by platform
+- [ ] Totals calculated independently per tab
+
+✅ **Checkout Flow:**
+- [ ] Platform-specific colors throughout
+- [ ] Progress indicators color-coded
+- [ ] Vendor logistics badges display (FREE/custom fee)
+- [ ] Paystack payment initialization works
+- [ ] State-based delivery calculation applies
+
+✅ **Communities:**
+- [ ] "Find Communities" opens modal
+- [ ] Search bar filters results
+- [ ] Result count updates
+- [ ] Clear button works
+- [ ] Community cards display correctly
+
+✅ **PWA:**
+- [ ] Service worker registers successfully
+- [ ] Offline indicator appears when offline
+- [ ] Install prompt shows (on supported browsers)
+- [ ] Can browse cached content offline
+
+✅ **Agent Gamification:**
+- [ ] Agent tier displays in dashboard
+- [ ] Commission rates show (base + bonus)
+- [ ] Farmer count visible
+- [ ] Next tier progression info shown
+
+### Troubleshooting Local Testing
+
+#### Issue: Backend won't start
+```bash
+# Check if port 8001 is already in use
+lsof -i :8001
+# Kill the process if needed
+kill -9 <PID>
+
+# Check MongoDB is running
+sudo service mongod status
+sudo service mongod restart
+
+# Check Python dependencies
+pip list | grep fastapi
+pip list | grep pymongo
+```
+
+#### Issue: Frontend won't compile
+```bash
+# Clear node modules and reinstall
+rm -rf node_modules package-lock.json
+yarn install
+
+# Clear cache
+yarn cache clean
+
+# Check for syntax errors in App.js
+cat frontend/src/App.js | head -50
+```
+
+#### Issue: Can't see products
+- Ensure backend is running (http://localhost:8001)
+- Check backend logs for errors
+- Verify REACT_APP_BACKEND_URL in frontend/.env
+- Try creating a test product via API or UI
+
+#### Issue: Service Worker not registering
+- Must use HTTPS or localhost
+- Check browser console for errors
+- Clear browser cache and hard reload (Ctrl+Shift+R)
+- Ensure service-worker.js is in /public folder
+
+#### Issue: Paystack payments failing
+- This is expected with dummy API keys
+- For testing, use Paystack test keys from your account
+- Calculation logic should still work even with dummy keys
+
+### Performance Testing
+
+```bash
+# Check backend response times
+time curl http://localhost:8001/api/products
+
+# Check frontend build size
+cd frontend
+yarn build
+ls -lh build/static/js/
+
+# Check MongoDB query performance
+mongosh
+use pyramyd_local_test
+db.products.find().explain("executionStats")
+```
+
 ## 📁 Project Structure
 
 ```
