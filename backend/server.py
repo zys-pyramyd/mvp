@@ -17,7 +17,7 @@ import hmac
 import requests
 
 # Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
-MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/') //
+MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
 JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-here-change-in-production')
 ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')  # For encrypting sensitive user data
 PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_dummy_paystack_key')
@@ -26,8 +26,10 @@ TWILIO_SID = os.environ.get('TWILIO_ACCOUNT_SID', 'dummy_twilio_sid')
 TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'dummy_twilio_token')
 
 # Kwik Delivery API
-KWIK_API_KEY = os.environ.get('KWIK_API_KEY', 'dummy_kwik_key')
-KWIK_API_URL = "https://api.kwik.delivery/v1" #input the right url
+KWIK_ACCESS_TOKEN = os.environ.get('KWIK_ACCESS_TOKEN', 'dummy_kwik_access_token')
+KWIK_DOMAIN_NAME = os.environ.get('KWIK_DOMAIN_NAME', 'pyramyd.com')
+KWIK_VENDOR_ID = os.environ.get('KWIK_VENDOR_ID', 'dummy_vendor_id')
+KWIK_API_URL = "https://api.kwik.delivery"  # Official Kwik API base URL
 KWIK_ENABLED_STATES = ["Lagos", "Oyo", "FCT Abuja"]  # States where Kwik operates
 
 # Admin credentials
@@ -261,34 +263,111 @@ def calculate_agent_commission(product_total: float, agent_user_id: str, db) -> 
 
 # Kwik Delivery Integration
 def kwik_request(method: str, endpoint: str, data: dict = None) -> dict:
-    """Make authenticated request to Kwik Delivery API"""
+    """
+    Make authenticated request to Kwik Delivery API.
+    Kwik API requires access_token in the request body, not headers.
+    """
     headers = {
-        "Authorization": f"Bearer {KWIK_API_KEY}",
         "Content-Type": "application/json"
     }
     url = f"{KWIK_API_URL}{endpoint}"
-    
+
+    # Add access_token to request body (Kwik's authentication method)
+    if data is None:
+        data = {}
+    data['access_token'] = KWIK_ACCESS_TOKEN
+
     try:
         if method == "GET":
-            response = requests.get(url, headers=headers)
+            # For GET requests, send as query params
+            response = requests.get(url, headers=headers, params=data)
         elif method == "POST":
+            # For POST requests, send in body
             response = requests.post(url, headers=headers, json=data)
         else:
             raise ValueError(f"Unsupported method: {method}")
-        
+
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"Kwik API error: {str(e)}")
-        if hasattr(e.response, 'text'):
+        if hasattr(e, 'response') and hasattr(e.response, 'text'):
             print(f"Response: {e.response.text}")
-        # Don't raise exception, return None to fallback to 20% rule
+        # Don't raise exception, return None to fallback to state-based fees
         return None
 
-def calculate_delivery_fee(product_total: float, buyer_state: str, product_data: dict = None) -> dict:
+def estimate_fare_kwik(pickup_address: dict, delivery_address: dict, vehicle_id: int = 0) -> dict:
     """
-    Smart delivery fee calculator with vendor priority
-    Priority: Vendor logistics > Kwik API > 20% rule
+    Estimate delivery fare using Kwik API.
+
+    Args:
+        pickup_address: dict with 'address', 'name', 'phone', 'latitude', 'longitude', 'email'
+        delivery_address: dict with 'address', 'name', 'phone', 'latitude', 'longitude', 'email'
+        vehicle_id: 0 for Bike/Motorcycle, other IDs for different vehicle types
+
+    Returns:
+        dict with 'estimated_fare', 'distance_km', 'success' or None if failed
+    """
+    payload = {
+        "domain_name": KWIK_DOMAIN_NAME,
+        "vendor_id": KWIK_VENDOR_ID,
+        "is_multiple_tasks": 1,
+        "has_pickup": 1,
+        "has_delivery": 1,
+        "vehicle_id": vehicle_id,
+        "pickups": [
+            {
+                "address": pickup_address.get('address', ''),
+                "name": pickup_address.get('name', 'Vendor'),
+                "phone": pickup_address.get('phone', '+234'),
+                "latitude": str(pickup_address.get('latitude', '')),
+                "longitude": str(pickup_address.get('longitude', '')),
+                "email": pickup_address.get('email', 'vendor@pyramyd.com')
+            }
+        ],
+        "deliveries": [
+            {
+                "address": delivery_address.get('address', ''),
+                "name": delivery_address.get('name', 'Customer'),
+                "phone": delivery_address.get('phone', '+234'),
+                "latitude": str(delivery_address.get('latitude', '')),
+                "longitude": str(delivery_address.get('longitude', '')),
+                "email": delivery_address.get('email', 'customer@example.com')
+            }
+        ]
+    }
+
+    # Endpoint might be /task/estimate_fare or similar - verify with Kwik docs
+    result = kwik_request("POST", "/task/estimate_fare", payload)
+
+    if result and result.get('status') == 'success':
+        # Parse the response - structure may vary, adjust based on actual API response
+        data = result.get('data', {})
+        return {
+            'success': True,
+            'estimated_fare': data.get('delivery_charge', 0),  # In Naira
+            'distance_km': data.get('distance', 0),
+            'currency': 'NGN',
+            'vehicle_type': vehicle_id
+        }
+
+    return None
+
+def calculate_delivery_fee(product_total: float, buyer_state: str, product_data: dict = None,
+                          pickup_address: dict = None, delivery_address: dict = None) -> dict:
+    """
+    Smart delivery fee calculator with vendor priority.
+    Priority: Vendor logistics > Kwik API (with real-time quotes) > State-based fees > 20% rule
+
+    Args:
+        product_total: Total product value in Naira
+        buyer_state: Customer's state
+        product_data: Optional product info (for vendor-managed logistics)
+        pickup_address: Optional pickup location (for Kwik fare estimation)
+        delivery_address: Optional delivery location (for Kwik fare estimation)
+
+    Returns:
+        dict with delivery_fee, delivery_method, and other metadata
     """
     delivery_info = {
         'delivery_fee': 0.0,
@@ -296,7 +375,7 @@ def calculate_delivery_fee(product_total: float, buyer_state: str, product_data:
         'kwik_available': False,
         'vendor_managed': False
     }
-    
+
     # Priority 1: Check if vendor manages logistics
     if product_data and product_data.get('logistics_managed_by') == 'seller':
         vendor_fee = product_data.get('seller_delivery_fee', 0.0)
@@ -307,19 +386,32 @@ def calculate_delivery_fee(product_total: float, buyer_state: str, product_data:
             'is_free': vendor_fee == 0.0
         })
         return delivery_info
-    
+
     # Priority 2: Check if Kwik is available for the state
     if buyer_state in KWIK_ENABLED_STATES:
-        # Note: In production, you would call Kwik API to get actual quote
-        # For now, we'll use state-based fees for Kwik-enabled states
+        # Try to get real-time quote from Kwik API if addresses are provided
+        if pickup_address and delivery_address:
+            kwik_estimate = estimate_fare_kwik(pickup_address, delivery_address)
+            if kwik_estimate and kwik_estimate.get('success'):
+                delivery_info.update({
+                    'delivery_fee': kwik_estimate.get('estimated_fare', 0),
+                    'delivery_method': 'kwik_delivery',
+                    'kwik_available': True,
+                    'distance_km': kwik_estimate.get('distance_km'),
+                    'quote_source': 'kwik_api'
+                })
+                return delivery_info
+
+        # Fallback to state-based fees if API call fails or addresses not provided
         kwik_fee = STATE_DELIVERY_FEES.get(buyer_state, 3000)
         delivery_info.update({
             'delivery_fee': kwik_fee,
             'delivery_method': 'kwik_delivery',
-            'kwik_available': True
+            'kwik_available': True,
+            'quote_source': 'state_based_estimate'
         })
         return delivery_info
-    
+
     # Priority 3: Use 20% of product value for other states
     twenty_percent_fee = product_total * 0.20
     delivery_info.update({
@@ -327,45 +419,80 @@ def calculate_delivery_fee(product_total: float, buyer_state: str, product_data:
         'delivery_method': '20_percent_rule',
         'state': buyer_state
     })
-    
+
     return delivery_info
 
-def create_kwik_delivery(pickup_address: dict, delivery_address: dict, order_details: dict) -> dict:
+def create_kwik_delivery(pickup_address: dict, delivery_address: dict, order_details: dict, vehicle_id: int = 0) -> dict:
     """
-    Create a delivery request on Kwik API
-    Returns tracking info or None if failed
+    Create a delivery task on Kwik API using official API structure.
+
+    Args:
+        pickup_address: dict with 'address', 'name', 'phone', 'latitude', 'longitude', 'email'
+        delivery_address: dict with 'address', 'name', 'phone', 'latitude', 'longitude', 'email'
+        order_details: dict with 'order_id', 'description', 'amount', 'collect_cod' (bool)
+        vehicle_id: 0 for Bike/Motorcycle, other IDs for different vehicle types
+
+    Returns:
+        dict with tracking info or None if failed
     """
+    # Determine payment method and COD amount
+    collect_cod = order_details.get('collect_cod', False)
+    total_amount_kobo = naira_to_kobo(order_details.get('amount', 0)) if collect_cod else 0
+
+    # Payment method: 524288 for EOMB (End of Month Billing), check Kwik docs for other methods
+    # If platform already collected payment, amount should be 0
+    payment_method = 524288  # EOMB - adjust based on your Kwik account setup
+
     kwik_payload = {
-        "pickup_details": {
-            "name": order_details.get('seller_name', 'Pyramyd Vendor'),
-            "phone": order_details.get('seller_phone', '+234'),
-            "address": pickup_address.get('address', ''),
-            "latitude": pickup_address.get('lat'),
-            "longitude": pickup_address.get('lng')
-        },
-        "delivery_details": {
-            "name": order_details.get('buyer_name', ''),
-            "phone": order_details.get('buyer_phone', ''),
-            "address": delivery_address.get('address', ''),
-            "latitude": delivery_address.get('lat'),
-            "longitude": delivery_address.get('lng')
-        },
-        "order_info": {
-            "order_id": order_details.get('order_id', ''),
-            "description": order_details.get('description', 'Product delivery'),
-            "amount": order_details.get('amount', 0)
-        }
+        "domain_name": KWIK_DOMAIN_NAME,
+        "vendor_id": KWIK_VENDOR_ID,
+        "is_multiple_tasks": 1,
+        "has_pickup": 1,
+        "has_delivery": 1,
+        "vehicle_id": vehicle_id,
+        "auto_assignment": 1,  # Automatically assign to available driver
+        "amount": total_amount_kobo,  # Total amount in kobo (if COD) or 0
+        "payment_method": payment_method,
+        "pickups": [
+            {
+                "address": pickup_address.get('address', ''),
+                "name": pickup_address.get('name', 'Pyramyd Vendor'),
+                "phone": pickup_address.get('phone', '+234'),
+                "latitude": str(pickup_address.get('latitude', '')),
+                "longitude": str(pickup_address.get('longitude', '')),
+                "email": pickup_address.get('email', 'vendor@pyramyd.com')
+            }
+        ],
+        "deliveries": [
+            {
+                "address": delivery_address.get('address', ''),
+                "name": delivery_address.get('name', 'Customer'),
+                "phone": delivery_address.get('phone', '+234'),
+                "latitude": str(delivery_address.get('latitude', '')),
+                "longitude": str(delivery_address.get('longitude', '')),
+                "email": delivery_address.get('email', 'customer@example.com')
+            }
+        ],
+        "delivery_instruction": f"Order Ref: {order_details.get('order_id', '')}. {order_details.get('description', 'Handle with care.')}"
     }
-    
-    result = kwik_request("POST", "/deliveries", kwik_payload)
-    
+
+    # Official endpoint for task creation
+    result = kwik_request("POST", "/task/create_pickup_and_delivery_task", kwik_payload)
+
     if result and result.get('status') == 'success':
+        # Parse response - adjust field names based on actual Kwik API response
+        data = result.get('data', {})
         return {
-            'kwik_delivery_id': result.get('delivery_id'),
-            'tracking_url': result.get('tracking_url'),
-            'estimated_time': result.get('estimated_time')
+            'success': True,
+            'kwik_task_id': data.get('task_id') or data.get('delivery_id'),
+            'tracking_url': data.get('tracking_url'),
+            'tracking_id': data.get('tracking_id'),
+            'estimated_time': data.get('estimated_time'),
+            'driver_name': data.get('driver_name'),
+            'driver_phone': data.get('driver_phone'),
+            'status': data.get('status', 'assigned')
         }
-    
+
     return None
 
 app = FastAPI(title="Pyramyd API", version="1.0.0")
