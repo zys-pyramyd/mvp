@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict, Tuple
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +15,8 @@ import base64
 import hashlib
 import hmac
 import requests
+from geopy.geocoders import Nominatim
+from geopy.distance import geodesic
 
 # Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
