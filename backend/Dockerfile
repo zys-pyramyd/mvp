@@ -1,10 +1,12 @@
-# Multi-stage build for production
+# ============================
+# 1. BUILDER STAGE
+# ============================
 FROM python:3.11-slim as builder
 
-# Set working directory
+# Create working directory inside the container
 WORKDIR /app
 
-# Install system dependencies needed for Python packages
+# Install system dependencies required for Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
@@ -13,48 +15,51 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
+# Copy dependencies file
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
+
+# Install Python dependencies into local user directory
+RUN pip install --upgrade pip --no-cache-dir && \
     pip install --no-cache-dir --user -r requirements.txt
 
-# Production stage
+
+# ============================
+# 2. PRODUCTION STAGE
+# ============================
 FROM python:3.11-slim
 
-# Set working directory
+# Working directory for the application
 WORKDIR /app
 
-# Install runtime dependencies only
+# Install lightweight runtime libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Python dependencies from builder
+# Copy installed dependencies from the builder stage
 COPY --from=builder /root/.local /root/.local
-
-# Make sure scripts in .local are usable
 ENV PATH=/root/.local/bin:$PATH
 
-# Copy application code (excluding files in .dockerignore)
+# Copy application source code
 COPY server.py .
 COPY geopy.py .
 
-# Create non-root user for security
+# Create a non-root user for security
 RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-# Set environment variables
+# Environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8001
 
-# Expose port (use PORT env var for Render compatibility)
+# Expose the application port
 EXPOSE ${PORT}
 
-# Health check
+# Add health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\", \"8001\")}/health', timeout=5)" || exit 1
+    CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\", 8001)}/health', timeout=5)" || exit 1
 
-# Run the application (Render will override this with $PORT)
-CMD uvicorn server:app --host 0.0.0.0 --port ${PORT:-8001} --workers 4
+# Start the application using Uvicorn
+CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT} --workers 4"]
