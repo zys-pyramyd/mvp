@@ -2252,16 +2252,14 @@ function App() {
       
       // Calculate platform charges based on type
       if (isCommunity) {
-        // Community: 2.5% commission + 10% service
-        platformCommission += itemTotal * 0.025;
-        platformServiceCharge += itemTotal * 0.10;
+        // Community: 5% service charge (paid by buyer)
+        platformServiceCharge += itemTotal * 0.05;
       } else if (isFarmHub) {
         // FarmHub: 10% service charge only
         platformServiceCharge += itemTotal * 0.10;
       } else {
-        // Home/PyExpress: 2.5% commission + 10% service
-        platformCommission += itemTotal * 0.025;
-        platformServiceCharge += itemTotal * 0.10;
+        // Home/PyExpress: 3% service charge (paid by buyer)
+        platformServiceCharge += itemTotal * 0.03;
       }
       
       // Calculate delivery fees based on method
@@ -2536,14 +2534,19 @@ function App() {
         subaccountCode = firstProduct.seller_subaccount_code || null;
       }
       
-      // Prepare payment data
+      // Prepare payment data with enhanced delivery parameters
       const paymentData = {
         product_total: productTotal,
         customer_state: shippingAddress.state,
         product_weight: cartItems.reduce((sum, item) => sum + (item.quantity * 1), 0), // Approximate weight
+        quantity: cartItems.reduce((sum, item) => sum + item.quantity, 0), // Total quantity
         subaccount_code: subaccountCode,
         product_id: cartItems.map(item => item.product.id).join(','), // Multiple products
         platform_type: platformType,
+        buyer_location: `${shippingAddress.address_line_1}${shippingAddress.address_line_2 ? ', ' + shippingAddress.address_line_2 : ''}`,
+        buyer_city: shippingAddress.city,
+        seller_location: firstProduct.location || '',
+        seller_city: firstProduct.city || '',
         callback_url: `${window.location.origin}/payment-callback`
       };
       
@@ -6409,7 +6412,7 @@ function App() {
                       
                       {orderSummary.platform_service_charge > 0 && (
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Service Charge (10%)</span>
+                          <span className="text-gray-600">Service Charge</span>
                           <span className="font-medium">₦{orderSummary.platform_service_charge?.toLocaleString() || 0}</span>
                         </div>
                       )}

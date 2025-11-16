@@ -15,8 +15,12 @@ import base64
 import hashlib
 import hmac
 import requests
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
+from geopy import GeopyHelper
 
 # Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
@@ -34,6 +38,14 @@ KWIK_VENDOR_ID = os.environ.get('KWIK_VENDOR_ID', 'dummy_vendor_id')
 KWIK_API_URL = "https://api.kwik.delivery"  # Official Kwik API base URL
 KWIK_ENABLED_STATES = ["Lagos", "Oyo", "FCT Abuja"]  # States where Kwik operates
 
+# Email Configuration
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+SUPPORT_EMAIL = "support@pyramydhub.com"
+FROM_EMAIL = os.environ.get('FROM_EMAIL', SUPPORT_EMAIL)
+
 # Admin credentials
 ADMIN_EMAIL = "a**********@gmail.com"
 ADMIN_PASSWORD = "******"  # Default password - change after first login
@@ -48,12 +60,21 @@ FARMHUB_SUBACCOUNT = os.environ.get('FARMHUB_SUBACCOUNT', 'ACCT_c94r8ia2jeg41lx'
 
 # Commission rates
 AGENT_BUYER_COMMISSION_RATE = 0.04  # 4% for agent buyers
-FARMHUB_SERVICE_CHARGE = 0.10  # 10% service charge
-COMMUNITY_COMMISSION = 0.025  # 2.5% commission
-COMMUNITY_SERVICE = 0.10  # 10% service charge
 
-# State-based delivery fees (in Naira)
-STATE_DELIVERY_FEES = {
+# FARMHUB: 10% service charge (extracted from vendor, vendor gets 90%)
+FARMHUB_SERVICE_CHARGE = 0.10
+
+# HOME: 2.5% commission (from vendor) + 3% service charge (from buyer)
+HOME_VENDOR_COMMISSION = 0.025  # Extracted from vendor's sales, vendor gets 97.5%
+HOME_BUYER_SERVICE_CHARGE = 0.03  # Paid by buyer on top of product price
+
+# COMMUNITY: 2.5% commission (from vendor) + 5% service charge (from buyer)
+COMMUNITY_VENDOR_COMMISSION = 0.025  # Extracted from vendor's sales, vendor gets 97.5%
+COMMUNITY_BUYER_SERVICE_CHARGE = 0.05  # Paid by buyer on top of product price
+
+# Base delivery fees for each state in Nigeria (in Naira)
+# These fees are used as the base for geocoded distance calculations
+BASE_DELIVERY_FEES = STATE_DELIVERY_FEES = {
     # Lagos and neighbors - Tier 1
     "Lagos": 1500,
     "Ogun": 2000,
@@ -108,9 +129,19 @@ STATE_DELIVERY_FEES = {
     "Taraba": 4000,
 }
 
+# HOME platform operates only in these states (24-hour delivery)
+HOME_PLATFORM_STATES = ["Lagos", "Oyo", "FCT Abuja"]
+
+# Perishable product categories (require faster/special handling)
+PERISHABLE_CATEGORIES = ["fish_meat", "spices_vegetables"]
+
+def get_base_delivery_fee(state: str) -> float:
+    """Get base delivery fee for a state"""
+    return BASE_DELIVERY_FEES.get(state, 3000)  # Default 3000 if state not found
+
 def get_delivery_fee_by_state(state: str) -> float:
-    """Get delivery fee based on customer's state"""
-    return STATE_DELIVERY_FEES.get(state, 3000)  # Default 3000 if state not found
+    """Get delivery fee based on customer's state (backward compatibility)"""
+    return get_base_delivery_fee(state)
 
 # Generate encryption key if not provided (for development only)
 if not ENCRYPTION_KEY:
@@ -179,6 +210,115 @@ def naira_to_kobo(amount: float) -> int:
 def kobo_to_naira(amount: int) -> float:
     """Convert Kobo to Naira"""
     return amount / 100
+
+def send_order_completion_email(order_data: dict):
+    """Send order completion notification to support email"""
+    try:
+        if not SMTP_USERNAME or not SMTP_PASSWORD:
+            print("⚠️ Email credentials not configured. Skipping email notification.")
+            return False
+
+        # Create email content
+        subject = f"Order Completed: {order_data.get('order_id', 'N/A')}"
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+                <h2 style="color: #2ecc71; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">Order Completed Successfully</h2>
+                
+                <div style="margin: 20px 0;">
+                    <h3 style="color: #27ae60;">Order Details</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Order ID:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">{order_data.get('order_id', 'N/A')}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Buyer:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">{order_data.get('buyer_username', 'N/A')}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Seller:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">{order_data.get('seller_username', 'N/A')}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Total Amount:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">₦{order_data.get('total_amount', 0):,.2f}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Delivery Method:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">{order_data.get('delivery_method', 'N/A')}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Delivery Address:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">{order_data.get('shipping_address', 'N/A')}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Completed At:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">{order_data.get('delivered_at', datetime.utcnow()).strftime('%Y-%m-%d %H:%M:%S') if isinstance(order_data.get('delivered_at'), datetime) else 'N/A'}</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div style="margin: 20px 0;">
+                    <h3 style="color: #27ae60;">Product Details</h3>
+                    {_format_product_details(order_data.get('product_details', {}))}
+                </div>
+                
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #777; font-size: 12px;">
+                    <p>This is an automated notification from Pyramyd Hub.</p>
+                    <p>For inquiries, contact: {SUPPORT_EMAIL}</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = FROM_EMAIL
+        msg['To'] = SUPPORT_EMAIL
+        
+        # Attach HTML content
+        html_part = MIMEText(html_content, 'html')
+        msg.attach(html_part)
+        
+        # Send email
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
+        
+        print(f"✅ Order completion email sent for order: {order_data.get('order_id')}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Failed to send order completion email: {str(e)}")
+        return False
+
+def _format_product_details(product_details: dict) -> str:
+    """Format product details for email"""
+    if not product_details:
+        return "<p>No product details available</p>"
+    
+    return f"""
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Product Name:</strong></td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">{product_details.get('title', 'N/A')}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Quantity:</strong></td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">{product_details.get('quantity', 0)} {product_details.get('unit', '')}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Unit Price:</strong></td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">₦{product_details.get('unit_price', 0):,.2f}</td>
+        </tr>
+    </table>
+    """
 
 # Commission structure for agents (updated rates)
 AGENT_COMMISSION_RATES = {
@@ -356,26 +496,36 @@ def estimate_fare_kwik(pickup_address: dict, delivery_address: dict, vehicle_id:
     return None
 
 def calculate_delivery_fee(product_total: float, buyer_state: str, product_data: dict = None,
-                          pickup_address: dict = None, delivery_address: dict = None) -> dict:
+                          pickup_address: dict = None, delivery_address: dict = None, 
+                          platform_type: str = "home", quantity: float = 1, 
+                          buyer_location: str = None, seller_location: str = None,
+                          buyer_city: str = None, seller_city: str = None) -> dict:
     """
-    Smart delivery fee calculator with vendor priority.
-    Priority: Vendor logistics > Kwik API (with real-time quotes) > State-based fees > 20% rule
+    Smart delivery fee calculator with vendor priority and platform-specific logic.
+    Priority: Vendor logistics > Kwik API (for HOME in enabled states) > Platform-specific geocode calculation
 
     Args:
         product_total: Total product value in Naira
         buyer_state: Customer's state
-        product_data: Optional product info (for vendor-managed logistics)
+        product_data: Optional product info (for vendor-managed logistics and perishable check)
         pickup_address: Optional pickup location (for Kwik fare estimation)
         delivery_address: Optional delivery location (for Kwik fare estimation)
+        platform_type: Platform type - "home", "farmhub", or "community"
+        quantity: Quantity of product (for farmhub/community calculation)
+        buyer_location: Buyer's full address/location string (for geocoding)
+        seller_location: Seller's full address/location string (for geocoding)
+        buyer_city: Buyer's city (used in geocoding if provided)
+        seller_city: Seller's city (used in geocoding if provided)
 
     Returns:
-        dict with delivery_fee, delivery_method, and other metadata
+        dict with delivery_fee, delivery_method, estimated_delivery_days, and other metadata
     """
     delivery_info = {
         'delivery_fee': 0.0,
         'delivery_method': 'unknown',
         'kwik_available': False,
-        'vendor_managed': False
+        'vendor_managed': False,
+        'estimated_delivery_days': None
     }
 
     # Priority 1: Check if vendor manages logistics
@@ -385,12 +535,13 @@ def calculate_delivery_fee(product_total: float, buyer_state: str, product_data:
             'delivery_fee': vendor_fee,
             'delivery_method': 'vendor_managed',
             'vendor_managed': True,
-            'is_free': vendor_fee == 0.0
+            'is_free': vendor_fee == 0.0,
+            'estimated_delivery_days': '3-14 days' if platform_type in ['farmhub', 'community'] else '24 hours'
         })
         return delivery_info
 
-    # Priority 2: Check if Kwik is available for the state
-    if buyer_state in KWIK_ENABLED_STATES:
+    # Priority 2: For HOME platform in Kwik-enabled states, try Kwik delivery
+    if platform_type == "home" and buyer_state in KWIK_ENABLED_STATES:
         # Try to get real-time quote from Kwik API if addresses are provided
         if pickup_address and delivery_address:
             kwik_estimate = estimate_fare_kwik(pickup_address, delivery_address)
@@ -400,7 +551,8 @@ def calculate_delivery_fee(product_total: float, buyer_state: str, product_data:
                     'delivery_method': 'kwik_delivery',
                     'kwik_available': True,
                     'distance_km': kwik_estimate.get('distance_km'),
-                    'quote_source': 'kwik_api'
+                    'quote_source': 'kwik_api',
+                    'estimated_delivery_days': '24 hours'
                 })
                 return delivery_info
 
@@ -410,17 +562,102 @@ def calculate_delivery_fee(product_total: float, buyer_state: str, product_data:
             'delivery_fee': kwik_fee,
             'delivery_method': 'kwik_delivery',
             'kwik_available': True,
-            'quote_source': 'state_based_estimate'
+            'quote_source': 'state_based_estimate',
+            'estimated_delivery_days': '24 hours'
         })
         return delivery_info
 
-    # Priority 3: Use 20% of product value for other states
-    twenty_percent_fee = product_total * 0.20
-    delivery_info.update({
-        'delivery_fee': twenty_percent_fee,
-        'delivery_method': '20_percent_rule',
-        'state': buyer_state
-    })
+    # Priority 3: Platform-specific geocode-based calculation
+    # Get base delivery fee for the state
+    base_fee = get_base_delivery_fee(buyer_state)
+    
+    # Try to calculate distance using geocoding
+    distance_km = None
+    if buyer_location or buyer_city:
+        try:
+            # Build buyer address string (include city if provided)
+            buyer_addr = buyer_location or ""
+            if buyer_city and buyer_city not in buyer_addr:
+                buyer_addr = f"{buyer_addr}, {buyer_city}" if buyer_addr else buyer_city
+            if buyer_state and buyer_state not in buyer_addr:
+                buyer_addr = f"{buyer_addr}, {buyer_state}, Nigeria"
+            
+            # Build seller address string (include city if provided)
+            seller_addr = seller_location or ""
+            if seller_city and seller_city not in seller_addr:
+                seller_addr = f"{seller_addr}, {seller_city}" if seller_addr else seller_city
+            # Add Nigeria to help with geocoding
+            if "Nigeria" not in seller_addr:
+                seller_addr = f"{seller_addr}, Nigeria"
+            
+            buyer_coords = geo_helper.geocode_address(buyer_addr.strip())
+            seller_coords = geo_helper.geocode_address(seller_addr.strip())
+            
+            if buyer_coords and seller_coords:
+                distance_km = geo_helper.distance_km(buyer_coords, seller_coords)
+        except Exception as e:
+            print(f"Geocoding error: {str(e)}")
+            distance_km = None
+    
+    # Calculate platform-specific delivery fee
+    if platform_type == "home":
+        # HOME: base_fee + (distance * 1000), max 40,000
+        if distance_km:
+            calculated_fee = base_fee + (distance_km * 1000)
+            delivery_fee = min(calculated_fee, 40000)  # Cap at 40,000
+            delivery_info.update({
+                'delivery_fee': delivery_fee,
+                'delivery_method': 'geocode_distance_based',
+                'distance_km': distance_km,
+                'base_fee': base_fee,
+                'estimated_delivery_days': '24 hours'
+            })
+        else:
+            # Fallback to base fee if geocoding fails
+            delivery_info.update({
+                'delivery_fee': base_fee,
+                'delivery_method': 'state_based_fallback',
+                'base_fee': base_fee,
+                'estimated_delivery_days': '24 hours'
+            })
+    
+    elif platform_type in ["farmhub", "community"]:
+        # FARMHUB/COMMUNITY: base_fee + (distance * quantity * multiplier)
+        # Check if product is perishable (multiplier = 15, else 10)
+        is_perishable = False
+        if product_data:
+            category = product_data.get('category', '')
+            is_perishable = category in PERISHABLE_CATEGORIES
+        
+        multiplier = 15 if is_perishable else 10
+        
+        if distance_km:
+            calculated_fee = base_fee + (distance_km * quantity * multiplier)
+            delivery_info.update({
+                'delivery_fee': calculated_fee,
+                'delivery_method': 'geocode_distance_quantity_based',
+                'distance_km': distance_km,
+                'base_fee': base_fee,
+                'quantity': quantity,
+                'is_perishable': is_perishable,
+                'multiplier': multiplier,
+                'estimated_delivery_days': '3-14 days'
+            })
+        else:
+            # Fallback to base fee if geocoding fails
+            delivery_info.update({
+                'delivery_fee': base_fee,
+                'delivery_method': 'state_based_fallback',
+                'base_fee': base_fee,
+                'estimated_delivery_days': '3-14 days'
+            })
+    else:
+        # Default fallback for unknown platforms
+        delivery_info.update({
+            'delivery_fee': base_fee,
+            'delivery_method': 'state_based_default',
+            'base_fee': base_fee
+        })
 
     return delivery_info
 
@@ -511,6 +748,10 @@ app.add_middleware(
 # MongoDB connection
 client = MongoClient(MONGO_URL)
 db = client.pyramyd_db
+
+# Initialize GeopyHelper with MongoDB caching
+geo_helper = GeopyHelper(user_agent="pyramyd_platform", db=db, cache_collection="geocode_cache")
+
 users_collection = db.users
 messages_collection = db.messages
 dropoff_locations_collection = db.dropoff_locations
@@ -657,7 +898,7 @@ class OrderStatus(str, Enum):
 
 class Order(BaseModel):
     id: Optional[str] = None
-    order_id: str
+    order_id: str = Field(default_factory=lambda: f"PY_ORD-{uuid.uuid4().hex[:12].upper()}")
     buyer_username: str
     seller_username: str
     product_details: dict
@@ -1166,6 +1407,12 @@ class Product(BaseModel):
     delivery_cost_dropoff: float = 0.0  # Cost for drop-off delivery (0.0 = free)
     delivery_cost_shipping: float = 0.0  # Cost for shipping delivery (0.0 = free)
     delivery_notes: Optional[str] = None  # Special delivery instructions/notes
+    # Group buying feature (for FARMHUB platform)
+    group_buy_enabled: bool = False  # Enable group buying for this product
+    group_buy_min_quantity: Optional[int] = None  # Minimum quantity for group buy
+    group_buy_discount_percentage: Optional[float] = None  # Discount for group buy
+    group_buy_current_participants: int = 0  # Current number of participants
+    group_buy_deadline: Optional[datetime] = None  # Deadline for group buy
     # Rating information
     average_rating: float = 5.0  # Product rating
     total_ratings: int = 0  # Number of product ratings
@@ -1200,6 +1447,11 @@ class ProductCreate(BaseModel):
     delivery_cost_dropoff: float = 0.0  # Cost for drop-off delivery (0.0 = free)
     delivery_cost_shipping: float = 0.0  # Cost for shipping delivery (0.0 = free)
     delivery_notes: Optional[str] = None  # Special delivery instructions/notes
+    # Group buying feature (for FARMHUB platform)
+    group_buy_enabled: bool = False  # Enable group buying for this product
+    group_buy_min_quantity: Optional[int] = None  # Minimum quantity for group buy
+    group_buy_discount_percentage: Optional[float] = None  # Discount for group buy
+    group_buy_deadline: Optional[datetime] = None  # Deadline for group buy
 
 class CartItem(BaseModel):
     product_id: str
@@ -2289,6 +2541,103 @@ async def get_products(
 @app.get("/api/categories")
 async def get_categories():
     return [{"value": cat.value, "label": cat.value.replace("_", " ").title()} for cat in ProductCategory]
+
+@app.get("/api/platform/vendor-charges")
+async def get_vendor_platform_charges(platform_type: str = "home"):
+    """
+    Get transparent breakdown of platform charges for vendors.
+    This shows vendors what they will pay/receive before posting products.
+    
+    Query params:
+    - platform_type: "home", "farmhub", or "community"
+    """
+    try:
+        if platform_type == "farmhub":
+            return {
+                "platform": "FARMHUB (Farm Deals)",
+                "platform_type": "farmhub",
+                "vendor_commission": {
+                    "rate": "10%",
+                    "description": "Service charge extracted from your sales",
+                    "example": "If you sell ₦10,000 worth of products, ₦1,000 goes to platform"
+                },
+                "buyer_service_charge": {
+                    "rate": "0%",
+                    "description": "No additional charge to buyers"
+                },
+                "vendor_receives": "90% of product price",
+                "delivery_fees": "Platform manages delivery (varies by distance and quantity)",
+                "example_calculation": {
+                    "product_price": 10000,
+                    "vendor_commission_deducted": 1000,
+                    "vendor_receives": 9000,
+                    "buyer_pays_product": 10000,
+                    "buyer_pays_service": 0,
+                    "buyer_pays_delivery": "Varies",
+                    "note": "Vendor gets 90%, platform gets 10% + delivery fees"
+                }
+            }
+        elif platform_type == "home":
+            return {
+                "platform": "HOME (PyExpress)",
+                "platform_type": "home",
+                "vendor_commission": {
+                    "rate": "2.5%",
+                    "description": "Commission extracted from your sales",
+                    "example": "If you sell ₦10,000 worth of products, ₦250 goes to platform"
+                },
+                "buyer_service_charge": {
+                    "rate": "3%",
+                    "description": "Service charge paid by buyer (added to their total)",
+                    "example": "Buyer pays ₦10,000 product + ₦300 service charge"
+                },
+                "vendor_receives": "97.5% of product price",
+                "buyer_sees": "Product price + 3% service charge + delivery",
+                "delivery_fees": "Platform manages delivery (varies by distance, capped at ₦40,000)",
+                "transparency_note": "⚠️ IMPORTANT: You receive 97.5% of your product price. The 3% service charge is paid by the buyer, not deducted from your sales.",
+                "example_calculation": {
+                    "product_price": 10000,
+                    "vendor_commission_deducted": 250,
+                    "vendor_receives": 9750,
+                    "buyer_pays_product": 10000,
+                    "buyer_pays_service_charge": 300,
+                    "buyer_pays_delivery": "Varies",
+                    "total_platform_revenue": "₦250 (from vendor) + ₦300 (from buyer) + delivery = ₦550 + delivery",
+                    "note": "Vendor gets 97.5%, buyer pays 3% service charge, platform gets both"
+                }
+            }
+        else:  # community
+            return {
+                "platform": "COMMUNITY",
+                "platform_type": "community",
+                "vendor_commission": {
+                    "rate": "2.5%",
+                    "description": "Commission extracted from your sales",
+                    "example": "If you sell ₦10,000 worth of products, ₦250 goes to platform"
+                },
+                "buyer_service_charge": {
+                    "rate": "5%",
+                    "description": "Service charge paid by buyer (added to their total)",
+                    "example": "Buyer pays ₦10,000 product + ₦500 service charge"
+                },
+                "vendor_receives": "97.5% of product price",
+                "buyer_sees": "Product price + 5% service charge + delivery",
+                "delivery_fees": "Platform manages delivery (varies by distance and quantity)",
+                "transparency_note": "⚠️ IMPORTANT: You receive 97.5% of your product price. The 5% service charge is paid by the buyer, not deducted from your sales.",
+                "example_calculation": {
+                    "product_price": 10000,
+                    "vendor_commission_deducted": 250,
+                    "vendor_receives": 9750,
+                    "buyer_pays_product": 10000,
+                    "buyer_pays_service_charge": 500,
+                    "buyer_pays_delivery": "Varies",
+                    "total_platform_revenue": "₦250 (from vendor) + ₦500 (from buyer) + delivery = ₦750 + delivery",
+                    "note": "Vendor gets 97.5%, buyer pays 5% service charge, platform gets both"
+                }
+            }
+    except Exception as e:
+        print(f"Error getting vendor charges: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get vendor charges")
 
 @app.post("/api/products")
 async def create_product(product_data: ProductCreate, current_user: dict = Depends(get_current_user)):
@@ -4171,6 +4520,14 @@ async def update_order_status(order_id: str, status_update: OrderStatusUpdate, c
             {"order_id": order_id},
             {"$set": update_data}
         )
+        
+        # Send email notification when order is completed/delivered
+        if status_update.status in [OrderStatus.DELIVERED, "completed"]:
+            # Get updated order with all details
+            updated_order = db.orders.find_one({"order_id": order_id})
+            if updated_order:
+                updated_order.pop('_id', None)
+                send_order_completion_email(updated_order)
         
         return {
             "message": f"Order status updated to {status_update.status}",
@@ -6292,13 +6649,19 @@ async def get_agent_tier_info(current_user: dict = Depends(get_current_user)):
 async def calculate_delivery_fee_endpoint(
     product_total: float,
     buyer_state: str,
-    product_id: Optional[str] = None
+    product_id: Optional[str] = None,
+    platform_type: str = "home",
+    quantity: float = 1,
+    buyer_location: Optional[str] = None,
+    seller_location: Optional[str] = None,
+    buyer_city: Optional[str] = None,
+    seller_city: Optional[str] = None
 ):
     """
     Calculate delivery fee with smart logic:
     1. Vendor logistics (if managed by seller)
-    2. Kwik Delivery (for Lagos, Oyo, FCT Abuja)
-    3. 20% rule (for other states)
+    2. Kwik Delivery (for HOME in Lagos, Oyo, FCT Abuja)
+    3. Platform-specific geocode calculation (HOME/FARMHUB/COMMUNITY)
     """
     try:
         product_data = None
@@ -6309,20 +6672,37 @@ async def calculate_delivery_fee_endpoint(
             if product:
                 product_data = {
                     'logistics_managed_by': product.get('logistics_managed_by', 'pyramyd'),
-                    'seller_delivery_fee': product.get('seller_delivery_fee', 0.0)
+                    'seller_delivery_fee': product.get('seller_delivery_fee', 0.0),
+                    'category': product.get('category', '')
                 }
+                # Get seller location if not provided
+                if not seller_location:
+                    seller_location = product.get('location', '')
         
-        # Calculate delivery fee
-        delivery_info = calculate_delivery_fee(product_total, buyer_state, product_data)
+        # Calculate delivery fee with new parameters
+        delivery_info = calculate_delivery_fee(
+            product_total=product_total,
+            buyer_state=buyer_state,
+            product_data=product_data,
+            platform_type=platform_type,
+            quantity=quantity,
+            buyer_location=buyer_location,
+            seller_location=seller_location,
+            buyer_city=buyer_city,
+            seller_city=seller_city
+        )
         
         return {
             "success": True,
             "delivery_fee": delivery_info['delivery_fee'],
             "delivery_method": delivery_info['delivery_method'],
+            "estimated_delivery_days": delivery_info.get('estimated_delivery_days'),
             "kwik_available": delivery_info.get('kwik_available', False),
             "vendor_managed": delivery_info.get('vendor_managed', False),
             "is_free_delivery": delivery_info.get('is_free', False),
+            "distance_km": delivery_info.get('distance_km'),
             "buyer_state": buyer_state,
+            "platform_type": platform_type,
             "details": delivery_info
         }
         
@@ -7422,10 +7802,15 @@ async def initialize_payment(
         product_total = payment_data.get("product_total", 0)  # In Naira
         customer_state = payment_data.get("customer_state")  # For delivery fee calculation
         product_weight = payment_data.get("product_weight", 1)  # In kg
+        quantity = payment_data.get("quantity", 1)  # Product quantity
         subaccount_code = payment_data.get("subaccount_code")  # For Home/Community
         product_id = payment_data.get("product_id")
         order_id = payment_data.get("order_id")
         platform_type = payment_data.get("platform_type", "home")  # farmhub, home, or community
+        buyer_location = payment_data.get("buyer_location")  # Buyer's address/location
+        buyer_city = payment_data.get("buyer_city")  # Buyer's city
+        seller_location = payment_data.get("seller_location")  # Seller's location
+        seller_city = payment_data.get("seller_city")  # Seller's city
         
         if not customer_state:
             raise HTTPException(status_code=400, detail="Customer state is required for delivery calculation")
@@ -7437,13 +7822,28 @@ async def initialize_payment(
             if product:
                 product_data = {
                     'logistics_managed_by': product.get('logistics_managed_by', 'pyramyd'),
-                    'seller_delivery_fee': product.get('seller_delivery_fee', 0.0)
+                    'seller_delivery_fee': product.get('seller_delivery_fee', 0.0),
+                    'category': product.get('category', '')
                 }
+                # Get seller location from product if not provided
+                if not seller_location:
+                    seller_location = product.get('location', '')
         
-        # Use smart delivery fee calculation
-        delivery_info = calculate_delivery_fee(product_total, customer_state, product_data)
+        # Use smart delivery fee calculation with new parameters
+        delivery_info = calculate_delivery_fee(
+            product_total=product_total,
+            buyer_state=customer_state,
+            product_data=product_data,
+            platform_type=platform_type,
+            quantity=quantity,
+            buyer_location=buyer_location,
+            seller_location=seller_location,
+            buyer_city=buyer_city,
+            seller_city=seller_city
+        )
         delivery_fee = delivery_info['delivery_fee']
         delivery_method = delivery_info['delivery_method']
+        estimated_delivery_days = delivery_info.get('estimated_delivery_days')
         
         # Convert to kobo
         product_total_kobo = naira_to_kobo(product_total)
@@ -7451,13 +7851,22 @@ async def initialize_payment(
         
         # Calculate platform cut based on type
         if platform_type == "farmhub":
-            # FarmHub: 10% service + delivery
-            platform_cut_kobo = int(product_total_kobo * FARMHUB_SERVICE_CHARGE) + delivery_fee_kobo
+            # FarmHub: 10% service charge (extracted from vendor) + delivery
+            # Vendor receives 90% of product total
+            service_kobo = int(product_total_kobo * FARMHUB_SERVICE_CHARGE)
+            platform_cut_kobo = service_kobo + delivery_fee_kobo
+        elif platform_type == "home":
+            # HOME: 2.5% commission (from vendor) + 3% service charge (from buyer) + delivery
+            # Vendor receives 97.5% of product total
+            vendor_commission_kobo = int(product_total_kobo * HOME_VENDOR_COMMISSION)
+            buyer_service_kobo = int(product_total_kobo * HOME_BUYER_SERVICE_CHARGE)
+            platform_cut_kobo = vendor_commission_kobo + buyer_service_kobo + delivery_fee_kobo
         else:
-            # Community/Home: 2.5% commission + 10% service + delivery
-            commission_kobo = int(product_total_kobo * COMMUNITY_COMMISSION)
-            service_kobo = int(product_total_kobo * COMMUNITY_SERVICE)
-            platform_cut_kobo = commission_kobo + service_kobo + delivery_fee_kobo
+            # Community: 2.5% commission (from vendor) + 5% service charge (from buyer) + delivery
+            # Vendor receives 97.5% of product total
+            vendor_commission_kobo = int(product_total_kobo * COMMUNITY_VENDOR_COMMISSION)
+            buyer_service_kobo = int(product_total_kobo * COMMUNITY_BUYER_SERVICE_CHARGE)
+            platform_cut_kobo = vendor_commission_kobo + buyer_service_kobo + delivery_fee_kobo
         
         # Check if buyer is an agent and calculate commission with tier bonus
         buyer_is_agent = buyer_role in ["agent", "purchasing_agent"]
@@ -7902,10 +8311,22 @@ async def update_order_status(
         if notes:
             update_data["seller_notes"] = notes
         
+        # Set delivered_at timestamp if order is delivered/completed
+        if new_status in ["delivered", "completed"]:
+            update_data["delivered_at"] = datetime.utcnow()
+        
         db.orders.update_one(
             {"order_id": order_id},
             {"$set": update_data}
         )
+        
+        # Send email notification when order is completed/delivered
+        if new_status in ["delivered", "completed"]:
+            # Get updated order with all details
+            updated_order = db.orders.find_one({"order_id": order_id})
+            if updated_order:
+                updated_order.pop('_id', None)
+                send_order_completion_email(updated_order)
         
         return {
             "message": "Order status updated successfully",
