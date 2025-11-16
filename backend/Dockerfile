@@ -53,8 +53,8 @@ ENV PYTHONUNBUFFERED=1 \
 EXPOSE ${PORT}
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:${PORT}/health', timeout=5)" || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\", \"8001\")}/health', timeout=5)" || exit 1
 
 # Run the application (Render will override this with $PORT)
 CMD uvicorn server:app --host 0.0.0.0 --port ${PORT:-8001} --workers 4

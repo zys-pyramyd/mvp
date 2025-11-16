@@ -5,12 +5,11 @@ services:
   # Backend API Service
   - type: web
     name: pyramyd-backend
-    runtime: python
+    runtime: docker
     region: oregon  # Choose: oregon, frankfurt, singapore
     plan: starter  # free, starter, standard, pro
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT --workers 4
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
       - key: MONGO_URL
