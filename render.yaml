@@ -6,9 +6,10 @@ services:
   - type: web
     name: pyramyd-backend
     runtime: docker
-    region: oregon  # Choose: oregon, frankfurt, singapore
+    region: frankfurt  # Choose: oregon, frankfurt, singapore
     plan: starter  # free, starter, standard, pro
     rootDir: backend
+    dockerfilePath: Dockerfile
     healthCheckPath: /health
     envVars:
       - key: MONGO_URL
