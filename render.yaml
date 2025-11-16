@@ -8,7 +8,6 @@ services:
     runtime: docker
     region: frankfurt  # Choose: oregon, frankfurt, singapore
     plan: starter  # free, starter, standard, pro
-    rootDir: backend
     healthCheckPath: /api/health
     envVars:
       - key: MONGO_URL
