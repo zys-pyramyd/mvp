@@ -43,12 +43,12 @@ SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
-SUPPORT_EMAIL = "support@pyramydhub.com"
+SUPPORT_EMAIL = os.environ.get('SUPPORT_MAIL','')
 FROM_EMAIL = os.environ.get('FROM_EMAIL', SUPPORT_EMAIL)
 
 # Admin credentials
-ADMIN_EMAIL = "a**********@gmail.com"
-ADMIN_PASSWORD = "******"  # Default password - change after first login
+ADMIN_EMAIL = os.environ.get('ADMIN_MAIL','')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD','')  # Default password - change after first login
 ADMIN_PASSWORD_HASH = "**********"
 
 # Paystack API Base URL
