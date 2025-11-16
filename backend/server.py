@@ -55,8 +55,8 @@ ADMIN_PASSWORD_HASH = "**********"
 PAYSTACK_API_URL = "https://api.paystack.co"
 
 # Farm Deals Fixed Split Group (Sophie Farms Investment Ltd)
-FARMHUB_SPLIT_GROUP = os.environ.get('FARMHUB_SPLIT_GROUP', 'SPL_dCqIOTFNRu')
-FARMHUB_SUBACCOUNT = os.environ.get('FARMHUB_SUBACCOUNT', 'ACCT_c94r8ia2jeg41lx')
+FARMHUB_SPLIT_GROUP = os.environ.get('FARMHUB_SPLIT_GROUP', '')
+FARMHUB_SUBACCOUNT = os.environ.get('FARMHUB_SUBACCOUNT', '')
 
 # Commission rates
 AGENT_BUYER_COMMISSION_RATE = 0.04  # 4% for agent buyers
