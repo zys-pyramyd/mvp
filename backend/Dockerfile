@@ -20,7 +20,7 @@ COPY requirements.txt .
 
 # Install Python dependencies into local user directory
 RUN pip install --upgrade pip --no-cache-dir && \
-    pip install --no-cache-dir --user -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
 
 # ============================
