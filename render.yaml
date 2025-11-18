@@ -31,7 +31,7 @@ services:
   - type: web
     name: pyramyd-frontend
     runtime: node
-    region: oregon
+    region: frankfurt
     plan: starter
     rootDir: frontend
     buildCommand: yarn install --frozen-lockfile && yarn build
@@ -63,7 +63,7 @@ services:
 databases:
   - name: pyramyd-mongodb
     plan: starter  # free (limited), starter, standard
-    region: oregon
+    region: frankfurt
     ipAllowList: []  # Empty = accessible from all Render services
 
 # Notes for deployment:
