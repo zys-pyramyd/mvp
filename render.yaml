@@ -5,7 +5,6 @@ services:
   # Backend API Service
   - type: web
     name: pyramyd-backend
-    port:8001
     runtime: docker
     region: frankfurt  # Choose: oregon, frankfurt, singapore
     plan: starter  # free, starter, standard, pro
