@@ -5,6 +5,7 @@ FROM python:3.11-slim as builder
 
 # Create working directory inside the container
 WORKDIR /app
+RUN echo "--- BUILDING VERSION WITH USR/LOCAL FIX ---"
 
 # Install system dependencies required for Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
