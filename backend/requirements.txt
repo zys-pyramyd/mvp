@@ -23,7 +23,7 @@ requests>=2.31.0
 requests-oauthlib>=2.0.0
 
 # Geolocation & Distance Calculation
-geopy>=2.4.0
+
 
 # Environment Variables
 python-dotenv>=1.0.1

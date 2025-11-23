@@ -1,21 +1,21 @@
 from typing import Optional, Dict
 import time
-from geopy.geocoders import Nominatim
-from geopy.distance import geodesic
+import math
+import requests
 
 class GeopyHelper:
     """
-    Lightweight geocoding + distance helper.
+    Lightweight geocoding + distance helper using Geoapify.
     - If you pass a `db` (pymongo database object) to the constructor, results will be cached
       in a collection named 'geocode_cache' by default.
     - Use geocode_address to obtain {'latitude': float, 'longitude': float} or None.
     - Use distance_km(coord1, coord2) to compute geodesic distance in km.
     """
-    def __init__(self, user_agent: str = "pyramyd_geocoder", db=None, cache_collection: str = "geocode_cache"):
-        # Nominatim is used by default; you can swap in another geocoder if desired.
-        self.geolocator = Nominatim(user_agent=user_agent, timeout=10)
+    def __init__(self, api_key: str, user_agent: str = "pyramyd_geocoder", db=None, cache_collection: str = "geocode_cache"):
+        self.api_key = api_key
         self.db = db
         self.cache_collection_name = cache_collection
+        self.base_url = "https://api.geoapify.com/v1/geocode/search"
 
     def _get_cache_collection(self):
         if not self.db:
@@ -29,27 +29,43 @@ class GeopyHelper:
 
         coll = self._get_cache_collection()
         key = address.strip()
+        
+        # Check cache first
         if coll:
             cached = coll.find_one({"address": key})
             if cached and cached.get("latitude") is not None and cached.get("longitude") is not None:
                 return {"latitude": float(cached["latitude"]), "longitude": float(cached["longitude"])}
 
+        # Call Geoapify API
         try:
-            loc = self.geolocator.geocode(key, timeout=10)
-            if not loc:
-                return None
-            result = {"latitude": float(loc.latitude), "longitude": float(loc.longitude)}
+            params = {
+                "text": key,
+                "apiKey": self.api_key,
+                "limit": 1
+            }
+            response = requests.get(self.base_url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data and data.get('features'):
+                    # Geoapify returns [lon, lat]
+                    lon = data['features'][0]['geometry']['coordinates'][0]
+                    lat = data['features'][0]['geometry']['coordinates'][1]
+                    
+                    result = {"latitude": float(lat), "longitude": float(lon)}
 
-            # Save to cache
-            if coll:
-                coll.update_one(
-                    {"address": key},
-                    {"$set": {"address": key, "latitude": result["latitude"], "longitude": result["longitude"], "cached_at": time.time()}},
-                    upsert=True
-                )
-            return result
-        except Exception:
-            # Any geocoding exception => return None to allow fallback logic upstream
+                    # Save to cache
+                    if coll:
+                        coll.update_one(
+                            {"address": key},
+                            {"$set": {"address": key, "latitude": result["latitude"], "longitude": result["longitude"], "cached_at": time.time()}},
+                            upsert=True
+                        )
+                    return result
+            
+            return None
+        except Exception as e:
+            print(f"Geocoding error for '{key}': {e}")
             return None
 
     def coords_from_location_dict(self, loc: Optional[dict]) -> Optional[Dict[str, float]]:
@@ -80,15 +96,32 @@ class GeopyHelper:
     @staticmethod
     def distance_km(coord_a: Dict[str, float], coord_b: Dict[str, float]) -> Optional[float]:
         """
-        Compute geodesic distance in kilometers between coord_a and coord_b.
+        Compute geodesic distance in kilometers between coord_a and coord_b using Haversine formula.
         coord_a and coord_b must be dicts with 'latitude' and 'longitude' floats.
         Returns float kilometers rounded to 2 decimals or None on error.
         """
         if not coord_a or not coord_b:
             return None
         try:
-            a = (float(coord_a["latitude"]), float(coord_a["longitude"]))
-            b = (float(coord_b["latitude"]), float(coord_b["longitude"]))
-            return round(geodesic(a, b).km, 2)
+            lat1 = float(coord_a["latitude"])
+            lon1 = float(coord_a["longitude"])
+            lat2 = float(coord_b["latitude"])
+            lon2 = float(coord_b["longitude"])
+            
+            R = 6371  # Earth radius in kilometers
+
+            lat1_rad = math.radians(lat1)
+            lon1_rad = math.radians(lon1)
+            lat2_rad = math.radians(lat2)
+            lon2_rad = math.radians(lon2)
+
+            dlon = lon2_rad - lon1_rad
+            dlat = lat2_rad - lat1_rad
+
+            a = math.sin(dlat / 2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2)**2
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+            distance = R * c
+            return round(distance, 2)
         except Exception:
             return None

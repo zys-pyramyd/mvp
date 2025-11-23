@@ -18,8 +18,6 @@ import requests
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from geopy.geocoders import Nominatim
-from geopy.distance import geodesic
 from geopy import GeopyHelper
 
 # Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
@@ -30,6 +28,7 @@ PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_dummy_payst
 PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY', 'pk_test_dummy_paystack_key')
 TWILIO_SID = os.environ.get('TWILIO_ACCOUNT_SID', 'dummy_twilio_sid')
 TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'dummy_twilio_token')
+GEOAPIFY_API_KEY = os.environ.get('GEOAPIFY_API_KEY', '04f9224444654ca5b967366d08eae4f4')
 
 # Kwik Delivery API
 KWIK_ACCESS_TOKEN = os.environ.get('KWIK_ACCESS_TOKEN', 'dummy_kwik_access_token')
@@ -750,7 +749,7 @@ client = MongoClient(MONGO_URL)
 db = client.pyramyd_db
 
 # Initialize GeopyHelper with MongoDB caching
-geo_helper = GeopyHelper(user_agent="pyramyd_platform", db=db, cache_collection="geocode_cache")
+geo_helper = GeopyHelper(api_key=GEOAPIFY_API_KEY, user_agent="pyramyd_platform", db=db, cache_collection="geocode_cache")
 
 users_collection = db.users
 messages_collection = db.messages
