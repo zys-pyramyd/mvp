@@ -93,35 +93,43 @@ class GeopyHelper:
 
         return None
 
-    @staticmethod
-    def distance_km(coord_a: Dict[str, float], coord_b: Dict[str, float]) -> Optional[float]:
+    def distance_km(self, coord_a: Dict[str, float], coord_b: Dict[str, float]) -> Optional[float]:
         """
-        Compute geodesic distance in kilometers between coord_a and coord_b using Haversine formula.
+        Compute driving distance in kilometers between coord_a and coord_b using Geoapify Routing API.
         coord_a and coord_b must be dicts with 'latitude' and 'longitude' floats.
         Returns float kilometers rounded to 2 decimals or None on error.
         """
         if not coord_a or not coord_b:
             return None
+        
         try:
             lat1 = float(coord_a["latitude"])
             lon1 = float(coord_a["longitude"])
             lat2 = float(coord_b["latitude"])
             lon2 = float(coord_b["longitude"])
             
-            R = 6371  # Earth radius in kilometers
-
-            lat1_rad = math.radians(lat1)
-            lon1_rad = math.radians(lon1)
-            lat2_rad = math.radians(lat2)
-            lon2_rad = math.radians(lon2)
-
-            dlon = lon2_rad - lon1_rad
-            dlat = lat2_rad - lat1_rad
-
-            a = math.sin(dlat / 2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2)**2
-            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-            distance = R * c
-            return round(distance, 2)
-        except Exception:
+            # Construct waypoints string: lat1,lon1|lat2,lon2
+            waypoints = f"{lat1},{lon1}|{lat2},{lon2}"
+            
+            routing_url = "https://api.geoapify.com/v1/routing"
+            params = {
+                "waypoints": waypoints,
+                "mode": "drive",
+                "apiKey": self.api_key
+            }
+            
+            response = requests.get(routing_url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data and data.get('features'):
+                    # Distance is in meters in properties
+                    distance_meters = data['features'][0]['properties']['distance']
+                    return round(distance_meters / 1000, 2)
+            
+            print(f"Routing API failed: {response.status_code} - {response.text}")
+            return None
+            
+        except Exception as e:
+            print(f"Distance calculation error: {e}")
             return None
