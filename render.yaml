@@ -6,6 +6,7 @@ services:
   - type: web
     name: pyramyd-backend
     runtime: docker
+    rootDir: backend
     region: frankfurt  # Choose: oregon, frankfurt, singapore
     plan: starter  # free, starter, standard, pro
     healthCheckPath: /api/health

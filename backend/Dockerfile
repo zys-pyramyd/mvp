@@ -20,7 +20,7 @@ COPY requirements.txt .
 
 # Install Python dependencies into local user directory
 RUN pip install --upgrade pip --no-cache-dir && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir --user -r requirements.txt
 
 
 # ============================
@@ -37,17 +37,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed dependencies from the builder stage
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
 
 # Copy application source code
 COPY server.py .
 COPY geopy.py .
 
-# Create a non-root user for security (and change permissions)
+# Create a non-root user for security
 RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
-# Uvicorn is already in /usr/local/bin, which is accessible to appuser.
 USER appuser
+
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
