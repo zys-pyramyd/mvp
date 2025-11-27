@@ -45,7 +45,9 @@ ENV PATH="/usr/local/bin:$PATH"
 
 # Copy application source code
 COPY server.py .
-COPY geopy.py .
+COPY geo_helper.py .
+COPY order ./order
+COPY payment ./payment
 
 # Create a non-root user for security
 RUN useradd -m -u 1000 appuser && \
