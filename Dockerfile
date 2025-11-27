@@ -41,8 +41,7 @@ COPY --from=builder /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
 
 # Copy application source code
-COPY backend/server.py .
-COPY backend/geopy.py .
+COPY backend/ .
 
 # Create a non-root user for security
 RUN useradd -m -u 1000 appuser && \

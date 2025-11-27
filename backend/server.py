@@ -18,8 +18,8 @@ import requests
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from .geo_helper import GeopyHelper
-from .payment.paystack import (
+from geo_helper import GeopyHelper
+from payment.paystack import (
     PaystackSubaccount, 
     PaystackTransaction, 
     PaystackTransferRecipient, 
@@ -29,10 +29,10 @@ from .payment.paystack import (
     naira_to_kobo,
     kobo_to_naira
 )
-from .payment.farm_deals_payment import initialize_farmhub_payment
-from .payment.pyexpress_payment import initialize_pyexpress_payment
-from .payment.community_payment import initialize_community_payment
-from .order.models import (
+from payment.farm_deals_payment import initialize_farmhub_payment
+from payment.pyexpress_payment import initialize_pyexpress_payment
+from payment.community_payment import initialize_community_payment
+from order.models import (
     Order, 
     CartItem, 
     GroupOrder, 
@@ -40,9 +40,9 @@ from .order.models import (
     AgentPurchaseOption, 
     GroupBuyingRequest
 )
-from .order.pyexpress_order import process_create_order
-from .order.community_order import process_create_group_order
-from .order.farm_deals_order import process_create_outsourced_order
+from order.pyexpress_order import process_create_order
+from order.community_order import process_create_group_order
+from order.farm_deals_order import process_create_outsourced_order
 
 # Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
