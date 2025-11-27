@@ -18,9 +18,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy dependencies file
 COPY backend/requirements.txt .
 
-# Install Python dependencies into local user directory
+# Install Python dependencies into a temporary directory
+# We use --prefix=/install so we can easily copy them to /usr/local in the next stage
 RUN pip install --upgrade pip --no-cache-dir && \
-    pip install --no-cache-dir --user -r requirements.txt
+    pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 
 # ============================
@@ -36,9 +37,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy installed dependencies from the builder stage
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+# Copy installed dependencies from the builder stage to /usr/local
+# This makes them available to all users (including appuser) and puts them in PATH
+# Security: /usr/local is owned by root, so appuser cannot modify installed packages (immutable)
+COPY --from=builder /install /usr/local
+ENV PATH="/usr/local/bin:$PATH"
+
 
 # Copy application source code
 COPY backend/ .
