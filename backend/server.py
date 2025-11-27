@@ -5,7 +5,7 @@ from typing import Optional, List, Dict, Tuple
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, EmailStr
 from pymongo import MongoClient
 import bcrypt
 import jwt
@@ -18,16 +18,31 @@ import requests
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from geopy import GeopyHelper
-from paystack import (
+from .geo_helper import GeopyHelper
+from .payment.paystack import (
     PaystackSubaccount, 
     PaystackTransaction, 
     PaystackTransferRecipient, 
     CommissionPayout,
     PAYSTACK_API_URL,
-    FARMHUB_SPLIT_GROUP,
-    FARMHUB_SUBACCOUNT
+    paystack_request,
+    naira_to_kobo,
+    kobo_to_naira
 )
+from .payment.farm_deals_payment import initialize_farmhub_payment
+from .payment.pyexpress_payment import initialize_pyexpress_payment
+from .payment.community_payment import initialize_community_payment
+from .order.models import (
+    Order, 
+    CartItem, 
+    GroupOrder, 
+    OutsourcedOrder, 
+    AgentPurchaseOption, 
+    GroupBuyingRequest
+)
+from .order.pyexpress_order import process_create_order
+from .order.community_order import process_create_group_order
+from .order.farm_deals_order import process_create_outsourced_order
 
 # Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
@@ -64,16 +79,7 @@ ADMIN_PASSWORD_HASH = "**********"
 # Commission rates
 AGENT_BUYER_COMMISSION_RATE = 0.04  # 4% for agent buyers
 
-# FARMHUB: 10% service charge (extracted from vendor, vendor gets 90%)
-FARMHUB_SERVICE_CHARGE = 0.10
 
-# HOME: 2.5% commission (from vendor) + 3% service charge (from buyer)
-HOME_VENDOR_COMMISSION = 0.025  # Extracted from vendor's sales, vendor gets 97.5%
-HOME_BUYER_SERVICE_CHARGE = 0.03  # Paid by buyer on top of product price
-
-# COMMUNITY: 2.5% commission (from vendor) + 5% service charge (from buyer)
-COMMUNITY_VENDOR_COMMISSION = 0.025  # Extracted from vendor's sales, vendor gets 97.5%
-COMMUNITY_BUYER_SERVICE_CHARGE = 0.05  # Paid by buyer on top of product price
 
 # Base delivery fees for each state in Nigeria (in Naira)
 # These fees are used as the base for geocoded distance calculations
@@ -170,49 +176,7 @@ def decrypt_data(encrypted_data: str) -> str:
         print(f"Decryption error: {str(e)}")
         return None
 
-# Paystack Helper Functions
-def paystack_request(method: str, endpoint: str, data: dict = None) -> dict:
-    """Make authenticated request to Paystack API"""
-    headers = {
-        "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
-        "Content-Type": "application/json"
-    }
-    url = f"{PAYSTACK_API_URL}{endpoint}"
-    
-    try:
-        if method == "GET":
-            response = requests.get(url, headers=headers)
-        elif method == "POST":
-            response = requests.post(url, headers=headers, json=data)
-        elif method == "PUT":
-            response = requests.put(url, headers=headers, json=data)
-        else:
-            raise ValueError(f"Unsupported method: {method}")
-        
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Paystack API error: {str(e)}")
-        if hasattr(e.response, 'text'):
-            print(f"Response: {e.response.text}")
-        raise HTTPException(status_code=500, detail=f"Paystack API error: {str(e)}")
 
-def verify_paystack_signature(payload: bytes, signature: str) -> bool:
-    """Verify Paystack webhook signature"""
-    computed_signature = hmac.new(
-        PAYSTACK_SECRET_KEY.encode('utf-8'),
-        payload,
-        hashlib.sha512
-    ).hexdigest()
-    return hmac.compare_digest(computed_signature, signature)
-
-def naira_to_kobo(amount: float) -> int:
-    """Convert Naira to Kobo (sub-unit)"""
-    return int(amount * 100)
-
-def kobo_to_naira(amount: int) -> float:
-    """Convert Kobo to Naira"""
-    return amount / 100
 
 def send_order_completion_email(order_data: dict):
     """Send order completion notification to support email"""
@@ -1087,15 +1051,7 @@ class DriverCreate(BaseModel):
     color: str
     year: Optional[int] = None
 
-class DeliveryRequestCreate(BaseModel):
-    order_id: str
-    order_type: str
-    pickup_address: str
-    delivery_address: str
-    product_details: str
-    weight_kg: Optional[float] = None
-    special_instructions: Optional[str] = None
-    estimated_price: float
+
 
 class PreOrderStatus(str, Enum):
     DRAFT = "draft"
@@ -1239,9 +1195,27 @@ class UserRegister(BaseModel):
     first_name: str
     last_name: str
     username: str
-    email: str
+    email: Optional[EmailStr] = None
     password: str
     phone: Optional[str] = None
+
+    @validator('phone')
+    def validate_phone(cls, v):
+        if v:
+            # Basic phone validation - allow +234... or 0...
+            import re
+            # Remove spaces and hyphens
+            clean_phone = re.sub(r'[\s-]', '', v)
+            # Check for E.164 format (e.g., +234...) or local format (0...)
+            if not re.match(r'^(\+\d{1,3}|0)\d{9,14}$', clean_phone):
+                raise ValueError('Invalid phone number format')
+        return v
+    
+    @validator('email', always=True)
+    def validate_email_or_phone(cls, v, values):
+        if not v and not values.get('phone'):
+            raise ValueError('Either email or phone number must be provided')
+        return v
 
 class UserLogin(BaseModel):
     email_or_phone: str
@@ -1252,7 +1226,7 @@ class User(BaseModel):
     first_name: str
     last_name: str
     username: str
-    email: str
+    email: Optional[EmailStr] = None
     phone: Optional[str] = None
     role: Optional[UserRole] = None
     is_verified: bool = False
@@ -1293,257 +1267,13 @@ class SecureAccountDetails(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-
-class CompleteRegistration(BaseModel):
-    first_name: str
-    last_name: str
-    username: str
-    email_or_phone: str
-    password: str
-    phone: Optional[str] = None
-    gender: str
-    date_of_birth: str
-    user_path: str  # 'buyer' or 'partner'
-    buyer_type: Optional[str] = None
-    business_info: Optional[dict] = None
-    partner_type: Optional[str] = None
-    business_category: Optional[str] = None
-    verification_info: Optional[dict] = None
-
-class Product(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    seller_id: str
-    seller_name: str
-    seller_type: Optional[str] = None  # "farmer", "agent", "business", "supplier"
-    seller_profile_picture: Optional[str] = None  # Seller's profile picture for transparency
-    title: str
-    description: str
-    # Enhanced category structure
-    category: ProductCategory
-    subcategory: Optional[str] = None  # Dynamic based on category
-    processing_level: ProcessingLevel = ProcessingLevel.NOT_PROCESSED
-    price_per_unit: float
-    original_price: Optional[float] = None  # Original price before discount
-    # Discount system
-    has_discount: bool = False
-    discount_type: Optional[str] = None  # "percentage" or "fixed"
-    discount_value: Optional[float] = None  # Percentage (e.g., 10 for 10%) or fixed amount (e.g., 500)
-    discount_amount: Optional[float] = None  # Calculated discount amount in currency
-    unit_of_measure: str  # kg, basket, crate, bag, gallon, etc.
-    unit_specification: Optional[str] = None  # "100kg", "big", "5 litres", etc.
-    quantity_available: int
-    minimum_order_quantity: int = 1
-    location: str
-    farm_name: Optional[str] = None
-    listed_by_agent: bool = False
-    agent_id: Optional[str] = None
-    agent_name: Optional[str] = None
-    agent_profile_picture: Optional[str] = None  # Agent's profile picture for transparency
-    business_name: Optional[str] = None  # Business name for transparency
-    images: List[str] = []
-    platform: str  # "pyhub" or "pyexpress"
-    # Logistics Management
-    logistics_managed_by: str = "pyramyd"  # "pyramyd" or "seller"
-    seller_delivery_fee: Optional[float] = None  # If seller manages logistics, their delivery fee (0 = free)
-    # Enhanced delivery options for suppliers
-    supports_dropoff_delivery: bool = True  # Whether supplier accepts drop-off locations
-    supports_shipping_delivery: bool = True  # Whether supplier accepts shipping addresses
-    delivery_cost_dropoff: float = 0.0  # Cost for drop-off delivery (0.0 = free)
-    delivery_cost_shipping: float = 0.0  # Cost for shipping delivery (0.0 = free)
-    delivery_notes: Optional[str] = None  # Special delivery instructions/notes
-    # Group buying feature (for FARMHUB platform)
-    group_buy_enabled: bool = False  # Enable group buying for this product
-    group_buy_min_quantity: Optional[int] = None  # Minimum quantity for group buy
-    group_buy_discount_percentage: Optional[float] = None  # Discount for group buy
-    group_buy_current_participants: int = 0  # Current number of participants
-    group_buy_deadline: Optional[datetime] = None  # Deadline for group buy
-    # Rating information
-    average_rating: float = 5.0  # Product rating
-    total_ratings: int = 0  # Number of product ratings
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-class ProductCreate(BaseModel):
-    title: str
-    description: str
-    # Enhanced category structure
-    category: ProductCategory
-    subcategory: Optional[str] = None  # Dynamic based on category
-    processing_level: ProcessingLevel = ProcessingLevel.NOT_PROCESSED
-    price_per_unit: float
-    # Discount options
-    has_discount: bool = False
-    discount_type: Optional[str] = None  # "percentage" or "fixed"
-    discount_value: Optional[float] = None  # Percentage (e.g., 10 for 10%) or fixed amount (e.g., 500)
-    unit_of_measure: str
-    unit_specification: Optional[str] = None  # "100kg", "big", "5 litres", etc.
-    quantity_available: int
-    minimum_order_quantity: int = 1
-    location: str
-    farm_name: Optional[str] = None
-    images: List[str] = []
-    platform: str = "pyhub"
-    # Logistics Management
-    logistics_managed_by: str = "pyramyd"  # "pyramyd" or "seller"
-    seller_delivery_fee: Optional[float] = None  # If seller manages logistics
-    # Enhanced delivery options for suppliers
-    supports_dropoff_delivery: bool = True  # Whether supplier accepts drop-off locations  
-    supports_shipping_delivery: bool = True  # Whether supplier accepts shipping addresses
-    delivery_cost_dropoff: float = 0.0  # Cost for drop-off delivery (0.0 = free)
-    delivery_cost_shipping: float = 0.0  # Cost for shipping delivery (0.0 = free)
-    delivery_notes: Optional[str] = None  # Special delivery instructions/notes
-    # Group buying feature (for FARMHUB platform)
-    group_buy_enabled: bool = False  # Enable group buying for this product
-    group_buy_min_quantity: Optional[int] = None  # Minimum quantity for group buy
-    group_buy_discount_percentage: Optional[float] = None  # Discount for group buy
-    group_buy_deadline: Optional[datetime] = None  # Deadline for group buy
-
-class CartItem(BaseModel):
-    product_id: str
-    quantity: int
-
-# Rating System Models
-class RatingType(str, Enum):
-    USER_RATING = "user_rating"  # Rating for farmers, agents, suppliers, processors
-    PRODUCT_RATING = "product_rating"  # Rating for products
-    DRIVER_RATING = "driver_rating"  # Rating for drivers
-    ORDER_RATING = "order_rating"  # Overall order experience rating
-
-class Rating(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    rating_type: RatingType
-    rating_value: int = Field(..., ge=1, le=5)  # 1-5 star rating
-    rater_username: str  # Who gave the rating
-    rater_id: str
-    rated_entity_id: str  # ID of user, product, driver being rated
-    rated_entity_username: Optional[str] = None  # Username if rating a user/driver
-    order_id: Optional[str] = None  # Associated order if applicable
-    comment: Optional[str] = None  # Optional review comment
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: Optional[datetime] = None
-
-class RatingCreate(BaseModel):
-    rating_type: RatingType
-    rating_value: int = Field(..., ge=1, le=5)
-    rated_entity_id: str
-    rated_entity_username: Optional[str] = None
-    order_id: Optional[str] = None
-    comment: Optional[str] = None
-
-class RatingResponse(BaseModel):
-    id: str
-    rating_type: RatingType
-    rating_value: int
-    rater_username: str
-    rated_entity_id: str
-    rated_entity_username: Optional[str] = None
-    comment: Optional[str] = None
-    created_at: datetime
-
-# Driver Management Models
-class DriverSubscriptionStatus(str, Enum):
-    TRIAL = "trial"  # 14-day free trial
-    ACTIVE = "active"  # Paid subscription
-    EXPIRED = "expired"  # Subscription expired
-    SUSPENDED = "suspended"  # Suspended by admin
-
-class LogisticsDriverSlot(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    logistics_business_id: str
-    logistics_username: str
-    slot_number: int
-    driver_id: Optional[str] = None  # Assigned driver ID
-    driver_username: Optional[str] = None
-    driver_name: Optional[str] = None
-    vehicle_type: Optional[VehicleType] = None
-    plate_number: Optional[str] = None
-    vehicle_make_model: Optional[str] = None
-    vehicle_color: Optional[str] = None
-    vehicle_year: Optional[int] = None
-    vehicle_photo: Optional[str] = None  # base64 vehicle image
-    date_of_birth: Optional[str] = None
-    address: Optional[str] = None
-    driver_license: Optional[str] = None
-    registration_link: Optional[str] = None  # Unique registration link for driver
-    subscription_status: DriverSubscriptionStatus = DriverSubscriptionStatus.TRIAL
-    trial_start_date: datetime = Field(default_factory=datetime.utcnow)
-    subscription_start_date: Optional[datetime] = None
-    subscription_end_date: Optional[datetime] = None
-    monthly_fee: float = 500.0  # ₦500 per driver per month
-    is_active: bool = True
-    total_trips: int = 0
-    average_rating: float = 5.0
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: Optional[datetime] = None
-
-class DriverSlotCreate(BaseModel):
-    driver_name: str
-    vehicle_type: VehicleType
-    plate_number: str
-    vehicle_make_model: str
-    vehicle_color: str
-    vehicle_year: Optional[int] = None
-    vehicle_photo: Optional[str] = None
-    date_of_birth: str  # Format: YYYY-MM-DD
-    address: str
-    driver_license: Optional[str] = None
-
-class DriverSlotUpdate(BaseModel):
-    driver_name: Optional[str] = None
-    vehicle_type: Optional[VehicleType] = None
-    plate_number: Optional[str] = None
-    vehicle_make_model: Optional[str] = None
-    vehicle_color: Optional[str] = None
-    vehicle_year: Optional[int] = None
-    vehicle_photo: Optional[str] = None
-    date_of_birth: Optional[str] = None
-    address: Optional[str] = None
-    driver_license: Optional[str] = None
-    is_active: Optional[bool] = None
-
-class DriverRegistrationComplete(BaseModel):
-    username: str
-    password: str
-    registration_token: str
-
-# Enhanced Driver Profile for Uber-like Interface
-class EnhancedDriverProfile(BaseModel):
-    id: str
-    driver_username: str
-    driver_name: str
-    phone_number: Optional[str] = None
-    profile_picture: Optional[str] = None
-    vehicle_info: dict  # Complete vehicle information
-    current_location: Optional[dict] = None
-    status: DriverStatus = DriverStatus.OFFLINE
-    average_rating: float = 5.0
-    total_trips: int = 0
-    total_earnings: float = 0.0
-    is_independent: bool = False  # False for logistics business managed drivers
-    logistics_business_name: Optional[str] = None
-    created_at: datetime
-    last_active: Optional[datetime] = None
-
-# Enhanced KYC System Models
-class BusinessType(str, Enum):
-    LIMITED = "ltd"
-    NGO = "ngo"
-    PLC = "plc"
-    PARTNERSHIP = "partnership"
-    SOLE_PROPRIETORSHIP = "sole_proprietorship"
-    
-class IdentificationType(str, Enum):
-    NIN = "nin"
-    BVN = "bvn"
-    NATIONAL_ID = "national_id"
-    VOTERS_CARD = "voters_card"
-    DRIVERS_LICENSE = "drivers_license"
-
 class DocumentType(str, Enum):
     CERTIFICATE_OF_INCORPORATION = "certificate_of_incorporation"
     TIN_CERTIFICATE = "tin_certificate"
     UTILITY_BILL = "utility_bill"
     NATIONAL_ID_DOC = "national_id_doc"
     HEADSHOT_PHOTO = "headshot_photo"
+    DRIVERS_LICENSE = "drivers_license"
 
 class KYCDocument(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -1556,6 +1286,20 @@ class KYCDocument(BaseModel):
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
     verified: bool = False
     verification_notes: Optional[str] = None
+
+class BusinessType(str, Enum):
+    SOLE_PROPRIETORSHIP = "sole_proprietorship"
+    PARTNERSHIP = "partnership"
+    LIMITED_LIABILITY_COMPANY = "limited_liability_company"
+    COOPERATIVE = "cooperative"
+    NGO = "ngo"
+
+class IdentificationType(str, Enum):
+    NIN = "nin"
+    BVN = "bvn"
+    DRIVERS_LICENSE = "drivers_license"
+    VOTERS_CARD = "voters_card"
+    INTERNATIONAL_PASSPORT = "international_passport"
 
 class RegisteredBusinessKYC(BaseModel):
     business_registration_number: str
@@ -2159,7 +1903,13 @@ async def health_check():
 @app.post("/api/auth/register")
 async def register(user_data: UserRegister):
     # Check if user exists
-    if db.users.find_one({"$or": [{"email": user_data.email}, {"username": user_data.username}]}):
+    query = {"$or": [{"username": user_data.username}]}
+    if user_data.email:
+        query["$or"].append({"email": user_data.email})
+    if user_data.phone:
+        query["$or"].append({"phone": user_data.phone})
+        
+    if db.users.find_one(query):
         raise HTTPException(status_code=400, detail="User already exists")
     
     # Create user
@@ -2189,6 +1939,7 @@ async def register(user_data: UserRegister):
             "last_name": user.last_name,
             "username": user.username,
             "email": user.email,
+            "phone": user.phone,
             "role": user.role
         }
     }
@@ -2676,68 +2427,10 @@ async def get_product(product_id: str):
 
 @app.post("/api/orders")
 async def create_order(items: List[CartItem], delivery_address: str, current_user: dict = Depends(get_current_user)):
-    if not items:
-        raise HTTPException(status_code=400, detail="No items in order")
-    
     # KYC Compliance Check for Order Creation
     validate_kyc_compliance(current_user, "collect_payments")
     
-    order_items = []
-    total_amount = 0.0
-    seller_id = None
-    seller_name = None
-    
-    for item in items:
-        product = db.products.find_one({"id": item.product_id})
-        if not product:
-            raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
-        
-        if item.quantity > product['quantity_available']:
-            raise HTTPException(status_code=400, detail=f"Insufficient quantity for {product['title']}")
-        
-        if item.quantity < product['minimum_order_quantity']:
-            raise HTTPException(status_code=400, detail=f"Minimum order quantity for {product['title']} is {product['minimum_order_quantity']}")
-        
-        item_total = product['price_per_unit'] * item.quantity
-        total_amount += item_total
-        
-        order_items.append({
-            "product_id": product['id'],
-            "title": product['title'],
-            "price_per_unit": product['price_per_unit'],
-            "quantity": item.quantity,
-            "total": item_total
-        })
-        
-        # All items should be from same seller for this MVP
-        if seller_id is None:
-            seller_id = product['seller_id']
-            seller_name = product['seller_name']
-        elif seller_id != product['seller_id']:
-            raise HTTPException(status_code=400, detail="All items must be from the same seller")
-    
-    # Create order
-    order = Order(
-        buyer_id=current_user['id'],
-        buyer_name=current_user['username'],
-        seller_id=seller_id,
-        seller_name=seller_name,
-        items=order_items,
-        total_amount=total_amount,
-        delivery_address=delivery_address
-    )
-    
-    order_dict = order.dict()
-    db.orders.insert_one(order_dict)
-    
-    # Update product quantities
-    for item in items:
-        db.products.update_one(
-            {"id": item.product_id},
-            {"$inc": {"quantity_available": -item.quantity}}
-        )
-    
-    return {"message": "Order created successfully", "order_id": order.id, "total_amount": total_amount}
+    return process_create_order(items, delivery_address, current_user, db)
 
 @app.get("/api/orders")
 async def get_orders(current_user: dict = Depends(get_current_user)):
@@ -2750,52 +2443,11 @@ async def get_orders(current_user: dict = Depends(get_current_user)):
     }).sort("created_at", -1))
     
     # Clean up response
-    for order in orders:
-        order.pop('_id', None)
-    
     return orders
-
-class AgentPurchaseOption(BaseModel):
-    commission_type: str  # "percentage" or "collect_after_delivery"
-    customer_id: str
-    delivery_address: str
-
-class GroupBuyingRequest(BaseModel):
-    produce: str
-    category: str
-    quantity: int
-    location: str
-
-class GroupOrder(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    agent_id: str
-    produce: str
-    category: str
-    location: str
-    total_quantity: int
-    buyers: List[dict]
-    selected_farm: dict
-    commission_type: str  # "pyramyd" or "after_delivery"
-    total_amount: float
-    agent_commission: float
-    status: str = "pending"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-class OutsourcedOrder(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    requester_id: str  # Agent or Processor who outsourced
-    produce: str
-    category: str
-    quantity: int
-    expected_price: float
-    location: str
-    status: str = "open"  # "open", "accepted", "completed", "cancelled"
-    accepting_agent_id: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 @app.post("/api/agent/purchase")
 async def agent_purchase(
-    items: List[CartItem], 
+    items: List[CartItem],
     purchase_option: AgentPurchaseOption,
     current_user: dict = Depends(get_current_user)
 ):
@@ -2947,47 +2599,7 @@ async def create_group_order(
     current_user: dict = Depends(get_current_user)
 ):
     """Create a group buying order"""
-    if current_user.get('role') != 'agent':
-        raise HTTPException(status_code=403, detail="Only agents can create group orders")
-    
-    # Calculate commission
-    total_amount = order_data['selectedPrice']['price_per_unit'] * order_data['quantity']
-    
-    if order_data['commissionType'] == 'pyramyd':
-        agent_commission = total_amount * 0.05  # 5% commission
-    else:
-        agent_commission = 0  # Will be collected after delivery
-    
-    # Create group order
-    group_order = GroupOrder(
-        agent_id=current_user['id'],
-        produce=order_data['produce'],
-        category=order_data['category'],
-        location=order_data['location'],
-        total_quantity=order_data['quantity'],
-        buyers=order_data['buyers'],
-        selected_farm=order_data['selectedPrice'],
-        commission_type=order_data['commissionType'],
-        total_amount=total_amount,
-        agent_commission=agent_commission
-    )
-    
-    # Save to database
-    order_dict = group_order.dict()
-    db.group_orders.insert_one(order_dict)
-    
-    # Update product quantity (real-time stock management)
-    db.products.update_one(
-        {"id": order_data['selectedPrice']['product_id']},
-        {"$inc": {"quantity_available": -order_data['quantity']}}
-    )
-    
-    return {
-        "message": "Group order created successfully",
-        "order_id": group_order.id,
-        "total_amount": total_amount,
-        "agent_commission": agent_commission
-    }
+    return process_create_group_order(order_data, current_user, db)
 
 @app.post("/api/outsource-order")
 async def create_outsourced_order(
@@ -2999,27 +2611,7 @@ async def create_outsourced_order(
     current_user: dict = Depends(get_current_user)
 ):
     """Create an outsourced order for agents to bid on"""
-    allowed_roles = ['agent', 'processor', 'supplier']
-    if current_user.get('role') not in allowed_roles:
-        raise HTTPException(status_code=403, detail="Only agents, processors, and suppliers can outsource orders")
-    
-    outsourced_order = OutsourcedOrder(
-        requester_id=current_user['id'],
-        produce=produce,
-        category=category,
-        quantity=quantity,
-        expected_price=expected_price,
-        location=location
-    )
-    
-    order_dict = outsourced_order.dict()
-    db.outsourced_orders.insert_one(order_dict)
-    
-    return {
-        "message": "Order outsourced successfully",
-        "order_id": outsourced_order.id,
-        "status": "open"
-    }
+    return process_create_outsourced_order(produce, category, quantity, expected_price, location, current_user, db)
 
 @app.get("/api/outsourced-orders")
 async def get_outsourced_orders(current_user: dict = Depends(get_current_user)):
@@ -7745,9 +7337,7 @@ async def initialize_payment(
         # Extract payment details
         product_total = payment_data.get("product_total", 0)  # In Naira
         customer_state = payment_data.get("customer_state")  # For delivery fee calculation
-        product_weight = payment_data.get("product_weight", 1)  # In kg
         quantity = payment_data.get("quantity", 1)  # Product quantity
-        subaccount_code = payment_data.get("subaccount_code")  # For Home/Community
         product_id = payment_data.get("product_id")
         order_id = payment_data.get("order_id")
         platform_type = payment_data.get("platform_type", "home")  # farmhub, home, or community
@@ -7787,30 +7377,26 @@ async def initialize_payment(
         )
         delivery_fee = delivery_info['delivery_fee']
         delivery_method = delivery_info['delivery_method']
-        estimated_delivery_days = delivery_info.get('estimated_delivery_days')
         
-        # Convert to kobo
-        product_total_kobo = naira_to_kobo(product_total)
-        delivery_fee_kobo = naira_to_kobo(delivery_fee)
-        
-        # Calculate platform cut based on type
+        # Initialize payment based on platform type
         if platform_type == "farmhub":
-            # FarmHub: 10% service charge (extracted from vendor) + delivery
-            # Vendor receives 90% of product total
-            service_kobo = int(product_total_kobo * FARMHUB_SERVICE_CHARGE)
-            platform_cut_kobo = service_kobo + delivery_fee_kobo
+            payment_result = initialize_farmhub_payment(payment_data, current_user, delivery_fee, delivery_method)
         elif platform_type == "home":
-            # HOME: 2.5% commission (from vendor) + 3% service charge (from buyer) + delivery
-            # Vendor receives 97.5% of product total
-            vendor_commission_kobo = int(product_total_kobo * HOME_VENDOR_COMMISSION)
-            buyer_service_kobo = int(product_total_kobo * HOME_BUYER_SERVICE_CHARGE)
-            platform_cut_kobo = vendor_commission_kobo + buyer_service_kobo + delivery_fee_kobo
+            payment_result = initialize_pyexpress_payment(payment_data, current_user, delivery_fee, delivery_method)
+        elif platform_type == "community":
+            payment_result = initialize_community_payment(payment_data, current_user, delivery_fee, delivery_method)
         else:
-            # Community: 2.5% commission (from vendor) + 5% service charge (from buyer) + delivery
-            # Vendor receives 97.5% of product total
-            vendor_commission_kobo = int(product_total_kobo * COMMUNITY_VENDOR_COMMISSION)
-            buyer_service_kobo = int(product_total_kobo * COMMUNITY_BUYER_SERVICE_CHARGE)
-            platform_cut_kobo = vendor_commission_kobo + buyer_service_kobo + delivery_fee_kobo
+            raise HTTPException(status_code=400, detail=f"Invalid platform type: {platform_type}")
+            
+        # Extract results
+        paystack_response = payment_result["response"]
+        reference = payment_result["reference"]
+        total_amount_kobo = payment_result["amount_kobo"]
+        platform_cut_kobo = payment_result["platform_cut_kobo"]
+        subaccount_code = payment_result.get("subaccount_code")
+        split_code = payment_result.get("split_code")
+        breakdown = payment_result["breakdown"]
+        product_total_kobo = naira_to_kobo(product_total)
         
         # Check if buyer is an agent and calculate commission with tier bonus
         buyer_is_agent = buyer_role in ["agent", "purchasing_agent"]
@@ -7819,63 +7405,14 @@ async def initialize_payment(
         
         if buyer_is_agent:
             # Calculate commission with tier bonus
-            commission_result = calculate_agent_commission(kobo_to_naira(product_total_kobo), user_id, db)
+            commission_result = calculate_agent_commission(product_total, user_id, db)
             agent_commission_kobo = naira_to_kobo(commission_result['total_commission'])
             agent_tier_info = commission_result['tier_info']
-        
-        # Total amount customer pays
-        total_amount_kobo = product_total_kobo + platform_cut_kobo
-        
-        # Generate unique reference
-        reference = f"PYR_{uuid.uuid4().hex[:12].upper()}"
-        
-        # Prepare Paystack payload based on platform type
-        if platform_type == "farmhub":
-            # Farm Deals: Use split group (NO subaccount parameter)
-            paystack_data = {
-                "email": buyer_email,
-                "amount": total_amount_kobo,
-                "split_code": FARMHUB_SPLIT_GROUP,  # Use split group SPL_dCqIOTFNRu
-                "reference": reference,
-                "callback_url": payment_data.get("callback_url", ""),
-                "metadata": {
-                    "product_id": product_id,
-                    "order_id": order_id,
-                    "platform_type": platform_type,
-                    "buyer_id": user_id,
-                    "customer_state": customer_state,
-                    "delivery_fee": delivery_fee,
-                    "delivery_method": delivery_method
-                }
-            }
-        else:
-            # Home/Community: Use dynamic subaccount
-            if not subaccount_code:
-                raise HTTPException(status_code=400, detail="Subaccount code is required for Home/Community transactions")
             
-            paystack_data = {
-                "email": buyer_email,
-                "amount": total_amount_kobo,
-                "subaccount": subaccount_code,  # Dynamic vendor subaccount
-                "transaction_charge": platform_cut_kobo,  # Platform's fixed cut
-                "bearer": "account",  # Platform pays Paystack fees
-                "reference": reference,
-                "callback_url": payment_data.get("callback_url", ""),
-                "metadata": {
-                    "product_id": product_id,
-                    "order_id": order_id,
-                    "platform_type": platform_type,
-                    "buyer_id": user_id,
-                    "customer_state": customer_state,
-                    "delivery_fee": delivery_fee,
-                    "delivery_method": delivery_method
-                }
-            }
-        
-        response = paystack_request("POST", "/transaction/initialize", paystack_data)
-        
-        if not response.get("status"):
-            raise HTTPException(status_code=400, detail=response.get("message", "Failed to initialize payment"))
+            # Add agent info to breakdown
+            breakdown["agent_commission"] = kobo_to_naira(agent_commission_kobo)
+            breakdown["agent_tier"] = agent_tier_info['tier_name'] if agent_tier_info else None
+            breakdown["tier_bonus"] = f"{agent_tier_info['bonus_commission'] * 100}%" if agent_tier_info else None
         
         # Save transaction record
         transaction = {
@@ -7886,12 +7423,12 @@ async def initialize_payment(
             "product_id": product_id,
             "order_id": order_id,
             "product_total": product_total_kobo,
-            "delivery_fee": delivery_fee_kobo,
+            "delivery_fee": naira_to_kobo(delivery_fee),
             "platform_cut": platform_cut_kobo,
             "total_amount": total_amount_kobo,
-            "subaccount_code": subaccount_code if platform_type != "farmhub" else FARMHUB_SUBACCOUNT,
-            "split_code": FARMHUB_SPLIT_GROUP if platform_type == "farmhub" else None,
-            "vendor_share": product_total_kobo,
+            "subaccount_code": subaccount_code,
+            "split_code": split_code,
+            "vendor_share": product_total_kobo, # This might need adjustment if split logic changes, but for now vendor gets product total - commissions handled by Paystack or manual payout
             "buyer_is_agent": buyer_is_agent,
             "agent_commission": agent_commission_kobo,
             "agent_tier": agent_tier_info['tier_name'] if agent_tier_info else None,
@@ -7899,8 +7436,8 @@ async def initialize_payment(
             "customer_state": customer_state,
             "platform_type": platform_type,
             "payment_status": "pending",
-            "authorization_url": response["data"]["authorization_url"],
-            "access_code": response["data"]["access_code"],
+            "authorization_url": paystack_response["data"]["authorization_url"],
+            "access_code": paystack_response["data"]["access_code"],
             "created_at": datetime.utcnow()
         }
         
@@ -7909,19 +7446,11 @@ async def initialize_payment(
         return {
             "status": True,
             "message": "Payment initialized",
-            "authorization_url": response["data"]["authorization_url"],
-            "access_code": response["data"]["access_code"],
+            "authorization_url": paystack_response["data"]["authorization_url"],
+            "access_code": paystack_response["data"]["access_code"],
             "reference": reference,
             "amount": kobo_to_naira(total_amount_kobo),
-            "breakdown": {
-                "product_total": kobo_to_naira(product_total_kobo),
-                "delivery_fee": kobo_to_naira(delivery_fee_kobo),
-                "delivery_state": customer_state,
-                "platform_cut": kobo_to_naira(platform_cut_kobo),
-                "agent_commission": kobo_to_naira(agent_commission_kobo) if buyer_is_agent else 0,
-                "agent_tier": agent_tier_info['tier_name'] if agent_tier_info else None,
-                "tier_bonus": f"{agent_tier_info['bonus_commission'] * 100}%" if agent_tier_info else None
-            }
+            "breakdown": breakdown
         }
         
     except HTTPException:
