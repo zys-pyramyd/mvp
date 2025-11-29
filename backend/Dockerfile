@@ -63,8 +63,5 @@ ENV PYTHONUNBUFFERED=1 \
 EXPOSE ${PORT}
 
 # Add health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\", 8001)}/api/health', timeout=5)" || exit 1
-
 # Start the application using Uvicorn
-CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT} --workers 4"]
+CMD sh -c "uvicorn server:app --host 0.0.0.0 --port ${PORT} --workers 4"

@@ -44,6 +44,183 @@ from order.pyexpress_order import process_create_order
 from order.community_order import process_create_group_order
 from order.farm_deals_order import process_create_outsourced_order
 
+# Pydantic Models for Registration
+class CompleteRegistration(BaseModel):
+    first_name: str
+    last_name: str
+    username: str
+    email_or_phone: str
+    password: str
+    phone: str
+    user_path: str
+    buyer_type: Optional[str] = None
+    partner_type: Optional[str] = None
+    business_category: Optional[str] = None
+    business_info: Optional[dict] = None
+    verification_info: Optional[dict] = None
+    gender: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    # Enhanced fields
+    id_type: Optional[str] = None
+    id_number: Optional[str] = None
+    documents: Optional[Dict[str, str]] = None  # URLs or base64 of uploaded docs
+    directors: Optional[List[Dict[str, str]]] = None
+    farm_details: Optional[List[Dict[str, str]]] = None
+    registration_status: Optional[str] = None # 'registered' or 'unregistered' for business
+    bio: Optional[str] = None
+
+class User(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    first_name: str
+    last_name: str
+    username: str
+    email: str
+    phone: str
+    role: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+# ... (Environment variables section remains unchanged) ...
+
+# Startup Event
+@app.on_event("startup")
+async def startup_event():
+    print(f"Application starting up on port {os.environ.get('PORT', '8001')}...")
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Pyramyd Backend Running", "service": "backend"}
+
+@app.post("/api/auth/complete-registration")
+async def complete_registration(registration_data: CompleteRegistration):
+    # Check if user exists
+    if db.users.find_one({"$or": [
+        {"email_or_phone": registration_data.email_or_phone}, 
+        {"username": registration_data.username}
+    ]}):
+        raise HTTPException(status_code=400, detail="User already exists")
+    
+    # Determine user role based on registration path
+    user_role = None
+    if registration_data.user_path == 'buyer':
+        if registration_data.buyer_type == 'skip':
+            user_role = 'general_buyer'
+        else:
+            user_role = registration_data.buyer_type
+    elif registration_data.user_path == 'partner':
+        if registration_data.partner_type == 'business':
+            user_role = registration_data.business_category
+        else:
+            user_role = registration_data.partner_type
+    
+    # --- ENFORCEMENT LOGIC ---
+    
+    # 1. Agent & Farmer Enforcement
+    if user_role in ['agent', 'farmer']:
+        # Require ID, Headshot, Address Proof
+        if not registration_data.id_type or not registration_data.id_number:
+             raise HTTPException(status_code=400, detail="Identity verification (ID Type & Number) is required for Agents and Farmers.")
+        
+        docs = registration_data.documents or {}
+        if not docs.get('headshot'):
+             raise HTTPException(status_code=400, detail="Headshot is required.")
+        if not docs.get('id_document'): # Slip/Card upload
+             raise HTTPException(status_code=400, detail="ID Document upload is required.")
+        if not docs.get('proof_of_address'):
+             raise HTTPException(status_code=400, detail="Proof of Address is required.")
+             
+        if user_role == 'farmer':
+            if not registration_data.farm_details:
+                raise HTTPException(status_code=400, detail="Farm details are required for Farmers.")
+
+    # 2. Business Enforcement
+    # Business roles can be: food_servicing, food_processor, farm_input, fintech, agriculture, supplier, others
+    # We check if the assigned role implies a business
+    is_business_role = registration_data.partner_type == 'business'
+    
+    if is_business_role:
+        if not registration_data.business_info:
+             raise HTTPException(status_code=400, detail="Business Information is required.")
+        
+        reg_status = registration_data.registration_status
+        if not reg_status:
+             raise HTTPException(status_code=400, detail="Business Registration Status (registered/unregistered) is required.")
+
+        docs = registration_data.documents or {}
+        
+        if reg_status == 'registered':
+            # Registered Business: Directors, CAC, Proof of Address
+            if not registration_data.directors or len(registration_data.directors) < 1:
+                 raise HTTPException(status_code=400, detail="At least one Director/Manager is required for registered businesses.")
+            if not docs.get('cac_document'):
+                 raise HTTPException(status_code=400, detail="CAC Document is required for registered businesses.")
+            if not docs.get('proof_of_address'):
+                 raise HTTPException(status_code=400, detail="Proof of Business Address is required.")
+                 
+        elif reg_status == 'unregistered':
+            # Unregistered Business: Treat like Agent (ID, Headshot, Bio)
+            if not registration_data.id_type or not registration_data.id_number:
+                 raise HTTPException(status_code=400, detail="Identity verification is required for unregistered businesses.")
+            if not docs.get('headshot'):
+                 raise HTTPException(status_code=400, detail="Headshot is required.")
+            if not docs.get('id_document'):
+                 raise HTTPException(status_code=400, detail="ID Document upload is required.")
+            if not docs.get('proof_of_address'):
+                 raise HTTPException(status_code=400, detail="Proof of Address is required.")
+            if not registration_data.bio:
+                 raise HTTPException(status_code=400, detail="Bio is required.")
+
+    # --- END ENFORCEMENT ---
+
+    # Create user with complete information
+    user = User(
+        first_name=registration_data.first_name,
+        last_name=registration_data.last_name,
+        username=registration_data.username,
+        email=registration_data.email_or_phone,  # Store as email for compatibility
+        phone=registration_data.phone,
+        role=user_role
+    )
+    
+    # Create user document with additional fields
+    user_dict = user.dict()
+    user_dict['password'] = hash_password(registration_data.password)
+    user_dict['gender'] = registration_data.gender
+    user_dict['date_of_birth'] = registration_data.date_of_birth
+    user_dict['user_path'] = registration_data.user_path
+    user_dict['business_info'] = registration_data.business_info or {}
+    user_dict['verification_info'] = registration_data.verification_info or {}
+    
+    # Store enhanced fields
+    user_dict['id_type'] = registration_data.id_type
+    user_dict['id_number'] = registration_data.id_number
+    user_dict['documents'] = registration_data.documents or {}
+    user_dict['directors'] = registration_data.directors or []
+    user_dict['farm_details'] = registration_data.farm_details or []
+    user_dict['registration_status'] = registration_data.registration_status
+    user_dict['bio'] = registration_data.bio
+    
+    user_dict['is_verified'] = False  # Will be updated after verification process
+    
+    db.users.insert_one(user_dict)
+    
+    # Generate token
+    token = create_token(user.id)
+    
+    return {
+        "message": "Registration completed successfully",
+        "token": token,
+        "user": {
+            "id": user.id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "username": user.username,
+            "email": user.email,
+            "role": user_role,
+            "user_path": registration_data.user_path
+        }
+    }
+
+
 # Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
 JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-here-change-in-production')
@@ -1979,66 +2156,7 @@ async def login(login_data: UserLogin):
         }
     }
 
-@app.post("/api/auth/complete-registration")
-async def complete_registration(registration_data: CompleteRegistration):
-    # Check if user exists
-    if db.users.find_one({"$or": [
-        {"email_or_phone": registration_data.email_or_phone}, 
-        {"username": registration_data.username}
-    ]}):
-        raise HTTPException(status_code=400, detail="User already exists")
-    
-    # Determine user role based on registration path
-    user_role = None
-    if registration_data.user_path == 'buyer':
-        if registration_data.buyer_type == 'skip':
-            user_role = 'general_buyer'
-        else:
-            user_role = registration_data.buyer_type
-    elif registration_data.user_path == 'partner':
-        if registration_data.partner_type == 'business':
-            user_role = registration_data.business_category
-        else:
-            user_role = registration_data.partner_type
-    
-    # Create user with complete information
-    user = User(
-        first_name=registration_data.first_name,
-        last_name=registration_data.last_name,
-        username=registration_data.username,
-        email=registration_data.email_or_phone,  # Store as email for compatibility
-        phone=registration_data.phone,
-        role=user_role
-    )
-    
-    # Create user document with additional fields
-    user_dict = user.dict()
-    user_dict['password'] = hash_password(registration_data.password)
-    user_dict['gender'] = registration_data.gender
-    user_dict['date_of_birth'] = registration_data.date_of_birth
-    user_dict['user_path'] = registration_data.user_path
-    user_dict['business_info'] = registration_data.business_info or {}
-    user_dict['verification_info'] = registration_data.verification_info or {}
-    user_dict['is_verified'] = False  # Will be updated after verification process
-    
-    db.users.insert_one(user_dict)
-    
-    # Generate token
-    token = create_token(user.id)
-    
-    return {
-        "message": "Registration completed successfully",
-        "token": token,
-        "user": {
-            "id": user.id,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "username": user.username,
-            "email": user.email,
-            "role": user_role,
-            "user_path": registration_data.user_path
-        }
-    }
+
 
 @app.get("/api/user/profile")
 async def get_profile(current_user: dict = Depends(get_current_user)):

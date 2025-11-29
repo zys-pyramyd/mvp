@@ -350,6 +350,17 @@ function App() {
     farm_info: ''
   });
 
+  // Enhanced Registration States
+  const [idType, setIdType] = useState(''); // 'nin', 'passport', 'voters_card', 'drivers_license'
+  const [idNumber, setIdNumber] = useState('');
+  const [documents, setDocuments] = useState({}); // { headshot: '', id_document: '', proof_of_address: '', cac_document: '' }
+  const [directors, setDirectors] = useState([]); // Array of director objects
+  const [farmDetails, setFarmDetails] = useState([]); // Array of farm objects
+  const [registrationStatus, setRegistrationStatus] = useState(''); // 'registered', 'unregistered'
+  const [bio, setBio] = useState('');
+  const [directorForm, setDirectorForm] = useState({ name: '', id_number: '', address: '' }); // Temp state for adding director
+  const [farmForm, setFarmForm] = useState({ farm_name: '', address: '', produce: '' }); // Temp state for adding farm
+
   // Category data with images
   const categoryData = [
     {
@@ -1490,7 +1501,7 @@ function App() {
 
   const handleBusinessCategory = (category) => {
     setBusinessCategory(category);
-    setRegistrationStep('verification');
+    setRegistrationStep('business_status');
   };
 
   // Bulk listings for Farm Deals
@@ -1529,6 +1540,29 @@ function App() {
     }
   };
 
+  const handleFileUpload = (file, docType) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setDocuments(prev => ({ ...prev, [docType]: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const addDirector = () => {
+    if (directorForm.name && directorForm.id_number && directorForm.address) {
+      setDirectors([...directors, directorForm]);
+      setDirectorForm({ name: '', id_number: '', address: '' });
+    }
+  };
+
+  const addFarm = () => {
+    if (farmForm.farm_name && farmForm.address && farmForm.produce) {
+      setFarmDetails([...farmDetails, farmForm]);
+      setFarmForm({ farm_name: '', address: '', produce: '' });
+    }
+  };
+
   const completeRegistration = async () => {
     try {
       // Submit complete registration to backend
@@ -1539,7 +1573,15 @@ function App() {
         business_info: businessInfo,
         partner_type: partnerType,
         business_category: businessCategory,
-        verification_info: verificationInfo
+        verification_info: verificationInfo,
+        // Enhanced fields
+        id_type: idType,
+        id_number: idNumber,
+        documents: documents,
+        directors: directors,
+        farm_details: farmDetails,
+        registration_status: registrationStatus,
+        bio: bio
       };
 
       const response = await fetch(`${API_BASE_URL}/api/auth/complete-registration`, {
@@ -5005,16 +5047,6 @@ function App() {
                           )}
                         </div>
 
-                        {/* Pre-order specific info - Responsive */}
-                        {product.type === 'preorder' && (
-                          <div className="mb-3 p-2 bg-orange-50 rounded-lg border border-orange-200">
-                            <div className="text-xs text-orange-700">
-                              <div>Partial payment: {Math.round((product.partial_payment_percentage || 0.3) * 100)}%</div>
-                              <div>Delivery: {new Date(product.delivery_date).toLocaleDateString()}</div>
-                            </div>
-                          </div>
-                        )}
-
                         {/* Seller Info with Profile Picture - Responsive */}
                         <div className="flex items-center gap-2 mb-3 p-2 bg-gray-50 rounded-lg">
                           {/* Profile Picture */}
@@ -5340,7 +5372,7 @@ function App() {
                             <button
                               onClick={() => {
                                 setAuthForm({ ...authForm, role: 'personal' });
-                                handleCompleteRegistration();
+                                setRegistrationStep('personal_details');
                               }}
                               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                             >
@@ -5482,33 +5514,62 @@ function App() {
                   </>
                 )}
 
+                {/* Business Status Selection Step */}
+                {registrationStep === 'business_status' && (
+                  <>
+                    <div className="flex justify-between items-center mb-6">
+                      <button
+                        onClick={() => setRegistrationStep('business_category')}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        ← Back
+                      </button>
+                      <h2 className="text-xl font-bold text-emerald-600">Business Status</h2>
+                      <div></div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-2xl space-y-4">
+                      <button
+                        onClick={() => {
+                          setRegistrationStatus('registered');
+                          setRegistrationStep('business_info');
+                        }}
+                        className="w-full text-left px-6 py-4 bg-white border-2 border-emerald-100 rounded-xl hover:border-emerald-500 transition-all shadow-sm"
+                      >
+                        <h3 className="text-lg font-bold text-gray-800">Registered Business</h3>
+                        <p className="text-gray-600">I have a CAC registration and business documents</p>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setRegistrationStatus('unregistered');
+                          setRegistrationStep('business_info');
+                        }}
+                        className="w-full text-left px-6 py-4 bg-white border-2 border-blue-100 rounded-xl hover:border-blue-500 transition-all shadow-sm"
+                      >
+                        <h3 className="text-lg font-bold text-gray-800">Unregistered Business</h3>
+                        <p className="text-gray-600">I am a small business owner without formal registration</p>
+                      </button>
+                    </div>
+                  </>
+                )}
+
                 {/* Business Info Step */}
                 {registrationStep === 'business_info' && (
                   <>
                     <div className="flex justify-between items-center mb-6">
                       <button
-                        onClick={() => setRegistrationStep('buyer_type')}
+                        onClick={() => setRegistrationStep('business_status')}
                         className="text-gray-500 hover:text-gray-700"
                       >
                         ← Back
                       </button>
-                      <h2 className="text-xl font-bold text-emerald-600">Business Information</h2>
+                      <h2 className="text-xl font-bold text-emerald-600">Business Details</h2>
                       <div></div>
                     </div>
 
-                    <div className="bg-gradient-to-br from-emerald-50 to-green-50 p-6 rounded-2xl">
+                    <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-2xl">
                       <form onSubmit={(e) => { e.preventDefault(); completeRegistration(); }} className="space-y-4">
-                        {selectedBuyerType === 'others' && (
-                          <input
-                            type="text"
-                            placeholder="Specify your business type"
-                            value={businessInfo.business_type}
-                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, business_type: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            required
-                          />
-                        )}
-
                         <input
                           type="text"
                           placeholder="Business Name"
@@ -5517,7 +5578,6 @@ function App() {
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           required
                         />
-
                         <input
                           type="text"
                           placeholder="Business Address"
@@ -5526,8 +5586,7 @@ function App() {
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           required
                         />
-
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                           <input
                             type="text"
                             placeholder="City"
@@ -5544,78 +5603,95 @@ function App() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                             required
                           />
-                          <input
-                            type="text"
-                            placeholder="Country"
-                            value={businessInfo.country}
-                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, country: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            required
-                          />
                         </div>
-
-                        <button
-                          type="submit"
-                          className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
-                        >
-                          Complete Registration
-                        </button>
-                      </form>
-                    </div>
-                  </>
-                )}
-
-                {/* Home Address Step (for skip option) */}
-                {registrationStep === 'home_address' && (
-                  <>
-                    <div className="flex justify-between items-center mb-6">
-                      <button
-                        onClick={() => setRegistrationStep('buyer_type')}
-                        className="text-gray-500 hover:text-gray-700"
-                      >
-                        ← Back
-                      </button>
-                      <h2 className="text-xl font-bold text-emerald-600">Your Address</h2>
-                      <div></div>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl">
-                      <form onSubmit={(e) => { e.preventDefault(); completeRegistration(); }} className="space-y-4">
                         <input
                           type="text"
-                          placeholder="Home Address"
-                          value={businessInfo.home_address}
-                          onChange={(e) => setBusinessInfo(prev => ({ ...prev, home_address: e.target.value }))}
+                          placeholder="Country"
+                          value={businessInfo.country}
+                          onChange={(e) => setBusinessInfo(prev => ({ ...prev, country: e.target.value }))}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           required
                         />
 
-                        <div className="grid grid-cols-3 gap-3">
-                          <input
-                            type="text"
-                            placeholder="City"
-                            value={businessInfo.city}
-                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, city: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            required
-                          />
-                          <input
-                            type="text"
-                            placeholder="State"
-                            value={businessInfo.state}
-                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, state: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            required
-                          />
-                          <input
-                            type="text"
-                            placeholder="Country"
-                            value={businessInfo.country}
-                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, country: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            required
-                          />
-                        </div>
+                        {/* Registered Business Specifics */}
+                        {registrationStatus === 'registered' && (
+                          <>
+                            <div className="mb-4 p-3 bg-emerald-100 rounded-lg">
+                              <p className="text-sm text-emerald-800 font-medium">Registered Business Additional Details</p>
+                            </div>
+
+                            <textarea
+                              placeholder="Business Bio (Tell us about your business)"
+                              value={bio}
+                              onChange={(e) => setBio(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              rows="3"
+                            />
+
+                            {/* Directors Section */}
+                            <div className="border-t border-gray-200 pt-4">
+                              <h4 className="font-medium text-gray-700 mb-2">Directors</h4>
+                              {directors.map((director, idx) => (
+                                <div key={idx} className="bg-white p-2 rounded mb-2 text-sm border border-gray-200">
+                                  {director.name} ({director.id_number})
+                                </div>
+                              ))}
+                              <div className="grid grid-cols-1 gap-2 bg-gray-50 p-3 rounded-lg">
+                                <input
+                                  type="text"
+                                  placeholder="Director Name"
+                                  value={directorForm.name}
+                                  onChange={(e) => setDirectorForm(prev => ({ ...prev, name: e.target.value }))}
+                                  className="w-full px-2 py-1 text-sm border rounded"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Director ID Number"
+                                  value={directorForm.id_number}
+                                  onChange={(e) => setDirectorForm(prev => ({ ...prev, id_number: e.target.value }))}
+                                  className="w-full px-2 py-1 text-sm border rounded"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Director Address"
+                                  value={directorForm.address}
+                                  onChange={(e) => setDirectorForm(prev => ({ ...prev, address: e.target.value }))}
+                                  className="w-full px-2 py-1 text-sm border rounded"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={addDirector}
+                                  className="w-full bg-gray-200 text-gray-700 py-1 rounded text-sm hover:bg-gray-300"
+                                >
+                                  Add Director
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Documents Section */}
+                            <div className="border-t border-gray-200 pt-4">
+                              <h4 className="font-medium text-gray-700 mb-2">Documents</h4>
+                              <div className="space-y-2">
+                                <div>
+                                  <label className="block text-xs text-gray-500 mb-1">CAC Certificate</label>
+                                  <input
+                                    type="file"
+                                    onChange={(e) => handleFileUpload(e.target.files[0], 'cac_certificate')}
+                                    className="w-full text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-500 mb-1">Proof of Address</label>
+                                  <input
+                                    type="file"
+                                    onChange={(e) => handleFileUpload(e.target.files[0], 'proof_of_address')}
+                                    className="w-full text-sm"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
 
                         <button
                           type="submit"
@@ -5915,6 +5991,58 @@ function App() {
                           </>
                         )}
 
+                        {/* Bio for Agents and Farmers */}
+                        {(partnerType === 'agent' || partnerType === 'farmer') && (
+                          <textarea
+                            placeholder="Bio (Tell us about yourself/business)"
+                            value={bio}
+                            onChange={(e) => setBio(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            rows="3"
+                          />
+                        )}
+
+
+
+                        <button
+                          type="submit"
+                          className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
+                        >
+                          Complete Registration
+                        </button>
+                      </form>
+                    </div>
+                  </>
+                )}
+
+                {/* Personal Details Step */}
+                {registrationStep === 'personal_details' && (
+                  <>
+                    <div className="flex justify-between items-center mb-6">
+                      <button
+                        onClick={() => setRegistrationStep('role_path')}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        ← Back
+                      </button>
+                      <h2 className="text-xl font-bold text-emerald-600">Personal Details</h2>
+                      <div></div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-blue-50 to-emerald-50 p-6 rounded-2xl">
+                      <form onSubmit={(e) => { e.preventDefault(); completeRegistration(); }} className="space-y-4">
+                        <div className="mb-4 p-3 bg-blue-100 rounded-lg">
+                          <p className="text-sm text-blue-800 font-medium">Tell us a bit about yourself (Optional)</p>
+                        </div>
+
+                        <textarea
+                          placeholder="Bio (e.g., I love fresh organic produce!)"
+                          value={bio}
+                          onChange={(e) => setBio(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          rows="3"
+                        />
+
                         <button
                           type="submit"
                           className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
@@ -5926,1673 +6054,870 @@ function App() {
                   </>
                 )}
               </>
-            )}
-          </div>
-        </div>
-      )}
+            )
+            }
+          </div >
+        </div >
+      )
+      }
 
       {/* Comprehensive Checkout Page */}
-      {showCheckout && (
-        <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-            <div className={`p-6 border-b ${checkoutPlatform === 'pyexpress' ? 'border-emerald-200 bg-emerald-50' : 'border-orange-200 bg-orange-50'}`}>
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-2xl font-semibold text-gray-900">
-                    {checkoutPlatform === 'pyexpress' ? '🛒 PyExpress Checkout' : '🌾 Farm Deals Checkout'}
-                  </h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {checkoutPlatform === 'pyexpress'
-                      ? 'Business & Supplier Products'
-                      : 'Farm Fresh Products with Fixed Split'}
-                  </p>
+      {
+        showCheckout && (
+          <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+              <div className={`p-6 border-b ${checkoutPlatform === 'pyexpress' ? 'border-emerald-200 bg-emerald-50' : 'border-orange-200 bg-orange-50'}`}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-gray-900">
+                      {checkoutPlatform === 'pyexpress' ? '🛒 PyExpress Checkout' : '🌾 Farm Deals Checkout'}
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {checkoutPlatform === 'pyexpress'
+                        ? 'Business & Supplier Products'
+                        : 'Farm Fresh Products with Fixed Split'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowCheckout(false)}
+                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                  >
+                    ×
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowCheckout(false)}
-                  className="text-gray-500 hover:text-gray-700 text-2xl"
-                >
-                  ×
-                </button>
+
+                {/* Progress Steps */}
+                <div className="mt-4 flex items-center space-x-4">
+                  <div className={`flex items-center ${checkoutStep === 'review' ? (checkoutPlatform === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600') : 'text-gray-400'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${checkoutStep === 'review'
+                      ? (checkoutPlatform === 'pyexpress' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600')
+                      : 'bg-gray-100 text-gray-400'
+                      }`}>1</div>
+                    <span className="ml-2 text-sm font-medium">Review Order</span>
+                  </div>
+                  <div className="h-px bg-gray-200 flex-1"></div>
+                  <div className={`flex items-center ${checkoutStep === 'address' ? (checkoutPlatform === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600') : 'text-gray-400'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${checkoutStep === 'address'
+                      ? (checkoutPlatform === 'pyexpress' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600')
+                      : 'bg-gray-100 text-gray-400'
+                      }`}>2</div>
+                    <span className="ml-2 text-sm font-medium">Shipping Address</span>
+                  </div>
+                  <div className="h-px bg-gray-200 flex-1"></div>
+                  <div className={`flex items-center ${checkoutStep === 'payment' ? (checkoutPlatform === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600') : 'text-gray-400'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${checkoutStep === 'payment'
+                      ? (checkoutPlatform === 'pyexpress' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600')
+                      : 'bg-gray-100 text-gray-400'
+                      }`}>3</div>
+                    <span className="ml-2 text-sm font-medium">Payment</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Progress Steps */}
-              <div className="mt-4 flex items-center space-x-4">
-                <div className={`flex items-center ${checkoutStep === 'review' ? (checkoutPlatform === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600') : 'text-gray-400'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${checkoutStep === 'review'
-                    ? (checkoutPlatform === 'pyexpress' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600')
-                    : 'bg-gray-100 text-gray-400'
-                    }`}>1</div>
-                  <span className="ml-2 text-sm font-medium">Review Order</span>
-                </div>
-                <div className="h-px bg-gray-200 flex-1"></div>
-                <div className={`flex items-center ${checkoutStep === 'address' ? (checkoutPlatform === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600') : 'text-gray-400'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${checkoutStep === 'address'
-                    ? (checkoutPlatform === 'pyexpress' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600')
-                    : 'bg-gray-100 text-gray-400'
-                    }`}>2</div>
-                  <span className="ml-2 text-sm font-medium">Shipping Address</span>
-                </div>
-                <div className="h-px bg-gray-200 flex-1"></div>
-                <div className={`flex items-center ${checkoutStep === 'payment' ? (checkoutPlatform === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600') : 'text-gray-400'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${checkoutStep === 'payment'
-                    ? (checkoutPlatform === 'pyexpress' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600')
-                    : 'bg-gray-100 text-gray-400'
-                    }`}>3</div>
-                  <span className="ml-2 text-sm font-medium">Payment</span>
-                </div>
-              </div>
-            </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Main Content */}
+                  <div className="lg:col-span-2">
+                    {/* Step 1: Review Order */}
+                    {checkoutStep === 'review' && (
+                      <div className="space-y-6">
+                        <h3 className="text-lg font-semibold text-gray-900">📦 Review Your Order</h3>
 
-            <div className="p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Main Content */}
-                <div className="lg:col-span-2">
-                  {/* Step 1: Review Order */}
-                  {checkoutStep === 'review' && (
-                    <div className="space-y-6">
-                      <h3 className="text-lg font-semibold text-gray-900">📦 Review Your Order</h3>
+                        {getActiveCartItems().length === 0 ? (
+                          <div className="text-center py-8">
+                            <div className="text-gray-500">Your cart is empty</div>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {getActiveCartItems().map((item) => (
+                              <div key={item.id} className="bg-gray-50 rounded-lg p-4">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <h4 className="font-semibold text-gray-900">
+                                      {item.product.product_name || item.product.crop_type}
+                                    </h4>
+                                    <p className="text-sm text-gray-600 mb-2">
+                                      {item.product.description || 'Fresh organic produce'}
+                                    </p>
 
-                      {getActiveCartItems().length === 0 ? (
-                        <div className="text-center py-8">
-                          <div className="text-gray-500">Your cart is empty</div>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {getActiveCartItems().map((item) => (
-                            <div key={item.id} className="bg-gray-50 rounded-lg p-4">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <h4 className="font-semibold text-gray-900">
-                                    {item.product.product_name || item.product.crop_type}
-                                  </h4>
-                                  <p className="text-sm text-gray-600 mb-2">
-                                    {item.product.description || 'Fresh organic produce'}
-                                  </p>
-
-                                  <div className="flex items-center space-x-4 text-sm">
-                                    <span className="text-gray-700">
-                                      <strong>Quantity:</strong> {item.quantity} {item.unit}
-                                      {item.unit_specification && ` (${item.unit_specification})`}
-                                    </span>
-                                    <span className="text-gray-700">
-                                      <strong>Price:</strong> ₦{item.product.price_per_unit}/{item.unit}
-                                    </span>
-                                    <span className={`px-2 py-1 rounded-full text-xs ${item.delivery_method === 'platform'
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : 'bg-green-100 text-green-800'
-                                      }`}>
-                                      {item.delivery_method === 'platform' ? '🚛 Platform Driver' : '🚚 Offline Delivery'}
-                                    </span>
-                                  </div>
-
-                                  <div className="mt-2 text-sm text-gray-600">
-                                    <strong>Seller:</strong> {item.product.seller_username}
-                                    {item.product.business_name && ` (${item.product.business_name})`}
-                                  </div>
-
-                                  {/* Vendor Logistics Display */}
-                                  {item.product.logistics_managed_by === 'seller' && (
-                                    <div className="mt-2">
-                                      {item.product.seller_delivery_fee === 0 ? (
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                          🎉 FREE Delivery (Vendor Managed)
-                                        </span>
-                                      ) : (
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                          🚚 Vendor Delivery: ₦{item.product.seller_delivery_fee?.toLocaleString()}
-                                        </span>
-                                      )}
+                                    <div className="flex items-center space-x-4 text-sm">
+                                      <span className="text-gray-700">
+                                        <strong>Quantity:</strong> {item.quantity} {item.unit}
+                                        {item.unit_specification && ` (${item.unit_specification})`}
+                                      </span>
+                                      <span className="text-gray-700">
+                                        <strong>Price:</strong> ₦{item.product.price_per_unit}/{item.unit}
+                                      </span>
+                                      <span className={`px-2 py-1 rounded-full text-xs ${item.delivery_method === 'platform'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : 'bg-green-100 text-green-800'
+                                        }`}>
+                                        {item.delivery_method === 'platform' ? '🚛 Platform Driver' : '🚚 Offline Delivery'}
+                                      </span>
                                     </div>
-                                  )}
-                                </div>
 
-                                <div className="text-right">
-                                  <div className="text-lg font-semibold text-gray-900">
-                                    ₦{(item.product.price_per_unit * item.quantity).toLocaleString()}
+                                    <div className="mt-2 text-sm text-gray-600">
+                                      <strong>Seller:</strong> {item.product.seller_username}
+                                      {item.product.business_name && ` (${item.product.business_name})`}
+                                    </div>
+
+                                    {/* Vendor Logistics Display */}
+                                    {item.product.logistics_managed_by === 'seller' && (
+                                      <div className="mt-2">
+                                        {item.product.seller_delivery_fee === 0 ? (
+                                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            🎉 FREE Delivery (Vendor Managed)
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                            🚚 Vendor Delivery: ₦{item.product.seller_delivery_fee?.toLocaleString()}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
-                                  <button
-                                    onClick={() => removeCartItem(item.id)}
-                                    className="text-red-600 hover:text-red-800 text-sm mt-1"
-                                  >
-                                    Remove
-                                  </button>
+
+                                  <div className="text-right">
+                                    <div className="text-lg font-semibold text-gray-900">
+                                      ₦{(item.product.price_per_unit * item.quantity).toLocaleString()}
+                                    </div>
+                                    <button
+                                      onClick={() => removeCartItem(item.id)}
+                                      className="text-red-600 hover:text-red-800 text-sm mt-1"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="flex justify-end">
-                        <button
-                          onClick={() => setCheckoutStep('address')}
-                          className={`px-6 py-2 text-white rounded-lg font-medium ${checkoutPlatform === 'pyexpress'
-                            ? 'bg-emerald-600 hover:bg-emerald-700'
-                            : 'bg-orange-600 hover:bg-orange-700'
-                            }`}
-                        >
-                          Continue to Shipping
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Step 2: Shipping Address */}
-                  {checkoutStep === 'address' && (
-                    <div className="space-y-6">
-                      <h3 className="text-lg font-semibold text-gray-900">📍 Shipping Address</h3>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
-                          <input
-                            type="text"
-                            value={shippingAddress.full_name}
-                            onChange={(e) => setShippingAddress(prev => ({ ...prev, full_name: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            placeholder="Enter your full name"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
-                          <input
-                            type="tel"
-                            value={shippingAddress.phone}
-                            onChange={(e) => setShippingAddress(prev => ({ ...prev, phone: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            placeholder="+234 xxx xxx xxxx"
-                          />
-                        </div>
-
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                          <input
-                            type="email"
-                            value={shippingAddress.email}
-                            onChange={(e) => setShippingAddress(prev => ({ ...prev, email: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            placeholder="your.email@example.com"
-                          />
-                        </div>
-
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1 *</label>
-                          <input
-                            type="text"
-                            value={shippingAddress.address_line_1}
-                            onChange={(e) => setShippingAddress(prev => ({ ...prev, address_line_1: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            placeholder="Street address, P.O. box, company name"
-                          />
-                        </div>
-
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
-                          <input
-                            type="text"
-                            value={shippingAddress.address_line_2}
-                            onChange={(e) => setShippingAddress(prev => ({ ...prev, address_line_2: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            placeholder="Apartment, suite, unit, building, floor, etc."
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
-                          <input
-                            type="text"
-                            value={shippingAddress.city}
-                            onChange={(e) => setShippingAddress(prev => ({ ...prev, city: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            placeholder="Lagos"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
-                          <input
-                            type="text"
-                            value={shippingAddress.state}
-                            onChange={(e) => setShippingAddress(prev => ({ ...prev, state: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            placeholder="Lagos State"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
-                          <input
-                            type="text"
-                            value={shippingAddress.postal_code}
-                            onChange={(e) => setShippingAddress(prev => ({ ...prev, postal_code: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            placeholder="100001"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-                          <select
-                            value={shippingAddress.country}
-                            onChange={(e) => setShippingAddress(prev => ({ ...prev, country: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                          >
-                            <option value="Nigeria">Nigeria</option>
-                            <option value="Ghana">Ghana</option>
-                            <option value="Kenya">Kenya</option>
-                          </select>
-                        </div>
-
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Instructions</label>
-                          <textarea
-                            value={shippingAddress.delivery_instructions}
-                            onChange={(e) => setShippingAddress(prev => ({ ...prev, delivery_instructions: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            rows="3"
-                            placeholder="Any special delivery instructions..."
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between">
-                        <button
-                          onClick={() => setCheckoutStep('review')}
-                          className="px-6 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
-                        >
-                          Back to Review
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (validateAddress()) {
-                              setCheckoutStep('payment');
-                            }
-                          }}
-                          className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
-                        >
-                          Continue to Payment
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Step 3: Payment */}
-                  {checkoutStep === 'payment' && (
-                    <div className="space-y-6">
-                      <h3 className="text-lg font-semibold text-gray-900">💳 Payment with Paystack</h3>
-
-                      <div className={`border rounded-lg p-4 ${checkoutPlatform === 'pyexpress'
-                        ? 'bg-emerald-50 border-emerald-200'
-                        : 'bg-orange-50 border-orange-200'
-                        }`}>
-                        <div className="flex items-start">
-                          <svg className={`w-5 h-5 mr-2 flex-shrink-0 mt-0.5 ${checkoutPlatform === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600'
-                            }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <div>
-                            <div className={`font-medium ${checkoutPlatform === 'pyexpress' ? 'text-emerald-900' : 'text-orange-900'
-                              }`}>
-                              {checkoutPlatform === 'pyexpress' ? 'PyExpress Checkout' : 'Farm Deals Checkout'}
-                            </div>
-                            <div className={`text-sm mt-1 ${checkoutPlatform === 'pyexpress' ? 'text-emerald-700' : 'text-orange-700'
-                              }`}>
-                              {checkoutPlatform === 'pyexpress'
-                                ? 'Payment will be split: Vendor receives product payment, platform handles service charges'
-                                : 'Payment via Fixed Split Group - Sophie Farms Investment Ltd manages farmer payouts'}
-                            </div>
-                            {user && (user.role === 'agent' || user.role === 'purchasing_agent') && (
-                              <div className="mt-2 text-sm font-medium text-blue-700">
-                                ✨ As an agent, you'll earn commission on this purchase!
-                              </div>
-                            )}
+                            ))}
                           </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="font-medium text-gray-900">Secure Payment via Paystack</div>
-                        <div className="space-y-2">
-                          <div className="flex items-center p-3 border border-gray-200 rounded-lg bg-white">
-                            <svg className="w-8 h-8 text-emerald-600 mr-3" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" />
-                            </svg>
-                            <div>
-                              <div className="font-medium">Debit/Credit Card</div>
-                              <div className="text-sm text-gray-600">Visa, Mastercard, Verve supported</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center p-3 border border-gray-200 rounded-lg bg-white">
-                            <svg className="w-8 h-8 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                            </svg>
-                            <div>
-                              <div className="font-medium">Bank Transfer & USSD</div>
-                              <div className="text-sm text-gray-600">Transfer directly from your bank</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center p-3 border border-gray-200 rounded-lg bg-white">
-                            <svg className="w-8 h-8 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                            </svg>
-                            <div>
-                              <div className="font-medium">Mobile Money</div>
-                              <div className="text-sm text-gray-600">MTN, Airtel, and other providers</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between">
-                        <button
-                          onClick={() => setCheckoutStep('address')}
-                          className="px-6 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
-                        >
-                          Back to Address
-                        </button>
-                        <button
-                          onClick={initializePayment}
-                          disabled={paymentProcessing}
-                          className={`px-8 py-2 text-white rounded-lg font-medium flex items-center ${checkoutPlatform === 'pyexpress'
-                            ? 'bg-emerald-600 hover:bg-emerald-700'
-                            : 'bg-orange-600 hover:bg-orange-700'
-                            } ${paymentProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          {paymentProcessing ? (
-                            <>
-                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                              Processing...
-                            </>
-                          ) : (
-                            `Pay ₦${orderSummary.total?.toLocaleString() || 0} Securely`
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Order Summary Sidebar */}
-                <div className="lg:col-span-1">
-                  <div className="bg-gray-50 rounded-lg p-6 sticky top-0">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Order Summary</h3>
-
-                    <div className="space-y-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Product Total ({orderSummary.item_count} items)</span>
-                        <span className="font-medium">₦{orderSummary.product_total?.toLocaleString() || 0}</span>
-                      </div>
-
-                      {orderSummary.platform_service_charge > 0 && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Service Charge</span>
-                          <span className="font-medium">₦{orderSummary.platform_service_charge?.toLocaleString() || 0}</span>
-                        </div>
-                      )}
-
-                      {orderSummary.platform_commission > 0 && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Platform Commission (2.5%)</span>
-                          <span className="font-medium">₦{orderSummary.platform_commission?.toLocaleString() || 0}</span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Delivery Fees</span>
-                        <span className="font-medium">₦{orderSummary.delivery_total?.toLocaleString() || 0}</span>
-                      </div>
-
-                      {orderSummary.is_agent && orderSummary.agent_commission > 0 && (
-                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 -mx-1">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-emerald-700 font-medium">🎁 Your Agent Commission (4%)</span>
-                            <span className="font-semibold text-emerald-700">₦{orderSummary.agent_commission?.toLocaleString() || 0}</span>
-                          </div>
-                          <p className="text-xs text-emerald-600 mt-1">
-                            Paid separately to your account after order completion
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="border-t border-gray-200 pt-3">
-                        <div className="flex justify-between">
-                          <span className="text-lg font-semibold text-gray-900">Total to Pay</span>
-                          <span className="text-lg font-semibold text-emerald-600">₦{orderSummary.total?.toLocaleString() || 0}</span>
-                        </div>
-                      </div>
-
-                      {/* Breakdown Info */}
-                      <div className="text-xs text-gray-500 mt-2 space-y-1">
-                        <div>• Vendor receives: ₦{orderSummary.product_total?.toLocaleString() || 0}</div>
-                        <div>• Platform fee: ₦{orderSummary.platform_cut?.toLocaleString() || 0}</div>
-                        {orderSummary.is_agent && (
-                          <div className="text-emerald-600 font-medium">• Your commission: ₦{orderSummary.agent_commission?.toLocaleString() || 0}</div>
                         )}
-                      </div>
-                    </div>
 
-                    {/* Shipping Address Summary */}
-                    {checkoutStep !== 'review' && shippingAddress.full_name && (
-                      <div className="mt-6 pt-6 border-t border-gray-200">
-                        <h4 className="font-medium text-gray-900 mb-2">📍 Shipping To:</h4>
-                        <div className="text-sm text-gray-600">
-                          <div>{shippingAddress.full_name}</div>
-                          <div>{shippingAddress.address_line_1}</div>
-                          {shippingAddress.address_line_2 && <div>{shippingAddress.address_line_2}</div>}
-                          <div>{shippingAddress.city}, {shippingAddress.state}</div>
-                          <div>{shippingAddress.country}</div>
-                          <div className="mt-1 font-medium">{shippingAddress.phone}</div>
+                        <div className="flex justify-end">
+                          <button
+                            onClick={() => setCheckoutStep('address')}
+                            className={`px-6 py-2 text-white rounded-lg font-medium ${checkoutPlatform === 'pyexpress'
+                              ? 'bg-emerald-600 hover:bg-emerald-700'
+                              : 'bg-orange-600 hover:bg-orange-700'
+                              }`}
+                          >
+                            Continue to Shipping
+                          </button>
                         </div>
                       </div>
                     )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Enhanced Delivery Request Modal */}
-      {showCreateDeliveryRequest && (
-        <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-gray-900">🚚 Create Delivery Request</h2>
-                <button
-                  onClick={() => setShowCreateDeliveryRequest(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
+                    {/* Step 2: Shipping Address */}
+                    {checkoutStep === 'address' && (
+                      <div className="space-y-6">
+                        <h3 className="text-lg font-semibold text-gray-900">📍 Shipping Address</h3>
 
-            <div className="p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Column - Form */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Order Details</h3>
-
-                  {/* Order Information */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Order ID</label>
-                      <input
-                        type="text"
-                        value={enhancedDeliveryForm.order_id}
-                        onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, order_id: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                        placeholder="e.g., ORD-12345"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Order Type</label>
-                      <select
-                        value={enhancedDeliveryForm.order_type}
-                        onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, order_type: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      >
-                        <option value="regular">Regular Order</option>
-                        <option value="preorder">Pre-order</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Product Details */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Product Details *</label>
-                    <textarea
-                      value={enhancedDeliveryForm.product_details}
-                      onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, product_details: e.target.value }))}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      placeholder="Describe the products to be delivered..."
-                    />
-                  </div>
-
-                  {/* Quantity and Weight */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Total Quantity *</label>
-                      <input
-                        type="number"
-                        value={enhancedDeliveryForm.total_quantity}
-                        onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, total_quantity: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                        placeholder="100"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                      <select
-                        value={enhancedDeliveryForm.quantity_unit}
-                        onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, quantity_unit: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      >
-                        <option value="kg">Kilograms</option>
-                        <option value="pieces">Pieces</option>
-                        <option value="bags">Bags</option>
-                        <option value="tins">Tins</option>
-                        <option value="crates">Crates</option>
-                        <option value="liters">Liters</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
-                      <input
-                        type="number"
-                        value={enhancedDeliveryForm.weight_kg}
-                        onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, weight_kg: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                        placeholder="50"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Locations */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">📍 Pickup Address *</label>
-                    <input
-                      type="text"
-                      value={enhancedDeliveryForm.pickup_address}
-                      onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, pickup_address: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      placeholder="Enter pickup address..."
-                    />
-                  </div>
-
-                  {/* Multiple Delivery Destinations */}
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="block text-sm font-medium text-gray-700">🎯 Delivery Destinations *</label>
-                      <button
-                        type="button"
-                        onClick={addDeliveryDestination}
-                        className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
-                      >
-                        + Add Destination
-                      </button>
-                    </div>
-
-                    <div className="space-y-2">
-                      {multipleDestinations.map((destination, index) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <div className="flex-1">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                             <input
                               type="text"
-                              value={destination}
-                              onChange={(e) => updateDeliveryDestination(index, e.target.value)}
+                              value={shippingAddress.full_name}
+                              onChange={(e) => setShippingAddress(prev => ({ ...prev, full_name: e.target.value }))}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                              placeholder={`Destination ${index + 1} address...`}
+                              placeholder="Enter your full name"
                             />
                           </div>
-                          {multipleDestinations.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeDeliveryDestination(index)}
-                              className="text-red-600 hover:text-red-700 p-1"
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                            <input
+                              type="tel"
+                              value={shippingAddress.phone}
+                              onChange={(e) => setShippingAddress(prev => ({ ...prev, phone: e.target.value }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                              placeholder="+234 xxx xxx xxxx"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                            <input
+                              type="email"
+                              value={shippingAddress.email}
+                              onChange={(e) => setShippingAddress(prev => ({ ...prev, email: e.target.value }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                              placeholder="your.email@example.com"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1 *</label>
+                            <input
+                              type="text"
+                              value={shippingAddress.address_line_1}
+                              onChange={(e) => setShippingAddress(prev => ({ ...prev, address_line_1: e.target.value }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                              placeholder="Street address, P.O. box, company name"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
+                            <input
+                              type="text"
+                              value={shippingAddress.address_line_2}
+                              onChange={(e) => setShippingAddress(prev => ({ ...prev, address_line_2: e.target.value }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                              placeholder="Apartment, suite, unit, building, floor, etc."
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                            <input
+                              type="text"
+                              value={shippingAddress.city}
+                              onChange={(e) => setShippingAddress(prev => ({ ...prev, city: e.target.value }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                              placeholder="Lagos"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
+                            <input
+                              type="text"
+                              value={shippingAddress.state}
+                              onChange={(e) => setShippingAddress(prev => ({ ...prev, state: e.target.value }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                              placeholder="Lagos State"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                            <input
+                              type="text"
+                              value={shippingAddress.postal_code}
+                              onChange={(e) => setShippingAddress(prev => ({ ...prev, postal_code: e.target.value }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                              placeholder="100001"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                            <select
+                              value={shippingAddress.country}
+                              onChange={(e) => setShippingAddress(prev => ({ ...prev, country: e.target.value }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
                             >
-                              ✕
-                            </button>
-                          )}
+                              <option value="Nigeria">Nigeria</option>
+                              <option value="Ghana">Ghana</option>
+                              <option value="Kenya">Kenya</option>
+                            </select>
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Instructions</label>
+                            <textarea
+                              value={shippingAddress.delivery_instructions}
+                              onChange={(e) => setShippingAddress(prev => ({ ...prev, delivery_instructions: e.target.value }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                              rows="3"
+                              placeholder="Any special delivery instructions..."
+                            />
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Pricing */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">💰 Estimated Price (₦) *</label>
-                    <input
-                      type="number"
-                      value={enhancedDeliveryForm.estimated_price}
-                      onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, estimated_price: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      placeholder="5000"
-                    />
-                  </div>
-
-                  {/* Special Instructions */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">📝 Special Instructions</label>
-                    <textarea
-                      value={enhancedDeliveryForm.special_instructions}
-                      onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, special_instructions: e.target.value }))}
-                      rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      placeholder="Any special handling requirements..."
-                    />
-                  </div>
-                </div>
-
-                {/* Right Column - Driver Search & Map */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">🔍 Find & Select Driver</h3>
-
-                  {/* Driver Search */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Search Drivers</label>
-                    <div className="flex space-x-2">
-                      <input
-                        type="text"
-                        value={driverSearch}
-                        onChange={(e) => setDriverSearch(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                        placeholder="Search by driver name or username..."
-                      />
-                      <button
-                        type="button"
-                        onClick={() => searchDrivers(pickupCoordinates)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                      >
-                        🔍
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Search Results */}
-                  {searchResults.length > 0 && (
-                    <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
-                      <div className="p-2 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
-                        Available Drivers ({searchResults.length})
+                        <div className="flex justify-between">
+                          <button
+                            onClick={() => setCheckoutStep('review')}
+                            className="px-6 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+                          >
+                            Back to Review
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (validateAddress()) {
+                                setCheckoutStep('payment');
+                              }
+                            }}
+                            className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
+                          >
+                            Continue to Payment
+                          </button>
+                        </div>
                       </div>
-                      {searchResults.map((driver) => (
-                        <div
-                          key={driver.driver_id}
-                          onClick={() => {
-                            setSelectedDriver(driver);
-                            setEnhancedDeliveryForm(prev => ({ ...prev, preferred_driver_username: driver.driver_username }));
-                          }}
-                          className={`p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 ${selectedDriver?.driver_id === driver.driver_id ? 'bg-emerald-50 border-emerald-200' : ''
-                            }`}
-                        >
-                          <div className="flex justify-between items-start">
+                    )}
+
+                    {/* Step 3: Payment */}
+                    {checkoutStep === 'payment' && (
+                      <div className="space-y-6">
+                        <h3 className="text-lg font-semibold text-gray-900">💳 Payment with Paystack</h3>
+
+                        <div className={`border rounded-lg p-4 ${checkoutPlatform === 'pyexpress'
+                          ? 'bg-emerald-50 border-emerald-200'
+                          : 'bg-orange-50 border-orange-200'
+                          }`}>
+                          <div className="flex items-start">
+                            <svg className={`w-5 h-5 mr-2 flex-shrink-0 mt-0.5 ${checkoutPlatform === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600'
+                              }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
                             <div>
-                              <div className="font-medium text-gray-900">{driver.driver_name}</div>
-                              <div className="text-sm text-gray-600">@{driver.driver_username}</div>
-                              <div className="text-sm text-gray-500">
-                                ⭐ {driver.rating} • {driver.total_deliveries} deliveries
-                              </div>
-                              <div className="text-sm text-blue-600">
-                                🚗 {driver.vehicle_info.make_model} ({driver.vehicle_info.plate_number})
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className={`text-sm px-2 py-1 rounded-full ${driver.status === 'online' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                              <div className={`font-medium ${checkoutPlatform === 'pyexpress' ? 'text-emerald-900' : 'text-orange-900'
                                 }`}>
-                                {driver.status}
+                                {checkoutPlatform === 'pyexpress' ? 'PyExpress Checkout' : 'Farm Deals Checkout'}
                               </div>
-                              {driver.distance_km && (
-                                <div className="text-sm text-gray-500 mt-1">
-                                  📍 {driver.distance_km} km away
+                              <div className={`text-sm mt-1 ${checkoutPlatform === 'pyexpress' ? 'text-emerald-700' : 'text-orange-700'
+                                }`}>
+                                {checkoutPlatform === 'pyexpress'
+                                  ? 'Payment will be split: Vendor receives product payment, platform handles service charges'
+                                  : 'Payment via Fixed Split Group - Sophie Farms Investment Ltd manages farmer payouts'}
+                              </div>
+                              {user && (user.role === 'agent' || user.role === 'purchasing_agent') && (
+                                <div className="mt-2 text-sm font-medium text-blue-700">
+                                  ✨ As an agent, you'll earn commission on this purchase!
                                 </div>
                               )}
                             </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
 
-                  {/* Selected Driver */}
-                  {selectedDriver && (
-                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
-                      <div className="text-sm font-medium text-emerald-800 mb-2">✅ Selected Driver</div>
-                      <div className="font-medium text-gray-900">{selectedDriver.driver_name}</div>
-                      <div className="text-sm text-gray-600">@{selectedDriver.driver_username}</div>
-                      <div className="text-sm text-gray-500">
-                        ⭐ {selectedDriver.rating} • {selectedDriver.total_deliveries} deliveries
+                        <div className="space-y-4">
+                          <div className="font-medium text-gray-900">Secure Payment via Paystack</div>
+                          <div className="space-y-2">
+                            <div className="flex items-center p-3 border border-gray-200 rounded-lg bg-white">
+                              <svg className="w-8 h-8 text-emerald-600 mr-3" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" />
+                              </svg>
+                              <div>
+                                <div className="font-medium">Debit/Credit Card</div>
+                                <div className="text-sm text-gray-600">Visa, Mastercard, Verve supported</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center p-3 border border-gray-200 rounded-lg bg-white">
+                              <svg className="w-8 h-8 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                              </svg>
+                              <div>
+                                <div className="font-medium">Bank Transfer & USSD</div>
+                                <div className="text-sm text-gray-600">Transfer directly from your bank</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center p-3 border border-gray-200 rounded-lg bg-white">
+                              <svg className="w-8 h-8 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                              <div>
+                                <div className="font-medium">Mobile Money</div>
+                                <div className="text-sm text-gray-600">MTN, Airtel, and other providers</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between">
+                          <button
+                            onClick={() => setCheckoutStep('address')}
+                            className="px-6 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+                          >
+                            Back to Address
+                          </button>
+                          <button
+                            onClick={initializePayment}
+                            disabled={paymentProcessing}
+                            className={`px-8 py-2 text-white rounded-lg font-medium flex items-center ${checkoutPlatform === 'pyexpress'
+                              ? 'bg-emerald-600 hover:bg-emerald-700'
+                              : 'bg-orange-600 hover:bg-orange-700'
+                              } ${paymentProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            {paymentProcessing ? (
+                              <>
+                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Processing...
+                              </>
+                            ) : (
+                              `Pay ₦${orderSummary.total?.toLocaleString() || 0} Securely`
+                            )}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Map Placeholder */}
-                  <div className="h-48 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center">
-                    <div className="text-center text-gray-500">
-                      <div className="text-2xl mb-2">🗺️</div>
-                      <div className="text-sm">Interactive Map</div>
-                      <div className="text-xs">Pickup & delivery locations will be shown here</div>
-                    </div>
+                    )}
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex space-x-3 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateDeliveryRequest(false)}
-                      className="flex-1 px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={createEnhancedDeliveryRequest}
-                      className="flex-1 px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
-                    >
-                      Create Request
-                    </button>
+                  {/* Order Summary Sidebar */}
+                  <div className="lg:col-span-1">
+                    <div className="bg-gray-50 rounded-lg p-6 sticky top-0">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Order Summary</h3>
+
+                      <div className="space-y-3">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Product Total ({orderSummary.item_count} items)</span>
+                          <span className="font-medium">₦{orderSummary.product_total?.toLocaleString() || 0}</span>
+                        </div>
+
+                        {orderSummary.platform_service_charge > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Service Charge</span>
+                            <span className="font-medium">₦{orderSummary.platform_service_charge?.toLocaleString() || 0}</span>
+                          </div>
+                        )}
+
+                        {orderSummary.platform_commission > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Platform Commission (2.5%)</span>
+                            <span className="font-medium">₦{orderSummary.platform_commission?.toLocaleString() || 0}</span>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Delivery Fees</span>
+                          <span className="font-medium">₦{orderSummary.delivery_total?.toLocaleString() || 0}</span>
+                        </div>
+
+                        {orderSummary.is_agent && orderSummary.agent_commission > 0 && (
+                          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 -mx-1">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-emerald-700 font-medium">🎁 Your Agent Commission (4%)</span>
+                              <span className="font-semibold text-emerald-700">₦{orderSummary.agent_commission?.toLocaleString() || 0}</span>
+                            </div>
+                            <p className="text-xs text-emerald-600 mt-1">
+                              Paid separately to your account after order completion
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="border-t border-gray-200 pt-3">
+                          <div className="flex justify-between">
+                            <span className="text-lg font-semibold text-gray-900">Total to Pay</span>
+                            <span className="text-lg font-semibold text-emerald-600">₦{orderSummary.total?.toLocaleString() || 0}</span>
+                          </div>
+                        </div>
+
+                        {/* Breakdown Info */}
+                        <div className="text-xs text-gray-500 mt-2 space-y-1">
+                          <div>• Vendor receives: ₦{orderSummary.product_total?.toLocaleString() || 0}</div>
+                          <div>• Platform fee: ₦{orderSummary.platform_cut?.toLocaleString() || 0}</div>
+                          {orderSummary.is_agent && (
+                            <div className="text-emerald-600 font-medium">• Your commission: ₦{orderSummary.agent_commission?.toLocaleString() || 0}</div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Shipping Address Summary */}
+                      {checkoutStep !== 'review' && shippingAddress.full_name && (
+                        <div className="mt-6 pt-6 border-t border-gray-200">
+                          <h4 className="font-medium text-gray-900 mb-2">📍 Shipping To:</h4>
+                          <div className="text-sm text-gray-600">
+                            <div>{shippingAddress.full_name}</div>
+                            <div>{shippingAddress.address_line_1}</div>
+                            {shippingAddress.address_line_2 && <div>{shippingAddress.address_line_2}</div>}
+                            <div>{shippingAddress.city}, {shippingAddress.state}</div>
+                            <div>{shippingAddress.country}</div>
+                            <div className="mt-1 font-medium">{shippingAddress.phone}</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-      {/* Delivery Messages Modal */}
-      {showDriverMessages && (
-        <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex">
-            {/* Left Side - Delivery Info */}
-            <div className="w-1/3 bg-gray-50 border-r border-gray-200 p-4">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">📦 Delivery Info</h3>
-                <button
-                  onClick={() => setShowDriverMessages(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-
-              {trackingData && (
-                <div className="space-y-4">
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">Status</div>
-                    <div className="text-lg font-semibold text-emerald-600">{trackingData.status}</div>
-                  </div>
-
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">Product</div>
-                    <div className="text-sm text-gray-900">{trackingData.product_details}</div>
-                  </div>
-
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">Quantity</div>
-                    <div className="text-sm text-gray-900">{trackingData.total_quantity} {trackingData.quantity_unit}</div>
-                  </div>
-
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">Pickup</div>
-                    <div className="text-sm text-gray-900">{trackingData.pickup_location.address}</div>
-                  </div>
-
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">Destinations</div>
-                    {trackingData.delivery_locations.map((location, index) => (
-                      <div key={index} className="text-sm text-gray-900">
-                        {index + 1}. {location.address}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">Price</div>
-                    <div className="text-sm text-gray-900">
-                      ₦{trackingData.negotiated_price || trackingData.estimated_price}
-                    </div>
-                  </div>
+      {/* Enhanced Delivery Request Modal */}
+      {
+        showCreateDeliveryRequest && (
+          <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-semibold text-gray-900">🚚 Create Delivery Request</h2>
+                  <button
+                    onClick={() => setShowCreateDeliveryRequest(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
                 </div>
-              )}
-            </div>
-
-            {/* Right Side - Chat */}
-            <div className="flex-1 flex flex-col">
-              <div className="p-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">💬 Delivery Chat</h3>
               </div>
 
-              {/* Messages */}
-              <div className="flex-1 p-4 overflow-y-auto">
-                {deliveryMessages.length === 0 ? (
-                  <div className="text-center text-gray-500 mt-8">
-                    <div className="text-2xl mb-2">💬</div>
-                    <div>No messages yet</div>
-                    <div className="text-sm">Start a conversation with your driver</div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {deliveryMessages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`flex ${message.sender_username === user.username ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div className={`max-w-xs px-3 py-2 rounded-lg ${message.sender_username === user.username
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-gray-200 text-gray-900'
-                          }`}>
-                          <div className="text-sm">
-                            {message.message_type === 'location' ? (
-                              <div>
-                                <div className="font-medium">📍 Location shared</div>
-                                <div className="text-xs opacity-75">Tap to view on map</div>
-                              </div>
-                            ) : (
-                              message.content
+              <div className="p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left Column - Form */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Order Details</h3>
+
+                    {/* Order Information */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Order ID</label>
+                        <input
+                          type="text"
+                          value={enhancedDeliveryForm.order_id}
+                          onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, order_id: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                          placeholder="e.g., ORD-12345"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Order Type</label>
+                        <select
+                          value={enhancedDeliveryForm.order_type}
+                          onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, order_type: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        >
+                          <option value="regular">Regular Order</option>
+                          <option value="preorder">Pre-order</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Product Details */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Product Details *</label>
+                      <textarea
+                        value={enhancedDeliveryForm.product_details}
+                        onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, product_details: e.target.value }))}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        placeholder="Describe the products to be delivered..."
+                      />
+                    </div>
+
+                    {/* Quantity and Weight */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Total Quantity *</label>
+                        <input
+                          type="number"
+                          value={enhancedDeliveryForm.total_quantity}
+                          onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, total_quantity: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                          placeholder="100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                        <select
+                          value={enhancedDeliveryForm.quantity_unit}
+                          onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, quantity_unit: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        >
+                          <option value="kg">Kilograms</option>
+                          <option value="pieces">Pieces</option>
+                          <option value="bags">Bags</option>
+                          <option value="tins">Tins</option>
+                          <option value="crates">Crates</option>
+                          <option value="liters">Liters</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
+                        <input
+                          type="number"
+                          value={enhancedDeliveryForm.weight_kg}
+                          onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, weight_kg: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                          placeholder="50"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Locations */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">📍 Pickup Address *</label>
+                      <input
+                        type="text"
+                        value={enhancedDeliveryForm.pickup_address}
+                        onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, pickup_address: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        placeholder="Enter pickup address..."
+                      />
+                    </div>
+
+                    {/* Multiple Delivery Destinations */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-medium text-gray-700">🎯 Delivery Destinations *</label>
+                        <button
+                          type="button"
+                          onClick={addDeliveryDestination}
+                          className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                        >
+                          + Add Destination
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {multipleDestinations.map((destination, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <div className="flex-1">
+                              <input
+                                type="text"
+                                value={destination}
+                                onChange={(e) => updateDeliveryDestination(index, e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                                placeholder={`Destination ${index + 1} address...`}
+                              />
+                            </div>
+                            {multipleDestinations.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeDeliveryDestination(index)}
+                                className="text-red-600 hover:text-red-700 p-1"
+                              >
+                                ✕
+                              </button>
                             )}
                           </div>
-                          <div className="text-xs mt-1 opacity-75">
-                            {new Date(message.timestamp).toLocaleTimeString()}
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Pricing */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">💰 Estimated Price (₦) *</label>
+                      <input
+                        type="number"
+                        value={enhancedDeliveryForm.estimated_price}
+                        onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, estimated_price: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        placeholder="5000"
+                      />
+                    </div>
+
+                    {/* Special Instructions */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">📝 Special Instructions</label>
+                      <textarea
+                        value={enhancedDeliveryForm.special_instructions}
+                        onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, special_instructions: e.target.value }))}
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        placeholder="Any special handling requirements..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right Column - Driver Search & Map */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">🔍 Find & Select Driver</h3>
+
+                    {/* Driver Search */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Search Drivers</label>
+                      <div className="flex space-x-2">
+                        <input
+                          type="text"
+                          value={driverSearch}
+                          onChange={(e) => setDriverSearch(e.target.value)}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                          placeholder="Search by driver name or username..."
+                        />
+                        <button
+                          type="button"
+                          onClick={() => searchDrivers(pickupCoordinates)}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        >
+                          🔍
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Search Results */}
+                    {searchResults.length > 0 && (
+                      <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
+                        <div className="p-2 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+                          Available Drivers ({searchResults.length})
+                        </div>
+                        {searchResults.map((driver) => (
+                          <div
+                            key={driver.driver_id}
+                            onClick={() => {
+                              setSelectedDriver(driver);
+                              setEnhancedDeliveryForm(prev => ({ ...prev, preferred_driver_username: driver.driver_username }));
+                            }}
+                            className={`p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 ${selectedDriver?.driver_id === driver.driver_id ? 'bg-emerald-50 border-emerald-200' : ''
+                              }`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="font-medium text-gray-900">{driver.driver_name}</div>
+                                <div className="text-sm text-gray-600">@{driver.driver_username}</div>
+                                <div className="text-sm text-gray-500">
+                                  ⭐ {driver.rating} • {driver.total_deliveries} deliveries
+                                </div>
+                                <div className="text-sm text-blue-600">
+                                  🚗 {driver.vehicle_info.make_model} ({driver.vehicle_info.plate_number})
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className={`text-sm px-2 py-1 rounded-full ${driver.status === 'online' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                                  }`}>
+                                  {driver.status}
+                                </div>
+                                {driver.distance_km && (
+                                  <div className="text-sm text-gray-500 mt-1">
+                                    📍 {driver.distance_km} km away
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Selected Driver */}
+                    {selectedDriver && (
+                      <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                        <div className="text-sm font-medium text-emerald-800 mb-2">✅ Selected Driver</div>
+                        <div className="font-medium text-gray-900">{selectedDriver.driver_name}</div>
+                        <div className="text-sm text-gray-600">@{selectedDriver.driver_username}</div>
+                        <div className="text-sm text-gray-500">
+                          ⭐ {selectedDriver.rating} • {selectedDriver.total_deliveries} deliveries
                         </div>
                       </div>
-                    ))}
+                    )}
+
+                    {/* Map Placeholder */}
+                    <div className="h-48 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center">
+                      <div className="text-center text-gray-500">
+                        <div className="text-2xl mb-2">🗺️</div>
+                        <div className="text-sm">Interactive Map</div>
+                        <div className="text-xs">Pickup & delivery locations will be shown here</div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex space-x-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateDeliveryRequest(false)}
+                        className="flex-1 px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={createEnhancedDeliveryRequest}
+                        className="flex-1 px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
+                      >
+                        Create Request
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Delivery Messages Modal */}
+      {
+        showDriverMessages && (
+          <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex">
+              {/* Left Side - Delivery Info */}
+              <div className="w-1/3 bg-gray-50 border-r border-gray-200 p-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">📦 Delivery Info</h3>
+                  <button
+                    onClick={() => setShowDriverMessages(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {trackingData && (
+                  <div className="space-y-4">
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">Status</div>
+                      <div className="text-lg font-semibold text-emerald-600">{trackingData.status}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">Product</div>
+                      <div className="text-sm text-gray-900">{trackingData.product_details}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">Quantity</div>
+                      <div className="text-sm text-gray-900">{trackingData.total_quantity} {trackingData.quantity_unit}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">Pickup</div>
+                      <div className="text-sm text-gray-900">{trackingData.pickup_location.address}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">Destinations</div>
+                      {trackingData.delivery_locations.map((location, index) => (
+                        <div key={index} className="text-sm text-gray-900">
+                          {index + 1}. {location.address}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">Price</div>
+                      <div className="text-sm text-gray-900">
+                        ₦{trackingData.negotiated_price || trackingData.estimated_price}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Message Input */}
-              <div className="p-4 border-t border-gray-200">
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={newDeliveryMessage}
-                    onChange={(e) => setNewDeliveryMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && newDeliveryMessage.trim() && sendDeliveryMessage(currentDeliveryChat, newDeliveryMessage)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                    placeholder="Type a message..."
-                  />
-                  <button
-                    onClick={() => sendDeliveryMessage(currentDeliveryChat, 'Current location', 'location')}
-                    className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                    title="Share location"
-                  >
-                    📍
-                  </button>
-                  <button
-                    onClick={() => newDeliveryMessage.trim() && sendDeliveryMessage(currentDeliveryChat, newDeliveryMessage)}
-                    className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600"
-                  >
-                    Send
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Pre-order Details Modal */}
-      {showPreOrderDetails && selectedPreOrder && (
-        <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-gray-900">Pre-order Details</h2>
-                <button
-                  onClick={() => {
-                    setShowPreOrderDetails(false);
-                    setSelectedPreOrder(null);
-                  }}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              {/* Product Image */}
-              {selectedPreOrder.images && selectedPreOrder.images.length > 0 ? (
-                <img
-                  src={selectedPreOrder.images[0]}
-                  alt={selectedPreOrder.product_name}
-                  className="w-full h-48 object-cover rounded-lg mb-4"
-                />
-              ) : (
-                <div className="w-full h-48 bg-gray-200 flex items-center justify-center rounded-lg mb-4">
-                  <span className="text-gray-500">No Image</span>
-                </div>
-              )}
-
-              {/* Product Info */}
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">{selectedPreOrder.product_name}</h3>
-              <p className="text-gray-600 mb-4">{selectedPreOrder.description}</p>
-
-              {/* Price and Stock */}
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-emerald-50 p-3 rounded-lg">
-                  <div className="text-sm text-gray-600">Price per unit</div>
-                  <div className="text-xl font-bold text-emerald-600">
-                    ₦{selectedPreOrder.price_per_unit}/{selectedPreOrder.unit}
-                  </div>
-                </div>
-                <div className="bg-orange-50 p-3 rounded-lg">
-                  <div className="text-sm text-gray-600">Available stock</div>
-                  <div className="text-xl font-bold text-orange-600">
-                    {selectedPreOrder.available_stock} {selectedPreOrder.unit}
-                  </div>
-                </div>
-              </div>
-
-              {/* Business Info */}
-              <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-semibold text-gray-900 mb-2">Seller Information</h4>
-                <div className="space-y-1 text-sm">
-                  <div><span className="font-medium">Business:</span> {selectedPreOrder.business_name}</div>
-                  {selectedPreOrder.farm_name && (
-                    <div><span className="font-medium">Farm:</span> {selectedPreOrder.farm_name}</div>
-                  )}
-                  {selectedPreOrder.agent_username && (
-                    <div><span className="font-medium">Agent:</span> @{selectedPreOrder.agent_username}</div>
-                  )}
-                  <div><span className="font-medium">Location:</span> {selectedPreOrder.location}</div>
-                  <div><span className="font-medium">Seller Type:</span> {selectedPreOrder.seller_type}</div>
-                </div>
-              </div>
-
-              {/* Pre-order Details */}
-              <div className="mb-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
-                <h4 className="font-semibold text-orange-900 mb-2">Pre-order Information</h4>
-                <div className="space-y-1 text-sm text-orange-800">
-                  <div>
-                    <span className="font-medium">Partial payment required:</span>
-                    {Math.round(selectedPreOrder.partial_payment_percentage * 100)}% upfront
-                  </div>
-                  <div>
-                    <span className="font-medium">Remaining payment:</span>
-                    {100 - Math.round(selectedPreOrder.partial_payment_percentage * 100)}% on delivery
-                  </div>
-                  <div>
-                    <span className="font-medium">Expected delivery:</span>
-                    {new Date(selectedPreOrder.delivery_date).toLocaleDateString()}
-                  </div>
-                  {selectedPreOrder.orders_count > 0 && (
-                    <div>
-                      <span className="font-medium">Current orders:</span>
-                      {selectedPreOrder.orders_count} ({selectedPreOrder.total_ordered_quantity} {selectedPreOrder.unit})
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Order Form */}
-              {user ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Quantity ({selectedPreOrder.unit})
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max={selectedPreOrder.available_stock}
-                      defaultValue="1"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      id="preorder-quantity"
-                      onChange={(e) => {
-                        const quantity = parseInt(e.target.value) || 1;
-                        const total = quantity * selectedPreOrder.price_per_unit;
-                        const partial = Math.round(total * selectedPreOrder.partial_payment_percentage);
-
-                        document.getElementById('summary-quantity').textContent = `${quantity} ${selectedPreOrder.unit}`;
-                        document.getElementById('summary-total').textContent = `₦${total}`;
-                        document.getElementById('summary-partial').textContent = `₦${partial}`;
-                        document.getElementById('summary-remaining').textContent = `₦${total - partial}`;
-                      }}
-                    />
-                  </div>
-
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="text-sm text-gray-600 mb-1">Order Summary</div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span>Unit price:</span>
-                        <span>₦{selectedPreOrder.price_per_unit}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Quantity:</span>
-                        <span id="summary-quantity">1 {selectedPreOrder.unit}</span>
-                      </div>
-                      <div className="flex justify-between font-medium">
-                        <span>Total amount:</span>
-                        <span id="summary-total">₦{selectedPreOrder.price_per_unit}</span>
-                      </div>
-                      <div className="flex justify-between text-orange-600">
-                        <span>Partial payment now:</span>
-                        <span id="summary-partial">₦{Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
-                      </div>
-                      <div className="flex justify-between text-gray-600">
-                        <span>Remaining on delivery:</span>
-                        <span id="summary-remaining">₦{selectedPreOrder.price_per_unit - Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={async () => {
-                      const quantity = parseInt(document.getElementById('preorder-quantity').value);
-                      if (quantity <= 0 || quantity > selectedPreOrder.available_stock) {
-                        alert('Please enter a valid quantity');
-                        return;
-                      }
-
-                      try {
-                        const token = localStorage.getItem('token');
-                        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/preorders/${selectedPreOrder.id}/order`, {
-                          method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                          },
-                          body: JSON.stringify({ quantity })
-                        });
-
-                        if (response.ok) {
-                          const result = await response.json();
-                          alert(`Pre-order placed successfully! Order ID: ${result.order_id}\nPartial payment: ₦${result.partial_amount}\nRemaining: ₦${result.remaining_amount}`);
-                          setShowPreOrderDetails(false);
-                          setSelectedPreOrder(null);
-                          fetchProducts(); // Refresh products to update stock
-                        } else {
-                          const error = await response.json();
-                          alert(`Error: ${error.detail || 'Failed to place pre-order'}`);
-                        }
-                      } catch (error) {
-                        console.error('Error placing pre-order:', error);
-                        alert('Error placing pre-order. Please try again.');
-                      }
-                    }}
-                    className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 font-medium transition-colors"
-                  >
-                    Place Pre-order
-                  </button>
-                </div>
-              ) : (
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-gray-600 mb-3">Please sign in to place pre-orders</p>
-                  <button
-                    onClick={() => {
-                      setShowPreOrderDetails(false);
-                      setAuthMode('login');
-                      setShowAuthModal(true);
-                    }}
-                    className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-                  >
-                    Sign In
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create Pre-order Modal */}
-      {showCreatePreOrder && (
-        <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-gray-900">Create Pre-order</h2>
-                <button
-                  onClick={() => setShowCreatePreOrder(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                try {
-                  const token = localStorage.getItem('token');
-                  const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/preorders/create`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                      ...preOrderForm,
-                      total_stock: parseInt(preOrderForm.total_stock),
-                      price_per_unit: parseFloat(preOrderForm.price_per_unit),
-                      delivery_date: new Date(preOrderForm.delivery_date).toISOString()
-                    })
-                  });
-
-                  if (response.ok) {
-                    const result = await response.json();
-                    alert('Pre-order created successfully! You can publish it from your dashboard.');
-                    setShowCreatePreOrder(false);
-                    setPreOrderForm({
-                      product_name: '',
-                      product_category: 'vegetables',
-                      description: '',
-                      total_stock: '',
-                      unit: 'kg',
-                      price_per_unit: '',
-                      partial_payment_percentage: 0.3,
-                      location: '',
-                      delivery_date: '',
-                      business_name: '',
-                      farm_name: '',
-                      images: []
-                    });
-                  } else {
-                    const error = await response.json();
-                    alert(`Error: ${error.detail || 'Failed to create pre-order'}`);
-                  }
-                } catch (error) {
-                  console.error('Error creating pre-order:', error);
-                  alert('Error creating pre-order. Please try again.');
-                }
-              }}>
-                <div className="space-y-4">
-                  {/* Product Information */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
-                      <input
-                        type="text"
-                        required
-                        value={preOrderForm.product_name}
-                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, product_name: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                        placeholder="e.g., Organic Tomatoes"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
-                      <select
-                        required
-                        value={preOrderForm.product_category}
-                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, product_category: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      >
-                        <option value="vegetables">Vegetables</option>
-                        <option value="fruits">Fruits</option>
-                        <option value="grains">Grains</option>
-                        <option value="legumes">Legumes</option>
-                        <option value="spices">Spices</option>
-                        <option value="feeds">Feeds</option>
-                        <option value="fertilizer">Fertilizer</option>
-                        <option value="seeds">Seeds</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
-                    <textarea
-                      required
-                      value={preOrderForm.description}
-                      onChange={(e) => setPreOrderForm(prev => ({ ...prev, description: e.target.value }))}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      placeholder="Describe your product, quality, farming methods, etc."
-                    />
-                  </div>
-
-                  {/* Stock and Pricing */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Total Stock *</label>
-                      <input
-                        type="number"
-                        required
-                        min="1"
-                        value={preOrderForm.total_stock}
-                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, total_stock: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                        placeholder="e.g., 1000"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Unit *</label>
-                      <select
-                        required
-                        value={preOrderForm.unit}
-                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, unit: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      >
-                        <option value="kg">Kilogram (kg)</option>
-                        <option value="g">Gram (g)</option>
-                        <option value="ton">Ton</option>
-                        <option value="pieces">Pieces</option>
-                        <option value="liters">Liters</option>
-                        <option value="bags">Bags</option>
-                        <option value="tins">Tins</option>
-                        <option value="crates">Crates</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Price per Unit (₦) *</label>
-                      <input
-                        type="number"
-                        required
-                        min="0"
-                        step="0.01"
-                        value={preOrderForm.price_per_unit}
-                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, price_per_unit: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                        placeholder="e.g., 500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Partial Payment */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Partial Payment Required ({Math.round(preOrderForm.partial_payment_percentage * 100)}%)
-                    </label>
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="0.9"
-                      step="0.05"
-                      value={preOrderForm.partial_payment_percentage}
-                      onChange={(e) => setPreOrderForm(prev => ({ ...prev, partial_payment_percentage: parseFloat(e.target.value) }))}
-                      className="w-full"
-                    />
-                    <div className="flex justify-between text-xs text-gray-500 mt-1">
-                      <span>10%</span>
-                      <span>90%</span>
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Buyers will pay {Math.round(preOrderForm.partial_payment_percentage * 100)}% upfront, remaining on delivery
-                    </p>
-                  </div>
-
-                  {/* Location and Business Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Location *</label>
-                      <input
-                        type="text"
-                        required
-                        value={preOrderForm.location}
-                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, location: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                        placeholder="e.g., Lagos, Nigeria"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Date *</label>
-                      <input
-                        type="datetime-local"
-                        required
-                        value={preOrderForm.delivery_date}
-                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, delivery_date: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Business Name *</label>
-                      <input
-                        type="text"
-                        required
-                        value={preOrderForm.business_name}
-                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, business_name: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                        placeholder="e.g., Green Valley Farms"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Farm Name (optional)</label>
-                      <input
-                        type="text"
-                        value={preOrderForm.farm_name}
-                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, farm_name: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                        placeholder="e.g., Green Valley Farm"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                    <button
-                      type="button"
-                      onClick={() => setShowCreatePreOrder(false)}
-                      className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
-                    >
-                      Create Pre-order
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Enhanced Cart Modal */}
-      {showCart && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
-          <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-lg flex flex-col">
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex justify-between items-center mb-3">
-                <h2 className="text-lg font-semibold">🛒 Shopping Cart ({cart.length})</h2>
-                <button
-                  onClick={() => setShowCart(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-
-              {/* Cart Tabs */}
-              <div className="flex space-x-2 mt-3">
-                <button
-                  onClick={() => setActiveCartTab('pyexpress')}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeCartTab === 'pyexpress'
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                >
-                  PyExpress ({getPyExpressCartItems().length})
-                </button>
-                <button
-                  onClick={() => setActiveCartTab('farmdeals')}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeCartTab === 'farmdeals'
-                    ? 'bg-orange-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                >
-                  Farm Deals ({getFarmDealsCartItems().length})
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4">
-              {getActiveCartItems().length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="text-gray-500 mb-4">
-                    <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.1 5H17M9 19a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM20 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
-                    </svg>
-                    <p className="text-lg">This cart is empty</p>
-                    <p className="text-sm">
-                      {activeCartTab === 'pyexpress'
-                        ? 'Add business products from Home to get started!'
-                        : 'Add farm products from Farm Deals to get started!'}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {getActiveCartItems().map((item) => (
-                    <div key={item.id} className="bg-gray-50 rounded-lg p-3">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900 text-sm">
-                            {item.product.product_name || item.product.crop_type}
-                          </h3>
-                          <p className="text-xs text-gray-600">
-                            ₦{item.product.price_per_unit}/{item.unit}
-                            {item.unit_specification && <span className="text-gray-500"> ({item.unit_specification})</span>} • {item.product.seller_username}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => removeCartItem(item.id)}
-                          className="text-red-500 hover:text-red-700 text-sm"
-                        >
-                          ✕
-                        </button>
-                      </div>
-
-                      {/* Quantity Controls */}
-                      <div className="flex items-center space-x-2 mb-2">
-                        <button
-                          onClick={() => updateCartItemQuantity(item.id, item.quantity - 1)}
-                          className="w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-sm"
-                        >
-                          -
-                        </button>
-                        <span className="text-sm font-medium w-12 text-center">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => updateCartItemQuantity(item.id, item.quantity + 1)}
-                          className="w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-sm"
-                        >
-                          +
-                        </button>
-                        <span className="text-xs text-gray-600">
-                          {item.unit}{item.unit_specification && ` (${item.unit_specification})`}
-                        </span>
-                      </div>
-
-                      {/* Delivery Method Toggle */}
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-xs text-gray-600">Delivery:</span>
-                        <button
-                          onClick={() => updateCartItemDeliveryMethod(
-                            item.id,
-                            item.delivery_method === 'platform' ? 'offline' : 'platform'
-                          )}
-                          className={`text-xs px-2 py-1 rounded-full ${item.delivery_method === 'platform'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-green-100 text-green-700'
-                            }`}
-                        >
-                          {item.delivery_method === 'platform' ? '🚛 Platform' : '🚚 Offline'}
-                        </button>
-                      </div>
-
-                      {/* Item Total */}
-                      <div className="text-right">
-                        <span className="font-semibold text-emerald-600">
-                          ₦{(item.product.price_per_unit * item.quantity).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Cart Footer */}
-            {getActiveCartItems().length > 0 && (
-              <div className="p-4 border-t border-gray-200 bg-white">
-                <div className="space-y-2 mb-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Items ({getActiveCartItems().reduce((sum, item) => sum + item.quantity, 0)})</span>
-                    <span className="font-medium">₦{getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Est. Delivery</span>
-                    <span className="font-medium">₦{Math.round(getActiveCartItems().length * 350).toLocaleString()}</span>
-                  </div>
-                  <div className={`flex justify-between font-semibold pt-2 border-t border-gray-200 ${activeCartTab === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600'
-                    }`}>
-                    <span>Total</span>
-                    <span>₦{(getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0) + Math.round(getActiveCartItems().length * 350)).toLocaleString()}</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    calculateOrderSummary();
-                    proceedToCheckout();
-                  }}
-                  className={`w-full text-white py-3 px-4 rounded-lg font-medium transition-colors ${activeCartTab === 'pyexpress'
-                    ? 'bg-emerald-600 hover:bg-emerald-700'
-                    : 'bg-orange-600 hover:bg-orange-700'
-                    }`}
-                >
-                  Checkout {activeCartTab === 'pyexpress' ? 'PyExpress' : 'Farm Deals'} ({getActiveCartItems().length} items)
-                </button>
-
-                <button
-                  onClick={() => setShowCart(false)}
-                  className="w-full mt-2 text-gray-600 hover:text-gray-800 py-2 text-sm"
-                >
-                  Continue Shopping
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Enhanced Messaging Modal */}
-      {showMessaging && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
-          <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-lg flex flex-col">
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold">Messages</h2>
-                <button
-                  onClick={() => setShowMessaging(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            {!selectedConversation ? (
-              <div className="flex-1 p-4">
-                {/* Username Search */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Search users by username
-                  </label>
-                  <input
-                    type="text"
-                    value={usernameSearch}
-                    onChange={(e) => {
-                      setUsernameSearch(e.target.value);
-                      searchUsers(e.target.value);
-                    }}
-                    placeholder="Enter username..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  />
-                </div>
-
-                {/* Search Results */}
-                {foundUsers.length > 0 && (
-                  <div className="mb-4">
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">Found Users</h3>
-                    <div className="space-y-2">
-                      {foundUsers.map(foundUser => (
-                        <div
-                          key={foundUser.username}
-                          onClick={() => startConversation(foundUser)}
-                          className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center font-semibold">
-                              {foundUser.username.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="font-medium text-gray-900">
-                                {foundUser.first_name} {foundUser.last_name}
-                              </p>
-                              <p className="text-sm text-gray-500">@{foundUser.username}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Recent Conversations */}
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">Recent Conversations</h3>
-                  {conversations.length === 0 ? (
-                    <p className="text-gray-500 text-center">No conversations yet. Search for users to start messaging!</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {conversations.map(conversation => (
-                        <div
-                          key={conversation.id}
-                          onClick={() => setSelectedConversation(conversation)}
-                          className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
-                              {conversation.avatar}
-                            </div>
-                            <div>
-                              <p className="font-medium text-gray-900">{conversation.name}</p>
-                              <p className="text-sm text-gray-500">Click to view messages</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
+              {/* Right Side - Chat */}
               <div className="flex-1 flex flex-col">
-                {/* Conversation Header */}
-                <div className="p-3 border-b border-gray-200 bg-gray-50">
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={() => setSelectedConversation(null)}
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      ←
-                    </button>
-                    <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
-                      {selectedConversation.avatar}
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{selectedConversation.name}</p>
-                      <p className="text-sm text-gray-500">Online</p>
-                    </div>
-                  </div>
+                <div className="p-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">💬 Delivery Chat</h3>
                 </div>
 
-                {/* Messages Area */}
+                {/* Messages */}
                 <div className="flex-1 p-4 overflow-y-auto">
-                  {messages.filter(msg => msg.conversation_id === selectedConversation.id).length === 0 ? (
-                    <p className="text-gray-500 text-center">No messages yet. Start the conversation!</p>
+                  {deliveryMessages.length === 0 ? (
+                    <div className="text-center text-gray-500 mt-8">
+                      <div className="text-2xl mb-2">💬</div>
+                      <div>No messages yet</div>
+                      <div className="text-sm">Start a conversation with your driver</div>
+                    </div>
                   ) : (
                     <div className="space-y-3">
-                      {messages.filter(msg => msg.conversation_id === selectedConversation.id).map(message => (
+                      {deliveryMessages.map((message) => (
                         <div
                           key={message.id}
-                          className={`flex ${message.sender === user.username ? 'justify-end' : 'justify-start'}`}
+                          className={`flex ${message.sender_username === user.username ? 'justify-end' : 'justify-start'}`}
                         >
-                          <div className={`max-w-xs px-3 py-2 rounded-lg ${message.sender === user.username
+                          <div className={`max-w-xs px-3 py-2 rounded-lg ${message.sender_username === user.username
                             ? 'bg-emerald-500 text-white'
                             : 'bg-gray-200 text-gray-900'
                             }`}>
-                            {message.type === 'audio' ? (
-                              <div>
-                                <audio controls className="w-full">
-                                  <source src={message.content} type="audio/webm" />
-                                  Your browser does not support the audio element.
-                                </audio>
-                                <p className="text-xs mt-1 opacity-75">Voice message</p>
-                              </div>
-                            ) : (
-                              <p>{message.content || message.text}</p>
-                            )}
-                            <p className="text-xs mt-1 opacity-75">
+                            <div className="text-sm">
+                              {message.message_type === 'location' ? (
+                                <div>
+                                  <div className="font-medium">📍 Location shared</div>
+                                  <div className="text-xs opacity-75">Tap to view on map</div>
+                                </div>
+                              ) : (
+                                message.content
+                              )}
+                            </div>
+                            <div className="text-xs mt-1 opacity-75">
                               {new Date(message.timestamp).toLocaleTimeString()}
-                            </p>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -7600,1838 +6925,2104 @@ function App() {
                   )}
                 </div>
 
-                {/* Message Input Area */}
+                {/* Message Input */}
                 <div className="p-4 border-t border-gray-200">
-                  {audioBlob && (
-                    <div className="mb-3 p-2 bg-green-50 rounded-lg border border-green-200">
-                      <p className="text-sm text-green-700 mb-2">Voice message recorded</p>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={sendAudioMessage}
-                          className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
-                        >
-                          Send
-                        </button>
-                        <button
-                          onClick={() => setAudioBlob(null)}
-                          className="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="flex space-x-2">
                     <input
                       type="text"
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                      value={newDeliveryMessage}
+                      onChange={(e) => setNewDeliveryMessage(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && newDeliveryMessage.trim() && sendDeliveryMessage(currentDeliveryChat, newDeliveryMessage)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
                       placeholder="Type a message..."
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     />
                     <button
-                      onClick={isRecording ? stopRecording : startRecording}
-                      className={`px-3 py-2 rounded-lg font-medium ${isRecording
-                        ? 'bg-red-500 text-white hover:bg-red-600'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                        }`}
+                      onClick={() => sendDeliveryMessage(currentDeliveryChat, 'Current location', 'location')}
+                      className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                      title="Share location"
                     >
-                      {isRecording ? '⏹️' : '🎤'}
+                      📍
                     </button>
                     <button
-                      onClick={sendMessage}
-                      className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium"
+                      onClick={() => newDeliveryMessage.trim() && sendDeliveryMessage(currentDeliveryChat, newDeliveryMessage)}
+                      className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600"
                     >
                       Send
                     </button>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Order Tracking Modal */}
-      {showOrderTracking && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-96 overflow-hidden">
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold">Order Tracking</h2>
-                <button
-                  onClick={() => setShowOrderTracking(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
             </div>
+          </div>
+        )
+      }
 
-            <div className="p-4 overflow-y-auto max-h-80">
-              {orders.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No orders found</p>
-              ) : (
-                <div className="space-y-4">
-                  {orders.map(order => (
-                    <div key={order.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">Order #{order.id.slice(-8)}</h3>
-                          <p className="text-sm text-gray-600">
-                            {new Date(order.created_at).toLocaleDateString()}
-                          </p>
+      {/* Pre-order Details Modal */}
+      {
+        showPreOrderDetails && selectedPreOrder && (
+          <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-semibold text-gray-900">Pre-order Details</h2>
+                  <button
+                    onClick={() => {
+                      setShowPreOrderDetails(false);
+                      setSelectedPreOrder(null);
+                    }}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6">
+                {/* Product Image */}
+                {selectedPreOrder.images && selectedPreOrder.images.length > 0 ? (
+                  <img
+                    src={selectedPreOrder.images[0]}
+                    alt={selectedPreOrder.product_name}
+                    className="w-full h-48 object-cover rounded-lg mb-4"
+                  />
+                ) : (
+                  <div className="w-full h-48 bg-gray-200 flex items-center justify-center rounded-lg mb-4">
+                    <span className="text-gray-500">No Image</span>
+                  </div>
+                )}
+
+                {/* Product Info */}
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">{selectedPreOrder.product_name}</h3>
+                <p className="text-gray-600 mb-4">{selectedPreOrder.description}</p>
+
+                {/* Price and Stock */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="bg-emerald-50 p-3 rounded-lg">
+                    <div className="text-sm text-gray-600">Price per unit</div>
+                    <div className="text-xl font-bold text-emerald-600">
+                      ₦{selectedPreOrder.price_per_unit}/{selectedPreOrder.unit}
+                    </div>
+                  </div>
+                  <div className="bg-orange-50 p-3 rounded-lg">
+                    <div className="text-sm text-gray-600">Available stock</div>
+                    <div className="text-xl font-bold text-orange-600">
+                      {selectedPreOrder.available_stock} {selectedPreOrder.unit}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Business Info */}
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-2">Seller Information</h4>
+                  <div className="space-y-1 text-sm">
+                    <div><span className="font-medium">Business:</span> {selectedPreOrder.business_name}</div>
+                    {selectedPreOrder.farm_name && (
+                      <div><span className="font-medium">Farm:</span> {selectedPreOrder.farm_name}</div>
+                    )}
+                    {selectedPreOrder.agent_username && (
+                      <div><span className="font-medium">Agent:</span> @{selectedPreOrder.agent_username}</div>
+                    )}
+                    <div><span className="font-medium">Location:</span> {selectedPreOrder.location}</div>
+                    <div><span className="font-medium">Seller Type:</span> {selectedPreOrder.seller_type}</div>
+                  </div>
+                </div>
+
+                {/* Pre-order Details */}
+                <div className="mb-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                  <h4 className="font-semibold text-orange-900 mb-2">Pre-order Information</h4>
+                  <div className="space-y-1 text-sm text-orange-800">
+                    <div>
+                      <span className="font-medium">Partial payment required:</span>
+                      {Math.round(selectedPreOrder.partial_payment_percentage * 100)}% upfront
+                    </div>
+                    <div>
+                      <span className="font-medium">Remaining payment:</span>
+                      {100 - Math.round(selectedPreOrder.partial_payment_percentage * 100)}% on delivery
+                    </div>
+                    <div>
+                      <span className="font-medium">Expected delivery:</span>
+                      {new Date(selectedPreOrder.delivery_date).toLocaleDateString()}
+                    </div>
+                    {selectedPreOrder.orders_count > 0 && (
+                      <div>
+                        <span className="font-medium">Current orders:</span>
+                        {selectedPreOrder.orders_count} ({selectedPreOrder.total_ordered_quantity} {selectedPreOrder.unit})
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Order Form */}
+                {user ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Quantity ({selectedPreOrder.unit})
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max={selectedPreOrder.available_stock}
+                        defaultValue="1"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        id="preorder-quantity"
+                        onChange={(e) => {
+                          const quantity = parseInt(e.target.value) || 1;
+                          const total = quantity * selectedPreOrder.price_per_unit;
+                          const partial = Math.round(total * selectedPreOrder.partial_payment_percentage);
+
+                          document.getElementById('summary-quantity').textContent = `${quantity} ${selectedPreOrder.unit}`;
+                          document.getElementById('summary-total').textContent = `₦${total}`;
+                          document.getElementById('summary-partial').textContent = `₦${partial}`;
+                          document.getElementById('summary-remaining').textContent = `₦${total - partial}`;
+                        }}
+                      />
+                    </div>
+
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <div className="text-sm text-gray-600 mb-1">Order Summary</div>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span>Unit price:</span>
+                          <span>₦{selectedPreOrder.price_per_unit}</span>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                          order.status === 'in_transit' ? 'bg-blue-100 text-blue-800' :
-                            order.status === 'confirmed' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-gray-100 text-gray-800'
-                          }`}>
-                          {order.status.replace('_', ' ').toUpperCase()}
-                        </span>
-                      </div>
-
-                      <div className="text-sm text-gray-600 mb-2">
-                        <p><strong>Total:</strong> ₦{order.total_amount.toLocaleString()}</p>
-                        <p><strong>Items:</strong> {order.items.length} item(s)</p>
-                        <p><strong>Delivery:</strong> {order.delivery_address}</p>
-                      </div>
-
-                      <div className="space-y-1">
-                        {order.items.map((item, index) => (
-                          <div key={index} className="flex justify-between text-sm">
-                            <span>{item.title} × {item.quantity}</span>
-                            <span>₦{item.total.toLocaleString()}</span>
-                          </div>
-                        ))}
+                        <div className="flex justify-between">
+                          <span>Quantity:</span>
+                          <span id="summary-quantity">1 {selectedPreOrder.unit}</span>
+                        </div>
+                        <div className="flex justify-between font-medium">
+                          <span>Total amount:</span>
+                          <span id="summary-total">₦{selectedPreOrder.price_per_unit}</span>
+                        </div>
+                        <div className="flex justify-between text-orange-600">
+                          <span>Partial payment now:</span>
+                          <span id="summary-partial">₦{Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-600">
+                          <span>Remaining on delivery:</span>
+                          <span id="summary-remaining">₦{selectedPreOrder.price_per_unit - Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
+                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Add Drop-off Location Modal */}
-      {showAddDropOff && user && user.role === 'agent' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
-            {/* Header */}
-            <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">📍 Add Drop-off Location</h2>
-                  <p className="text-gray-600 mt-1">Create a convenient pickup location for buyers</p>
-                </div>
-                <button
-                  onClick={() => setShowAddDropOff(false)}
-                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
-                >
-                  ×
-                </button>
+                    <button
+                      onClick={async () => {
+                        const quantity = parseInt(document.getElementById('preorder-quantity').value);
+                        if (quantity <= 0 || quantity > selectedPreOrder.available_stock) {
+                          alert('Please enter a valid quantity');
+                          return;
+                        }
+
+                        try {
+                          const token = localStorage.getItem('token');
+                          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/preorders/${selectedPreOrder.id}/order`, {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({ quantity })
+                          });
+
+                          if (response.ok) {
+                            const result = await response.json();
+                            alert(`Pre-order placed successfully! Order ID: ${result.order_id}\nPartial payment: ₦${result.partial_amount}\nRemaining: ₦${result.remaining_amount}`);
+                            setShowPreOrderDetails(false);
+                            setSelectedPreOrder(null);
+                            fetchProducts(); // Refresh products to update stock
+                          } else {
+                            const error = await response.json();
+                            alert(`Error: ${error.detail || 'Failed to place pre-order'}`);
+                          }
+                        } catch (error) {
+                          console.error('Error placing pre-order:', error);
+                          alert('Error placing pre-order. Please try again.');
+                        }
+                      }}
+                      className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 font-medium transition-colors"
+                    >
+                      Place Pre-order
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <p className="text-gray-600 mb-3">Please sign in to place pre-orders</p>
+                    <button
+                      onClick={() => {
+                        setShowPreOrderDetails(false);
+                        setAuthMode('login');
+                        setShowAuthModal(true);
+                      }}
+                      className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                    >
+                      Sign In
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
+          </div>
+        )
+      }
 
-            {/* Form Content */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              <form
-                onSubmit={async (e) => {
+      {/* Create Pre-order Modal */}
+      {
+        showCreatePreOrder && (
+          <div className="modal-backdrop-blur fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-semibold text-gray-900">Create Pre-order</h2>
+                  <button
+                    onClick={() => setShowCreatePreOrder(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6">
+                <form onSubmit={async (e) => {
                   e.preventDefault();
-                  const formData = new FormData(e.target);
-
-                  const locationData = {
-                    name: formData.get('name'),
-                    address: formData.get('address'),
-                    city: formData.get('city'),
-                    state: formData.get('state'),
-                    country: formData.get('country') || 'Nigeria',
-                    contact_person: formData.get('contact_person'),
-                    contact_phone: formData.get('contact_phone'),
-                    operating_hours: formData.get('operating_hours'),
-                    description: formData.get('description')
-                  };
-
                   try {
                     const token = localStorage.getItem('token');
-                    const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/dropoff-locations`, {
+                    const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/preorders/create`, {
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                       },
-                      body: JSON.stringify(locationData)
+                      body: JSON.stringify({
+                        ...preOrderForm,
+                        total_stock: parseInt(preOrderForm.total_stock),
+                        price_per_unit: parseFloat(preOrderForm.price_per_unit),
+                        delivery_date: new Date(preOrderForm.delivery_date).toISOString()
+                      })
                     });
 
                     if (response.ok) {
                       const result = await response.json();
-                      alert(`Drop-off location "${result.location.name}" created successfully!`);
-
-                      // Add to local state
-                      setDropOffLocations(prev => [...prev, {
-                        id: result.location.id,
-                        name: result.location.name,
-                        address: result.location.address,
-                        city: result.location.city,
-                        state: result.location.state
-                      }]);
-
-                      setShowAddDropOff(false);
-                      e.target.reset();
+                      alert('Pre-order created successfully! You can publish it from your dashboard.');
+                      setShowCreatePreOrder(false);
+                      setPreOrderForm({
+                        product_name: '',
+                        product_category: 'vegetables',
+                        description: '',
+                        total_stock: '',
+                        unit: 'kg',
+                        price_per_unit: '',
+                        partial_payment_percentage: 0.3,
+                        location: '',
+                        delivery_date: '',
+                        business_name: '',
+                        farm_name: '',
+                        images: []
+                      });
                     } else {
                       const error = await response.json();
-                      alert(`Error: ${error.detail}`);
+                      alert(`Error: ${error.detail || 'Failed to create pre-order'}`);
                     }
                   } catch (error) {
-                    console.error('Error creating drop-off location:', error);
-                    alert('Error creating drop-off location. Please try again.');
+                    console.error('Error creating pre-order:', error);
+                    alert('Error creating pre-order. Please try again.');
                   }
-                }}
-                className="space-y-6"
-              >
-                {/* Basic Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Location Name *
+                }}>
+                  <div className="space-y-4">
+                    {/* Product Information */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
+                        <input
+                          type="text"
+                          required
+                          value={preOrderForm.product_name}
+                          onChange={(e) => setPreOrderForm(prev => ({ ...prev, product_name: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                          placeholder="e.g., Organic Tomatoes"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                        <select
+                          required
+                          value={preOrderForm.product_category}
+                          onChange={(e) => setPreOrderForm(prev => ({ ...prev, product_category: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        >
+                          <option value="vegetables">Vegetables</option>
+                          <option value="fruits">Fruits</option>
+                          <option value="grains">Grains</option>
+                          <option value="legumes">Legumes</option>
+                          <option value="spices">Spices</option>
+                          <option value="feeds">Feeds</option>
+                          <option value="fertilizer">Fertilizer</option>
+                          <option value="seeds">Seeds</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                      <textarea
+                        required
+                        value={preOrderForm.description}
+                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, description: e.target.value }))}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        placeholder="Describe your product, quality, farming methods, etc."
+                      />
+                    </div>
+
+                    {/* Stock and Pricing */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Total Stock *</label>
+                        <input
+                          type="number"
+                          required
+                          min="1"
+                          value={preOrderForm.total_stock}
+                          onChange={(e) => setPreOrderForm(prev => ({ ...prev, total_stock: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                          placeholder="e.g., 1000"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Unit *</label>
+                        <select
+                          required
+                          value={preOrderForm.unit}
+                          onChange={(e) => setPreOrderForm(prev => ({ ...prev, unit: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        >
+                          <option value="kg">Kilogram (kg)</option>
+                          <option value="g">Gram (g)</option>
+                          <option value="ton">Ton</option>
+                          <option value="pieces">Pieces</option>
+                          <option value="liters">Liters</option>
+                          <option value="bags">Bags</option>
+                          <option value="tins">Tins</option>
+                          <option value="crates">Crates</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Price per Unit (₦) *</label>
+                        <input
+                          type="number"
+                          required
+                          min="0"
+                          step="0.01"
+                          value={preOrderForm.price_per_unit}
+                          onChange={(e) => setPreOrderForm(prev => ({ ...prev, price_per_unit: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                          placeholder="e.g., 500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Partial Payment */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Partial Payment Required ({Math.round(preOrderForm.partial_payment_percentage * 100)}%)
+                      </label>
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="0.9"
+                        step="0.05"
+                        value={preOrderForm.partial_payment_percentage}
+                        onChange={(e) => setPreOrderForm(prev => ({ ...prev, partial_payment_percentage: parseFloat(e.target.value) }))}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>10%</span>
+                        <span>90%</span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Buyers will pay {Math.round(preOrderForm.partial_payment_percentage * 100)}% upfront, remaining on delivery
+                      </p>
+                    </div>
+
+                    {/* Location and Business Info */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Location *</label>
+                        <input
+                          type="text"
+                          required
+                          value={preOrderForm.location}
+                          onChange={(e) => setPreOrderForm(prev => ({ ...prev, location: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                          placeholder="e.g., Lagos, Nigeria"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Date *</label>
+                        <input
+                          type="datetime-local"
+                          required
+                          value={preOrderForm.delivery_date}
+                          onChange={(e) => setPreOrderForm(prev => ({ ...prev, delivery_date: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Business Name *</label>
+                        <input
+                          type="text"
+                          required
+                          value={preOrderForm.business_name}
+                          onChange={(e) => setPreOrderForm(prev => ({ ...prev, business_name: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                          placeholder="e.g., Green Valley Farms"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Farm Name (optional)</label>
+                        <input
+                          type="text"
+                          value={preOrderForm.farm_name}
+                          onChange={(e) => setPreOrderForm(prev => ({ ...prev, farm_name: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                          placeholder="e.g., Green Valley Farm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                      <button
+                        type="button"
+                        onClick={() => setShowCreatePreOrder(false)}
+                        className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
+                      >
+                        Create Pre-order
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Enhanced Cart Modal */}
+      {
+        showCart && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+            <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-lg flex flex-col">
+              <div className="p-4 border-b border-gray-200">
+                <div className="flex justify-between items-center mb-3">
+                  <h2 className="text-lg font-semibold">🛒 Shopping Cart ({cart.length})</h2>
+                  <button
+                    onClick={() => setShowCart(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Cart Tabs */}
+                <div className="flex space-x-2 mt-3">
+                  <button
+                    onClick={() => setActiveCartTab('pyexpress')}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeCartTab === 'pyexpress'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                  >
+                    PyExpress ({getPyExpressCartItems().length})
+                  </button>
+                  <button
+                    onClick={() => setActiveCartTab('farmdeals')}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeCartTab === 'farmdeals'
+                      ? 'bg-orange-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                  >
+                    Farm Deals ({getFarmDealsCartItems().length})
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4">
+                {getActiveCartItems().length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="text-gray-500 mb-4">
+                      <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.1 5H17M9 19a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM20 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+                      </svg>
+                      <p className="text-lg">This cart is empty</p>
+                      <p className="text-sm">
+                        {activeCartTab === 'pyexpress'
+                          ? 'Add business products from Home to get started!'
+                          : 'Add farm products from Farm Deals to get started!'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {getActiveCartItems().map((item) => (
+                      <div key={item.id} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <h3 className="font-medium text-gray-900 text-sm">
+                              {item.product.product_name || item.product.crop_type}
+                            </h3>
+                            <p className="text-xs text-gray-600">
+                              ₦{item.product.price_per_unit}/{item.unit}
+                              {item.unit_specification && <span className="text-gray-500"> ({item.unit_specification})</span>} • {item.product.seller_username}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => removeCartItem(item.id)}
+                            className="text-red-500 hover:text-red-700 text-sm"
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        {/* Quantity Controls */}
+                        <div className="flex items-center space-x-2 mb-2">
+                          <button
+                            onClick={() => updateCartItemQuantity(item.id, item.quantity - 1)}
+                            className="w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-sm"
+                          >
+                            -
+                          </button>
+                          <span className="text-sm font-medium w-12 text-center">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => updateCartItemQuantity(item.id, item.quantity + 1)}
+                            className="w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-sm"
+                          >
+                            +
+                          </button>
+                          <span className="text-xs text-gray-600">
+                            {item.unit}{item.unit_specification && ` (${item.unit_specification})`}
+                          </span>
+                        </div>
+
+                        {/* Delivery Method Toggle */}
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className="text-xs text-gray-600">Delivery:</span>
+                          <button
+                            onClick={() => updateCartItemDeliveryMethod(
+                              item.id,
+                              item.delivery_method === 'platform' ? 'offline' : 'platform'
+                            )}
+                            className={`text-xs px-2 py-1 rounded-full ${item.delivery_method === 'platform'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-green-100 text-green-700'
+                              }`}
+                          >
+                            {item.delivery_method === 'platform' ? '🚛 Platform' : '🚚 Offline'}
+                          </button>
+                        </div>
+
+                        {/* Item Total */}
+                        <div className="text-right">
+                          <span className="font-semibold text-emerald-600">
+                            ₦{(item.product.price_per_unit * item.quantity).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Cart Footer */}
+              {getActiveCartItems().length > 0 && (
+                <div className="p-4 border-t border-gray-200 bg-white">
+                  <div className="space-y-2 mb-4">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Items ({getActiveCartItems().reduce((sum, item) => sum + item.quantity, 0)})</span>
+                      <span className="font-medium">₦{getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Est. Delivery</span>
+                      <span className="font-medium">₦{Math.round(getActiveCartItems().length * 350).toLocaleString()}</span>
+                    </div>
+                    <div className={`flex justify-between font-semibold pt-2 border-t border-gray-200 ${activeCartTab === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600'
+                      }`}>
+                      <span>Total</span>
+                      <span>₦{(getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0) + Math.round(getActiveCartItems().length * 350)).toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      calculateOrderSummary();
+                      proceedToCheckout();
+                    }}
+                    className={`w-full text-white py-3 px-4 rounded-lg font-medium transition-colors ${activeCartTab === 'pyexpress'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-orange-600 hover:bg-orange-700'
+                      }`}
+                  >
+                    Checkout {activeCartTab === 'pyexpress' ? 'PyExpress' : 'Farm Deals'} ({getActiveCartItems().length} items)
+                  </button>
+
+                  <button
+                    onClick={() => setShowCart(false)}
+                    className="w-full mt-2 text-gray-600 hover:text-gray-800 py-2 text-sm"
+                  >
+                    Continue Shopping
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      {/* Enhanced Messaging Modal */}
+      {
+        showMessaging && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+            <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-lg flex flex-col">
+              <div className="p-4 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-lg font-semibold">Messages</h2>
+                  <button
+                    onClick={() => setShowMessaging(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              {!selectedConversation ? (
+                <div className="flex-1 p-4">
+                  {/* Username Search */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Search users by username
                     </label>
                     <input
                       type="text"
-                      name="name"
+                      value={usernameSearch}
+                      onChange={(e) => {
+                        setUsernameSearch(e.target.value);
+                        searchUsers(e.target.value);
+                      }}
+                      placeholder="Enter username..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Search Results */}
+                  {foundUsers.length > 0 && (
+                    <div className="mb-4">
+                      <h3 className="text-sm font-medium text-gray-700 mb-2">Found Users</h3>
+                      <div className="space-y-2">
+                        {foundUsers.map(foundUser => (
+                          <div
+                            key={foundUser.username}
+                            onClick={() => startConversation(foundUser)}
+                            className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center font-semibold">
+                                {foundUser.username.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">
+                                  {foundUser.first_name} {foundUser.last_name}
+                                </p>
+                                <p className="text-sm text-gray-500">@{foundUser.username}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recent Conversations */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Recent Conversations</h3>
+                    {conversations.length === 0 ? (
+                      <p className="text-gray-500 text-center">No conversations yet. Search for users to start messaging!</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {conversations.map(conversation => (
+                          <div
+                            key={conversation.id}
+                            onClick={() => setSelectedConversation(conversation)}
+                            className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
+                                {conversation.avatar}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">{conversation.name}</p>
+                                <p className="text-sm text-gray-500">Click to view messages</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col">
+                  {/* Conversation Header */}
+                  <div className="p-3 border-b border-gray-200 bg-gray-50">
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => setSelectedConversation(null)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        ←
+                      </button>
+                      <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
+                        {selectedConversation.avatar}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{selectedConversation.name}</p>
+                        <p className="text-sm text-gray-500">Online</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Messages Area */}
+                  <div className="flex-1 p-4 overflow-y-auto">
+                    {messages.filter(msg => msg.conversation_id === selectedConversation.id).length === 0 ? (
+                      <p className="text-gray-500 text-center">No messages yet. Start the conversation!</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {messages.filter(msg => msg.conversation_id === selectedConversation.id).map(message => (
+                          <div
+                            key={message.id}
+                            className={`flex ${message.sender === user.username ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div className={`max-w-xs px-3 py-2 rounded-lg ${message.sender === user.username
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-gray-200 text-gray-900'
+                              }`}>
+                              {message.type === 'audio' ? (
+                                <div>
+                                  <audio controls className="w-full">
+                                    <source src={message.content} type="audio/webm" />
+                                    Your browser does not support the audio element.
+                                  </audio>
+                                  <p className="text-xs mt-1 opacity-75">Voice message</p>
+                                </div>
+                              ) : (
+                                <p>{message.content || message.text}</p>
+                              )}
+                              <p className="text-xs mt-1 opacity-75">
+                                {new Date(message.timestamp).toLocaleTimeString()}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Message Input Area */}
+                  <div className="p-4 border-t border-gray-200">
+                    {audioBlob && (
+                      <div className="mb-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                        <p className="text-sm text-green-700 mb-2">Voice message recorded</p>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={sendAudioMessage}
+                            className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                          >
+                            Send
+                          </button>
+                          <button
+                            onClick={() => setAudioBlob(null)}
+                            className="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                        placeholder="Type a message..."
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+                      <button
+                        onClick={isRecording ? stopRecording : startRecording}
+                        className={`px-3 py-2 rounded-lg font-medium ${isRecording
+                          ? 'bg-red-500 text-white hover:bg-red-600'
+                          : 'bg-blue-500 text-white hover:bg-blue-600'
+                          }`}
+                      >
+                        {isRecording ? '⏹️' : '🎤'}
+                      </button>
+                      <button
+                        onClick={sendMessage}
+                        className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium"
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      {/* Order Tracking Modal */}
+      {
+        showOrderTracking && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-96 overflow-hidden">
+              <div className="p-4 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-lg font-semibold">Order Tracking</h2>
+                  <button
+                    onClick={() => setShowOrderTracking(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 overflow-y-auto max-h-80">
+                {orders.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No orders found</p>
+                ) : (
+                  <div className="space-y-4">
+                    {orders.map(order => (
+                      <div key={order.id} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h3 className="font-semibold text-gray-900">Order #{order.id.slice(-8)}</h3>
+                            <p className="text-sm text-gray-600">
+                              {new Date(order.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                            order.status === 'in_transit' ? 'bg-blue-100 text-blue-800' :
+                              order.status === 'confirmed' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                            }`}>
+                            {order.status.replace('_', ' ').toUpperCase()}
+                          </span>
+                        </div>
+
+                        <div className="text-sm text-gray-600 mb-2">
+                          <p><strong>Total:</strong> ₦{order.total_amount.toLocaleString()}</p>
+                          <p><strong>Items:</strong> {order.items.length} item(s)</p>
+                          <p><strong>Delivery:</strong> {order.delivery_address}</p>
+                        </div>
+
+                        <div className="space-y-1">
+                          {order.items.map((item, index) => (
+                            <div key={index} className="flex justify-between text-sm">
+                              <span>{item.title} × {item.quantity}</span>
+                              <span>₦{item.total.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Add Drop-off Location Modal */}
+      {
+        showAddDropOff && user && user.role === 'agent' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
+              {/* Header */}
+              <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">📍 Add Drop-off Location</h2>
+                    <p className="text-gray-600 mt-1">Create a convenient pickup location for buyers</p>
+                  </div>
+                  <button
+                    onClick={() => setShowAddDropOff(false)}
+                    className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              {/* Form Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+
+                    const locationData = {
+                      name: formData.get('name'),
+                      address: formData.get('address'),
+                      city: formData.get('city'),
+                      state: formData.get('state'),
+                      country: formData.get('country') || 'Nigeria',
+                      contact_person: formData.get('contact_person'),
+                      contact_phone: formData.get('contact_phone'),
+                      operating_hours: formData.get('operating_hours'),
+                      description: formData.get('description')
+                    };
+
+                    try {
+                      const token = localStorage.getItem('token');
+                      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/dropoff-locations`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(locationData)
+                      });
+
+                      if (response.ok) {
+                        const result = await response.json();
+                        alert(`Drop-off location "${result.location.name}" created successfully!`);
+
+                        // Add to local state
+                        setDropOffLocations(prev => [...prev, {
+                          id: result.location.id,
+                          name: result.location.name,
+                          address: result.location.address,
+                          city: result.location.city,
+                          state: result.location.state
+                        }]);
+
+                        setShowAddDropOff(false);
+                        e.target.reset();
+                      } else {
+                        const error = await response.json();
+                        alert(`Error: ${error.detail}`);
+                      }
+                    } catch (error) {
+                      console.error('Error creating drop-off location:', error);
+                      alert('Error creating drop-off location. Please try again.');
+                    }
+                  }}
+                  className="space-y-6"
+                >
+                  {/* Basic Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Location Name *
+                      </label>
+                      <input
+                        type="text"
+                        name="name"
+                        required
+                        placeholder="e.g., Mile 12 Market, Kano Central Market"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        State *
+                      </label>
+                      <select
+                        name="state"
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      >
+                        <option value="">Select State</option>
+                        <option value="Lagos">Lagos</option>
+                        <option value="Kano">Kano</option>
+                        <option value="Anambra">Anambra</option>
+                        <option value="Rivers">Rivers</option>
+                        <option value="Kaduna">Kaduna</option>
+                        <option value="Oyo">Oyo</option>
+                        <option value="Delta">Delta</option>
+                        <option value="Imo">Imo</option>
+                        <option value="Ogun">Ogun</option>
+                        <option value="FCT">FCT Abuja</option>
+                        <option value="Cross River">Cross River</option>
+                        <option value="Plateau">Plateau</option>
+                        <option value="Abia">Abia</option>
+                        <option value="Enugu">Enugu</option>
+                        <option value="Benue">Benue</option>
+                        <option value="Edo">Edo</option>
+                        <option value="Kwara">Kwara</option>
+                        <option value="Akwa Ibom">Akwa Ibom</option>
+                        <option value="Osun">Osun</option>
+                        <option value="Kogi">Kogi</option>
+                        <option value="Zamfara">Zamfara</option>
+                        <option value="Sokoto">Sokoto</option>
+                        <option value="Kebbi">Kebbi</option>
+                        <option value="Niger">Niger</option>
+                        <option value="Jigawa">Jigawa</option>
+                        <option value="Yobe">Yobe</option>
+                        <option value="Borno">Borno</option>
+                        <option value="Gombe">Gombe</option>
+                        <option value="Bauchi">Bauchi</option>
+                        <option value="Adamawa">Adamawa</option>
+                        <option value="Taraba">Taraba</option>
+                        <option value="Nasarawa">Nasarawa</option>
+                        <option value="Ebonyi">Ebonyi</option>
+                        <option value="Ekiti">Ekiti</option>
+                        <option value="Ondo">Ondo</option>
+                        <option value="Bayelsa">Bayelsa</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        City *
+                      </label>
+                      <input
+                        type="text"
+                        name="city"
+                        required
+                        placeholder="e.g., Lagos, Kano, Onitsha"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Country
+                      </label>
+                      <input
+                        type="text"
+                        name="country"
+                        defaultValue="Nigeria"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50"
+                        readOnly
+                      />
+                    </div>
+                  </div>
+
+                  {/* Address */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Full Address *
+                    </label>
+                    <textarea
+                      name="address"
                       required
-                      placeholder="e.g., Mile 12 Market, Kano Central Market"
+                      rows="3"
+                      placeholder="e.g., Shop 45, Mile 12 International Market, Mile 12, Lagos State"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    ></textarea>
+                  </div>
+
+                  {/* Contact Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Contact Person
+                      </label>
+                      <input
+                        type="text"
+                        name="contact_person"
+                        placeholder="e.g., Mr. John Doe"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Contact Phone
+                      </label>
+                      <input
+                        type="tel"
+                        name="contact_phone"
+                        placeholder="e.g., +234 801 234 5678"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Operating Hours */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Operating Hours
+                    </label>
+                    <input
+                      type="text"
+                      name="operating_hours"
+                      placeholder="e.g., 6:00 AM - 6:00 PM (Mon-Sat)"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     />
                   </div>
 
+                  {/* Description */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      State *
+                      Additional Notes
                     </label>
-                    <select
-                      name="state"
-                      required
+                    <textarea
+                      name="description"
+                      rows="2"
+                      placeholder="e.g., Near Gate 3, look for the blue sign"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    ></textarea>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex space-x-4 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddDropOff(false)}
+                      className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
                     >
-                      <option value="">Select State</option>
-                      <option value="Lagos">Lagos</option>
-                      <option value="Kano">Kano</option>
-                      <option value="Anambra">Anambra</option>
-                      <option value="Rivers">Rivers</option>
-                      <option value="Kaduna">Kaduna</option>
-                      <option value="Oyo">Oyo</option>
-                      <option value="Delta">Delta</option>
-                      <option value="Imo">Imo</option>
-                      <option value="Ogun">Ogun</option>
-                      <option value="FCT">FCT Abuja</option>
-                      <option value="Cross River">Cross River</option>
-                      <option value="Plateau">Plateau</option>
-                      <option value="Abia">Abia</option>
-                      <option value="Enugu">Enugu</option>
-                      <option value="Benue">Benue</option>
-                      <option value="Edo">Edo</option>
-                      <option value="Kwara">Kwara</option>
-                      <option value="Akwa Ibom">Akwa Ibom</option>
-                      <option value="Osun">Osun</option>
-                      <option value="Kogi">Kogi</option>
-                      <option value="Zamfara">Zamfara</option>
-                      <option value="Sokoto">Sokoto</option>
-                      <option value="Kebbi">Kebbi</option>
-                      <option value="Niger">Niger</option>
-                      <option value="Jigawa">Jigawa</option>
-                      <option value="Yobe">Yobe</option>
-                      <option value="Borno">Borno</option>
-                      <option value="Gombe">Gombe</option>
-                      <option value="Bauchi">Bauchi</option>
-                      <option value="Adamawa">Adamawa</option>
-                      <option value="Taraba">Taraba</option>
-                      <option value="Nasarawa">Nasarawa</option>
-                      <option value="Ebonyi">Ebonyi</option>
-                      <option value="Ekiti">Ekiti</option>
-                      <option value="Ondo">Ondo</option>
-                      <option value="Bayelsa">Bayelsa</option>
-                    </select>
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+                    >
+                      📍 Add Location
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Product Detail Modal - Simplified Version */}
+      {
+        showProductDetail && selectedProduct && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+              {/* Header */}
+              <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-blue-50">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                      {selectedProduct.product_name || selectedProduct.crop_type}
+                    </h1>
+                    <div className="flex items-center space-x-4">
+                      {/* Enhanced Pricing Display */}
+                      <div className="text-3xl font-bold text-emerald-600">
+                        ₦{selectedProduct.price_per_unit}/{selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'}
+                        {(selectedProduct.unit_specification) &&
+                          <span className="text-lg font-medium text-gray-600 ml-2">
+                            ({selectedProduct.unit_specification})
+                          </span>
+                        }
+                      </div>
+
+                      {/* Pre-order Badge */}
+                      {selectedProduct.type === 'preorder' && (
+                        <div className="bg-orange-500 text-white px-4 py-2 rounded-full text-sm font-bold">
+                          ⚡ PRE-ORDER
+                        </div>
+                      )}
+                    </div>
                   </div>
 
+                  <button
+                    onClick={closeProductDetail}
+                    className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              {/* Content - Scrollable */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Left Column - Product Image and Info */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      City *
-                    </label>
-                    <input
-                      type="text"
-                      name="city"
-                      required
-                      placeholder="e.g., Lagos, Kano, Onitsha"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                    />
+                    {/* Product Image */}
+                    {selectedProduct.images && selectedProduct.images.length > 0 ? (
+                      <img
+                        src={selectedProduct.images[0]}
+                        alt={selectedProduct.product_name || selectedProduct.crop_type}
+                        className="w-full h-64 object-cover rounded-lg shadow-lg mb-4"
+                      />
+                    ) : (
+                      <div className="w-full h-64 bg-gradient-to-r from-gray-200 to-gray-300 flex items-center justify-center rounded-lg shadow-lg mb-4">
+                        <span className="text-gray-500 text-lg">📦 Product Image</span>
+                      </div>
+                    )}
+
+                    {/* Product Description */}
+                    <div className="mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Product Description</h3>
+                      <p className="text-gray-600 leading-relaxed">
+                        {selectedProduct.description || 'High quality organic produce from certified farms. Fresh, nutritious, and carefully handled to ensure maximum freshness and quality.'}
+                      </p>
+                    </div>
+
+                    {/* Location and Seller Info */}
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Seller Information</h3>
+
+                      {selectedProduct.farm_name && (
+                        <div className="mb-2">
+                          <span className="text-sm text-gray-600">Farm:</span>
+                          <div className="font-medium text-gray-800">{selectedProduct.farm_name}</div>
+                        </div>
+                      )}
+
+                      {selectedProduct.agent_username && (
+                        <div className="mb-2">
+                          <span className="text-sm text-gray-600">Agent:</span>
+                          <div className="font-medium text-blue-600">@{selectedProduct.agent_username}</div>
+                          <div className="flex items-center mt-1">
+                            <span className="text-yellow-400">★★★★☆</span>
+                            <span className="text-sm text-gray-600 ml-2">4.2/5 (Agent Rating)</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <span className="text-sm text-gray-600">Location:</span>
+                        <div className="font-medium text-gray-800">📍 {selectedProduct.location}</div>
+                      </div>
+                    </div>
                   </div>
 
+                  {/* Right Column - Purchase Options */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Country
-                    </label>
-                    <input
-                      type="text"
-                      name="country"
-                      defaultValue="Nigeria"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-gray-50"
-                      readOnly
-                    />
+                    {/* Stock Information */}
+                    <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Stock Information</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-sm text-gray-600">Available:</span>
+                          <div className="font-semibold text-emerald-600">
+                            {selectedProduct.type === 'preorder' ? (
+                              `${selectedProduct.available_stock || selectedProduct.total_stock || 100} ${selectedProduct.unit || 'kg'}`
+                            ) : (
+                              `${selectedProduct.quantity || '100'} ${selectedProduct.unit || 'kg'}`
+                            )}
+                          </div>
+                        </div>
+
+                        {selectedProduct.type === 'preorder' && (
+                          <>
+                            <div>
+                              <span className="text-sm text-gray-600">Payment Required:</span>
+                              <div className="font-semibold text-blue-600">
+                                {selectedProduct.partial_payment_percentage ?
+                                  `${Math.round(selectedProduct.partial_payment_percentage * 100)}%` :
+                                  '100%'
+                                }
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-sm text-gray-600">Delivery:</span>
+                              <div className="font-semibold text-gray-700">
+                                {new Date(selectedProduct.delivery_date).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Purchase Options */}
+                    <div className="p-4 bg-emerald-50 rounded-lg">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Purchase Options</h3>
+
+                      {/* Product Unit Display (Read-only for buyers) */}
+                      <div className="mb-4 p-3 bg-emerald-100 rounded-lg border border-emerald-300">
+                        <div className="text-sm font-medium text-emerald-700">
+                          Unit: {selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'}
+                          {(selectedProduct.unit_specification) &&
+                            <span className="ml-2 text-emerald-600">({selectedProduct.unit_specification})</span>
+                          }
+                        </div>
+                        <div className="text-xs text-emerald-600 mt-1">
+                          Select how many {selectedProduct.unit || selectedProduct.unit_of_measure || 'units'} you want to buy
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        {/* Quantity and Drop-off Location Selection */}
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Quantity (Number of {selectedProduct.unit || selectedProduct.unit_of_measure || 'units'})
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              max={selectedProduct.quantity || selectedProduct.available_stock || selectedProduct.total_stock || 100}
+                              defaultValue="1"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                              id={`detail-quantity`}
+                              placeholder="1, 2, 3..."
+                            />
+                            <div className="text-xs text-gray-500 mt-1">
+                              Max available: {selectedProduct.quantity || selectedProduct.available_stock || selectedProduct.total_stock || 100}
+                            </div>
+                          </div>
+
+                          {/* Enhanced Delivery Options Selection */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Delivery Options</label>
+
+                            {(() => {
+                              const productId = selectedProduct.id || selectedProduct._id;
+                              const deliveryOptions = productDeliveryOptions[productId];
+
+                              if (!deliveryOptions) {
+                                return (
+                                  <div className="p-3 bg-gray-100 rounded-lg">
+                                    <div className="text-gray-600">Loading delivery options...</div>
+                                  </div>
+                                );
+                              }
+
+                              const supportsBoth = deliveryOptions.supports_dropoff_delivery && deliveryOptions.supports_shipping_delivery;
+                              const supportsDropoff = deliveryOptions.supports_dropoff_delivery;
+                              const supportsShipping = deliveryOptions.supports_shipping_delivery;
+
+                              return (
+                                <div className="space-y-3">
+                                  {/* Delivery Method Selection (only show if both are supported) */}
+                                  {supportsBoth && (
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedDeliveryMethod('dropoff')}
+                                        className={`p-3 rounded-lg border-2 transition-colors ${selectedDeliveryMethod === 'dropoff'
+                                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                          }`}
+                                      >
+                                        <div className="text-sm font-medium">📍 Drop-off Location</div>
+                                        <div className="text-xs mt-1">
+                                          {deliveryOptions.delivery_costs.dropoff.is_free
+                                            ? 'Free'
+                                            : `₦${deliveryOptions.delivery_costs.dropoff.cost}`
+                                          }
+                                        </div>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedDeliveryMethod('shipping')}
+                                        className={`p-3 rounded-lg border-2 transition-colors ${selectedDeliveryMethod === 'shipping'
+                                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                          }`}
+                                      >
+                                        <div className="text-sm font-medium">🚚 Home Delivery</div>
+                                        <div className="text-xs mt-1">
+                                          {deliveryOptions.delivery_costs.shipping.is_free
+                                            ? 'Free'
+                                            : `₦${deliveryOptions.delivery_costs.shipping.cost}`
+                                          }
+                                        </div>
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* Drop-off Location Selection */}
+                                  {(selectedDeliveryMethod === 'dropoff' || (supportsDropoff && !supportsBoth)) && (
+                                    <div>
+                                      <select
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                                        id="detail-dropoff"
+                                      >
+                                        <option value="">Select drop-off location</option>
+                                        {dropOffLocations.map(location => (
+                                          <option key={location.id} value={location.id}>
+                                            {location.name} - {location.city}, {location.state}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        📍 Pick up your order at a convenient market or location
+                                        {deliveryOptions.delivery_costs.dropoff.cost > 0 && (
+                                          <span className="text-emerald-600 font-medium ml-2">
+                                            (₦{deliveryOptions.delivery_costs.dropoff.cost} fee)
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Shipping Address Input */}
+                                  {(selectedDeliveryMethod === 'shipping' || (supportsShipping && !supportsBoth)) && (
+                                    <div>
+                                      <textarea
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        id="detail-shipping-address"
+                                        placeholder="Enter your full delivery address..."
+                                        rows="3"
+                                      ></textarea>
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        🚚 We'll deliver directly to your address
+                                        {deliveryOptions.delivery_costs.shipping.cost > 0 && (
+                                          <span className="text-blue-600 font-medium ml-2">
+                                            (₦{deliveryOptions.delivery_costs.shipping.cost} fee)
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Delivery Notes */}
+                                  {deliveryOptions.delivery_notes && (
+                                    <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                      <div className="text-xs font-medium text-yellow-800">Delivery Notes:</div>
+                                      <div className="text-xs text-yellow-700 mt-1">{deliveryOptions.delivery_notes}</div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+
+                        {/* Enhanced Add to Cart Button */}
+                        <button
+                          onClick={() => {
+                            const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
+                            const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg';
+                            const specification = selectedProduct.unit_specification || 'standard';
+
+                            const productId = selectedProduct.id || selectedProduct._id;
+                            const deliveryOptions = productDeliveryOptions[productId];
+
+                            if (!deliveryOptions) {
+                              alert('Unable to determine delivery options. Please try again.');
+                              return;
+                            }
+
+                            // Determine actual delivery method based on what's supported
+                            let deliveryMethod = selectedDeliveryMethod;
+                            if (!deliveryOptions.supports_dropoff_delivery && !deliveryOptions.supports_shipping_delivery) {
+                              alert('This product has no available delivery methods. Please contact the supplier.');
+                              return;
+                            }
+
+                            // Default to available method if current selection isn't supported
+                            if (deliveryMethod === 'dropoff' && !deliveryOptions.supports_dropoff_delivery) {
+                              deliveryMethod = 'shipping';
+                            } else if (deliveryMethod === 'shipping' && !deliveryOptions.supports_shipping_delivery) {
+                              deliveryMethod = 'dropoff';
+                            }
+
+                            let deliveryDetails = null;
+
+                            // Validate and get delivery details based on method
+                            if (deliveryMethod === 'dropoff') {
+                              const dropoffLocationId = document.getElementById('detail-dropoff')?.value;
+                              if (!dropoffLocationId) {
+                                alert('Please select a drop-off location');
+                                return;
+                              }
+
+                              const dropoffLocation = dropOffLocations.find(loc => loc.id.toString() === dropoffLocationId);
+                              if (!dropoffLocation) {
+                                alert('Invalid drop-off location selected');
+                                return;
+                              }
+
+                              deliveryDetails = {
+                                type: 'dropoff',
+                                dropoffLocation: dropoffLocation,
+                                cost: deliveryOptions.delivery_costs.dropoff.cost
+                              };
+                            } else if (deliveryMethod === 'shipping') {
+                              const shippingAddress = document.getElementById('detail-shipping-address')?.value?.trim();
+                              if (!shippingAddress) {
+                                alert('Please enter your delivery address');
+                                return;
+                              }
+
+                              deliveryDetails = {
+                                type: 'shipping',
+                                shippingAddress: shippingAddress,
+                                cost: deliveryOptions.delivery_costs.shipping.cost
+                              };
+                            }
+
+                            const cartItem = {
+                              ...selectedProduct,
+                              cartQuantity: quantity,
+                              cartUnit: unit,
+                              cartSpecification: specification,
+                              deliveryMethod: deliveryMethod,
+                              deliveryDetails: deliveryDetails
+                            };
+
+                            // Use the appropriate parameters for addEnhancedToCart based on delivery method
+                            if (deliveryMethod === 'dropoff') {
+                              addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff', deliveryDetails.dropoffLocation);
+                            } else {
+                              addEnhancedToCart(cartItem, quantity, unit, specification, 'platform', null, deliveryDetails.shippingAddress);
+                            }
+
+                            closeProductDetail();
+                          }}
+                          className={`w-full py-3 px-6 rounded-lg font-bold text-lg transition-colors ${selectedProduct.type === 'preorder'
+                            ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            }`}
+                        >
+                          {selectedProduct.type === 'preorder' ? '🛒 Add Pre-order to Cart' : '🛒 Add to Cart'}
+                        </button>
+
+                        {/* Rate Product Button */}
+                        {user && (
+                          <button
+                            onClick={() => {
+                              const productId = selectedProduct.id || selectedProduct._id;
+                              openRatingModal('product_rating', productId, null, null);
+                            }}
+                            className="w-full mt-3 py-2 px-6 border-2 border-yellow-400 text-yellow-600 rounded-lg font-medium text-sm hover:bg-yellow-50 transition-colors"
+                          >
+                            ⭐ Rate this Product
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Address */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Full Address *
+                {/* Simple Pre-Order and Recommended Sections */}
+                <div className="mt-8 pt-8 border-t border-gray-200">
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">🔥 More Pre-Orders Available</h2>
+                  <div className="flex space-x-4 overflow-x-auto pb-4">
+                    {products.filter(product =>
+                      product.type === 'preorder' &&
+                      (product.id || product._id) !== (selectedProduct.id || selectedProduct._id)
+                    ).slice(0, 3).map((product, index) => (
+                      <div key={index} className="flex-shrink-0 w-48 bg-orange-50 rounded-lg p-3 border border-orange-200 cursor-pointer"
+                        onClick={() => setSelectedProduct(product)}>
+                        <h4 className="font-bold text-sm text-gray-900 mb-1">
+                          {product.product_name || product.crop_type}
+                        </h4>
+                        <div className="text-orange-600 font-bold">
+                          ₦{product.price_per_unit}/{product.unit || 'kg'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Rating Modal */}
+      {
+        showRatingModal && ratingModalData && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Rate & Review</h2>
+                <button
+                  onClick={closeRatingModal}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const ratingValue = parseInt(formData.get('rating'));
+                const comment = formData.get('comment');
+
+                try {
+                  await submitRating({
+                    ...ratingModalData,
+                    rating_value: ratingValue,
+                    comment: comment || null
+                  });
+
+                  alert('Rating submitted successfully!');
+                  closeRatingModal();
+
+                  // Refresh products to show updated ratings
+                  fetchProducts();
+                } catch (error) {
+                  alert('Failed to submit rating: ' + error.message);
+                }
+              }}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Your Rating
+                  </label>
+                  <div className="flex space-x-1">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <label key={star} className="cursor-pointer">
+                        <input
+                          type="radio"
+                          name="rating"
+                          value={star}
+                          required
+                          className="hidden"
+                        />
+                        <span className="text-2xl text-gray-300 hover:text-yellow-400 transition-colors">
+                          ⭐
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Review (Optional)
                   </label>
                   <textarea
-                    name="address"
-                    required
+                    name="comment"
                     rows="3"
-                    placeholder="e.g., Shop 45, Mile 12 International Market, Mile 12, Lagos State"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                    placeholder="Share your experience..."
                   ></textarea>
                 </div>
 
-                {/* Contact Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Contact Person
-                    </label>
-                    <input
-                      type="text"
-                      name="contact_person"
-                      placeholder="e.g., Mr. John Doe"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Contact Phone
-                    </label>
-                    <input
-                      type="tel"
-                      name="contact_phone"
-                      placeholder="e.g., +234 801 234 5678"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Operating Hours */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Operating Hours
-                  </label>
-                  <input
-                    type="text"
-                    name="operating_hours"
-                    placeholder="e.g., 6:00 AM - 6:00 PM (Mon-Sat)"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  />
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Additional Notes
-                  </label>
-                  <textarea
-                    name="description"
-                    rows="2"
-                    placeholder="e.g., Near Gate 3, look for the blue sign"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  ></textarea>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex space-x-4 pt-4">
+                <div className="flex space-x-3">
                   <button
                     type="button"
-                    onClick={() => setShowAddDropOff(false)}
-                    className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+                    onClick={closeRatingModal}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+                    className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
                   >
-                    📍 Add Location
+                    Submit Rating
                   </button>
                 </div>
               </form>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Product Detail Modal - Simplified Version */}
-      {showProductDetail && selectedProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            {/* Header */}
-            <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-blue-50">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                    {selectedProduct.product_name || selectedProduct.crop_type}
-                  </h1>
-                  <div className="flex items-center space-x-4">
-                    {/* Enhanced Pricing Display */}
-                    <div className="text-3xl font-bold text-emerald-600">
-                      ₦{selectedProduct.price_per_unit}/{selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'}
-                      {(selectedProduct.unit_specification) &&
-                        <span className="text-lg font-medium text-gray-600 ml-2">
-                          ({selectedProduct.unit_specification})
-                        </span>
-                      }
-                    </div>
-
-                    {/* Pre-order Badge */}
-                    {selectedProduct.type === 'preorder' && (
-                      <div className="bg-orange-500 text-white px-4 py-2 rounded-full text-sm font-bold">
-                        ⚡ PRE-ORDER
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  onClick={closeProductDetail}
-                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            {/* Content - Scrollable */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Left Column - Product Image and Info */}
-                <div>
-                  {/* Product Image */}
-                  {selectedProduct.images && selectedProduct.images.length > 0 ? (
-                    <img
-                      src={selectedProduct.images[0]}
-                      alt={selectedProduct.product_name || selectedProduct.crop_type}
-                      className="w-full h-64 object-cover rounded-lg shadow-lg mb-4"
-                    />
-                  ) : (
-                    <div className="w-full h-64 bg-gradient-to-r from-gray-200 to-gray-300 flex items-center justify-center rounded-lg shadow-lg mb-4">
-                      <span className="text-gray-500 text-lg">📦 Product Image</span>
-                    </div>
-                  )}
-
-                  {/* Product Description */}
-                  <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Product Description</h3>
-                    <p className="text-gray-600 leading-relaxed">
-                      {selectedProduct.description || 'High quality organic produce from certified farms. Fresh, nutritious, and carefully handled to ensure maximum freshness and quality.'}
-                    </p>
-                  </div>
-
-                  {/* Location and Seller Info */}
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Seller Information</h3>
-
-                    {selectedProduct.farm_name && (
-                      <div className="mb-2">
-                        <span className="text-sm text-gray-600">Farm:</span>
-                        <div className="font-medium text-gray-800">{selectedProduct.farm_name}</div>
-                      </div>
-                    )}
-
-                    {selectedProduct.agent_username && (
-                      <div className="mb-2">
-                        <span className="text-sm text-gray-600">Agent:</span>
-                        <div className="font-medium text-blue-600">@{selectedProduct.agent_username}</div>
-                        <div className="flex items-center mt-1">
-                          <span className="text-yellow-400">★★★★☆</span>
-                          <span className="text-sm text-gray-600 ml-2">4.2/5 (Agent Rating)</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <span className="text-sm text-gray-600">Location:</span>
-                      <div className="font-medium text-gray-800">📍 {selectedProduct.location}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Column - Purchase Options */}
-                <div>
-                  {/* Stock Information */}
-                  <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Stock Information</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="text-sm text-gray-600">Available:</span>
-                        <div className="font-semibold text-emerald-600">
-                          {selectedProduct.type === 'preorder' ? (
-                            `${selectedProduct.available_stock || selectedProduct.total_stock || 100} ${selectedProduct.unit || 'kg'}`
-                          ) : (
-                            `${selectedProduct.quantity || '100'} ${selectedProduct.unit || 'kg'}`
-                          )}
-                        </div>
-                      </div>
-
-                      {selectedProduct.type === 'preorder' && (
-                        <>
-                          <div>
-                            <span className="text-sm text-gray-600">Payment Required:</span>
-                            <div className="font-semibold text-blue-600">
-                              {selectedProduct.partial_payment_percentage ?
-                                `${Math.round(selectedProduct.partial_payment_percentage * 100)}%` :
-                                '100%'
-                              }
-                            </div>
-                          </div>
-                          <div>
-                            <span className="text-sm text-gray-600">Delivery:</span>
-                            <div className="font-semibold text-gray-700">
-                              {new Date(selectedProduct.delivery_date).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Purchase Options */}
-                  <div className="p-4 bg-emerald-50 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Purchase Options</h3>
-
-                    {/* Product Unit Display (Read-only for buyers) */}
-                    <div className="mb-4 p-3 bg-emerald-100 rounded-lg border border-emerald-300">
-                      <div className="text-sm font-medium text-emerald-700">
-                        Unit: {selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'}
-                        {(selectedProduct.unit_specification) &&
-                          <span className="ml-2 text-emerald-600">({selectedProduct.unit_specification})</span>
-                        }
-                      </div>
-                      <div className="text-xs text-emerald-600 mt-1">
-                        Select how many {selectedProduct.unit || selectedProduct.unit_of_measure || 'units'} you want to buy
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      {/* Quantity and Drop-off Location Selection */}
-                      <div className="grid grid-cols-1 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Quantity (Number of {selectedProduct.unit || selectedProduct.unit_of_measure || 'units'})
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max={selectedProduct.quantity || selectedProduct.available_stock || selectedProduct.total_stock || 100}
-                            defaultValue="1"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                            id={`detail-quantity`}
-                            placeholder="1, 2, 3..."
-                          />
-                          <div className="text-xs text-gray-500 mt-1">
-                            Max available: {selectedProduct.quantity || selectedProduct.available_stock || selectedProduct.total_stock || 100}
-                          </div>
-                        </div>
-
-                        {/* Enhanced Delivery Options Selection */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Delivery Options</label>
-
-                          {(() => {
-                            const productId = selectedProduct.id || selectedProduct._id;
-                            const deliveryOptions = productDeliveryOptions[productId];
-
-                            if (!deliveryOptions) {
-                              return (
-                                <div className="p-3 bg-gray-100 rounded-lg">
-                                  <div className="text-gray-600">Loading delivery options...</div>
-                                </div>
-                              );
-                            }
-
-                            const supportsBoth = deliveryOptions.supports_dropoff_delivery && deliveryOptions.supports_shipping_delivery;
-                            const supportsDropoff = deliveryOptions.supports_dropoff_delivery;
-                            const supportsShipping = deliveryOptions.supports_shipping_delivery;
-
-                            return (
-                              <div className="space-y-3">
-                                {/* Delivery Method Selection (only show if both are supported) */}
-                                {supportsBoth && (
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => setSelectedDeliveryMethod('dropoff')}
-                                      className={`p-3 rounded-lg border-2 transition-colors ${selectedDeliveryMethod === 'dropoff'
-                                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                                        : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
-                                        }`}
-                                    >
-                                      <div className="text-sm font-medium">📍 Drop-off Location</div>
-                                      <div className="text-xs mt-1">
-                                        {deliveryOptions.delivery_costs.dropoff.is_free
-                                          ? 'Free'
-                                          : `₦${deliveryOptions.delivery_costs.dropoff.cost}`
-                                        }
-                                      </div>
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setSelectedDeliveryMethod('shipping')}
-                                      className={`p-3 rounded-lg border-2 transition-colors ${selectedDeliveryMethod === 'shipping'
-                                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                        : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
-                                        }`}
-                                    >
-                                      <div className="text-sm font-medium">🚚 Home Delivery</div>
-                                      <div className="text-xs mt-1">
-                                        {deliveryOptions.delivery_costs.shipping.is_free
-                                          ? 'Free'
-                                          : `₦${deliveryOptions.delivery_costs.shipping.cost}`
-                                        }
-                                      </div>
-                                    </button>
-                                  </div>
-                                )}
-
-                                {/* Drop-off Location Selection */}
-                                {(selectedDeliveryMethod === 'dropoff' || (supportsDropoff && !supportsBoth)) && (
-                                  <div>
-                                    <select
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                                      id="detail-dropoff"
-                                    >
-                                      <option value="">Select drop-off location</option>
-                                      {dropOffLocations.map(location => (
-                                        <option key={location.id} value={location.id}>
-                                          {location.name} - {location.city}, {location.state}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      📍 Pick up your order at a convenient market or location
-                                      {deliveryOptions.delivery_costs.dropoff.cost > 0 && (
-                                        <span className="text-emerald-600 font-medium ml-2">
-                                          (₦{deliveryOptions.delivery_costs.dropoff.cost} fee)
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Shipping Address Input */}
-                                {(selectedDeliveryMethod === 'shipping' || (supportsShipping && !supportsBoth)) && (
-                                  <div>
-                                    <textarea
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                      id="detail-shipping-address"
-                                      placeholder="Enter your full delivery address..."
-                                      rows="3"
-                                    ></textarea>
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      🚚 We'll deliver directly to your address
-                                      {deliveryOptions.delivery_costs.shipping.cost > 0 && (
-                                        <span className="text-blue-600 font-medium ml-2">
-                                          (₦{deliveryOptions.delivery_costs.shipping.cost} fee)
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Delivery Notes */}
-                                {deliveryOptions.delivery_notes && (
-                                  <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                    <div className="text-xs font-medium text-yellow-800">Delivery Notes:</div>
-                                    <div className="text-xs text-yellow-700 mt-1">{deliveryOptions.delivery_notes}</div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-
-                      {/* Enhanced Add to Cart Button */}
-                      <button
-                        onClick={() => {
-                          const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
-                          const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg';
-                          const specification = selectedProduct.unit_specification || 'standard';
-
-                          const productId = selectedProduct.id || selectedProduct._id;
-                          const deliveryOptions = productDeliveryOptions[productId];
-
-                          if (!deliveryOptions) {
-                            alert('Unable to determine delivery options. Please try again.');
-                            return;
-                          }
-
-                          // Determine actual delivery method based on what's supported
-                          let deliveryMethod = selectedDeliveryMethod;
-                          if (!deliveryOptions.supports_dropoff_delivery && !deliveryOptions.supports_shipping_delivery) {
-                            alert('This product has no available delivery methods. Please contact the supplier.');
-                            return;
-                          }
-
-                          // Default to available method if current selection isn't supported
-                          if (deliveryMethod === 'dropoff' && !deliveryOptions.supports_dropoff_delivery) {
-                            deliveryMethod = 'shipping';
-                          } else if (deliveryMethod === 'shipping' && !deliveryOptions.supports_shipping_delivery) {
-                            deliveryMethod = 'dropoff';
-                          }
-
-                          let deliveryDetails = null;
-
-                          // Validate and get delivery details based on method
-                          if (deliveryMethod === 'dropoff') {
-                            const dropoffLocationId = document.getElementById('detail-dropoff')?.value;
-                            if (!dropoffLocationId) {
-                              alert('Please select a drop-off location');
-                              return;
-                            }
-
-                            const dropoffLocation = dropOffLocations.find(loc => loc.id.toString() === dropoffLocationId);
-                            if (!dropoffLocation) {
-                              alert('Invalid drop-off location selected');
-                              return;
-                            }
-
-                            deliveryDetails = {
-                              type: 'dropoff',
-                              dropoffLocation: dropoffLocation,
-                              cost: deliveryOptions.delivery_costs.dropoff.cost
-                            };
-                          } else if (deliveryMethod === 'shipping') {
-                            const shippingAddress = document.getElementById('detail-shipping-address')?.value?.trim();
-                            if (!shippingAddress) {
-                              alert('Please enter your delivery address');
-                              return;
-                            }
-
-                            deliveryDetails = {
-                              type: 'shipping',
-                              shippingAddress: shippingAddress,
-                              cost: deliveryOptions.delivery_costs.shipping.cost
-                            };
-                          }
-
-                          const cartItem = {
-                            ...selectedProduct,
-                            cartQuantity: quantity,
-                            cartUnit: unit,
-                            cartSpecification: specification,
-                            deliveryMethod: deliveryMethod,
-                            deliveryDetails: deliveryDetails
-                          };
-
-                          // Use the appropriate parameters for addEnhancedToCart based on delivery method
-                          if (deliveryMethod === 'dropoff') {
-                            addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff', deliveryDetails.dropoffLocation);
-                          } else {
-                            addEnhancedToCart(cartItem, quantity, unit, specification, 'platform', null, deliveryDetails.shippingAddress);
-                          }
-
-                          closeProductDetail();
-                        }}
-                        className={`w-full py-3 px-6 rounded-lg font-bold text-lg transition-colors ${selectedProduct.type === 'preorder'
-                          ? 'bg-orange-600 hover:bg-orange-700 text-white'
-                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                          }`}
-                      >
-                        {selectedProduct.type === 'preorder' ? '🛒 Add Pre-order to Cart' : '🛒 Add to Cart'}
-                      </button>
-
-                      {/* Rate Product Button */}
-                      {user && (
-                        <button
-                          onClick={() => {
-                            const productId = selectedProduct.id || selectedProduct._id;
-                            openRatingModal('product_rating', productId, null, null);
-                          }}
-                          className="w-full mt-3 py-2 px-6 border-2 border-yellow-400 text-yellow-600 rounded-lg font-medium text-sm hover:bg-yellow-50 transition-colors"
-                        >
-                          ⭐ Rate this Product
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Simple Pre-Order and Recommended Sections */}
-              <div className="mt-8 pt-8 border-t border-gray-200">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">🔥 More Pre-Orders Available</h2>
-                <div className="flex space-x-4 overflow-x-auto pb-4">
-                  {products.filter(product =>
-                    product.type === 'preorder' &&
-                    (product.id || product._id) !== (selectedProduct.id || selectedProduct._id)
-                  ).slice(0, 3).map((product, index) => (
-                    <div key={index} className="flex-shrink-0 w-48 bg-orange-50 rounded-lg p-3 border border-orange-200 cursor-pointer"
-                      onClick={() => setSelectedProduct(product)}>
-                      <h4 className="font-bold text-sm text-gray-900 mb-1">
-                        {product.product_name || product.crop_type}
-                      </h4>
-                      <div className="text-orange-600 font-bold">
-                        ₦{product.price_per_unit}/{product.unit || 'kg'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Rating Modal */}
-      {showRatingModal && ratingModalData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Rate & Review</h2>
-              <button
-                onClick={closeRatingModal}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ×
-              </button>
-            </div>
-
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const formData = new FormData(e.target);
-              const ratingValue = parseInt(formData.get('rating'));
-              const comment = formData.get('comment');
-
-              try {
-                await submitRating({
-                  ...ratingModalData,
-                  rating_value: ratingValue,
-                  comment: comment || null
-                });
-
-                alert('Rating submitted successfully!');
-                closeRatingModal();
-
-                // Refresh products to show updated ratings
-                fetchProducts();
-              } catch (error) {
-                alert('Failed to submit rating: ' + error.message);
-              }
-            }}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Your Rating
-                </label>
-                <div className="flex space-x-1">
-                  {[1, 2, 3, 4, 5].map(star => (
-                    <label key={star} className="cursor-pointer">
-                      <input
-                        type="radio"
-                        name="rating"
-                        value={star}
-                        required
-                        className="hidden"
-                      />
-                      <span className="text-2xl text-gray-300 hover:text-yellow-400 transition-colors">
-                        ⭐
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Review (Optional)
-                </label>
-                <textarea
-                  name="comment"
-                  rows="3"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                  placeholder="Share your experience..."
-                ></textarea>
-              </div>
-
-              <div className="flex space-x-3">
-                <button
-                  type="button"
-                  onClick={closeRatingModal}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-                >
-                  Submit Rating
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Driver Management Modal (for logistics businesses) */}
-      {showDriverManagement && user && user.role === 'logistics' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-semibold">Driver Management</h2>
-                <button
-                  onClick={() => setShowDriverManagement(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              {/* Purchase New Slots Section */}
-              <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
-                <h3 className="text-lg font-semibold mb-4">Purchase Driver Slots</h3>
-                <p className="text-gray-600 mb-4">
-                  Each driver slot costs ₦500/month with a 14-day free trial. Purchase slots to add drivers to your fleet.
-                </p>
-                <div className="flex space-x-4">
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    placeholder="Number of slots"
-                    className="px-3 py-2 border border-gray-300 rounded-lg"
-                    id="slots-count"
-                  />
+      {
+        showDriverManagement && user && user.role === 'logistics' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-semibold">Driver Management</h2>
                   <button
-                    onClick={async () => {
-                      const slotsCount = parseInt(document.getElementById('slots-count').value);
-                      if (slotsCount >= 1 && slotsCount <= 10) {
-                        try {
-                          const result = await purchaseDriverSlots(slotsCount);
-                          alert(`Successfully purchased ${result.slots_created} driver slots!\nTotal cost: ${result.total_monthly_cost}/month\n14-day free trial included`);
-                        } catch (error) {
-                          alert('Error: ' + error.message);
-                        }
-                      } else {
-                        alert('Please enter a valid number of slots (1-10)');
-                      }
-                    }}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    onClick={() => setShowDriverManagement(false)}
+                    className="text-gray-500 hover:text-gray-700"
                   >
-                    Purchase Slots
+                    ×
                   </button>
                 </div>
               </div>
 
-              {/* Current Driver Slots */}
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold">Your Driver Slots</h3>
-                  <button
-                    onClick={fetchDriverSlots}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-                  >
-                    Refresh
-                  </button>
-                </div>
-
-                {driverSlots.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No driver slots found. Purchase slots to get started!</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {driverSlots.map(slot => (
-                      <div key={slot.id} className="border border-gray-200 rounded-lg p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-medium">Slot #{slot.slot_number}</h4>
-                          <span className={`text-xs px-2 py-1 rounded ${slot.subscription_status === 'trial'
-                            ? 'bg-green-100 text-green-800'
-                            : slot.subscription_status === 'active'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-red-100 text-red-800'
-                            }`}>
-                            {slot.subscription_status}
-                          </span>
-                        </div>
-
-                        {slot.driver_id ? (
-                          <div className="space-y-2">
-                            <div className="text-sm">
-                              <strong>Driver:</strong> {slot.driver_name}
-                            </div>
-                            <div className="text-sm">
-                              <strong>Vehicle:</strong> {slot.vehicle_make_model} ({slot.plate_number})
-                            </div>
-                            <div className="text-sm">
-                              <strong>Rating:</strong> ⭐ {slot.average_rating}/5.0
-                            </div>
-                            <div className="text-sm">
-                              <strong>Trips:</strong> {slot.total_trips}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <p className="text-gray-500 text-sm">No driver assigned</p>
-                            <button
-                              onClick={() => {
-                                // Simple driver assignment form
-                                const driverName = prompt('Driver Name:');
-                                const plateNumber = prompt('Plate Number:');
-                                const vehicleMake = prompt('Vehicle Make/Model:');
-                                const vehicleColor = prompt('Vehicle Color:');
-                                const dob = prompt('Date of Birth (YYYY-MM-DD):');
-                                const address = prompt('Address:');
-
-                                if (driverName && plateNumber && vehicleMake && vehicleColor && dob && address) {
-                                  assignDriverToSlot(slot.id, {
-                                    driver_name: driverName,
-                                    vehicle_type: 'motorcycle', // Default, could be improved
-                                    plate_number: plateNumber,
-                                    vehicle_make_model: vehicleMake,
-                                    vehicle_color: vehicleColor,
-                                    date_of_birth: dob,
-                                    address: address
-                                  }).then(result => {
-                                    alert(`Driver assigned successfully!\nRegistration link: ${result.registration_link}`);
-                                  }).catch(error => {
-                                    alert('Error: ' + error.message);
-                                  });
-                                }
-                              }}
-                              className="w-full px-3 py-2 bg-emerald-600 text-white rounded text-sm hover:bg-emerald-700"
-                            >
-                              Assign Driver
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Find Drivers Modal (Uber-like interface) */}
-      {showFindDrivers && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-semibold">🚗 Find Drivers</h2>
-                <button
-                  onClick={() => setShowFindDrivers(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              {/* Search Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <input
-                  type="text"
-                  placeholder="Location..."
-                  value={driverSearchFilters.location}
-                  onChange={(e) => setDriverSearchFilters(prev => ({ ...prev, location: e.target.value }))}
-                  className="px-3 py-2 border border-gray-300 rounded-lg"
-                />
-                <select
-                  value={driverSearchFilters.vehicle_type}
-                  onChange={(e) => setDriverSearchFilters(prev => ({ ...prev, vehicle_type: e.target.value }))}
-                  className="px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">All Vehicle Types</option>
-                  <option value="motorcycle">Motorcycle</option>
-                  <option value="car">Car</option>
-                  <option value="van">Van</option>
-                  <option value="truck">Truck</option>
-                </select>
-                <select
-                  value={driverSearchFilters.min_rating || ''}
-                  onChange={(e) => setDriverSearchFilters(prev => ({ ...prev, min_rating: e.target.value ? parseFloat(e.target.value) : null }))}
-                  className="px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Any Rating</option>
-                  <option value="4.5">4.5+ Stars</option>
-                  <option value="4.0">4.0+ Stars</option>
-                  <option value="3.5">3.5+ Stars</option>
-                </select>
-              </div>
-
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Available Drivers</h3>
-                <button
-                  onClick={() => fetchAvailableDrivers(driverSearchFilters)}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-                >
-                  Search Drivers
-                </button>
-              </div>
-
-              {availableDrivers.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <p>Click "Search Drivers" to find available drivers</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {availableDrivers.map(driver => (
-                    <div key={driver.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <div className="flex items-center space-x-3 mb-3">
-                        <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
-                          <span className="text-emerald-600 font-semibold">
-                            {driver.name?.charAt(0) || 'D'}
-                          </span>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold">{driver.name}</h4>
-                          <div className="flex items-center">
-                            <span className="text-yellow-400">⭐</span>
-                            <span className="ml-1 text-sm text-gray-600">
-                              {driver.average_rating.toFixed(1)} ({driver.total_trips} trips)
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 mb-4">
-                        <div className="text-sm">
-                          <strong>Vehicle:</strong> {driver.vehicle_info?.make_model || 'N/A'}
-                        </div>
-                        <div className="text-sm">
-                          <strong>Type:</strong> {driver.vehicle_info?.type || 'N/A'}
-                        </div>
-                        <div className="text-sm">
-                          <strong>Plate:</strong> {driver.vehicle_info?.plate_number || 'N/A'}
-                        </div>
-                        {driver.logistics_business && (
-                          <div className="text-sm">
-                            <strong>Company:</strong> @{driver.logistics_business}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => {
-                            // Could integrate with order creation or messaging
-                            alert(`Driver: ${driver.name}\nContact through platform messaging`);
-                          }}
-                          className="flex-1 px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                        >
-                          View Profile
-                        </button>
-                        <button
-                          onClick={() => {
-                            alert(`Request sent to ${driver.name}!`);
-                          }}
-                          className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded text-sm hover:bg-emerald-700"
-                        >
-                          Request Driver
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Digital Wallet Dashboard */}
-      {showWallet && user && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-semibold">💰 My Wallet</h2>
-                <button
-                  onClick={() => setShowWallet(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              {/* Wallet Balance Card */}
-              <div className="mb-8 p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg">
-                <h3 className="text-lg font-semibold mb-2">Wallet Balance</h3>
-                <div className="text-3xl font-bold mb-4">
-                  ₦{walletSummary ? walletSummary.balance.toLocaleString() : '0'}
-                </div>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <div className="text-purple-200">Total Funded</div>
-                    <div className="font-medium">₦{walletSummary ? walletSummary.total_funded.toLocaleString() : '0'}</div>
-                  </div>
-                  <div>
-                    <div className="text-purple-200">Total Spent</div>
-                    <div className="font-medium">₦{walletSummary ? walletSummary.total_spent.toLocaleString() : '0'}</div>
-                  </div>
-                  <div>
-                    <div className="text-purple-200">Withdrawn</div>
-                    <div className="font-medium">₦{walletSummary ? walletSummary.total_withdrawn.toLocaleString() : '0'}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick Actions */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <button
-                  onClick={() => setShowFundWallet(true)}
-                  className="p-4 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
-                >
-                  <div className="text-2xl mb-2">💳</div>
-                  <div className="font-medium">Fund Wallet</div>
-                </button>
-                <button
-                  onClick={() => setShowWithdrawFunds(true)}
-                  className="p-4 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-                >
-                  <div className="text-2xl mb-2">🏦</div>
-                  <div className="font-medium">Withdraw</div>
-                </button>
-                <button
-                  onClick={() => setShowCreateGiftCard(true)}
-                  className="p-4 bg-pink-100 text-pink-700 rounded-lg hover:bg-pink-200 transition-colors"
-                >
-                  <div className="text-2xl mb-2">🎁</div>
-                  <div className="font-medium">Buy Gift Card</div>
-                </button>
-                <button
-                  onClick={() => setShowAddBankAccount(true)}
-                  className="p-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  <div className="text-2xl mb-2">🏧</div>
-                  <div className="font-medium">Add Bank</div>
-                </button>
-              </div>
-
-              {/* Transaction History */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Recent Transactions</h3>
-                {walletTransactions.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No transactions yet. Start by funding your wallet!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {walletTransactions.slice(0, 10).map(transaction => (
-                      <div key={transaction.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <div className={`text-2xl ${transaction.transaction_type.includes('funding') || transaction.transaction_type.includes('redemption')
-                            ? 'text-green-600'
-                            : 'text-red-600'
-                            }`}>
-                            {transaction.transaction_type.includes('funding') ? '⬇️' :
-                              transaction.transaction_type.includes('withdrawal') ? '⬆️' :
-                                transaction.transaction_type.includes('gift_card') ? '🎁' : '💰'}
-                          </div>
-                          <div>
-                            <div className="font-medium">{transaction.description}</div>
-                            <div className="text-sm text-gray-500">
-                              {new Date(transaction.created_at).toLocaleDateString()} • {transaction.reference}
-                            </div>
-                          </div>
-                        </div>
-                        <div className={`text-right ${transaction.transaction_type.includes('funding') || transaction.transaction_type.includes('redemption')
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                          }`}>
-                          <div className="font-semibold">
-                            {transaction.transaction_type.includes('funding') || transaction.transaction_type.includes('redemption') ? '+' : '-'}
-                            ₦{transaction.amount.toLocaleString()}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            Status: {transaction.status}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Fund Wallet Modal */}
-      {showFundWallet && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold">💳 Fund Wallet</h3>
-              <button
-                onClick={() => setShowFundWallet(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ×
-              </button>
-            </div>
-
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const formData = new FormData(e.target);
-              const amount = formData.get('amount');
-              const fundingMethod = formData.get('funding_method');
-              const description = formData.get('description');
-
-              try {
-                await fundWallet(amount, fundingMethod, description);
-                alert(`Successfully funded wallet with ₦${parseFloat(amount).toLocaleString()}`);
-                setShowFundWallet(false);
-              } catch (error) {
-                alert('Failed to fund wallet: ' + error.message);
-              }
-            }}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Amount (₦)
-                  </label>
-                  <input
-                    type="number"
-                    name="amount"
-                    min="100"
-                    max="500000"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                    placeholder="Enter amount to fund"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Funding Method
-                  </label>
-                  <select
-                    name="funding_method"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">Select funding method</option>
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="debit_card">Debit Card</option>
-                    <option value="ussd">USSD</option>
-                    <option value="bank_deposit">Bank Deposit</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    name="description"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                    placeholder="Wallet funding"
-                  />
-                </div>
-              </div>
-
-              <div className="flex space-x-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowFundWallet(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                >
-                  Fund Wallet
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Gift Cards Modal */}
-      {showGiftCards && user && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-semibold">🎁 Gift Cards</h2>
-                <button
-                  onClick={() => setShowGiftCards(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              {/* Quick Actions */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                <button
-                  onClick={() => setShowCreateGiftCard(true)}
-                  className="p-6 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:from-pink-600 hover:to-purple-700 transition-colors"
-                >
-                  <div className="text-3xl mb-2">🎁</div>
-                  <div className="text-lg font-semibold">Create Gift Card</div>
-                  <div className="text-sm text-pink-100">Purchase gift cards for others</div>
-                </button>
-                <button
-                  onClick={() => setShowRedeemGiftCard(true)}
-                  className="p-6 bg-gradient-to-r from-green-500 to-blue-600 text-white rounded-lg hover:from-green-600 hover:to-blue-700 transition-colors"
-                >
-                  <div className="text-3xl mb-2">💰</div>
-                  <div className="text-lg font-semibold">Redeem Gift Card</div>
-                  <div className="text-sm text-green-100">Add gift card value to wallet</div>
-                </button>
-              </div>
-
-              {/* User's Gift Cards */}
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold">My Gift Cards</h3>
-                  <button
-                    onClick={fetchUserGiftCards}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-                  >
-                    Refresh
-                  </button>
-                </div>
-
-                {userGiftCards.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No gift cards purchased yet. Create your first gift card!</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {userGiftCards.map(giftCard => (
-                      <div key={giftCard.id} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-br from-pink-50 to-purple-50">
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="text-2xl">🎁</div>
-                          <span className={`text-xs px-2 py-1 rounded ${giftCard.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : giftCard.status === 'redeemed'
-                              ? 'bg-gray-100 text-gray-800'
-                              : 'bg-red-100 text-red-800'
-                            }`}>
-                            {giftCard.status}
-                          </span>
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="font-mono text-sm font-semibold text-purple-600">
-                            {giftCard.card_code}
-                          </div>
-                          <div className="text-lg font-bold">
-                            ₦{giftCard.amount.toLocaleString()}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            Balance: ₦{giftCard.balance.toLocaleString()}
-                          </div>
-                          {giftCard.recipient_name && (
-                            <div className="text-sm text-gray-600">
-                              For: {giftCard.recipient_name}
-                            </div>
-                          )}
-                          <div className="text-xs text-gray-500">
-                            Expires: {new Date(giftCard.expiry_date).toLocaleDateString()}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create Gift Card Modal */}
-      {showCreateGiftCard && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold">🎁 Create Gift Card</h3>
-              <button
-                onClick={() => setShowCreateGiftCard(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ×
-              </button>
-            </div>
-
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const formData = new FormData(e.target);
-              const amount = formData.get('amount');
-              const recipientEmail = formData.get('recipient_email');
-              const recipientName = formData.get('recipient_name');
-              const message = formData.get('message');
-
-              try {
-                const result = await createGiftCard(amount, recipientEmail, recipientName, message);
-                alert(`Gift card created successfully!\nCard Code: ${result.gift_card.card_code}\nAmount: ₦${parseFloat(amount).toLocaleString()}`);
-                setShowCreateGiftCard(false);
-              } catch (error) {
-                alert('Failed to create gift card: ' + error.message);
-              }
-            }}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Gift Card Amount (₦)
-                  </label>
-                  <input
-                    type="number"
-                    name="amount"
-                    min="100"
-                    max="100000"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="Enter gift card value"
-                  />
-                  <div className="text-xs text-gray-500 mt-1">Min: ₦100, Max: ₦100,000</div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Recipient Name (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    name="recipient_name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="Who is this gift card for?"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Recipient Email (Optional)
-                  </label>
-                  <input
-                    type="email"
-                    name="recipient_email"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="Recipient's email address"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Gift Message (Optional)
-                  </label>
-                  <textarea
-                    name="message"
-                    rows="3"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="Add a personal message..."
-                  ></textarea>
-                </div>
-              </div>
-
-              <div className="flex space-x-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateGiftCard(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700"
-                >
-                  Create Gift Card
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Redeem Gift Card Modal */}
-      {showRedeemGiftCard && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold">💰 Redeem Gift Card</h3>
-              <button
-                onClick={() => {
-                  setShowRedeemGiftCard(false);
-                  setGiftCardDetails(null);
-                }}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ×
-              </button>
-            </div>
-
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const formData = new FormData(e.target);
-              const cardCode = formData.get('card_code');
-              const amount = formData.get('amount');
-
-              try {
-                const result = await redeemGiftCard(cardCode, amount);
-                alert(`Gift card redeemed successfully!\nRedeemed: ₦${result.redeemed_amount.toLocaleString()}\nNew wallet balance: ₦${result.new_wallet_balance.toLocaleString()}`);
-                setShowRedeemGiftCard(false);
-                setGiftCardDetails(null);
-              } catch (error) {
-                alert('Failed to redeem gift card: ' + error.message);
-              }
-            }}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Gift Card Code
-                  </label>
-                  <div className="flex space-x-2">
+              <div className="p-6">
+                {/* Purchase New Slots Section */}
+                <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-4">Purchase Driver Slots</h3>
+                  <p className="text-gray-600 mb-4">
+                    Each driver slot costs ₦500/month with a 14-day free trial. Purchase slots to add drivers to your fleet.
+                  </p>
+                  <div className="flex space-x-4">
                     <input
-                      type="text"
-                      name="card_code"
-                      required
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 uppercase"
-                      placeholder="GIFT-XXXXXXXX"
-                      onChange={async (e) => {
-                        const code = e.target.value.trim();
-                        if (code.length >= 8) {
-                          await fetchGiftCardDetails(code);
-                        }
-                      }}
+                      type="number"
+                      min="1"
+                      max="10"
+                      placeholder="Number of slots"
+                      className="px-3 py-2 border border-gray-300 rounded-lg"
+                      id="slots-count"
                     />
                     <button
-                      type="button"
                       onClick={async () => {
-                        const code = document.querySelector('input[name="card_code"]').value;
-                        if (code) await fetchGiftCardDetails(code);
+                        const slotsCount = parseInt(document.getElementById('slots-count').value);
+                        if (slotsCount >= 1 && slotsCount <= 10) {
+                          try {
+                            const result = await purchaseDriverSlots(slotsCount);
+                            alert(`Successfully purchased ${result.slots_created} driver slots!\nTotal cost: ${result.total_monthly_cost}/month\n14-day free trial included`);
+                          } catch (error) {
+                            alert('Error: ' + error.message);
+                          }
+                        } else {
+                          alert('Please enter a valid number of slots (1-10)');
+                        }
                       }}
-                      className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
-                      Check
+                      Purchase Slots
                     </button>
                   </div>
                 </div>
 
-                {giftCardDetails && (
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="space-y-2">
-                      <div className="font-semibold text-green-800">
-                        Gift Card Found!
-                      </div>
-                      <div className="text-sm text-green-700">
-                        Available Balance: ₦{giftCardDetails.balance.toLocaleString()}
-                      </div>
-                      <div className="text-sm text-green-600">
-                        Status: {giftCardDetails.status} •
-                        Expires: {new Date(giftCardDetails.expiry_date).toLocaleDateString()}
-                      </div>
-                      {giftCardDetails.message && (
-                        <div className="text-sm text-green-600 italic">
-                          "{giftCardDetails.message}"
-                        </div>
-                      )}
+                {/* Current Driver Slots */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold">Your Driver Slots</h3>
+                    <button
+                      onClick={fetchDriverSlots}
+                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+
+                  {driverSlots.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No driver slots found. Purchase slots to get started!</p>
                     </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {driverSlots.map(slot => (
+                        <div key={slot.id} className="border border-gray-200 rounded-lg p-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="font-medium">Slot #{slot.slot_number}</h4>
+                            <span className={`text-xs px-2 py-1 rounded ${slot.subscription_status === 'trial'
+                              ? 'bg-green-100 text-green-800'
+                              : slot.subscription_status === 'active'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-red-100 text-red-800'
+                              }`}>
+                              {slot.subscription_status}
+                            </span>
+                          </div>
+
+                          {slot.driver_id ? (
+                            <div className="space-y-2">
+                              <div className="text-sm">
+                                <strong>Driver:</strong> {slot.driver_name}
+                              </div>
+                              <div className="text-sm">
+                                <strong>Vehicle:</strong> {slot.vehicle_make_model} ({slot.plate_number})
+                              </div>
+                              <div className="text-sm">
+                                <strong>Rating:</strong> ⭐ {slot.average_rating}/5.0
+                              </div>
+                              <div className="text-sm">
+                                <strong>Trips:</strong> {slot.total_trips}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <p className="text-gray-500 text-sm">No driver assigned</p>
+                              <button
+                                onClick={() => {
+                                  // Simple driver assignment form
+                                  const driverName = prompt('Driver Name:');
+                                  const plateNumber = prompt('Plate Number:');
+                                  const vehicleMake = prompt('Vehicle Make/Model:');
+                                  const vehicleColor = prompt('Vehicle Color:');
+                                  const dob = prompt('Date of Birth (YYYY-MM-DD):');
+                                  const address = prompt('Address:');
+
+                                  if (driverName && plateNumber && vehicleMake && vehicleColor && dob && address) {
+                                    assignDriverToSlot(slot.id, {
+                                      driver_name: driverName,
+                                      vehicle_type: 'motorcycle', // Default, could be improved
+                                      plate_number: plateNumber,
+                                      vehicle_make_model: vehicleMake,
+                                      vehicle_color: vehicleColor,
+                                      date_of_birth: dob,
+                                      address: address
+                                    }).then(result => {
+                                      alert(`Driver assigned successfully!\nRegistration link: ${result.registration_link}`);
+                                    }).catch(error => {
+                                      alert('Error: ' + error.message);
+                                    });
+                                  }
+                                }}
+                                className="w-full px-3 py-2 bg-emerald-600 text-white rounded text-sm hover:bg-emerald-700"
+                              >
+                                Assign Driver
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Find Drivers Modal (Uber-like interface) */}
+      {
+        showFindDrivers && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-semibold">🚗 Find Drivers</h2>
+                  <button
+                    onClick={() => setShowFindDrivers(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6">
+                {/* Search Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <input
+                    type="text"
+                    placeholder="Location..."
+                    value={driverSearchFilters.location}
+                    onChange={(e) => setDriverSearchFilters(prev => ({ ...prev, location: e.target.value }))}
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <select
+                    value={driverSearchFilters.vehicle_type}
+                    onChange={(e) => setDriverSearchFilters(prev => ({ ...prev, vehicle_type: e.target.value }))}
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">All Vehicle Types</option>
+                    <option value="motorcycle">Motorcycle</option>
+                    <option value="car">Car</option>
+                    <option value="van">Van</option>
+                    <option value="truck">Truck</option>
+                  </select>
+                  <select
+                    value={driverSearchFilters.min_rating || ''}
+                    onChange={(e) => setDriverSearchFilters(prev => ({ ...prev, min_rating: e.target.value ? parseFloat(e.target.value) : null }))}
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Any Rating</option>
+                    <option value="4.5">4.5+ Stars</option>
+                    <option value="4.0">4.0+ Stars</option>
+                    <option value="3.5">3.5+ Stars</option>
+                  </select>
+                </div>
+
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">Available Drivers</h3>
+                  <button
+                    onClick={() => fetchAvailableDrivers(driverSearchFilters)}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                  >
+                    Search Drivers
+                  </button>
+                </div>
+
+                {availableDrivers.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Click "Search Drivers" to find available drivers</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {availableDrivers.map(driver => (
+                      <div key={driver.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-center space-x-3 mb-3">
+                          <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                            <span className="text-emerald-600 font-semibold">
+                              {driver.name?.charAt(0) || 'D'}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="font-semibold">{driver.name}</h4>
+                            <div className="flex items-center">
+                              <span className="text-yellow-400">⭐</span>
+                              <span className="ml-1 text-sm text-gray-600">
+                                {driver.average_rating.toFixed(1)} ({driver.total_trips} trips)
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 mb-4">
+                          <div className="text-sm">
+                            <strong>Vehicle:</strong> {driver.vehicle_info?.make_model || 'N/A'}
+                          </div>
+                          <div className="text-sm">
+                            <strong>Type:</strong> {driver.vehicle_info?.type || 'N/A'}
+                          </div>
+                          <div className="text-sm">
+                            <strong>Plate:</strong> {driver.vehicle_info?.plate_number || 'N/A'}
+                          </div>
+                          {driver.logistics_business && (
+                            <div className="text-sm">
+                              <strong>Company:</strong> @{driver.logistics_business}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => {
+                              // Could integrate with order creation or messaging
+                              alert(`Driver: ${driver.name}\nContact through platform messaging`);
+                            }}
+                            className="flex-1 px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                          >
+                            View Profile
+                          </button>
+                          <button
+                            onClick={() => {
+                              alert(`Request sent to ${driver.name}!`);
+                            }}
+                            className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded text-sm hover:bg-emerald-700"
+                          >
+                            Request Driver
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )
+      }
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Amount to Redeem (Optional)
-                  </label>
-                  <input
-                    type="number"
-                    name="amount"
-                    min="1"
-                    max={giftCardDetails ? giftCardDetails.balance : 100000}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                    placeholder="Leave empty to redeem full amount"
-                  />
-                  <div className="text-xs text-gray-500 mt-1">
-                    Leave empty to redeem the full gift card balance
-                  </div>
+      {/* Digital Wallet Dashboard */}
+      {
+        showWallet && user && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-semibold">💰 My Wallet</h2>
+                  <button
+                    onClick={() => setShowWallet(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
                 </div>
               </div>
 
-              <div className="flex space-x-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRedeemGiftCard(false);
-                    setGiftCardDetails(null);
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!giftCardDetails}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
-                >
-                  Redeem Gift Card
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* KYC Completion Prompt */}
-      {showKYCPrompt && kycStatus && kycStatus.requires_kyc && kycStatus.status === 'not_started' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6 border-2 border-yellow-200">
-            <div className="text-center">
-              <div className="text-4xl mb-4">🔐</div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-800">Complete Your KYC</h3>
-              <p className="text-gray-600 mb-4">
-                Complete your KYC verification to start receiving payments on the platform.
-              </p>
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                <p className="text-sm text-yellow-800">
-                  <strong>Important:</strong> KYC completion is required to receive payments from buyers.
-                  Without KYC, you can browse and purchase but cannot receive funds.
-                </p>
-              </div>
-
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowKYCPrompt(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                >
-                  Later
-                </button>
-                <button
-                  onClick={() => {
-                    setShowKYCPrompt(false);
-                    // Navigate to KYC completion - would implement KYC modal
-                    alert('KYC completion form will open here. This includes:\n\n' +
-                      'For Registered Businesses:\n- Business Registration Number\n- TIN Certificate\n- Certificate of Incorporation\n\n' +
-                      'For Others (Farmers/Agents/Unregistered):\n- NIN or BVN\n- Headshot photo (camera)\n- National ID upload\n- Utility bill');
-                  }}
-                  className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-                >
-                  Complete KYC
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Farmer Dashboard */}
-      {showFarmerDashboard && user && user.role === 'farmer' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-semibold">🌾 Farmer Dashboard</h2>
-                <button
-                  onClick={() => setShowFarmerDashboard(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            {farmerDashboardData ? (
               <div className="p-6">
-                {/* Profile Summary */}
-                <div className="mb-8 p-6 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg">
-                  <h3 className="text-lg font-semibold mb-2">Welcome, {farmerDashboardData.farmer_profile.name}!</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                {/* Wallet Balance Card */}
+                <div className="mb-8 p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg">
+                  <h3 className="text-lg font-semibold mb-2">Wallet Balance</h3>
+                  <div className="text-3xl font-bold mb-4">
+                    ₦{walletSummary ? walletSummary.balance.toLocaleString() : '0'}
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
-                      <div className="text-green-200">KYC Status</div>
-                      <div className="font-medium capitalize">{farmerDashboardData.farmer_profile.kyc_status}</div>
+                      <div className="text-purple-200">Total Funded</div>
+                      <div className="font-medium">₦{walletSummary ? walletSummary.total_funded.toLocaleString() : '0'}</div>
                     </div>
                     <div>
-                      <div className="text-green-200">Rating</div>
-                      <div className="font-medium">⭐ {farmerDashboardData.farmer_profile.average_rating}/5</div>
+                      <div className="text-purple-200">Total Spent</div>
+                      <div className="font-medium">₦{walletSummary ? walletSummary.total_spent.toLocaleString() : '0'}</div>
                     </div>
                     <div>
-                      <div className="text-green-200">Products</div>
-                      <div className="font-medium">{farmerDashboardData.business_metrics.total_products}</div>
-                    </div>
-                    <div>
-                      <div className="text-green-200">Revenue</div>
-                      <div className="font-medium">₦{farmerDashboardData.business_metrics.total_revenue.toLocaleString()}</div>
+                      <div className="text-purple-200">Withdrawn</div>
+                      <div className="font-medium">₦{walletSummary ? walletSummary.total_withdrawn.toLocaleString() : '0'}</div>
                     </div>
                   </div>
                 </div>
 
-                {/* Business Metrics */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <div className="text-2xl text-blue-600 mb-2">📦</div>
-                    <div className="text-2xl font-bold text-blue-600">{farmerDashboardData.business_metrics.active_products}</div>
-                    <div className="text-sm text-blue-600">Active Products</div>
-                  </div>
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <div className="text-2xl text-green-600 mb-2">🌾</div>
-                    <div className="text-2xl font-bold text-green-600">{farmerDashboardData.business_metrics.total_farmlands}</div>
-                    <div className="text-sm text-green-600">Farmlands</div>
-                  </div>
-                  <div className="bg-yellow-50 p-4 rounded-lg">
-                    <div className="text-2xl text-yellow-600 mb-2">📋</div>
-                    <div className="text-2xl font-bold text-yellow-600">{farmerDashboardData.business_metrics.pending_orders}</div>
-                    <div className="text-sm text-yellow-600">Pending Orders</div>
-                  </div>
-                  <div className="bg-purple-50 p-4 rounded-lg">
-                    <div className="text-2xl text-purple-600 mb-2">📏</div>
-                    <div className="text-2xl font-bold text-purple-600">{farmerDashboardData.business_metrics.total_hectares}</div>
-                    <div className="text-sm text-purple-600">Total Hectares</div>
-                  </div>
+                {/* Quick Actions */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                  <button
+                    onClick={() => setShowFundWallet(true)}
+                    className="p-4 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                  >
+                    <div className="text-2xl mb-2">💳</div>
+                    <div className="font-medium">Fund Wallet</div>
+                  </button>
+                  <button
+                    onClick={() => setShowWithdrawFunds(true)}
+                    className="p-4 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                  >
+                    <div className="text-2xl mb-2">🏦</div>
+                    <div className="font-medium">Withdraw</div>
+                  </button>
+                  <button
+                    onClick={() => setShowCreateGiftCard(true)}
+                    className="p-4 bg-pink-100 text-pink-700 rounded-lg hover:bg-pink-200 transition-colors"
+                  >
+                    <div className="text-2xl mb-2">🎁</div>
+                    <div className="font-medium">Buy Gift Card</div>
+                  </button>
+                  <button
+                    onClick={() => setShowAddBankAccount(true)}
+                    className="p-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    <div className="text-2xl mb-2">🏧</div>
+                    <div className="font-medium">Add Bank</div>
+                  </button>
                 </div>
 
-                {/* Recent Orders */}
+                {/* Transaction History */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
-                  {farmerDashboardData.recent_orders.length === 0 ? (
+                  <h3 className="text-lg font-semibold mb-4">Recent Transactions</h3>
+                  {walletTransactions.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
-                      <p>No recent orders. Start listing your products to get orders!</p>
+                      <p>No transactions yet. Start by funding your wallet!</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {farmerDashboardData.recent_orders.map((order, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                          <div>
-                            <div className="font-medium">{order.product}</div>
-                            <div className="text-sm text-gray-500">Buyer: {order.buyer}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-semibold">₦{order.amount.toLocaleString()}</div>
-                            <div className={`text-xs px-2 py-1 rounded ${order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-gray-100 text-gray-800'
+                      {walletTransactions.slice(0, 10).map(transaction => (
+                        <div key={transaction.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <div className={`text-2xl ${transaction.transaction_type.includes('funding') || transaction.transaction_type.includes('redemption')
+                              ? 'text-green-600'
+                              : 'text-red-600'
                               }`}>
-                              {order.status}
+                              {transaction.transaction_type.includes('funding') ? '⬇️' :
+                                transaction.transaction_type.includes('withdrawal') ? '⬆️' :
+                                  transaction.transaction_type.includes('gift_card') ? '🎁' : '💰'}
+                            </div>
+                            <div>
+                              <div className="font-medium">{transaction.description}</div>
+                              <div className="text-sm text-gray-500">
+                                {new Date(transaction.created_at).toLocaleDateString()} • {transaction.reference}
+                              </div>
+                            </div>
+                          </div>
+                          <div className={`text-right ${transaction.transaction_type.includes('funding') || transaction.transaction_type.includes('redemption')
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                            }`}>
+                            <div className="font-semibold">
+                              {transaction.transaction_type.includes('funding') || transaction.transaction_type.includes('redemption') ? '+' : '-'}
+                              ₦{transaction.amount.toLocaleString()}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Status: {transaction.status}
                             </div>
                           </div>
                         </div>
@@ -9440,101 +9031,196 @@ function App() {
                   )}
                 </div>
               </div>
-            ) : (
-              <div className="p-6">
-                <div className="text-center py-8 text-gray-500">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-                  <p>Loading dashboard data...</p>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-      {/* Agent Dashboard */}
-      {showAgentDashboard && user && user.role === 'agent' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-semibold">🤝 Agent Dashboard</h2>
+      {/* Fund Wallet Modal */}
+      {
+        showFundWallet && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold">💳 Fund Wallet</h3>
                 <button
-                  onClick={() => setShowAgentDashboard(false)}
+                  onClick={() => setShowFundWallet(false)}
                   className="text-gray-500 hover:text-gray-700"
                 >
                   ×
                 </button>
               </div>
+
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const amount = formData.get('amount');
+                const fundingMethod = formData.get('funding_method');
+                const description = formData.get('description');
+
+                try {
+                  await fundWallet(amount, fundingMethod, description);
+                  alert(`Successfully funded wallet with ₦${parseFloat(amount).toLocaleString()}`);
+                  setShowFundWallet(false);
+                } catch (error) {
+                  alert('Failed to fund wallet: ' + error.message);
+                }
+              }}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Amount (₦)
+                    </label>
+                    <input
+                      type="number"
+                      name="amount"
+                      min="100"
+                      max="500000"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      placeholder="Enter amount to fund"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Funding Method
+                    </label>
+                    <select
+                      name="funding_method"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="">Select funding method</option>
+                      <option value="bank_transfer">Bank Transfer</option>
+                      <option value="debit_card">Debit Card</option>
+                      <option value="ussd">USSD</option>
+                      <option value="bank_deposit">Bank Deposit</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Description (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      name="description"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      placeholder="Wallet funding"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowFundWallet(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  >
+                    Fund Wallet
+                  </button>
+                </div>
+              </form>
             </div>
+          </div>
+        )
+      }
 
-            {agentDashboardData ? (
+      {/* Gift Cards Modal */}
+      {
+        showGiftCards && user && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-semibold">🎁 Gift Cards</h2>
+                  <button
+                    onClick={() => setShowGiftCards(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
               <div className="p-6">
-                {/* Profile Summary */}
-                <div className="mb-8 p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg">
-                  <h3 className="text-lg font-semibold mb-2">Welcome, {agentDashboardData.agent_profile.name}!</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <div className="text-purple-200">KYC Status</div>
-                      <div className="font-medium capitalize">{agentDashboardData.agent_profile.kyc_status}</div>
-                    </div>
-                    <div>
-                      <div className="text-purple-200">Rating</div>
-                      <div className="font-medium">⭐ {agentDashboardData.agent_profile.average_rating}/5</div>
-                    </div>
-                    <div>
-                      <div className="text-purple-200">Farmers</div>
-                      <div className="font-medium">{agentDashboardData.business_metrics.total_farmers}</div>
-                    </div>
-                    <div>
-                      <div className="text-purple-200">Commission</div>
-                      <div className="font-medium">₦{agentDashboardData.business_metrics.agent_commission.toLocaleString()}</div>
-                    </div>
-                  </div>
+                {/* Quick Actions */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                  <button
+                    onClick={() => setShowCreateGiftCard(true)}
+                    className="p-6 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:from-pink-600 hover:to-purple-700 transition-colors"
+                  >
+                    <div className="text-3xl mb-2">🎁</div>
+                    <div className="text-lg font-semibold">Create Gift Card</div>
+                    <div className="text-sm text-pink-100">Purchase gift cards for others</div>
+                  </button>
+                  <button
+                    onClick={() => setShowRedeemGiftCard(true)}
+                    className="p-6 bg-gradient-to-r from-green-500 to-blue-600 text-white rounded-lg hover:from-green-600 hover:to-blue-700 transition-colors"
+                  >
+                    <div className="text-3xl mb-2">💰</div>
+                    <div className="text-lg font-semibold">Redeem Gift Card</div>
+                    <div className="text-sm text-green-100">Add gift card value to wallet</div>
+                  </button>
                 </div>
 
-                {/* Business Metrics */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <div className="text-2xl text-green-600 mb-2">👨‍🌾</div>
-                    <div className="text-2xl font-bold text-green-600">{agentDashboardData.business_metrics.active_farmers}</div>
-                    <div className="text-sm text-green-600">Active Farmers</div>
-                  </div>
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <div className="text-2xl text-blue-600 mb-2">📦</div>
-                    <div className="text-2xl font-bold text-blue-600">{agentDashboardData.business_metrics.active_products}</div>
-                    <div className="text-sm text-blue-600">Active Products</div>
-                  </div>
-                  <div className="bg-yellow-50 p-4 rounded-lg">
-                    <div className="text-2xl text-yellow-600 mb-2">💰</div>
-                    <div className="text-2xl font-bold text-yellow-600">₦{agentDashboardData.business_metrics.total_revenue.toLocaleString()}</div>
-                    <div className="text-sm text-yellow-600">Total Revenue</div>
-                  </div>
-                  <div className="bg-red-50 p-4 rounded-lg">
-                    <div className="text-2xl text-red-600 mb-2">📋</div>
-                    <div className="text-2xl font-bold text-red-600">{agentDashboardData.business_metrics.pending_orders}</div>
-                    <div className="text-sm text-red-600">Pending Orders</div>
-                  </div>
-                </div>
-
-                {/* Top Farmers */}
+                {/* User's Gift Cards */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Top Performing Farmers</h3>
-                  {agentDashboardData.top_farmers.length === 0 ? (
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold">My Gift Cards</h3>
+                    <button
+                      onClick={fetchUserGiftCards}
+                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+
+                  {userGiftCards.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
-                      <p>No farmers in your network yet. Start adding farmers to grow your business!</p>
+                      <p>No gift cards purchased yet. Create your first gift card!</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {agentDashboardData.top_farmers.map((farmer, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                          <div>
-                            <div className="font-medium">{farmer.name}</div>
-                            <div className="text-sm text-gray-500">{farmer.location} • Joined: {new Date(farmer.linked_date).toLocaleDateString()}</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {userGiftCards.map(giftCard => (
+                        <div key={giftCard.id} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-br from-pink-50 to-purple-50">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="text-2xl">🎁</div>
+                            <span className={`text-xs px-2 py-1 rounded ${giftCard.status === 'active'
+                              ? 'bg-green-100 text-green-800'
+                              : giftCard.status === 'redeemed'
+                                ? 'bg-gray-100 text-gray-800'
+                                : 'bg-red-100 text-red-800'
+                              }`}>
+                              {giftCard.status}
+                            </span>
                           </div>
-                          <div className="text-right">
-                            <div className="font-semibold">₦{farmer.total_sales.toLocaleString()}</div>
-                            <div className="text-sm text-gray-500">{farmer.total_listings} listings</div>
+
+                          <div className="space-y-2">
+                            <div className="font-mono text-sm font-semibold text-purple-600">
+                              {giftCard.card_code}
+                            </div>
+                            <div className="text-lg font-bold">
+                              ₦{giftCard.amount.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              Balance: ₦{giftCard.balance.toLocaleString()}
+                            </div>
+                            {giftCard.recipient_name && (
+                              <div className="text-sm text-gray-600">
+                                For: {giftCard.recipient_name}
+                              </div>
+                            )}
+                            <div className="text-xs text-gray-500">
+                              Expires: {new Date(giftCard.expiry_date).toLocaleDateString()}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -9542,78 +9228,566 @@ function App() {
                   )}
                 </div>
               </div>
-            ) : (
-              <div className="p-6">
-                <div className="text-center py-8 text-gray-500">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-                  <p>Loading dashboard data...</p>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-      {/* Market Prices Chart */}
-      {showMarketChart && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-semibold">📈 Market Prices</h2>
+      {/* Create Gift Card Modal */}
+      {
+        showCreateGiftCard && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold">🎁 Create Gift Card</h3>
                 <button
-                  onClick={() => setShowMarketChart(false)}
+                  onClick={() => setShowCreateGiftCard(false)}
                   className="text-gray-500 hover:text-gray-700"
                 >
                   ×
                 </button>
               </div>
-            </div>
 
-            <div className="p-6">
-              <div className="mb-6">
-                <p className="text-gray-600">
-                  Current market prices for agricultural products. Prices are updated regularly based on market conditions.
-                </p>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const amount = formData.get('amount');
+                const recipientEmail = formData.get('recipient_email');
+                const recipientName = formData.get('recipient_name');
+                const message = formData.get('message');
+
+                try {
+                  const result = await createGiftCard(amount, recipientEmail, recipientName, message);
+                  alert(`Gift card created successfully!\nCard Code: ${result.gift_card.card_code}\nAmount: ₦${parseFloat(amount).toLocaleString()}`);
+                  setShowCreateGiftCard(false);
+                } catch (error) {
+                  alert('Failed to create gift card: ' + error.message);
+                }
+              }}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Gift Card Amount (₦)
+                    </label>
+                    <input
+                      type="number"
+                      name="amount"
+                      min="100"
+                      max="100000"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                      placeholder="Enter gift card value"
+                    />
+                    <div className="text-xs text-gray-500 mt-1">Min: ₦100, Max: ₦100,000</div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Recipient Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      name="recipient_name"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                      placeholder="Who is this gift card for?"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Recipient Email (Optional)
+                    </label>
+                    <input
+                      type="email"
+                      name="recipient_email"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                      placeholder="Recipient's email address"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Gift Message (Optional)
+                    </label>
+                    <textarea
+                      name="message"
+                      rows="3"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                      placeholder="Add a personal message..."
+                    ></textarea>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateGiftCard(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700"
+                  >
+                    Create Gift Card
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Redeem Gift Card Modal */}
+      {
+        showRedeemGiftCard && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold">💰 Redeem Gift Card</h3>
+                <button
+                  onClick={() => {
+                    setShowRedeemGiftCard(false);
+                    setGiftCardDetails(null);
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
               </div>
 
-              {marketPrices.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                  <p>Loading market prices...</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {marketPrices.map((item, index) => (
-                    <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-semibold text-gray-800">{item.product}</h3>
-                          <div className="text-xs text-gray-500 capitalize">{item.category.replace('_', ' ')}</div>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const cardCode = formData.get('card_code');
+                const amount = formData.get('amount');
+
+                try {
+                  const result = await redeemGiftCard(cardCode, amount);
+                  alert(`Gift card redeemed successfully!\nRedeemed: ₦${result.redeemed_amount.toLocaleString()}\nNew wallet balance: ₦${result.new_wallet_balance.toLocaleString()}`);
+                  setShowRedeemGiftCard(false);
+                  setGiftCardDetails(null);
+                } catch (error) {
+                  alert('Failed to redeem gift card: ' + error.message);
+                }
+              }}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Gift Card Code
+                    </label>
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        name="card_code"
+                        required
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 uppercase"
+                        placeholder="GIFT-XXXXXXXX"
+                        onChange={async (e) => {
+                          const code = e.target.value.trim();
+                          if (code.length >= 8) {
+                            await fetchGiftCardDetails(code);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const code = document.querySelector('input[name="card_code"]').value;
+                          if (code) await fetchGiftCardDetails(code);
+                        }}
+                        className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                      >
+                        Check
+                      </button>
+                    </div>
+                  </div>
+
+                  {giftCardDetails && (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="space-y-2">
+                        <div className="font-semibold text-green-800">
+                          Gift Card Found!
                         </div>
-                        <div className="text-right">
-                          <div className="text-xl font-bold text-gray-900">₦{item.price.toLocaleString()}</div>
-                          <div className={`text-sm font-medium ${item.trend.startsWith('+') ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                            {item.trend}
+                        <div className="text-sm text-green-700">
+                          Available Balance: ₦{giftCardDetails.balance.toLocaleString()}
+                        </div>
+                        <div className="text-sm text-green-600">
+                          Status: {giftCardDetails.status} •
+                          Expires: {new Date(giftCardDetails.expiry_date).toLocaleDateString()}
+                        </div>
+                        {giftCardDetails.message && (
+                          <div className="text-sm text-green-600 italic">
+                            "{giftCardDetails.message}"
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  )}
 
-              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="text-sm text-blue-800">
-                  <strong>Note:</strong> Prices are indicative and may vary based on quality, location, and market conditions.
-                  Use these as reference for your pricing decisions.
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Amount to Redeem (Optional)
+                    </label>
+                    <input
+                      type="number"
+                      name="amount"
+                      min="1"
+                      max={giftCardDetails ? giftCardDetails.balance : 100000}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                      placeholder="Leave empty to redeem full amount"
+                    />
+                    <div className="text-xs text-gray-500 mt-1">
+                      Leave empty to redeem the full gift card balance
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowRedeemGiftCard(false);
+                      setGiftCardDetails(null);
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!giftCardDetails}
+                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
+                  >
+                    Redeem Gift Card
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )
+      }
+
+      {/* KYC Completion Prompt */}
+      {
+        showKYCPrompt && kycStatus && kycStatus.requires_kyc && kycStatus.status === 'not_started' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-md w-full p-6 border-2 border-yellow-200">
+              <div className="text-center">
+                <div className="text-4xl mb-4">🔐</div>
+                <h3 className="text-xl font-semibold mb-2 text-gray-800">Complete Your KYC</h3>
+                <p className="text-gray-600 mb-4">
+                  Complete your KYC verification to start receiving payments on the platform.
+                </p>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Important:</strong> KYC completion is required to receive payments from buyers.
+                    Without KYC, you can browse and purchase but cannot receive funds.
+                  </p>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowKYCPrompt(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Later
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowKYCPrompt(false);
+                      // Navigate to KYC completion - would implement KYC modal
+                      alert('KYC completion form will open here. This includes:\n\n' +
+                        'For Registered Businesses:\n- Business Registration Number\n- TIN Certificate\n- Certificate of Incorporation\n\n' +
+                        'For Others (Farmers/Agents/Unregistered):\n- NIN or BVN\n- Headshot photo (camera)\n- National ID upload\n- Utility bill');
+                    }}
+                    className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                  >
+                    Complete KYC
+                  </button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
+
+      {/* Farmer Dashboard */}
+      {
+        showFarmerDashboard && user && user.role === 'farmer' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-semibold">🌾 Farmer Dashboard</h2>
+                  <button
+                    onClick={() => setShowFarmerDashboard(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              {farmerDashboardData ? (
+                <div className="p-6">
+                  {/* Profile Summary */}
+                  <div className="mb-8 p-6 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg">
+                    <h3 className="text-lg font-semibold mb-2">Welcome, {farmerDashboardData.farmer_profile.name}!</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <div className="text-green-200">KYC Status</div>
+                        <div className="font-medium capitalize">{farmerDashboardData.farmer_profile.kyc_status}</div>
+                      </div>
+                      <div>
+                        <div className="text-green-200">Rating</div>
+                        <div className="font-medium">⭐ {farmerDashboardData.farmer_profile.average_rating}/5</div>
+                      </div>
+                      <div>
+                        <div className="text-green-200">Products</div>
+                        <div className="font-medium">{farmerDashboardData.business_metrics.total_products}</div>
+                      </div>
+                      <div>
+                        <div className="text-green-200">Revenue</div>
+                        <div className="font-medium">₦{farmerDashboardData.business_metrics.total_revenue.toLocaleString()}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Business Metrics */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <div className="text-2xl text-blue-600 mb-2">📦</div>
+                      <div className="text-2xl font-bold text-blue-600">{farmerDashboardData.business_metrics.active_products}</div>
+                      <div className="text-sm text-blue-600">Active Products</div>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <div className="text-2xl text-green-600 mb-2">🌾</div>
+                      <div className="text-2xl font-bold text-green-600">{farmerDashboardData.business_metrics.total_farmlands}</div>
+                      <div className="text-sm text-green-600">Farmlands</div>
+                    </div>
+                    <div className="bg-yellow-50 p-4 rounded-lg">
+                      <div className="text-2xl text-yellow-600 mb-2">📋</div>
+                      <div className="text-2xl font-bold text-yellow-600">{farmerDashboardData.business_metrics.pending_orders}</div>
+                      <div className="text-sm text-yellow-600">Pending Orders</div>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <div className="text-2xl text-purple-600 mb-2">📏</div>
+                      <div className="text-2xl font-bold text-purple-600">{farmerDashboardData.business_metrics.total_hectares}</div>
+                      <div className="text-sm text-purple-600">Total Hectares</div>
+                    </div>
+                  </div>
+
+                  {/* Recent Orders */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
+                    {farmerDashboardData.recent_orders.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <p>No recent orders. Start listing your products to get orders!</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {farmerDashboardData.recent_orders.map((order, index) => (
+                          <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                            <div>
+                              <div className="font-medium">{order.product}</div>
+                              <div className="text-sm text-gray-500">Buyer: {order.buyer}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-semibold">₦{order.amount.toLocaleString()}</div>
+                              <div className={`text-xs px-2 py-1 rounded ${order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                {order.status}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6">
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+                    <p>Loading dashboard data...</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      {/* Agent Dashboard */}
+      {
+        showAgentDashboard && user && user.role === 'agent' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-semibold">🤝 Agent Dashboard</h2>
+                  <button
+                    onClick={() => setShowAgentDashboard(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              {agentDashboardData ? (
+                <div className="p-6">
+                  {/* Profile Summary */}
+                  <div className="mb-8 p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg">
+                    <h3 className="text-lg font-semibold mb-2">Welcome, {agentDashboardData.agent_profile.name}!</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <div className="text-purple-200">KYC Status</div>
+                        <div className="font-medium capitalize">{agentDashboardData.agent_profile.kyc_status}</div>
+                      </div>
+                      <div>
+                        <div className="text-purple-200">Rating</div>
+                        <div className="font-medium">⭐ {agentDashboardData.agent_profile.average_rating}/5</div>
+                      </div>
+                      <div>
+                        <div className="text-purple-200">Farmers</div>
+                        <div className="font-medium">{agentDashboardData.business_metrics.total_farmers}</div>
+                      </div>
+                      <div>
+                        <div className="text-purple-200">Commission</div>
+                        <div className="font-medium">₦{agentDashboardData.business_metrics.agent_commission.toLocaleString()}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Business Metrics */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <div className="text-2xl text-green-600 mb-2">👨‍🌾</div>
+                      <div className="text-2xl font-bold text-green-600">{agentDashboardData.business_metrics.active_farmers}</div>
+                      <div className="text-sm text-green-600">Active Farmers</div>
+                    </div>
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <div className="text-2xl text-blue-600 mb-2">📦</div>
+                      <div className="text-2xl font-bold text-blue-600">{agentDashboardData.business_metrics.active_products}</div>
+                      <div className="text-sm text-blue-600">Active Products</div>
+                    </div>
+                    <div className="bg-yellow-50 p-4 rounded-lg">
+                      <div className="text-2xl text-yellow-600 mb-2">💰</div>
+                      <div className="text-2xl font-bold text-yellow-600">₦{agentDashboardData.business_metrics.total_revenue.toLocaleString()}</div>
+                      <div className="text-sm text-yellow-600">Total Revenue</div>
+                    </div>
+                    <div className="bg-red-50 p-4 rounded-lg">
+                      <div className="text-2xl text-red-600 mb-2">📋</div>
+                      <div className="text-2xl font-bold text-red-600">{agentDashboardData.business_metrics.pending_orders}</div>
+                      <div className="text-sm text-red-600">Pending Orders</div>
+                    </div>
+                  </div>
+
+                  {/* Top Farmers */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Top Performing Farmers</h3>
+                    {agentDashboardData.top_farmers.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <p>No farmers in your network yet. Start adding farmers to grow your business!</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {agentDashboardData.top_farmers.map((farmer, index) => (
+                          <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                            <div>
+                              <div className="font-medium">{farmer.name}</div>
+                              <div className="text-sm text-gray-500">{farmer.location} • Joined: {new Date(farmer.linked_date).toLocaleDateString()}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-semibold">₦{farmer.total_sales.toLocaleString()}</div>
+                              <div className="text-sm text-gray-500">{farmer.total_listings} listings</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6">
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+                    <p>Loading dashboard data...</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      {/* Market Prices Chart */}
+      {
+        showMarketChart && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-semibold">📈 Market Prices</h2>
+                  <button
+                    onClick={() => setShowMarketChart(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6">
+                <div className="mb-6">
+                  <p className="text-gray-600">
+                    Current market prices for agricultural products. Prices are updated regularly based on market conditions.
+                  </p>
+                </div>
+
+                {marketPrices.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                    <p>Loading market prices...</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {marketPrices.map((item, index) => (
+                      <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-semibold text-gray-800">{item.product}</h3>
+                            <div className="text-xs text-gray-500 capitalize">{item.category.replace('_', ' ')}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xl font-bold text-gray-900">₦{item.price.toLocaleString()}</div>
+                            <div className={`text-sm font-medium ${item.trend.startsWith('+') ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                              {item.trend}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="text-sm text-blue-800">
+                    <strong>Note:</strong> Prices are indicative and may vary based on quality, location, and market conditions.
+                    Use these as reference for your pricing decisions.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
 
       {/* Communities Modals */}
       {showCreateCommunity && <CreateCommunityModal />}
@@ -9626,7 +9800,7 @@ function App() {
       {/* Seller Details Modal */}
       {showSellerDetails && <SellerDetailsModal />}
 
-    </div>
+    </div >
   );
 }
 
