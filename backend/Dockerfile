@@ -19,6 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy dependencies file
 COPY requirements.txt .
 
+# Suppress pip root warning
+ENV PIP_ROOT_USER_ACTION=ignore
+
 # Install Python dependencies into a temporary directory
 # We use --prefix=/install so we can easily copy them to /usr/local in the next stage
 RUN pip install --upgrade pip --no-cache-dir && \
