@@ -81,14 +81,7 @@ class User(BaseModel):
 
 # ... (Environment variables section remains unchanged) ...
 
-# Startup Event
-@app.on_event("startup")
-async def startup_event():
-    print(f"Application starting up on port {os.environ.get('PORT', '8001')}...")
 
-@app.get("/")
-async def root():
-    return {"status": "ok", "message": "Pyramyd Backend Running", "service": "backend"}
 
 @app.post("/api/auth/complete-registration")
 async def complete_registration(registration_data: CompleteRegistration):
@@ -888,6 +881,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Startup Event
+@app.on_event("startup")
+async def startup_event():
+    print(f"Application starting up on port {os.environ.get('PORT', '8001')}...")
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Pyramyd Backend Running", "service": "backend"}
 
 # MongoDB connection
 client = MongoClient(MONGO_URL)
