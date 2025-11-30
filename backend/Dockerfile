@@ -60,7 +60,7 @@ USER appuser
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8001
+    PORT=5000
 
 # Expose the application port
 EXPOSE ${PORT}
