@@ -40,9 +40,65 @@ from order.models import (
     AgentPurchaseOption, 
     GroupBuyingRequest
 )
-from order.pyexpress_order import process_create_order
-from order.community_order import process_create_group_order
-from order.farm_deals_order import process_create_outsourced_order
+
+# Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
+MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
+JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-here-change-in-production')
+ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')  # For encrypting sensitive user data
+PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_dummy_paystack_key')
+PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY', 'pk_test_dummy_paystack_key')
+TWILIO_SID = os.environ.get('TWILIO_ACCOUNT_SID', 'dummy_twilio_sid')
+TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'dummy_twilio_token')
+GEOAPIFY_API_KEY = os.environ.get('GEOAPIFY_API_KEY', '04f9224444654ca5b967366d08eae4f4')
+
+# Kwik Delivery API
+KWIK_ACCESS_TOKEN = os.environ.get('KWIK_ACCESS_TOKEN', 'dummy_kwik_access_token')
+KWIK_DOMAIN_NAME = os.environ.get('KWIK_DOMAIN_NAME', 'pyramyd.com')
+KWIK_VENDOR_ID = os.environ.get('KWIK_VENDOR_ID', 'dummy_vendor_id')
+KWIK_API_URL = "https://api.kwik.delivery"  # Official Kwik API base URL
+KWIK_ENABLED_STATES = ["Lagos", "Oyo", "FCT Abuja"]  # States where Kwik operates
+
+# Email Configuration
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+SUPPORT_EMAIL = os.environ.get('SUPPORT_MAIL','')
+FROM_EMAIL = os.environ.get('FROM_EMAIL', SUPPORT_EMAIL)
+
+# Admin credentials
+ADMIN_EMAIL = os.environ.get('ADMIN_MAIL','')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD','')  # Default password - change after first login
+ADMIN_PASSWORD_HASH = "**********"
+
+# Initialize MongoDB
+try:
+    client = MongoClient(MONGO_URL)
+    db = client['pyramyd']
+    users_collection = db['users']
+    agent_farmers_collection = db['agent_farmers']
+    driver_slots_collection = db['driver_slots']
+    ratings_collection = db['ratings']
+    print("OK Connected to MongoDB")
+except Exception as e:
+    print(f"X Error connecting to MongoDB: {e}")
+
+
+# Initialize FastAPI
+app = FastAPI(
+    title="Pyramyd API",
+    description="Backend for Pyramyd Market",
+    version="1.0.0"
+)
+
+# CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Pydantic Models for Registration
 class CompleteRegistration(BaseModel):
@@ -78,8 +134,6 @@ class User(BaseModel):
     phone: str
     role: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
-
-# ... (Environment variables section remains unchanged) ...
 
 
 
@@ -214,35 +268,6 @@ async def complete_registration(registration_data: CompleteRegistration):
     }
 
 
-# Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
-MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
-JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-here-change-in-production')
-ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')  # For encrypting sensitive user data
-PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_dummy_paystack_key')
-PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY', 'pk_test_dummy_paystack_key')
-TWILIO_SID = os.environ.get('TWILIO_ACCOUNT_SID', 'dummy_twilio_sid')
-TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'dummy_twilio_token')
-GEOAPIFY_API_KEY = os.environ.get('GEOAPIFY_API_KEY', '04f9224444654ca5b967366d08eae4f4')
-
-# Kwik Delivery API
-KWIK_ACCESS_TOKEN = os.environ.get('KWIK_ACCESS_TOKEN', 'dummy_kwik_access_token')
-KWIK_DOMAIN_NAME = os.environ.get('KWIK_DOMAIN_NAME', 'pyramyd.com')
-KWIK_VENDOR_ID = os.environ.get('KWIK_VENDOR_ID', 'dummy_vendor_id')
-KWIK_API_URL = "https://api.kwik.delivery"  # Official Kwik API base URL
-KWIK_ENABLED_STATES = ["Lagos", "Oyo", "FCT Abuja"]  # States where Kwik operates
-
-# Email Configuration
-SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
-SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
-SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
-SUPPORT_EMAIL = os.environ.get('SUPPORT_MAIL','')
-FROM_EMAIL = os.environ.get('FROM_EMAIL', SUPPORT_EMAIL)
-
-# Admin credentials
-ADMIN_EMAIL = os.environ.get('ADMIN_MAIL','')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD','')  # Default password - change after first login
-ADMIN_PASSWORD_HASH = "**********"
 
 
 
@@ -1033,6 +1058,43 @@ NIGERIAN_STATES = [
     "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun",
     "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
 ]
+
+
+class ProductCreate(BaseModel):
+    title: str
+    description: str
+    category: ProductCategory
+    price_per_unit: float
+    unit: str
+    quantity: int
+    images: List[str] = []
+    location: str
+    platform: str = "home"
+    has_discount: bool = False
+    discount_value: float = 0.0
+    discount_type: str = "percentage"
+    logistics_managed_by: str = "platform"
+    seller_delivery_fee: float = 0.0
+
+class Product(ProductCreate):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    seller_id: str
+    seller_name: str
+    seller_type: Optional[str] = None
+    seller_profile_picture: Optional[str] = None
+    business_name: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    original_price: Optional[float] = None
+    discount_amount: float = 0.0
+
+
+class RatingCreate(BaseModel):
+    rating_value: float
+    comment: Optional[str] = None
+    rating_type: str
+    rated_entity_id: str
+    rated_entity_username: Optional[str] = None
+    order_id: Optional[str] = None
 
 class OrderStatus(str, Enum):
     PENDING = "pending"
