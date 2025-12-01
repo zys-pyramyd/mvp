@@ -42,7 +42,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed dependencies from the builder stage to /usr/local
-# This makes them available to all users (including appuser) and puts them in PATH
+# making them available to all users (including appuser) and puts them in PATH
 COPY --from=builder /install /usr/local
 ENV PATH="/usr/local/bin:$PATH"
 
