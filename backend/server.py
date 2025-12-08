@@ -92,9 +92,23 @@ app = FastAPI(
 )
 
 # CORS Middleware
+# Allow requests from frontend domains
+allowed_origins = [
+    "http://localhost:3000",  # Local development
+    "http://localhost:5000",  # Alternative local port
+    "https://pyramydhyb.com",  # Production domain (if applicable)
+    "https://www.pyramydhyb.com",  # Production domain with www
+    "https://*.vercel.app",  # Vercel preview deployments
+]
+
+# Get Vercel URL from environment if available
+vercel_url = os.environ.get('VERCEL_URL')
+if vercel_url:
+    allowed_origins.append(f"https://{vercel_url}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
