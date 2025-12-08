@@ -4522,22 +4522,46 @@ function App() {
               </div>
             )}
 
-            {/* Location Filter */}
+
+            {/* Location Filter with Delivery Notification */}
             <div className="mb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-medium text-gray-700">📍 Location:</span>
-                  <select
-                    value={locationFilter}
-                    onChange={(e) => setLocationFilter(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  >
-                    <option value="">All Locations</option>
-                    {availableLocations.map(location => (
-                      <option key={location} value={location}>{location}</option>
-                    ))}
-                  </select>
+              {/* Responsive container: column on mobile, row on PC */}
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+                {/* Delivery Location Notification Banner - Above on mobile, beside on PC */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 lg:flex-1">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-xs font-semibold text-blue-900 mb-0.5">💡 Fast Delivery Tip</h4>
+                      <p className="text-xs text-blue-800">
+                        Buy from sellers closest to your location for faster delivery!
+                      </p>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Location Filter - Below on mobile, beside on PC */}
+                <div className="flex items-center justify-between lg:justify-start">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-medium text-gray-700">📍 Location:</span>
+                    <select
+                      value={locationFilter}
+                      onChange={(e) => setLocationFilter(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    >
+                      <option value="">All Locations</option>
+                      {availableLocations.map(location => (
+                        <option key={location} value={location}>{location}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
               </div>
             </div>
 

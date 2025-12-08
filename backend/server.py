@@ -8852,6 +8852,7 @@ async def get_my_ratings(
 #         print(f"Error finding drivers: {str(e)}")
 #         raise HTTPException(status_code=500, detail="Failed to find drivers")
 
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8001))
