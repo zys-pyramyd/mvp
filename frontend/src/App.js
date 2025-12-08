@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import './App.css';
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://mvp-2-u8e9.onrender.com';
+console.log('API_BASE_URL:', API_BASE_URL);
 
 // Custom Icons as SVG components using provided designs
 const AddToCartIcon = () => (
@@ -1270,6 +1271,20 @@ function App() {
       }
     } catch (error) {
       console.error('Error fetching user communities:', error);
+    }
+    return null;
+  };
+
+  const fetchCommunities = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/communities`);
+      if (response.ok) {
+        const data = await response.json();
+        setCommunities(data.communities || []);
+        return data;
+      }
+    } catch (error) {
+      console.error('Error fetching communities:', error);
     }
     return null;
   };
@@ -2709,7 +2724,7 @@ function App() {
       console.error('Error searching buyers:', error);
     }
   };
-  
+   
   const addBuyerToGroup = (buyer, quantity) => {
     const existingBuyer = groupBuyingData.buyers.find(b => b.id === buyer.id);
     if (!existingBuyer) {
@@ -2720,7 +2735,7 @@ function App() {
       }));
     }
   };
-  
+   
   const removeBuyerFromGroup = (buyerId) => {
     const buyer = groupBuyingData.buyers.find(b => b.id === buyerId);
     if (buyer) {
@@ -2731,7 +2746,7 @@ function App() {
       }));
     }
   };
-  
+   
   const fetchPriceRecommendations = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -2761,7 +2776,7 @@ function App() {
       console.error('Error fetching recommendations:', error);
     }
   };
-  
+   
   const createGroupOrder = async () => {
     try {
       const token = localStorage.getItem('token');
