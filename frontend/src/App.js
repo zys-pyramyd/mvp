@@ -366,7 +366,15 @@ function App() {
   const categoryData = [
     {
       value: 'grains_legumes',
-      label: 'Grains & Legumes',
+      label: 'Grains, Rice &Cereals',
+      image: 'https://images.unsplash.com/photo-1499529112087-3cb3b73cec95?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwzfHxhZ3JpY3VsdHVyYWwlMjBwcm9kdWN0c3xlbnwwfHx8fDE3NTM5NTM1ODd8MA&ixlib=rb-4.1.0&q=85'
+    }, {
+      value: 'beans_varieties',
+      label: 'Beans & Varieties',
+      image: 'https://images.unsplash.com/photo-1499529112087-3cb3b73cec95?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwzfHxhZ3JpY3VsdHVyYWwlMjBwcm9kdWN0c3xlbnwwfHx8fDE3NTM5NTM1ODd8MA&ixlib=rb-4.1.0&q=85'
+    }, {
+      value: 'flour_bakings',
+      label: 'Flour & Baking',
       image: 'https://images.unsplash.com/photo-1499529112087-3cb3b73cec95?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwzfHxhZ3JpY3VsdHVyYWwlMjBwcm9kdWN0c3xlbnwwfHx8fDE3NTM5NTM1ODd8MA&ixlib=rb-4.1.0&q=85'
     },
     {
@@ -380,13 +388,18 @@ function App() {
       image: 'https://images.pexels.com/photos/725992/pexels-photo-725992.jpeg'
     },
     {
+      value: 'sea_foods',
+      label: 'Sea Foods',
+      image: 'https://images.pexels.com/photos/725992/pexels-photo-725992.jpeg'
+    },
+    {
       value: 'tubers_roots',
       label: 'Roots & Tubers',
       image: 'https://images.unsplash.com/photo-1587049016137-d2d2b14b0d61?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHx5YW18ZW58MHx8fHwxNzUzOTUzNzAwfDA&ixlib=rb-4.1.0&q=85'
     },
     {
       value: 'fruits',
-      label: 'Fruits',
+      label: 'Fruits & Nuts',
       image: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?crop=entropy&cs=srgb&fm=jpg&ixid=M3w0MjI5Nzh8MHwxfHNlYXJjaHwxfHxmcnVpdHN8ZW58MHx8fHwxNzUzOTUzNjUwfDA&ixlib=rb-4.1.0&q=85'
     },
     {
@@ -416,7 +429,7 @@ function App() {
     },
     {
       value: 'packaged_goods',
-      label: 'Packaged Goods',
+      label: 'Canned Food',
       image: 'https://images.unsplash.com/photo-1741522226997-a34b5a45c648?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwxfHxwYWNrYWdlZCUyMGZvb2R8ZW58MHx8fHwxNzUzOTUzNjQ0fDA&ixlib=rb-4.1.0&q=85'
     },
   ];
