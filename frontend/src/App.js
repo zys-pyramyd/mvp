@@ -5,6 +5,7 @@ const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://mvp-2-u8e9.on
 console.log('API_BASE_URL:', API_BASE_URL);
 import SellerDashboard from './SellerDashboard';
 import AdminDashboard from './AdminDashboard';
+import { NIGERIAN_STATES } from './nigerianStates';
 
 // Custom Icons as SVG components using provided designs
 const AddToCartIcon = () => (
@@ -1634,7 +1635,15 @@ function App() {
   const fetchAvailableLocations = async () => {
     try {
       // Extract unique locations from products
-      const productLocations = [...new Set(products.map(p => p.location))];
+      // Extract unique locations from products and normalize against standard list
+      const productLocations = [...new Set(products.map(p => {
+        if (!p.location) return null;
+        const normalized = p.location.trim();
+        // Try to match with standard state list
+        const match = NIGERIAN_STATES.find(s => s.toLowerCase() === normalized.toLowerCase());
+        return match || normalized;
+      }))].filter(Boolean).sort();
+
       setAvailableLocations(productLocations);
       return productLocations;
     } catch (error) {
@@ -4621,54 +4630,6 @@ function App() {
                 </button>
               </div>
             </div>
-
-            {/* Auto-changing Slides */}
-            <div className="mb-6">
-              <div className={`relative bg-gradient-to-r ${slideContent[currentSlide].bgGradient} rounded-xl p-6 overflow-hidden transition-all duration-500`}>
-                <div className="text-center">
-                  <div className="min-h-[100px] flex flex-col items-center justify-center">
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                        {slideContent[currentSlide].title}
-                      </h2>
-                      <p className="text-gray-600 text-sm mb-4">
-                        {slideContent[currentSlide].description}
-                      </p>
-
-                      {/* CTA Button */}
-                      {slideContent[currentSlide].cta && (
-                        <button
-                          onClick={() => handleSlideAction(slideContent[currentSlide].cta.action)}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md hover:shadow-lg transform hover:scale-105 duration-200"
-                        >
-                          {slideContent[currentSlide].cta.text}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Pagination dots */}
-                  <div className="flex justify-center space-x-2 mt-4">
-                    {slideContent.map((_, index) => (
-                      <div
-                        key={index}
-                        onClick={() => setCurrentSlide(index)}
-                        className={`w-2 h-2 rounded-full cursor-pointer transition-colors ${index === currentSlide ? 'bg-emerald-500' : 'bg-gray-300 hover:bg-gray-400'
-                          }`}
-                      ></div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Background decoration */}
-                <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 opacity-10">
-                  <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
             {/* Advanced Filters Toggle */}
             <div className="mb-4 flex justify-between items-center">
               <button
@@ -4801,6 +4762,54 @@ function App() {
                 </div>
               </div>
             )}
+
+            {/* Auto-changing Slides */}
+            <div className="mb-6">
+              <div className={`relative bg-gradient-to-r ${slideContent[currentSlide].bgGradient} rounded-xl p-6 overflow-hidden transition-all duration-500`}>
+                <div className="text-center">
+                  <div className="min-h-[100px] flex flex-col items-center justify-center">
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                        {slideContent[currentSlide].title}
+                      </h2>
+                      <p className="text-gray-600 text-sm mb-4">
+                        {slideContent[currentSlide].description}
+                      </p>
+
+                      {/* CTA Button */}
+                      {slideContent[currentSlide].cta && (
+                        <button
+                          onClick={() => handleSlideAction(slideContent[currentSlide].cta.action)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md hover:shadow-lg transform hover:scale-105 duration-200"
+                        >
+                          {slideContent[currentSlide].cta.text}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Pagination dots */}
+                  <div className="flex justify-center space-x-2 mt-4">
+                    {slideContent.map((_, index) => (
+                      <div
+                        key={index}
+                        onClick={() => setCurrentSlide(index)}
+                        className={`w-2 h-2 rounded-full cursor-pointer transition-colors ${index === currentSlide ? 'bg-emerald-500' : 'bg-gray-300 hover:bg-gray-400'
+                          }`}
+                      ></div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Background decoration */}
+                <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 opacity-10">
+                  <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
 
 
             {/* Location Filter with Delivery Notification */}

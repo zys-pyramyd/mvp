@@ -1486,7 +1486,9 @@ class ProductCreate(BaseModel):
     unit: str
     quantity: int
     images: List[str] = []
-    location: str
+    location: str # This constitutes the State
+    city: Optional[str] = None
+    pickup_address: Optional[str] = None
     platform: str = "home"
     has_discount: bool = False
     discount_value: float = 0.0
@@ -1511,7 +1513,10 @@ class Product(ProductCreate):
     business_name: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     original_price: Optional[float] = None
+    original_price: Optional[float] = None
     discount_amount: float = 0.0
+    city: Optional[str] = None
+    pickup_address: Optional[str] = None
 
 
 

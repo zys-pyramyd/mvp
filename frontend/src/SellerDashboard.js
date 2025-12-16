@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { NIGERIAN_STATES } from './nigerianStates';
 
 const SellerDashboard = ({ user, token }) => {
     const [activeTab, setActiveTab] = useState('overview'); // overview, farmers, deliveries, inventory
@@ -6,6 +7,7 @@ const SellerDashboard = ({ user, token }) => {
     const [farmers, setFarmers] = useState([]);
     const [deliveries, setDeliveries] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [showAddProduct, setShowAddProduct] = useState(false);
 
     useEffect(() => {
         fetchInitialData();
@@ -91,7 +93,10 @@ const SellerDashboard = ({ user, token }) => {
                         <p className="text-gray-500 capitalize">{user.role} Control Center • @{user.username}</p>
                     </div>
                     <div className="flex gap-2">
-                        <button className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700">
+                        <button
+                            onClick={() => setShowAddProduct(true)}
+                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700"
+                        >
                             + Add Product
                         </button>
                     </div>
@@ -190,6 +195,218 @@ const SellerDashboard = ({ user, token }) => {
                         </div>
                     )}
                 </div>
+            </div>
+        </div>
+
+                {/* Add Product Modal */ }
+    {
+        showAddProduct && (
+            <AddProductModal
+                onClose={() => setShowAddProduct(false)}
+                onSuccess={() => {
+                    setShowAddProduct(false);
+                    fetchInitialData(); // Refresh data
+                }}
+                token={token}
+            />
+        )
+    }
+            </div >
+        </div >
+    );
+};
+
+const AddProductModal = ({ onClose, onSuccess, token }) => {
+    const [formData, setFormData] = useState({
+        title: '',
+        description: '',
+        category: 'grains_cereals',
+        price_per_unit: '',
+        unit: 'kg',
+        quantity: '',
+        location: '', // State
+        city: '',
+        pickup_address: '',
+        country: 'Nigeria', // Fixed
+        seller_delivery_fee: 0
+    });
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+
+        try {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/products`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(formData)
+            });
+
+            if (response.ok) {
+                alert('Product added successfully!');
+                onSuccess();
+            } else {
+                const error = await response.json();
+                alert(error.detail || 'Failed to add product');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Error creating product');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white rounded-xl max-w-2xl w-full p-6 my-8">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-bold">Add New Product</h2>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Product Title</label>
+                            <input
+                                type="text"
+                                required
+                                className="w-full border rounded p-2"
+                                value={formData.title}
+                                onChange={e => setFormData({ ...formData, title: e.target.value })}
+                                placeholder="e.g. Fresh Red Tomatoes"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Category</label>
+                            <select
+                                className="w-full border rounded p-2"
+                                value={formData.category}
+                                onChange={e => setFormData({ ...formData, category: e.target.value })}
+                            >
+                                <option value="grains_cereals">Grains & Cereals</option>
+                                <option value="tubers_roots">Tubers & Roots</option>
+                                <option value="fish_meat">Fish & Meat</option>
+                                <option value="spices_vegetables">Spices & Vegetables</option>
+                                <option value="packaged_goods">Packaged Goods</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="col-span-2">
+                            <label className="block text-sm font-medium text-gray-700">Price (₦)</label>
+                            <input
+                                type="number"
+                                required
+                                className="w-full border rounded p-2"
+                                value={formData.price_per_unit}
+                                onChange={e => setFormData({ ...formData, price_per_unit: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Quantity</label>
+                            <input
+                                type="number"
+                                required
+                                className="w-full border rounded p-2"
+                                value={formData.quantity}
+                                onChange={e => setFormData({ ...formData, quantity: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Unit</label>
+                            <select
+                                className="w-full border rounded p-2"
+                                value={formData.unit}
+                                onChange={e => setFormData({ ...formData, unit: e.target.value })}
+                            >
+                                <option value="kg">kg</option>
+                                <option value="bag">bag</option>
+                                <option value="litre">litre</option>
+                                <option value="basket">basket</option>
+                                <option value="crate">crate</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Description</label>
+                        <textarea
+                            required
+                            className="w-full border rounded p-2 h-24"
+                            value={formData.description}
+                            onChange={e => setFormData({ ...formData, description: e.target.value })}
+                            placeholder="Describe your product freshness, quality, etc."
+                        ></textarea>
+                    </div>
+
+                    <div className="border-t pt-4">
+                        <h3 className="font-semibold text-gray-900 mb-3">Product Location</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Country</label>
+                                <input
+                                    type="text"
+                                    value="Nigeria"
+                                    disabled
+                                    className="w-full border rounded p-2 bg-gray-100 text-gray-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">State</label>
+                                <select
+                                    required
+                                    className="w-full border rounded p-2"
+                                    value={formData.location}
+                                    onChange={e => setFormData({ ...formData, location: e.target.value })}
+                                >
+                                    <option value="">Select State</option>
+                                    {NIGERIAN_STATES.map(state => (
+                                        <option key={state} value={state}>{state}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">City/LGA</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="w-full border rounded p-2"
+                                    value={formData.city}
+                                    onChange={e => setFormData({ ...formData, city: e.target.value })}
+                                    placeholder="e.g. Ikeja"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Pickup Address (Optional)</label>
+                                <input
+                                    type="text"
+                                    className="w-full border rounded p-2"
+                                    value={formData.pickup_address}
+                                    onChange={e => setFormData({ ...formData, pickup_address: e.target.value })}
+                                    placeholder="e.g. 15 Farm Road"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancel</button>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="px-6 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                            {loading ? 'Posting...' : 'Post Product'}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );
