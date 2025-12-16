@@ -60,6 +60,7 @@ KWIK_ENABLED_STATES = ["Lagos", "Oyo", "FCT Abuja"]  # States where Kwik operate
 
 # Email Configuration
 SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
@@ -79,6 +80,10 @@ try:
     agent_farmers_collection = db['agent_farmers']
     agent_farmers_collection = db['agent_farmers']
     ratings_collection = db['ratings']
+    community_posts_collection = db['community_posts']
+    post_likes_collection = db['post_likes']
+    post_comments_collection = db['post_comments']
+    group_orders_collection = db['group_orders']
     print("OK Connected to MongoDB")
 except Exception as e:
     print(f"X Error connecting to MongoDB: {e}")
@@ -364,7 +369,7 @@ def get_delivery_fee_by_state(state: str) -> float:
 # Generate encryption key if not provided (for development only)
 if not ENCRYPTION_KEY:
     ENCRYPTION_KEY = Fernet.generate_key().decode()
-    print(f"⚠️ WARNING: Using auto-generated encryption key. Set ENCRYPTION_KEY in production!")
+    print(f"WARNING: Using auto-generated encryption key. Set ENCRYPTION_KEY in production!")
 
 # Initialize Fernet cipher for encryption
 cipher_suite = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
@@ -386,6 +391,270 @@ def decrypt_data(encrypted_data: str) -> str:
         return None
 
 
+
+
+# --- AUTHENTICATION & SECURITY ---
+security = HTTPBearer()
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+def create_token(user_id: str) -> str:
+    payload = {
+        'user_id': user_id,
+        'exp': datetime.utcnow() + timedelta(days=30)
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm='HS256')
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+        user_id = payload.get('user_id')
+        user = db.users.find_one({'id': user_id})
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+ADMIN_EMAILS = ["abdulazeezshakrullah@gmail.com", "abdulazeezshakrullah@pyramydhub.com"]
+
+@app.on_event("startup")
+async def startup_db_client():
+    print("Checking for admin users...")
+    try:
+        initial_password = "AdminInitialPassword123!" # Default initial password
+        hashed = hash_password(initial_password)
+        
+        for email in ADMIN_EMAILS:
+            user = db.users.find_one({"email": email})
+            if not user:
+                print(f"Creating admin user: {email}")
+                new_admin = {
+                    "id": str(uuid.uuid4()),
+                    "email": email,
+                    "password": hashed,
+                    "role": "admin",
+                    "username": email.split('@')[0],
+                    "first_name": "Abdulazeez",
+                    "last_name": "Shakrullah",
+                    "is_verified": True,
+                    "created_at": datetime.utcnow()
+                }
+                db.users.insert_one(new_admin)
+                print(f"Admin created: {email}, Default Password: {initial_password}")
+            else:
+                if user.get("role") != "admin":
+                    db.users.update_one({"_id": user["_id"]}, {"$set": {"role": "admin"}})
+                    print(f"Updated role to admin for {email}")
+    except Exception as e:
+        print(f"Error seeding admins: {e}")
+
+def get_kyc_requirements(user: dict) -> dict:
+    """Get specific KYC requirements based on user type"""
+    role = user.get("role", "")
+    business_category = user.get("business_category", "")
+    is_registered_business = user.get("is_registered_business", False)
+    
+    # Agent-specific KYC requirements
+    if role == "agent":
+        return {
+            "type": "agent",
+            "title": "Agent KYC Requirements",
+            "description": "Specialized requirements for agricultural agents",
+            "review_time": "1-3 business days",
+            "documents": [
+                "Headshot Photo (Camera captured)",
+                "National ID Document (NIN or BVN)",
+                "Utility Bill (Address verification)",
+                "Bank Statement (Financial verification)",
+                "Certificate of Incorporation (If registered business)",
+                "TIN Certificate (If registered business)"
+            ],
+            "information_required": [
+                "Business name and address",
+                "Personal identification details",
+                "Agricultural experience",
+                "Target operation locations",
+                "Expected farmer network size"
+            ],
+            "endpoint": "/api/kyc/agent/submit",
+            "benefits_after_approval": [
+                "Register and verify farmers",
+                "Earn commission on farmer sales",
+                "Access agent dashboard",
+                "Build farmer network"
+            ]
+        }
+    
+    # Farmer-specific KYC requirements  
+    elif role == "farmer":
+        return {
+            "type": "farmer",
+            "title": "Farmer KYC Requirements", 
+            "description": "Verification requirements for farmers",
+            "review_time": "24-48 hours (agent-verified) or 2-5 business days (self-verified)",
+            "documents": [
+                "Headshot Photo (Camera captured)",
+                "National ID Document (NIN or BVN)", 
+                "Farm Photo (Show your farming area)",
+                "Land Ownership Document (Certificate or lease agreement)"
+            ],
+            "information_required": [
+                "Personal identification details",
+                "Farm location and size",
+                "Primary crops grown",
+                "Farming experience",
+                "Land ownership status"
+            ],
+            "verification_options": [
+                {
+                    "method": "agent_verified",
+                    "title": "Agent Verification (Recommended)",
+                    "description": "Get verified by a registered agent for faster processing",
+                    "processing_time": "24-48 hours",
+                    "benefits": ["Faster approval", "Agent support", "Market access guidance"]
+                },
+                {
+                    "method": "self_verified", 
+                    "title": "Self Verification",
+                    "description": "Submit documents directly for verification",
+                    "processing_time": "2-5 business days",
+                    "benefits": ["Direct submission", "Full document control"]
+                }
+            ],
+            "endpoint": "/api/kyc/farmer/submit"
+        }
+    
+    # Business KYC requirements (existing)
+    elif role == "business":
+        if is_registered_business:
+            return {
+                "type": "registered_business",
+                "title": "Registered Business KYC",
+                "description": "Requirements for registered businesses",
+                "review_time": "2-5 business days",
+                "documents": [
+                    "Business Registration Number",
+                    "TIN Certificate", 
+                    "Certificate of Incorporation",
+                    "Business Address Verification (Utility Bill)"
+                ],
+                "endpoint": "/api/kyc/registered-business/submit"
+            }
+        else:
+            return {
+                "type": "unregistered_business",
+                "title": "Unregistered Business KYC", 
+                "description": "Requirements for unregistered businesses",
+                "review_time": "2-5 business days",
+                "documents": [
+                    "NIN or BVN",
+                    "Headshot Photo (Camera)",
+                    "National ID Document",
+                    "Utility Bill (Address Verification)"
+                ],
+                "endpoint": "/api/kyc/unregistered-entity/submit"
+            }
+    
+    # Default for other roles
+    else:
+        return {
+            "type": "unregistered_entity", 
+            "title": "Standard KYC Requirements",
+            "documents": [
+                "NIN or BVN",
+                "Headshot Photo (Camera)",
+                "National ID Document", 
+                "Utility Bill (Address Verification)"
+            ],
+            "endpoint": "/api/kyc/unregistered-entity/submit"
+        }
+
+def validate_kyc_compliance(user: dict, action: str = "general"):
+    """
+    Validate if user is KYC compliant for specific actions.
+    """
+    # Personal accounts don't require KYC
+    if user.get("role") == "personal":
+        return True
+    
+    # Check if KYC is required and approved
+    kyc_status = user.get("kyc_status", "not_started")
+    user_role = user.get("role", "")
+    
+    # Enhanced restrictions for agents - they must complete KYC before ANY platform actions
+    if user_role == "agent":
+        if kyc_status == "not_started":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "AGENT_KYC_REQUIRED",
+                    "message": "Agents must complete their KYC verification before performing any actions on the platform. Please submit your KYC documents to get started.",
+                    "kyc_status": kyc_status,
+                    "verification_time": "Verification takes within 24 hours to verify",
+                    "access_level": "view_only",
+                    "required_actions": get_kyc_requirements(user)
+                }
+            )
+        elif kyc_status == "pending":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "AGENT_KYC_PENDING", 
+                    "message": "Your KYC is under review. You can access the platform to view but cannot onboard farmers or publish farm produce until your status changes to verified.",
+                    "kyc_status": kyc_status,
+                    "verification_time": "Verification typically completes within 24 hours",
+                    "access_level": "view_only"
+                }
+            )
+        elif kyc_status == "rejected":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "AGENT_KYC_REJECTED",
+                    "message": "Your KYC was rejected. Please resubmit with correct documents. You can only view the platform until verification is completed.",
+                    "kyc_status": kyc_status,
+                    "access_level": "view_only",
+                    "required_actions": get_kyc_requirements(user)
+                }
+            )
+    
+    # For other roles (business, farmer, etc.) - standard KYC validation
+    if kyc_status != "approved":
+        status_messages = {
+            "not_started": "Please complete your KYC verification to perform this action",
+            "pending": "Your KYC is under review. You can perform this action once approved", 
+            "rejected": "Your KYC was rejected. Please resubmit with correct documents to continue"
+        }
+        
+        action_context = {
+            "sales": "receive payments or complete sales",
+            "register_farmers": "register farmers to your network",
+            "post_products": "post products for sale", 
+            "collect_payments": "collect payments from customers"
+        }
+        
+        context = action_context.get(action, "perform this action")
+        message = f"KYC verification required to {context}. {status_messages.get(kyc_status, 'KYC verification required')}"
+        
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "KYC_REQUIRED",
+                "message": message,
+                "kyc_status": kyc_status,
+                "required_actions": get_kyc_requirements(user)
+            }
+        )
+    
+    return True
 
 def send_order_completion_email(order_data: dict):
     """Send order completion notification to support email"""
@@ -716,32 +985,11 @@ def calculate_delivery_fee(product_total: float, buyer_state: str, product_data:
         })
         return delivery_info
 
-    # Priority 2: For HOME platform in Kwik-enabled states, try Kwik delivery
-    if platform_type == "home" and buyer_state in KWIK_ENABLED_STATES:
-        # Try to get real-time quote from Kwik API if addresses are provided
-        if pickup_address and delivery_address:
-            kwik_estimate = estimate_fare_kwik(pickup_address, delivery_address)
-            if kwik_estimate and kwik_estimate.get('success'):
-                delivery_info.update({
-                    'delivery_fee': kwik_estimate.get('estimated_fare', 0),
-                    'delivery_method': 'kwik_delivery',
-                    'kwik_available': True,
-                    'distance_km': kwik_estimate.get('distance_km'),
-                    'quote_source': 'kwik_api',
-                    'estimated_delivery_days': '24 hours'
-                })
-                return delivery_info
+    # Priority 2: Standard Platform Delivery (Distance or Zone based)
+    # We skipped Kwik as per user request. 
+    
+    # Continue to standard calculation below...
 
-        # Fallback to state-based fees if API call fails or addresses not provided
-        kwik_fee = STATE_DELIVERY_FEES.get(buyer_state, 3000)
-        delivery_info.update({
-            'delivery_fee': kwik_fee,
-            'delivery_method': 'kwik_delivery',
-            'kwik_available': True,
-            'quote_source': 'state_based_estimate',
-            'estimated_delivery_days': '24 hours'
-        })
-        return delivery_info
 
     # Priority 3: Platform-specific geocode-based calculation
     # Get base delivery fee for the state
@@ -973,8 +1221,153 @@ commission_payouts_collection = db.commission_payouts
 # Kwik Delivery collection
 kwik_deliveries_collection = db.kwik_deliveries
 
-# Security
-security = HTTPBearer()
+# Endpoints for new features
+
+@app.put("/api/products/{product_id}/preorder-time")
+async def update_preorder_time(
+    product_id: str,
+    time_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update pre-order availability time"""
+    # Verify ownership
+    product = db.products.find_one({"id": product_id})
+    if not product:
+         raise HTTPException(status_code=404, detail="Product not found")
+         
+    if product["seller_id"] != current_user["id"]:
+         raise HTTPException(status_code=403, detail="Not authorized")
+    
+    db.products.update_one(
+        {"id": product_id},
+        {"$set": {
+            "preorder_available_date": time_data.get("available_date"),
+            "preorder_end_date": time_data.get("end_date"),
+            "is_preorder": True
+        }}
+    )
+    
+    return {"message": "Pre-order time updated"}
+
+@app.get("/api/communities/search")
+async def search_communities(
+    q: str,  # Search query
+    type: str = "all"  # all, community, product
+):
+    """Search communities and products"""
+    try:
+        results = {
+            "communities": [],
+            "products": []
+        }
+        
+        if type in ["all", "community"]:
+            communities = list(communities_collection.find({
+                "$or": [
+                    {"name": {"$regex": q, "$options": "i"}},
+                    {"description": {"$regex": q, "$options": "i"}},
+                    {"category": {"$regex": q, "$options": "i"}}
+                ]
+            }).limit(10))
+            
+            for community in communities:
+                community.pop('_id', None)
+            results["communities"] = communities
+        
+        if type in ["all", "product"]:
+            products = list(community_products_collection.find({
+                "$or": [
+                    {"title": {"$regex": q, "$options": "i"}},
+                    {"description": {"$regex": q, "$options": "i"}},
+                    {"category": {"$regex": q, "$options": "i"}}
+                ]
+            }).limit(10))
+            
+            for product in products:
+                product.pop('_id', None)
+            results["products"] = products
+        
+        return results
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/admin/stats")
+async def get_admin_stats(current_user: dict = Depends(get_current_user)):
+    """Admin dashboard statistics"""
+    # Verify admin - logic can be improved to check specific admin roles or email list
+    # For MVP, we might just check if role is 'admin' or email matches specific env var
+    # As per checklist, we should use ADMIN_EMAIL
+    if current_user["email"] != ADMIN_EMAIL and current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Aggregate stats
+    total_transactions = paystack_transactions_collection.count_documents({"status": "success"})
+    
+    # Calculate revenue
+    revenue_pipeline = [
+        {"$match": {"status": "success"}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}} # Amount is usually in kobo
+    ]
+    revenue_result = list(paystack_transactions_collection.aggregate(revenue_pipeline))
+    total_revenue = (revenue_result[0]["total"] / 100) if revenue_result else 0
+    
+    return {
+        "totalTransactions": total_transactions,
+        "totalRevenue": total_revenue,
+        "activeUsers": users_collection.count_documents({}),
+        "pendingOrders": db.orders.count_documents({"status": "pending"}),
+        "pendingKYC": users_collection.count_documents({"kyc_status": "pending"})
+    }
+
+@app.get("/api/agent/farmers")
+async def get_agent_farmers(current_user: dict = Depends(get_current_user)):
+    """Get list of farmers managed by the agent with performance stats"""
+    if current_user["role"] != "agent":
+        raise HTTPException(status_code=403, detail="Only agents can access this endpoint")
+        
+    try:
+        # Get relationships
+        relationships = list(agent_farmers_collection.find({"agent_id": current_user["id"]}))
+        farmer_ids = [r["farmer_id"] for r in relationships]
+        
+        farmers = []
+        for farmer_id in farmer_ids:
+            # Get farmer profile
+            farmer = users_collection.find_one({"id": farmer_id})
+            if not farmer:
+                continue
+                
+            # Get stats
+            product_count = db.products.count_documents({"seller_id": farmer_id})
+            
+            # Sales stats
+            sales_pipeline = [
+                {"$match": {"delivery_handler_id": farmer_id, "status": {"$ne": "cancelled"}}},
+                {"$group": {"_id": None, "total_sales": {"$sum": "$total_amount"}, "order_count": {"$sum": 1}}}
+            ]
+            sales_result = list(db.orders.aggregate(sales_pipeline))
+            sales_data = sales_result[0] if sales_result else {"total_sales": 0, "order_count": 0}
+            
+            farmers.append({
+                "id": farmer["id"],
+                "username": farmer["username"],
+                "first_name": farmer.get("first_name", ""),
+                "last_name": farmer.get("last_name", ""),
+                "profile_picture": farmer.get("profile_picture"),
+                "product_count": product_count,
+                "total_sales": sales_data["total_sales"],
+                "total_orders": sales_data["order_count"],
+                "joined_at": farmer.get("created_at")
+            })
+            
+        return {"farmers": farmers}
+        
+    except Exception as e:
+        print(f"Error getting agent farmers: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 # Enums
 class UserRole(str, Enum):
@@ -1003,10 +1396,21 @@ class KYCStatus(str, Enum):
     REJECTED = "rejected"
 
 class ProductCategory(str, Enum):
-    GRAINS_LEGUMES = "grains_legumes"
-    FISH_MEAT = "fish_meat"
+    GRAINS_CEREALS = "grains_cereals"
+    GRAINS_LEGUMES = "grains_legumes" # Kept for backward compatibility
+    BEANS_VARIETIES = "beans_varieties"
+    FLOUR_BAKINGS = "flour_bakings"
     SPICES_VEGETABLES = "spices_vegetables" 
+    FISH_MEAT = "fish_meat"
+    SEA_FOODS = "sea_foods"
     TUBERS_ROOTS = "tubers_roots"
+    FRUITS = "fruits"
+    CASH_CROP = "cash_crop"
+    FERTILIZER = "fertilizer"
+    HERBICIDES = "herbicides"
+    PESTICIDES = "pesticides"
+    SEEDS = "seeds"
+    PACKAGED_GOODS = "packaged_goods"
 
 class GrainsLegumesSubcategory(str, Enum):
     RICE = "rice"  # e.g. local rice, ofada rice, basmati rice
@@ -1089,6 +1493,14 @@ class ProductCreate(BaseModel):
     discount_type: str = "percentage"
     logistics_managed_by: str = "platform"
     seller_delivery_fee: float = 0.0
+    # Additional Product Details
+    about_product: Optional[str] = None
+    product_benefits: Optional[List[str]] = []
+    usage_instructions: Optional[str] = None
+    # Pre-order specific fields
+    is_preorder: bool = False
+    preorder_available_date: Optional[datetime] = None
+    preorder_end_date: Optional[datetime] = None
 
 class Product(ProductCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -1146,6 +1558,23 @@ class Order(BaseModel):
     agent_fee_percentage: float = 0.05  # Updated agent fee (5%)
     payment_timing: str = "after_delivery"  # "after_delivery" for offline, "during_transit" for platform
     status: OrderStatus = OrderStatus.PENDING
+    delivery_handler_id: Optional[str] = None
+    delivery_notes: Optional[str] = None
+
+class KYCDocument(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    document_type: str  # headshot, nin, drivers_license, voters_card, cac
+    document_image: str  # Base64 encoded
+    verified: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class BusinessKYC(BaseModel):
+    cac_document: str  # Base64
+    registration_id: str
+    company_name: str
+    director_name: str
+    director_phone: str
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
@@ -1575,6 +2004,21 @@ class RegisteredBusinessKYC(BaseModel):
     contact_person_email: str
     # Documents will be uploaded separately
     certificate_of_incorporation_id: Optional[str] = None
+
+class NotificationType(str, Enum):
+    MENTION = "mention"
+    LIKE = "like"
+    COMMENT = "comment"
+    SYSTEM = "system"
+
+class Notification(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    message: str
+    type: NotificationType
+    is_read: bool = False
+    link: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     tin_certificate_id: Optional[str] = None
     utility_bill_id: Optional[str] = None
 
@@ -1729,7 +2173,9 @@ class FarmlandRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     farmer_id: str
     location: str  # Farmland location
-    size_hectares: float
+    size: float
+    size_unit: str = "hectare"  # acre, hectare, square_meter, square_kilometer
+    size_hectares: Optional[float] = None  # Deprecated/Calculated
     crop_types: List[str]  # Types of crops grown
     soil_type: Optional[str] = None
     irrigation_method: Optional[str] = None
@@ -2234,9 +2680,9 @@ async def login(login_data: UserLogin):
         "token": token,
         "user": {
             "id": user['id'],
-            "first_name": user['first_name'],
-            "last_name": user['last_name'],
-            "username": user['username'],
+            "first_name": user.get('first_name', ''),
+            "last_name": user.get('last_name', ''),
+            "username": user.get('username', ''),
             "email": user.get('email', user.get('email_or_phone')),
             "role": user.get('role'),
             "platform": platform
@@ -4109,6 +4555,9 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
             "agent_fee_percentage": 0.05,
             "payment_timing": payment_timing,
             "status": OrderStatus.PENDING,
+            "delivery_status": "pending",  # Unified delivery status
+            "delivery_handler_id": product.get("seller_id"), # Seller is default handler
+            "delivery_notes": "",
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
@@ -4282,6 +4731,81 @@ async def update_order_status(order_id: str, status_update: OrderStatusUpdate, c
     except Exception as e:
         print(f"Error updating order status: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to update order status")
+
+@app.post("/api/delivery/status")
+async def update_delivery_status(
+    status_data: dict,  # {order_id: str, status: str, notes: str}
+    current_user: dict = Depends(get_current_user)
+):
+    """Update delivery status (Agent/Farmer only)"""
+    try:
+        order = db.orders.find_one({"order_id": status_data.get("order_id")})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+            
+        # Verify permission: User must be the seller OR an agent managing the seller
+        is_authorized = False
+        if current_user["id"] == order.get("delivery_handler_id"):
+            is_authorized = True
+        elif current_user["role"] == "agent":
+             # Check if agent manages this farmer/seller
+             managed_farmer = agent_farmers_collection.find_one({
+                 "agent_id": current_user["id"],
+                 "farmer_id": order.get("delivery_handler_id")
+             })
+             if managed_farmer:
+                 is_authorized = True
+                 
+        if not is_authorized:
+             raise HTTPException(status_code=403, detail="Not authorized to manage this delivery")
+
+        update_fields = {
+            "delivery_status": status_data.get("status"),
+            "updated_at": datetime.utcnow()
+        }
+        if status_data.get("notes"):
+            update_fields["delivery_notes"] = status_data.get("notes")
+
+        db.orders.update_one(
+            {"order_id": status_data.get("order_id")},
+            {"$set": update_fields}
+        )
+        
+        return {"message": "Delivery status updated", "status": status_data.get("status")}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating delivery status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/agent/deliveries")
+async def get_agent_deliveries(current_user: dict = Depends(get_current_user)):
+    """Get deliveries for farmers managed by this agent"""
+    if current_user["role"] != "agent":
+        raise HTTPException(status_code=403, detail="Only agents can access this endpoint")
+        
+    try:
+        # Get list of managed farmers
+        managed_farmers = list(agent_farmers_collection.find({"agent_id": current_user["id"]}))
+        farmer_ids = [f["farmer_id"] for f in managed_farmers]
+        
+        # Also include the agent's own sales if any
+        farmer_ids.append(current_user["id"])
+        
+        # Find pending deliveries
+        orders = list(db.orders.find({
+            "delivery_handler_id": {"$in": farmer_ids},
+            "status": {"$ne": "cancelled"} # Show all active orders
+        }).sort("created_at", -1))
+        
+        for order in orders:
+            order.pop('_id', None)
+            
+        return {"orders": orders}
+    except Exception as e:
+        print(f"Error getting agent deliveries: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/orders/my-orders")
 async def get_my_orders(order_type: str = "buyer", current_user: dict = Depends(get_current_user)):
@@ -5967,6 +6491,474 @@ async def promote_member(
         print(f"Error promoting member: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to promote member")
 
+@app.post("/api/communities/{community_id}/posts")
+async def create_community_post(
+    community_id: str,
+    post_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new post in a community (Admin/Creator only)"""
+    try:
+        # Verify community exists
+        community = communities_collection.find_one({"id": community_id})
+        if not community:
+            raise HTTPException(status_code=404, detail="Community not found")
+
+        # Verify permission (Admin/Creator)
+        member = community_members_collection.find_one({
+            "community_id": community_id,
+            "user_id": current_user["id"],
+            "is_active": True
+        })
+
+        if not member or member["role"] not in ["admin", "creator"]:
+            raise HTTPException(status_code=403, detail="Only admins can post in this community")
+
+        # Create Post
+        post = {
+            "id": str(uuid.uuid4()),
+            "community_id": community_id,
+            "user_id": current_user["id"],
+            "author_name": f"{current_user['first_name']} {current_user['last_name']}",
+            "author_role": member["role"],
+            "content": post_data.get("content"),
+            "images": post_data.get("images", []), # List of image URLs
+            "product_id": post_data.get("product_id"), # Optional: Link to a product
+            "likes_count": 0,
+            "comments_count": 0,
+            "created_at": datetime.utcnow().isoformat(),
+            "is_active": True
+        }
+
+        community_posts_collection.insert_one(post)
+        post.pop('_id', None)
+
+        return {"message": "Post created successfully", "post": post}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error creating post: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create post")
+
+@app.get("/api/communities/{community_id}/posts")
+async def get_community_posts(
+    community_id: str,
+    limit: int = 20,
+    skip: int = 0,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get posts for a community"""
+    try:
+        # Check membership (Optional: Public communities might allow viewing without joining)
+        # For now, let's allow anyone to view public communities, members for private
+        community = communities_collection.find_one({"id": community_id})
+        if not community:
+            raise HTTPException(status_code=404, detail="Community not found")
+
+        if community.get("privacy") == "private":
+             member = community_members_collection.find_one({
+                "community_id": community_id,
+                "user_id": current_user["id"],
+                "is_active": True
+            })
+             if not member:
+                 raise HTTPException(status_code=403, detail="Must be a member to view posts")
+
+        posts = list(community_posts_collection.find(
+            {"community_id": community_id, "is_active": True}
+        ).sort("created_at", -1).skip(skip).limit(limit))
+
+        for post in posts:
+            post.pop('_id', None)
+            # Check if user liked this post
+            like = post_likes_collection.find_one({
+                "post_id": post["id"],
+                "user_id": current_user["id"]
+            })
+            post["has_liked"] = bool(like)
+
+        return {"posts": posts}
+
+    except Exception as e:
+        print(f"Error getting posts: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch posts")
+
+@app.post("/api/communities/{community_id}/members/add")
+async def add_community_member(
+    community_id: str,
+    member_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add a member to community (Admin/Creator only)"""
+    try:
+        # Verify permission
+        current_member = community_members_collection.find_one({
+            "community_id": community_id,
+            "user_id": current_user["id"],
+            "is_active": True
+        })
+        
+        if not current_member or current_member["role"] not in ["admin", "creator"]:
+            raise HTTPException(status_code=403, detail="Only admins can add members")
+
+        target_identifier = member_data.get("identifier") # Email or Phone or Username
+        if not target_identifier:
+             raise HTTPException(status_code=400, detail="Member email, phone or username required")
+
+        # Find User
+        target_user = users_collection.find_one({
+            "$or": [
+                {"email": target_identifier},
+                {"phone": target_identifier},
+                {"username": target_identifier},
+                {"email_or_phone": target_identifier}
+            ]
+        })
+
+        if not target_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check if already member
+        existing = community_members_collection.find_one({
+            "community_id": community_id,
+            "user_id": target_user["id"]
+        })
+
+        if existing and existing["is_active"]:
+             raise HTTPException(status_code=400, detail="User is already a member")
+
+        if existing:
+            # Reactivate
+             community_members_collection.update_one(
+                {"id": existing["id"]},
+                {"$set": {"is_active": True, "role": "member", "joined_at": datetime.utcnow().isoformat()}}
+            )
+        else:
+            # Add new
+            new_member = {
+                "id": str(uuid.uuid4()),
+                "community_id": community_id,
+                "user_id": target_user["id"],
+                "username": target_user["username"],
+                "role": "member",
+                "joined_at": datetime.utcnow().isoformat(),
+                "is_active": True
+            }
+            community_members_collection.insert_one(new_member)
+
+        # Update count
+        count = community_members_collection.count_documents({"community_id": community_id, "is_active": True})
+        communities_collection.update_one({"id": community_id}, {"$set": {"member_count": count}})
+
+        return {"message": "Member added successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error adding member: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add member")
+
+@app.delete("/api/communities/{community_id}/members/{user_id}")
+async def remove_community_member(
+    community_id: str,
+    user_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Remove a member from community (Admin/Creator only)"""
+    try:
+         # Verify permission
+        current_member = community_members_collection.find_one({
+            "community_id": community_id,
+            "user_id": current_user["id"],
+            "is_active": True
+        })
+        
+        if not current_member or current_member["role"] not in ["admin", "creator"]:
+            raise HTTPException(status_code=403, detail="Only admins can remove members")
+            
+        # Prevent removing self (must leave instead)
+        if user_id == current_user["id"]:
+             raise HTTPException(status_code=400, detail="Cannot remove yourself. Use leave endpoint.")
+
+        # Check target member
+        target_member = community_members_collection.find_one({
+            "community_id": community_id,
+            "user_id": user_id,
+            "is_active": True
+        })
+
+        if not target_member:
+            raise HTTPException(status_code=404, detail="Member not found")
+            
+        # Prevent Admin removing Creator
+        if target_member["role"] == "creator":
+             raise HTTPException(status_code=403, detail="Cannot remove the community creator")
+
+        # Deactivate
+        community_members_collection.update_one(
+            {"id": target_member["id"]},
+            {"$set": {"is_active": False}}
+        )
+
+        # Update count
+        count = community_members_collection.count_documents({"community_id": community_id, "is_active": True})
+        communities_collection.update_one({"id": community_id}, {"$set": {"member_count": count}})
+
+        return {"message": "Member removed successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error removing member: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to remove member")
+        
+@app.post("/api/communities/posts/{post_id}/like")
+async def toggle_post_like(post_id: str, current_user: dict = Depends(get_current_user)):
+    """Toggle like on a post"""
+    try:
+        post = community_posts_collection.find_one({"id": post_id})
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+            
+        existing_like = post_likes_collection.find_one({
+            "post_id": post_id,
+            "user_id": current_user["id"]
+        })
+        
+        if existing_like:
+            # Unlike
+            post_likes_collection.delete_one({"id": existing_like["id"]})
+            community_posts_collection.update_one(
+                {"id": post_id},
+                {"$inc": {"likes_count": -1}}
+            )
+            liked = False
+        else:
+            # Like
+            like = {
+                "id": str(uuid.uuid4()),
+                "post_id": post_id,
+                "user_id": current_user["id"],
+                "created_at": datetime.utcnow().isoformat()
+            }
+            post_likes_collection.insert_one(like)
+            community_posts_collection.update_one(
+                {"id": post_id},
+                {"$inc": {"likes_count": 1}}
+            )
+            liked = True
+            
+        return {"liked": liked, "likes_count": post["likes_count"] + (1 if liked else -1)}
+        
+    except Exception as e:
+        print(f"Error toggling like: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to toggle like")
+
+@app.post("/api/communities/posts/{post_id}/comments")
+async def add_post_comment(
+    post_id: str, 
+    comment_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add a comment to a post"""
+    try:
+        post = community_posts_collection.find_one({"id": post_id})
+        if not post:
+             raise HTTPException(status_code=404, detail="Post not found")
+             
+        comment = {
+            "id": str(uuid.uuid4()),
+            "post_id": post_id,
+            "user_id": current_user["id"],
+            "username": current_user["username"],
+            "user_avatar": current_user.get("profile_picture"), # Assuming this exists
+            "content": comment_data.get("content"),
+            "created_at": datetime.utcnow().isoformat(),
+            "likes_count": 0
+        }
+        
+        post_comments_collection.insert_one(comment)
+        
+        community_posts_collection.update_one(
+            {"id": post_id},
+            {"$inc": {"comments_count": 1}}
+        )
+        
+        comment.pop('_id', None)
+        return {"comment": comment}
+        
+    except Exception as e:
+        print(f"Error adding comment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add comment")
+        
+
+@app.get("/api/communities/posts/{post_id}/comments")
+async def get_post_comments(post_id: str, limit: int = 50, skip: int = 0):
+    try:
+        comments = list(post_comments_collection.find(
+            {"post_id": post_id}
+        ).sort("created_at", 1).skip(skip).limit(limit))
+        
+        for c in comments:
+            c.pop('_id', None)
+            
+        return {"comments": comments}
+    except Exception as e:
+        print(f"Error getting comments: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch comments")
+
+# -------------------------------------------------------------------------- #
+#                            Group Buying Endpoints                          #
+# -------------------------------------------------------------------------- #
+
+@app.get("/api/my-communities")
+async def get_my_communities(current_user: dict = Depends(get_current_user)):
+    try:
+        communities = list(communities_collection.find({
+            "members.user_id": current_user["id"]
+        }))
+        for c in communities:
+            c.pop('_id', None)
+        return {"communities": communities}
+    except Exception as e:
+        print(f"Error fetching my communities: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch communities")
+
+@app.post("/api/group-orders")
+async def create_group_order(
+    order_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new group buying order (Admin/Creator only)"""
+    try:
+        # 1. Validate permissions (Admin/Creator of the community)
+        # For MVP, we pass community_id in order_data
+        community_id = order_data.get("community_id")
+        if not community_id:
+             raise HTTPException(status_code=400, detail="Community ID required")
+
+        community = communities_collection.find_one({"id": community_id})
+        if not community:
+            raise HTTPException(status_code=404, detail="Community not found")
+
+        # Check member role
+        member = community_members_collection.find_one({
+             "community_id": community_id,
+             "user_id": current_user["id"],
+             "is_active": True
+        })
+
+        if not member or member["role"] not in ["admin", "creator"]:
+             raise HTTPException(status_code=403, detail="Only admins can start group orders")
+
+        # 2. Calculate Commission
+        # Rule: Agents get 3% commission. Others 0%.
+        price_per_unit = float(order_data.get("price_per_unit", 0))
+        target_quantity = int(order_data.get("target_quantity", 1))
+        
+        commission_rate = 0.03 if current_user.get("role") == "agent" else 0
+        potential_commission = (price_per_unit * target_quantity) * commission_rate
+
+        # 3. Create Order
+        group_order = {
+            "id": str(uuid.uuid4()),
+            "community_id": community_id,
+            "creator_id": current_user["id"],
+            "creator_name": f"{current_user['first_name']} {current_user['last_name']}",
+            "product_name": order_data.get("product_name"),
+            "description": order_data.get("description"),
+            "price_per_unit": price_per_unit,
+            "target_quantity": target_quantity,
+            "current_quantity": 0, # Starts at 0
+            "unit": order_data.get("unit", "units"),
+            "deadline": order_data.get("deadline"), # ISO Date string
+            "image": order_data.get("image"), # URL
+            "participants": [], # List of {user_id, quantity, pledged_at}
+            "status": "active", # active, completed, cancelled
+            "commission_rate": commission_rate,
+            "potential_commission": potential_commission,
+            "created_at": datetime.utcnow().isoformat()
+        }
+
+        group_orders_collection.insert_one(group_order)
+        group_order.pop('_id', None)
+
+        return {"message": "Group order created successfully", "order": group_order}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error creating group order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create group order")
+
+@app.get("/api/communities/{community_id}/group-orders")
+async def get_community_group_orders(community_id: str):
+    """List active group orders for a community"""
+    try:
+        orders = list(group_orders_collection.find(
+            {"community_id": community_id, "status": "active"}
+        ).sort("created_at", -1))
+        
+        for order in orders:
+            order.pop('_id', None)
+            
+        return {"orders": orders}
+    except Exception as e:
+        print(f"Error getting group orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch group orders")
+
+@app.post("/api/group-orders/{order_id}/join")
+async def join_group_order(
+    order_id: str,
+    join_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Join/Pledge to a group order"""
+    try:
+        quantity = int(join_data.get("quantity", 0))
+        if quantity <= 0:
+            raise HTTPException(status_code=400, detail="Quantity must be greater than 0")
+
+        order = group_orders_collection.find_one({"id": order_id})
+        if not order:
+             raise HTTPException(status_code=404, detail="Order not found")
+        
+        if order["status"] != "active":
+             raise HTTPException(status_code=400, detail="Order is not active")
+
+        # Add participant
+        participant = {
+            "user_id": current_user["id"],
+            "username": current_user["username"],
+            "quantity": quantity,
+            "pledged_at": datetime.utcnow().isoformat()
+        }
+
+        # Update order
+        group_orders_collection.update_one(
+            {"id": order_id},
+            {
+                "$push": {"participants": participant},
+                "$inc": {"current_quantity": quantity}
+            }
+        )
+        
+        # Check completion (Simple check)
+        updated_order = group_orders_collection.find_one({"id": order_id})
+        if updated_order["current_quantity"] >= updated_order["target_quantity"]:
+             # Mark as completed (or ready for processing)
+             # For MVP, we just flag it. In real usage, this might trigger payment collection.
+             pass 
+
+        return {"message": "Pledge successful"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error joining group order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to join group order")
+
 @app.get("/api/kyc/documents/my-documents")
 async def get_my_kyc_documents(current_user: dict = Depends(get_current_user)):
     """Get user's uploaded KYC documents"""
@@ -6630,59 +7622,10 @@ async def get_audit_logs(
         print(f"Error getting audit logs: {str(e)}")
 
 
-# ==================== ADMIN DASHBOARD ====================
 
-@app.post("/api/admin/login")
-async def admin_login(credentials: dict):
-    """Admin login endpoint"""
-    try:
-        email = credentials.get("email")
-        password = credentials.get("password")
-        
-        if not email or not password:
-            raise HTTPException(status_code=400, detail="Email and password required")
-        
-        # Check if email matches admin email
-        if email != ADMIN_EMAIL:
-            raise HTTPException(status_code=401, detail="Invalid admin credentials")
-        
-        # Verify password
-        if not bcrypt.checkpw(password.encode('utf-8'), ADMIN_PASSWORD_HASH.encode('utf-8')):
-            raise HTTPException(status_code=401, detail="Invalid admin credentials")
-        
-        # Create admin token
-        admin_data = {
-            "id": "admin_001",
-            "email": ADMIN_EMAIL,
-            "role": "admin",
-            "username": "Admin",
-            "first_name": "Abdulazeez",
-            "last_name": "Shakrullah"
-        }
-        
-        token = create_token(admin_data)
-        
-        # Log admin login
-        audit_log = {
-            "id": str(uuid.uuid4()),
-            "user_id": "admin_001",
-            "action": "admin_login",
-            "details": {"email": email},
-            "timestamp": datetime.utcnow()
-        }
-        audit_logs_collection.insert_one(audit_log)
-        
-        return {
-            "token": token,
-            "user": admin_data,
-            "message": "Admin login successful"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error in admin login: {str(e)}")
-        raise HTTPException(status_code=500, detail="Admin login failed")
+# ==================== ADMIN DASHBOARD ====================
+# Admin login is handled via standard /api/auth/login with role validation
+
 
 @app.get("/api/admin/dashboard")
 async def get_admin_dashboard(current_user: dict = Depends(get_current_user)):
@@ -8867,7 +9810,374 @@ async def get_my_ratings(
 #         raise HTTPException(status_code=500, detail="Failed to find drivers")
 
 
+
+# --- Priority 2: Pre-order & Group Buying Endpoints ---
+
+@app.put("/api/products/{product_id}/preorder-time")
+async def update_preorder_time(
+    product_id: str,
+    time_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update pre-order availability time"""
+    product = products_collection.find_one({"id": product_id, "seller_id": current_user["id"]})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found or not authorized")
+    
+    # Parse dates
+    available_date = time_data.get("available_date")
+    end_date = time_data.get("end_date")
+    
+    if available_date:
+        try:
+            available_date = datetime.fromisoformat(available_date.replace('Z', '+00:00'))
+        except ValueError:
+            pass # Handle or log error
+    if end_date:
+        try:
+            end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        except ValueError:
+            pass
+
+    products_collection.update_one(
+        {"id": product_id},
+        {"$set": {
+            "preorder_available_date": available_date,
+            "preorder_end_date": end_date
+        }}
+    )
+    
+    return {"message": "Pre-order time updated"}
+
+@app.post("/api/group-orders")
+async def create_group_order_endpoint(
+    order_data: GroupBuyingRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new Group Order"""
+    # Calculate commission based on user role
+    agent_commission = 0.0
+    commission_type = "none"
+    
+    if current_user.get("role") == "agent":
+        # Agent Buying Commission: 3% of total price
+        commission_type = "agent_buy"
+    
+    # Create the GroupOrder object
+    group_order = GroupOrder(
+        agent_id=current_user["id"],
+        produce=order_data.produce,
+        category=order_data.category,
+        location=order_data.location,
+        total_quantity=order_data.quantity,
+        buyers=[{
+            "user_id": current_user["id"], 
+            "username": current_user["username"], 
+            "quantity": order_data.quantity
+        }],
+        selected_farm={}, 
+        commission_type=commission_type,
+        total_amount=0.0, 
+        agent_commission=0.0 
+    )
+    
+    group_orders_collection.insert_one(group_order.dict())
+    
+    return {"message": "Group Order Created", "order_id": group_order.id}
+
+@app.get("/api/communities/{community_id}/group-orders")
+async def list_community_group_orders(
+    community_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """List active group orders for a community"""
+    orders = list(group_orders_collection.find({"status": "pending"}))
+    for order in orders:
+        order.pop('_id', None)
+    return orders
+
+@app.post("/api/group-orders/{order_id}/join")
+async def join_group_order(
+    order_id: str,
+    join_data: dict, # {"quantity": int}
+    current_user: dict = Depends(get_current_user)
+):
+    """Join an existing Group Order"""
+    quantity = join_data.get("quantity", 0)
+    if quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be positive")
+        
+    order = group_orders_collection.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    # Add buyer to list
+    new_buyer = {
+        "user_id": current_user["id"],
+        "username": current_user["username"],
+        "quantity": quantity
+    }
+    
+    group_orders_collection.update_one(
+        {"id": order_id},
+        {
+            "$push": {"buyers": new_buyer},
+            "$inc": {"total_quantity": quantity}
+        }
+    )
+    
+    return {"message": "Joined group order successfully"}
+
+
+# --------------------------------------------------------------------------
+#                           PRIORITY 3: COMMUNITY FEATURES
+# --------------------------------------------------------------------------
+
+@app.get("/api/notifications")
+async def get_notifications(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get user notifications"""
+    # Assuming a notifications_collection exists, if not we will define it dynamically or use a generic one
+    # For MVP, we'll assume it exists or use a new one. 
+    # Let's check init first... if not defined, we'll use db["notifications"]
+    notifications = list(db["notifications"].find({"user_id": current_user["id"]}).sort("created_at", -1).limit(50))
+    for n in notifications:
+        n.pop("_id", None)
+    return notifications
+
+@app.get("/api/communities/search")
+async def search_communities(
+    q: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Search for communities by name or description"""
+    if not q:
+        return []
+    regex = {"$regex": q, "$options": "i"}
+    communities = list(communities_collection.find({
+        "$or": [
+            {"name": regex},
+            {"description": regex},
+            {"category": regex}
+        ]
+    }))
+    for c in communities:
+        c.pop("_id", None)
+    return communities
+
+@app.post("/api/communities/{community_id}/posts")
+async def create_community_post(
+    community_id: str,
+    post_data: dict, # {content: str, images: [], product_id: str}
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new post in a community with Mentions support"""
+    community = communities_collection.find_one({"id": community_id})
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+    
+    # Process Mentions
+    content = post_data.get("content", "")
+    mentions = re.findall(r'@(\w+)', content)
+    unique_mentions = set(mentions)
+
+    # Check for @all
+    notify_all = "@all" in content
+    
+    post = CommunityPost(
+        community_id=community_id,
+        author_id=current_user["id"],
+        author_name=current_user["username"],
+        author_role=current_user.get("role", "member"),
+        content=content,
+        images=post_data.get("images", []),
+        linked_product_id=post_data.get("product_id")
+    )
+    
+    community_posts_collection.insert_one(post.dict())
+    
+    # Send Notifications
+    if notify_all:
+        members = list(community_members_collection.find({"community_id": community_id}))
+        for member in members:
+            if member["user_id"] != current_user["id"]:
+                db["notifications"].insert_one(Notification(
+                    user_id=member["user_id"],
+                    message=f"@{current_user['username']} mentioned @all in {community['name']}",
+                    type=NotificationType.MENTION,
+                    link=f"/communities/{community_id}"
+                ).dict())
+    else:
+        for username in unique_mentions:
+            user = users_collection.find_one({"username": username})
+            if user and user["id"] != current_user["id"]:
+                 db["notifications"].insert_one(Notification(
+                    user_id=user["id"],
+                    message=f"@{current_user['username']} mentioned you in {community['name']}",
+                    type=NotificationType.MENTION,
+                    link=f"/communities/{community_id}"
+                ).dict())
+
+    return {"message": "Post created", "post_id": post.id}
+
+@app.get("/api/communities/{community_id}/posts")
+async def list_community_posts(
+    community_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """List posts for a community"""
+    posts = list(community_posts_collection.find({"community_id": community_id}).sort("created_at", -1))
+    for p in posts:
+        p.pop("_id", None)
+    return {"posts": posts}
+
+@app.post("/api/communities/posts/{post_id}/like")
+async def like_community_post(
+    post_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Toggle like on a post"""
+    post = community_posts_collection.find_one({"id": post_id})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Check if already liked
+    existing_like = community_likes_collection.find_one({
+        "post_id": post_id,
+        "user_id": current_user["id"]
+    })
+    
+    if existing_like:
+        # User already liked, remove like (toggle) -> For simplicity we will just return success or 'already liked', 
+        # but typically toggle is better. Let's just Add Like for MVP as per request
+        return {"message": "Already liked"} # Or implement remove logic
+    
+    like = PostLike(
+        post_id=post_id,
+        user_id=current_user["id"],
+        username=current_user["username"]
+    )
+    community_likes_collection.insert_one(like.dict())
+    
+    # Update post like count
+    community_posts_collection.update_one(
+        {"id": post_id},
+        {"$inc": {"likes_count": 1}}
+    )
+
+    # Notify Author
+    if post["author_id"] != current_user["id"]:
+        db["notifications"].insert_one(Notification(
+            user_id=post["author_id"],
+            message=f"@{current_user['username']} liked your post",
+            type=NotificationType.LIKE,
+            link=f"/communities/{post['community_id']}"
+        ).dict())
+    
+    return {"message": "Post liked"}
+
+@app.post("/api/communities/posts/{post_id}/comments")
+async def comment_community_post(
+    post_id: str,
+    comment_data: dict, # {content: str}
+    current_user: dict = Depends(get_current_user)
+):
+    """Add a comment to a post"""
+    post = community_posts_collection.find_one({"id": post_id})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+        
+    comment = PostComment(
+        post_id=post_id,
+        user_id=current_user["id"],
+        username=current_user["username"],
+        content=comment_data.get("content", "")
+    )
+    community_comments_collection.insert_one(comment.dict())
+    
+    # Update post comment count
+    community_posts_collection.update_one(
+        {"id": post_id},
+        {"$inc": {"comments_count": 1}}
+    )
+    
+    # Notify Author
+    if post["author_id"] != current_user["id"]:
+        db["notifications"].insert_one(Notification(
+            user_id=post["author_id"],
+            message=f"@{current_user['username']} commented on your post",
+            type=NotificationType.COMMENT,
+            link=f"/communities/{post['community_id']}"
+        ).dict())
+
+    return {"message": "Comment added", "comment_id": comment.id}
+
+@app.get("/api/communities/{community_id}/members")
+async def list_community_members(
+    community_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """List members of a community"""
+    members = list(community_members_collection.find({"community_id": community_id}))
+    for m in members:
+        m.pop("_id", None)
+    return {"members": members}
+
+@app.delete("/api/communities/{community_id}/members/{user_id}")
+async def remove_community_member(
+    community_id: str,
+    user_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Remove a member from a community (Admin/Creator only)"""
+    community = communities_collection.find_one({"id": community_id})
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+        
+    # Check permissions (Creator or Admin)
+    # Ideally check community_roles_collection for admin status
+    is_authorized = False
+    
+    # 1. Creator check
+    if community.get("created_by") == current_user["id"]:
+        is_authorized = True
+        
+    # 2. Admin Check (Simplified)
+    # admin_role = community_roles_collection.find_one({"community_id": community_id, "user_id": current_user["id"], "role": "admin"})
+    # if admin_role: is_authorized = True
+    
+    if not is_authorized: # For MVP allow creator only
+        raise HTTPException(status_code=403, detail="Not authorized to remove members")
+        
+    result = community_members_collection.delete_one({
+        "community_id": community_id,
+        "user_id": user_id
+    })
+    
+    if result.deleted_count > 0:
+        communities_collection.update_one(
+            {"id": community_id},
+            {"$inc": {"member_count": -1}}
+        )
+        return {"message": "Member removed"}
+    
+    raise HTTPException(status_code=404, detail="Member not found")
+
 if __name__ == "__main__":
+    # Load Environment Variables
+    DB_URI = os.getenv("MONGO_URI") # Use the correct env var name
+    if not DB_URI:
+             # Fallback to local MongoDB if not set
+        DB_URI = "mongodb://localhost:27017"
+    
+    client = MongoClient(DB_URI)
+    db = client["pyramyd_db"]
+    print(f"Connected to MongoDB at {DB_URI}")
+    
+    # Start Server
     import uvicorn
-    port = int(os.environ.get("PORT", 8001))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    port = int(os.environ.get("PORT", 8000))
+    print(f"Starting server on port {port}...")
+    # Using string import allows reloading
+    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=True)

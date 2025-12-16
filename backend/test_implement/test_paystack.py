@@ -2,11 +2,12 @@ import sys
 import os
 
 # Add current directory to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add project root to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
     print("Attempting to import paystack...")
-    import paystack
+    from backend.payment import paystack
     print("Successfully imported paystack.py")
     print(f"PaystackSubaccount: {paystack.PaystackSubaccount}")
     print(f"PAYSTACK_API_URL: {paystack.PAYSTACK_API_URL}")

@@ -4,7 +4,8 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 # Add backend directory to sys.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add project root to sys.path to allow importing from backend
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.payment.farm_deals_payment import initialize_farmhub_payment
 from backend.payment.pyexpress_payment import initialize_pyexpress_payment

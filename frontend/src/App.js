@@ -3,6 +3,8 @@ import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://mvp-2-u8e9.onrender.com';
 console.log('API_BASE_URL:', API_BASE_URL);
+import SellerDashboard from './SellerDashboard';
+import AdminDashboard from './AdminDashboard';
 
 // Custom Icons as SVG components using provided designs
 const AddToCartIcon = () => (
@@ -28,6 +30,48 @@ const ProfileIcon = () => (
     <path d="M4.938 14.0625C5.688 13.5347 6.49 13.1424 7.344 12.8854C8.198 12.6285 9.083 12.5 10 12.5C10.917 12.5 11.802 12.6285 12.656 12.8854C13.51 13.1424 14.312 13.5347 15.062 14.0625C15.549 13.4931 15.91 12.8611 16.146 12.1667C16.382 11.4722 16.5 10.75 16.5 10C16.5 8.19903 15.866 6.66542 14.599 5.39917C13.332 4.13305 11.798 3.5 9.995 3.5C8.193 3.5 6.66 4.13305 5.396 5.39917C4.132 6.66542 3.5 8.19903 3.5 10C3.5 10.75 3.618 11.4722 3.854 12.1667C4.09 12.8611 4.451 13.4931 4.938 14.0625ZM10 11.5C9.167 11.5 8.458 11.2083 7.875 10.625C7.292 10.0417 7 9.33333 7 8.5C7 7.66667 7.292 6.95833 7.875 6.375C8.458 5.79167 9.167 5.5 10 5.5C10.833 5.5 11.542 5.79167 12.125 6.375C12.708 6.95833 13 7.66667 13 8.5C13 9.33333 12.708 10.0417 12.125 10.625C11.542 11.2083 10.833 11.5 10 11.5ZM10.006 18C8.905 18 7.868 17.7917 6.896 17.375C5.924 16.9583 5.073 16.3854 4.344 15.6562C3.615 14.9271 3.042 14.0767 2.625 13.105C2.208 12.1333 2 11.0951 2 9.99042C2 8.88569 2.208 7.85069 2.625 6.88542C3.042 5.92014 3.615 5.07292 4.344 4.34375C5.073 3.61458 5.923 3.04167 6.895 2.625C7.867 2.20833 8.905 2 10.01 2C11.114 2 12.149 2.20833 13.115 2.625C14.08 3.04167 14.927 3.61458 15.656 4.34375C16.385 5.07292 16.958 5.92167 17.375 6.89C17.792 7.85847 18 8.89319 18 9.99417C18 11.0953 17.792 12.1319 17.375 13.1042C16.958 14.0764 16.385 14.9271 15.656 15.6562C14.927 16.3854 14.078 16.9583 13.11 17.375C12.142 17.7917 11.107 18 10.006 18ZM10 16.5C10.722 16.5 11.417 16.3854 12.083 16.1562C12.75 15.9271 13.375 15.5903 13.958 15.1458C13.361 14.7708 12.729 14.4861 12.062 14.2917C11.396 14.0972 10.708 14 10 14C9.292 14 8.601 14.0938 7.927 14.2812C7.253 14.4688 6.625 14.7569 6.042 15.1458C6.625 15.5903 7.25 15.9271 7.917 16.1562C8.583 16.3854 9.278 16.5 10 16.5ZM10 10C10.417 10 10.771 9.85417 11.062 9.5625C11.354 9.27083 11.5 8.91667 11.5 8.5C11.5 8.08333 11.354 7.72917 11.062 7.4375C10.771 7.14583 10.417 7 10 7C9.583 7 9.229 7.14583 8.938 7.4375C8.646 7.72917 8.5 8.08333 8.5 8.5C8.5 8.91667 8.646 9.27083 8.938 9.5625C9.229 9.85417 9.583 10 10 10Z" fill="currentColor" />
   </svg>
 );
+
+const PreOrderTimer = ({ deadline }) => {
+  const [timeLeft, setTimeLeft] = useState(null);
+
+  useEffect(() => {
+    if (!deadline) return;
+    const calculateTimeLeft = () => {
+      const difference = +new Date(deadline) - +new Date();
+      let timeLeft = {};
+
+      if (difference > 0) {
+        timeLeft = {
+          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+          minutes: Math.floor((difference / 1000 / 60) % 60),
+          seconds: Math.floor((difference / 1000) % 60)
+        };
+      }
+      return timeLeft;
+    };
+
+    setTimeLeft(calculateTimeLeft());
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [deadline]);
+
+  if (!timeLeft || Object.keys(timeLeft).length === 0) {
+    return <span className="text-red-500 font-bold">Ended</span>;
+  }
+
+  return (
+    <div className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-bold flex items-center space-x-2">
+      <span>⏱️ Ends in:</span>
+      <span>
+        {timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s
+      </span>
+    </div>
+  );
+};
 
 function App() {
   const [user, setUser] = useState(null);
@@ -98,6 +142,11 @@ function App() {
   const [showWithdrawFunds, setShowWithdrawFunds] = useState(false);
   const [showAddBankAccount, setShowAddBankAccount] = useState(false);
 
+  // Global Group Buy State
+  const [showGlobalGroupBuyModal, setShowGlobalGroupBuyModal] = useState(false);
+  const [globalGroupOrderProduct, setGlobalGroupOrderProduct] = useState(null);
+  const [userCommunities, setUserCommunities] = useState([]);
+
   // Gift card state
   const [showGiftCards, setShowGiftCards] = useState(false);
   const [userGiftCards, setUserGiftCards] = useState([]);
@@ -156,7 +205,36 @@ function App() {
   // Seller Details Modal state
   const [showSellerDetails, setShowSellerDetails] = useState(false);
   const [sellerDetails, setSellerDetails] = useState(null);
+
   const [loadingSellerDetails, setLoadingSellerDetails] = useState(false);
+
+  // Notifications State
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchNotifications = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const res = await fetch(`${API_BASE_URL}/api/notifications`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data);
+        setUnreadCount(data.filter(n => !n.is_read).length);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 60000); // Poll every minute
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
 
   // PWA and Offline state
@@ -365,7 +443,7 @@ function App() {
   // Category data with images
   const categoryData = [
     {
-      value: 'grains_legumes',
+      value: 'grains_cereals',
       label: 'Grains, Rice &Cereals',
       image: 'https://images.unsplash.com/photo-1499529112087-3cb3b73cec95?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwzfHxhZ3JpY3VsdHVyYWwlMjBwcm9kdWN0c3xlbnwwfHx8fDE3NTM5NTM1ODd8MA&ixlib=rb-4.1.0&q=85'
     }, {
@@ -403,6 +481,11 @@ function App() {
       image: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?crop=entropy&cs=srgb&fm=jpg&ixid=M3w0MjI5Nzh8MHwxfHNlYXJjaHwxfHxmcnVpdHN8ZW58MHx8fHwxNzUzOTUzNjUwfDA&ixlib=rb-4.1.0&q=85'
     },
     {
+      value: 'packaged_goods',
+      label: 'Canned Food',
+      image: 'https://images.unsplash.com/photo-1741522226997-a34b5a45c648?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwxfHxwYWNrYWdlZCUyMGZvb2R8ZW58MHx8fHwxNzUzOTUzNjQ0fDA&ixlib=rb-4.1.0&q=85'
+    },
+    {
       value: 'cash_crop',
       label: 'Cash Crop',
       image: 'https://images.unsplash.com/photo-1502395809857-fd80069897d0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxjb3R0b258ZW58MHx8fHwxNzUzOTUzNjM4fDA&ixlib=rb-4.1.0&q=85'
@@ -427,11 +510,7 @@ function App() {
       label: 'Seeds',
       image: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NjZ8MHwxfHNlYXJjaHwxfHxzZWVkc3xlbnwwfHx8fDE3NTM5NTM2MTZ8MA&ixlib=rb-4.1.0&q=85'
     },
-    {
-      value: 'packaged_goods',
-      label: 'Canned Food',
-      image: 'https://images.unsplash.com/photo-1741522226997-a34b5a45c648?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwxfHxwYWNrYWdlZCUyMGZvb2R8ZW58MHx8fHwxNzUzOTUzNjQ0fDA&ixlib=rb-4.1.0&q=85'
-    },
+
   ];
 
   useEffect(() => {
@@ -554,6 +633,58 @@ function App() {
 
     setDeferredPrompt(null);
     setShowInstallPrompt(false);
+  };
+
+  // Community Handlers
+  const handleJoinCommunity = async (communityId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/communities/${communityId}/join`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        alert('Joined community successfully!');
+        fetchCommunities();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error joining community:', error);
+      return false;
+    }
+  };
+
+  const handleCreatePost = async (communityId, postData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/communities/${communityId}/posts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(postData)
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Error creating post:', error);
+      return false;
+    }
+  };
+
+  const handleRemoveMember = async (communityId, userId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/communities/${communityId}/members/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Error removing member:', error);
+      return false;
+    }
   };
 
   const fetchUserProfile = async (token) => {
@@ -1426,6 +1557,15 @@ function App() {
     }
   };
 
+  const handleBasicRegistration = (e) => {
+    e.preventDefault();
+    if (!authForm.first_name || !authForm.last_name || !authForm.username || !authForm.email_or_phone || !authForm.password || !authForm.gender || !authForm.date_of_birth) {
+      alert('Please fill in all required fields');
+      return;
+    }
+    setRegistrationStep('role_path');
+  };
+
   // Dashboard functions
   const fetchFarmerDashboard = async () => {
     try {
@@ -2120,6 +2260,48 @@ function App() {
       ...prev,
       delivery_addresses: prev.delivery_addresses.filter((_, i) => i !== index)
     }));
+  };
+
+  // Global Group Buy Handlers
+  const fetchUserCommunities = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/my-communities`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserCommunities(data.communities || []);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleOpenGlobalGroupBuy = async (product) => {
+    setGlobalGroupOrderProduct(product);
+    await fetchUserCommunities();
+    setShowGlobalGroupBuyModal(true);
+  };
+
+  const handleSubmitGlobalGroupOrder = async (orderData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/group-orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(orderData)
+      });
+      if (res.ok) {
+        alert('Group Order Created Successfully!');
+        setShowGlobalGroupBuyModal(false);
+        return true;
+      }
+      const err = await res.json();
+      alert(`Failed to create order: ${err.detail || 'Unknown error'}`);
+      return false;
+    } catch (e) { console.error(e); alert('Error creating order'); return false; }
   };
 
   const updateDeliveryDestination = (index, value) => {
@@ -3640,6 +3822,44 @@ function App() {
 
             {/* Right side navigation icons - Responsive Priority: Cart & Profile always visible */}
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+              {/* Notifications - Always Visible */}
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="nav-button icon-button relative p-1 sm:p-1.5 md:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 flex-shrink-0"
+                title="Notifications"
+              >
+                <div className="w-5 h-5 flex items-center justify-center text-xl">
+                  🔔
+                </div>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-semibold text-[10px] sm:text-xs">
+                    {unreadCount}
+                  </span>
+                )}
+
+                {/* Notification Dropdown */}
+                {showNotifications && (
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-white shadow-xl rounded-lg border border-gray-100 z-50 overflow-hidden text-left">
+                    <div className="p-3 border-b bg-gray-50 flex justify-between items-center">
+                      <h3 className="font-semibold text-sm text-gray-800">Notifications</h3>
+                      <button onClick={(e) => { e.stopPropagation(); setShowNotifications(false); }} className="text-gray-400 hover:text-gray-600">×</button>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-4 text-center text-gray-500 text-sm">No notifications</div>
+                      ) : (
+                        notifications.map(n => (
+                          <div key={n.id} className={`p-3 border-b hover:bg-gray-50 transition cursor-pointer ${!n.is_read ? 'bg-blue-50' : ''}`}>
+                            <p className="text-xs text-gray-800">{n.message}</p>
+                            <span className="text-xs text-gray-400 mt-1 block">{new Date(n.created_at).toLocaleTimeString()}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </button>
+
               {/* Cart - Always Visible (Priority 1) */}
               <button
                 onClick={() => setShowCart(true)}
@@ -3837,6 +4057,33 @@ function App() {
                           className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-50 font-medium"
                         >
                           📍 Add Drop-off Location
+                        </button>
+                      )}
+
+                      {/* Delivery Management */}
+                      {['agent', 'farmer', 'supplier_farm_inputs', 'supplier_food_produce', 'processor'].includes(user.role) && (
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setCurrentPlatform('agent_deliveries');
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-gray-50 font-medium"
+                        >
+
+                          📦 Manage Deliveries
+                        </button>
+                      )}
+
+                      {/* Admin Dashboard */}
+                      {user.role === 'admin' && (
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setCurrentPlatform('admin_dashboard');
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-50 font-medium"
+                        >
+                          ⚙️ Admin Dashboard
                         </button>
                       )}
 
@@ -4129,14 +4376,19 @@ function App() {
                   >
                     Find Communities
                   </button>
-                  {user && (
-                    <button
-                      onClick={() => setShowCreateCommunity(true)}
-                      className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors font-medium"
-                    >
-                      Create Community
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      if (!user) {
+                        setShowAuthModal(true);
+                        setAuthMode('login');
+                      } else {
+                        setShowCreateCommunity(true);
+                      }
+                    }}
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors font-medium"
+                  >
+                    Create Community
+                  </button>
                 </div>
               </div>
             </div>
@@ -4603,7 +4855,7 @@ function App() {
                   className={`flex-shrink-0 cursor-pointer transition-all duration-200 ${selectedCategory === '' ? 'transform scale-105' : 'hover:transform hover:scale-105'
                     }`}
                 >
-                  <div className="w-24 h-24 rounded-xl overflow-hidden mb-2 bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                  <div className="w-24 h-24 rounded-full overflow-hidden mb-2 bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
                     <span className="text-white text-xs font-medium">All</span>
                   </div>
                   <p className="text-xs text-center text-gray-700 font-medium">All Categories</p>
@@ -4617,7 +4869,7 @@ function App() {
                     className={`flex-shrink-0 cursor-pointer transition-all duration-200 ${selectedCategory === category.value ? 'transform scale-105' : 'hover:transform hover:scale-105'
                       }`}
                   >
-                    <div className={`w-24 h-24 rounded-xl overflow-hidden mb-2 border-2 transition-colors ${selectedCategory === category.value ? 'border-emerald-500' : 'border-gray-200'
+                    <div className={`w-24 h-24 rounded-full overflow-hidden mb-2 border-2 transition-colors ${selectedCategory === category.value ? 'border-emerald-500' : 'border-gray-200'
                       }`}>
                       <img
                         src={category.image}
@@ -4635,6 +4887,16 @@ function App() {
             </div>
 
             {/* Pre-Order Sales Section - Only show on Home page */}
+            {/* Seller/Agent Dashboard (Replaces Agent Delivery Dashboard) */}
+            {currentPlatform === 'agent_deliveries' && (
+              <SellerDashboard user={user} token={localStorage.getItem('token')} />
+            )}
+
+            {/* Admin Dashboard */}
+            {currentPlatform === 'admin_dashboard' && (
+              <AdminDashboard token={localStorage.getItem('token')} />
+            )}
+
             {currentPlatform === 'home' && (
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-4">
@@ -4852,10 +5114,21 @@ function App() {
                         >
                           <div className="text-center">
                             <div className="text-2xl mb-1">
-                              {key === 'grains_legumes' ? '🌾' :
-                                key === 'fish_meat' ? '🐟' :
-                                  key === 'spices_vegetables' ? '🌶️' :
-                                    key === 'tubers_roots' ? '🥔' : '📦'}
+                              {key === 'grains_cereals' ? '🌾' :
+                                key === 'grains_legumes' ? '🌾' :
+                                  key === 'beans_varieties' ? '🫘' :
+                                    key === 'flour_bakings' ? '🍞' :
+                                      key === 'spices_vegetables' ? '🌶️' :
+                                        key === 'fish_meat' ? '🐟' :
+                                          key === 'sea_foods' ? '🦞' :
+                                            key === 'tubers_roots' ? '🥔' :
+                                              key === 'fruits' ? '🍎' :
+                                                key === 'cash_crop' ? '💰' :
+                                                  key === 'fertilizer' ? '🧪' :
+                                                    key === 'herbicides' ? '☠️' :
+                                                      key === 'pesticides' ? '🦟' :
+                                                        key === 'seeds' ? '🌱' :
+                                                          key === 'packaged_goods' ? '🥫' : '📦'}
                             </div>
                             <div className="text-xs font-medium text-gray-700 mb-1">{category.name}</div>
                             {/* Show example products */}
@@ -5221,6 +5494,13 @@ function App() {
                           >
                             {product.type === 'preorder' ? 'Add Pre-order to Cart' : 'Add to Cart'}
                           </button>
+
+                          <button
+                            onClick={() => handleOpenGlobalGroupBuy(product)}
+                            className="w-full mt-2 py-2 px-3 sm:px-4 rounded-lg font-medium transition-colors text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            🤝 Start Group Buy
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -5228,10 +5508,14 @@ function App() {
               )}
             </div>
           </div>
-        )}
-      </main>
+        )
+        }
+      </main >
 
-      {/* Enhanced Registration Modal */}
+
+
+  // Auth Modal JSX starts...
+      // Enhanced Registration Modal
       {showAuthModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -5444,7 +5728,7 @@ function App() {
                             <button
                               onClick={() => {
                                 setAuthForm({ ...authForm, role: 'farmer' });
-                                setRegistrationStep('business_profile');
+                                setRegistrationStep('business_status');
                               }}
                               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                             >
@@ -5464,7 +5748,7 @@ function App() {
                             <button
                               onClick={() => {
                                 setAuthForm({ ...authForm, role: 'agent' });
-                                setRegistrationStep('business_profile');
+                                setRegistrationStep('business_status');
                               }}
                               className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                             >
@@ -5484,7 +5768,7 @@ function App() {
                             <button
                               onClick={() => {
                                 setAuthForm({ ...authForm, role: 'business' });
-                                setRegistrationStep('business_profile');
+                                setRegistrationStep('business_status');
                               }}
                               className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
                             >
@@ -5493,6 +5777,68 @@ function App() {
                           </div>
                         </div>
                       </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Personal Details Step */}
+                {registrationStep === 'personal_details' && (
+                  <>
+                    <div className="flex justify-between items-center mb-6">
+                      <button
+                        onClick={() => setRegistrationStep('role_path')}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        ← Back
+                      </button>
+                      <h2 className="text-xl font-bold text-emerald-600">Personal Details</h2>
+                      <div></div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl">
+                      <form onSubmit={(e) => { e.preventDefault(); completeRegistration(); }} className="space-y-4">
+                        <input
+                          type="text"
+                          placeholder="Home Address"
+                          value={businessInfo.home_address}
+                          onChange={(e) => setBusinessInfo(prev => ({ ...prev, home_address: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          required
+                        />
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            type="text"
+                            placeholder="City"
+                            value={businessInfo.city}
+                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, city: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            required
+                          />
+                          <input
+                            type="text"
+                            placeholder="State"
+                            value={businessInfo.state}
+                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, state: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            required
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Country"
+                          value={businessInfo.country}
+                          onChange={(e) => setBusinessInfo(prev => ({ ...prev, country: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          required
+                        />
+
+                        <button
+                          type="submit"
+                          className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium mt-4"
+                        >
+                          Complete Registration
+                        </button>
+                      </form>
                     </div>
                   </>
                 )}
@@ -8195,10 +8541,15 @@ function App() {
                         }
                       </div>
 
-                      {/* Pre-order Badge */}
+                      {/* Pre-order Badge & Timer */}
                       {selectedProduct.type === 'preorder' && (
-                        <div className="bg-orange-500 text-white px-4 py-2 rounded-full text-sm font-bold">
-                          ⚡ PRE-ORDER
+                        <div className="flex flex-col items-end space-y-1">
+                          <div className="bg-orange-500 text-white px-4 py-2 rounded-full text-sm font-bold">
+                            ⚡ PRE-ORDER
+                          </div>
+                          {selectedProduct.preorder_end_date && (
+                            <PreOrderTimer deadline={selectedProduct.preorder_end_date} />
+                          )}
                         </div>
                       )}
                     </div>
@@ -8238,6 +8589,36 @@ function App() {
                         {selectedProduct.description || 'High quality organic produce from certified farms. Fresh, nutritious, and carefully handled to ensure maximum freshness and quality.'}
                       </p>
                     </div>
+
+                    {/* About Product (New) */}
+                    {selectedProduct.about_product && (
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">About Product</h3>
+                        <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{selectedProduct.about_product}</p>
+                      </div>
+                    )}
+
+                    {/* Product Benefits (New) */}
+                    {selectedProduct.product_benefits && selectedProduct.product_benefits.length > 0 && (
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Key Benefits</h3>
+                        <ul className="list-disc pl-5 text-gray-600 space-y-1">
+                          {selectedProduct.product_benefits.map((benefit, i) => (
+                            <li key={i}>{benefit}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Usage Instructions (New) */}
+                    {selectedProduct.usage_instructions && (
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Usage Instructions</h3>
+                        <div className="bg-emerald-50 p-3 rounded-lg text-gray-700 text-sm whitespace-pre-wrap">
+                          {selectedProduct.usage_instructions}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Location and Seller Info */}
                     <div className="p-4 bg-blue-50 rounded-lg">
@@ -9842,9 +10223,36 @@ function App() {
       }
 
       {/* Communities Modals */}
-      {showCreateCommunity && <CreateCommunityModal />}
-      {showCommunityBrowser && <CommunityBrowser />}
-      {showCommunityDetails && <CommunityDetailsModal />}
+      {showCreateCommunity && (
+        <CreateCommunityModal
+          onClose={() => setShowCreateCommunity(false)}
+          onSuccess={() => {
+            fetchCommunities();
+          }}
+          token={localStorage.getItem('token')}
+          API_BASE_URL={API_BASE_URL}
+        />
+      )}
+      {showCommunityBrowser && (
+        <CommunityBrowser
+          onClose={() => setShowCommunityBrowser(false)}
+          communities={communities}
+          onJoin={handleJoinCommunity}
+          user={user}
+        />
+      )}
+      {showCommunityDetails && (
+        <CommunityDetailsModal
+          community={selectedCommunity || {}}
+          onClose={() => setShowCommunityDetails(false)}
+          user={user}
+          token={localStorage.getItem('token')}
+          onJoin={handleJoinCommunity}
+          onCreatePost={handleCreatePost}
+          onRemoveMember={handleRemoveMember}
+          API_BASE_URL={API_BASE_URL}
+        />
+      )}
 
       {/* Profile Picture Upload Modal */}
       {showProfilePictureUpload && <ProfilePictureUploadModal />}
@@ -9852,8 +10260,1024 @@ function App() {
       {/* Seller Details Modal */}
       {showSellerDetails && <SellerDetailsModal />}
 
+      {/* Global Group Order Modal */}
+      {showGlobalGroupBuyModal && (
+        <CreateGroupOrderModal
+          onClose={() => setShowGlobalGroupBuyModal(false)}
+          onSubmit={handleSubmitGlobalGroupOrder}
+          communities={userCommunities}
+        />
+      )}
+
     </div >
   );
 }
 
 export default App;
+
+/* -------------------------------------------------------------------------- */
+/*                            Community Components                            */
+/* -------------------------------------------------------------------------- */
+
+const CreateCommunityModal = ({ onClose, onSuccess, token, API_BASE_URL }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    category: 'general',
+    privacy: 'public'
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/communities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(formData)
+      });
+      if (response.ok) {
+        onSuccess();
+        onClose();
+        alert('Community created successfully!');
+      } else {
+        alert('Failed to create community');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Error creating community');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg max-w-md w-full p-6">
+        <h2 className="text-xl font-bold mb-4">Create Community</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            className="w-full border p-2 rounded"
+            placeholder="Community Name"
+            value={formData.name}
+            onChange={e => setFormData({ ...formData, name: e.target.value })}
+            required
+          />
+          <textarea
+            className="w-full border p-2 rounded"
+            placeholder="Description"
+            value={formData.description}
+            onChange={e => setFormData({ ...formData, description: e.target.value })}
+            required
+          />
+          <select
+            className="w-full border p-2 rounded"
+            value={formData.category}
+            onChange={e => setFormData({ ...formData, category: e.target.value })}
+          >
+            <option value="general">General</option>
+            <option value="farming">Farming</option>
+            <option value="market">Market</option>
+          </select>
+          <select
+            className="w-full border p-2 rounded"
+            value={formData.privacy}
+            onChange={e => setFormData({ ...formData, privacy: e.target.value })}
+          >
+            <option value="public">Public</option>
+            <option value="private">Private</option>
+          </select>
+          <div className="flex justify-end space-x-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 border rounded">Cancel</button>
+            <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const CommunityBrowser = ({ onClose, communities, onJoin, user }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Discover Communities</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">×</button>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {communities.map(c => (
+            <div key={c.id} className="border p-4 rounded-lg flex justify-between items-center transition hover:shadow-md">
+              <div>
+                <h3 className="font-semibold text-lg">{c.name}</h3>
+                <p className="text-sm text-gray-600 line-clamp-2">{c.description}</p>
+                <div className="text-xs text-gray-500 mt-1 flex gap-2">
+                  <span>👥 {c.member_count} members</span>
+                  <span className="capitalize">🏷️ {c.category}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => onJoin(c.id)}
+                className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 font-medium"
+              >
+                Join
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CommunityDetailsModal = ({ community, onClose, user, token, onJoin, onCreatePost, onRemoveMember, API_BASE_URL }) => {
+  const [activeTab, setActiveTab] = useState('feed');
+  const [posts, setPosts] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [newPostContent, setNewPostContent] = useState('');
+  const [newPostImages, setNewPostImages] = useState([]); // Array of strings (URLs)
+  const [imageUrlInput, setImageUrlInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (community?.id && token) {
+      fetchPosts();
+      fetchMembers();
+      checkMembership();
+    }
+  }, [community, token]);
+
+  const checkMembership = async () => {
+    // For now, heuristic: pass user role or check member list
+    // We will check if user is in fetched member list for admin status
+  };
+
+  const fetchPosts = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/communities/${community.id}/posts`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPosts(data.posts || []);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchMembers = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/communities/${community.id}/members`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMembers(data.members || []);
+      }
+    } catch (e) { console.error("Failed to fetch members", e); }
+  };
+
+  const handlePostSubmit = async () => {
+    if (!newPostContent.trim()) return;
+    setLoading(true);
+    const success = await onCreatePost(community.id, {
+      content: newPostContent,
+      images: newPostImages,
+      product_id: null
+    });
+    if (success) {
+      setNewPostContent('');
+      setNewPostImages([]);
+      fetchPosts();
+    } else {
+      alert('Failed to post');
+    }
+    setLoading(false);
+  };
+
+  const addImage = () => {
+    if (imageUrlInput) {
+      setNewPostImages([...newPostImages, imageUrlInput]);
+      setImageUrlInput('');
+    }
+  };
+
+  // Carousel component for post
+  const PostImages = ({ images }) => {
+    const [idx, setIdx] = useState(0);
+    if (!images || images.length === 0) return null;
+    return (
+      <div className="relative h-64 bg-gray-100 rounded-lg mb-2 overflow-hidden">
+        <img src={images[idx]} alt="Post" className="w-full h-full object-cover" />
+        {images.length > 1 && (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); setIdx((idx - 1 + images.length) % images.length); }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white rounded-full p-1"
+            >
+              ❮
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setIdx((idx + 1) % images.length); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white rounded-full p-1"
+            >
+              ❯
+            </button>
+          </>
+        )}
+        <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+          {idx + 1} / {images.length}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full h-[85vh] flex flex-col shadow-xl">
+        {/* Header */}
+        <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">{community.name}</h2>
+            <p className="text-sm text-gray-500">{community.member_count} members</p>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 bg-white p-2 rounded-full shadow-sm">✕</button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b">
+          <button
+            className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'feed' ? 'border-b-2 border-emerald-500 text-emerald-600 bg-emerald-50' : 'text-gray-600 hover:bg-gray-50'}`}
+            onClick={() => setActiveTab('feed')}
+          >
+            📰 Feed
+          </button>
+          <button
+            className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'members' ? 'border-b-2 border-emerald-500 text-emerald-600 bg-emerald-50' : 'text-gray-600 hover:bg-gray-50'}`}
+            onClick={() => setActiveTab('members')}
+          >
+            👥 Members
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+          {activeTab === 'feed' && (
+            <div className="max-w-2xl mx-auto">
+              {/* Create Post UI */}
+              <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                <textarea
+                  className="w-full border-none focus:ring-0 text-gray-700 resize-none mb-2"
+                  placeholder="Share something with the community..."
+                  rows={2}
+                  value={newPostContent}
+                  onChange={(e) => setNewPostContent(e.target.value)}
+                />
+                {newPostImages.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto mb-2 pb-2">
+                    {newPostImages.map((img, i) => (
+                      <div key={i} className="relative w-16 h-16 flex-shrink-0">
+                        <img src={img} className="w-full h-full object-cover rounded" />
+                        <button
+                          onClick={() => setNewPostImages(newPostImages.filter((_, idx) => idx !== i))}
+                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-2 border-t">
+                  <div className="flex gap-2">
+                    <input
+                      className="text-xs border rounded px-2 py-1 w-40"
+                      placeholder="Image URL"
+                      value={imageUrlInput}
+                      onChange={e => setImageUrlInput(e.target.value)}
+                    />
+                    <button onClick={addImage} className="text-xs bg-gray-100 px-2 py-1 rounded hover:bg-gray-200">Add info</button>
+                  </div>
+                  <button
+                    onClick={handlePostSubmit}
+                    disabled={loading || !newPostContent}
+                    className={`bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50`}
+                  >
+                    {loading ? 'Posting...' : 'Post'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Feed List */}
+              <div className="space-y-4">
+                {posts.length === 0 ? (
+                  <div className="text-center text-gray-500 py-10">No posts yet. Be the first to share!</div>
+                ) : (
+                  posts.map(post => (
+                    <div key={post.id} className="bg-white border border-gray-100 p-4 rounded-lg shadow-sm">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 font-bold text-xs">
+                            {post.author_name?.[0] || 'U'}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-sm text-gray-900">{post.author_name}</div>
+                            <div className="text-xs text-gray-500">{new Date(post.created_at).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                        {post.author_role === 'admin' && (
+                          <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">Admin</span>
+                        )}
+                      </div>
+
+                      {/* Content with Mention Highlighting */}
+                      <p className="text-gray-800 mb-3 whitespace-pre-wrap">
+                        {post.content.split(/(@\w+)/g).map((part, i) =>
+                          part.match(/@\w+/) ? <span key={i} className="text-blue-600 font-medium">{part}</span> : part
+                        )}
+                      </p>
+
+                      <PostImages images={post.images} />
+
+                      <div className="flex gap-4 mt-3 pt-3 border-t text-sm text-gray-500">
+                        <button
+                          onClick={async () => {
+                            await fetch(`${API_BASE_URL}/api/communities/posts/${post.id}/like`, {
+                              method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            fetchPosts();
+                          }}
+                          className="flex items-center gap-1 hover:text-emerald-600"
+                        >
+                          <span>❤️</span> {post.likes_count} Likes
+                        </button>
+                        <button className="flex items-center gap-1 hover:text-blue-600">
+                          <span>💬</span> {post.comments_count} Comments
+                        </button>
+                      </div>
+
+                      {/* Comments Section (Simplified) */}
+                      {/* Could implement comment list toggle here later */}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'members' && (
+            <div className="max-w-2xl mx-auto bg-white p-4 rounded-lg shadow-sm">
+              <h3 className="font-bold mb-4">Community Members ({members.length})</h3>
+              {members.length === 0 ? <p className="text-gray-500">Loading members...</p> : (
+                <div className="space-y-2">
+                  {members.map(member => (
+                    <div key={member.id || member.user_id} className="flex justify-between items-center p-2 border-b last:border-0 hover:bg-gray-50 transition">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 text-sm font-bold">
+                          {member.username?.[0].toUpperCase() || 'U'}
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-800">@{member.username}</div>
+                          <div className="text-xs text-gray-500 capitalize">{member.role}</div>
+                        </div>
+                      </div>
+                      {/* Remove Button for Admins */}
+                      {(community.created_by === user.id) && member.user_id !== user.id && (
+                        <button
+                          onClick={async () => {
+                            if (window.confirm(`Remove @${member.username}?`)) {
+                              await onRemoveMember(community.id, member.user_id);
+                              fetchMembers(); // Refresh
+                            }
+                          }}
+                          className="text-red-500 text-xs hover:bg-red-50 px-2 py-1 rounded"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+/* -------------------------------------------------------------------------- */
+/*                            Community Components                            */
+/* -------------------------------------------------------------------------- */
+
+const CreateCommunityModal = ({ onClose, onSuccess, token, API_BASE_URL }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    category: 'general',
+    privacy: 'public'
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/communities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(formData)
+      });
+      if (response.ok) {
+        onSuccess();
+        onClose();
+        alert('Community created successfully!');
+      } else {
+        alert('Failed to create community');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Error creating community');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg max-w-md w-full p-6">
+        <h2 className="text-xl font-bold mb-4">Create Community</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            className="w-full border p-2 rounded"
+            placeholder="Community Name"
+            value={formData.name}
+            onChange={e => setFormData({ ...formData, name: e.target.value })}
+            required
+          />
+          <textarea
+            className="w-full border p-2 rounded"
+            placeholder="Description"
+            value={formData.description}
+            onChange={e => setFormData({ ...formData, description: e.target.value })}
+            required
+          />
+          <select
+            className="w-full border p-2 rounded"
+            value={formData.category}
+            onChange={e => setFormData({ ...formData, category: e.target.value })}
+          >
+            <option value="general">General</option>
+            <option value="farming">Farming</option>
+            <option value="market">Market</option>
+          </select>
+          <select
+            className="w-full border p-2 rounded"
+            value={formData.privacy}
+            onChange={e => setFormData({ ...formData, privacy: e.target.value })}
+          >
+            <option value="public">Public</option>
+            <option value="private">Private</option>
+          </select>
+          <div className="flex justify-end space-x-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 border rounded">Cancel</button>
+            <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const CommunityBrowser = ({ onClose, communities: initialCommunities, onJoin, user }) => {
+  const [displayedCommunities, setDisplayedCommunities] = useState(initialCommunities);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Debounce search could be added here, for now simple search button or effect
+  useEffect(() => {
+    setDisplayedCommunities(initialCommunities);
+  }, [initialCommunities]);
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      setDisplayedCommunities(initialCommunities);
+      return;
+    }
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      // Assuming API_BASE_URL is available in scope or passed. 
+      // Use relative path or API_BASE_URL if available. App component defines API_BASE_URL constant at top.
+      // But we are inside a sub-component. We should use the prop if passed, or default to relative /api
+      // The best way is to use the same pattern as other calls.
+      const baseUrl = API_BASE_URL || '/api'; // Fallback
+      // BETTER: Ensure API_BASE_URL is reachable. In this file, API_BASE_URL is defined at top level scope!
+      // So we can just use API_BASE_URL directly since it is in the same file scope (lines 1-6).
+
+      const res = await fetch(`${API_BASE_URL}/api/communities/search?q=${encodeURIComponent(searchQuery)}&type=community`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Backend returns { communities: [], products: [] }
+        setDisplayedCommunities(data.communities || []);
+      }
+    } catch (e) { console.error("Search failed", e); }
+    setLoading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Discover Communities</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">×</button>
+        </div>
+
+        {/* Search Bar */}
+        <div className="flex gap-2 mb-4">
+          <input
+            type="text"
+            className="flex-1 border p-2 rounded-lg"
+            placeholder="Search communities..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          />
+          <button
+            onClick={handleSearch}
+            className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+            disabled={loading}
+          >
+            {loading ? 'Searching...' : 'Search'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+          {displayedCommunities.length === 0 ? <p className="text-center text-gray-500">No communities found.</p> :
+            displayedCommunities.map(c => (
+              <div key={c.id} className="border p-4 rounded-lg flex justify-between items-center transition hover:shadow-md">
+                <div>
+                  <h3 className="font-semibold text-lg">{c.name}</h3>
+                  <p className="text-sm text-gray-600 line-clamp-2">{c.description}</p>
+                  <div className="text-xs text-gray-500 mt-1 flex gap-2">
+                    <span>👥 {c.member_count} members</span>
+                    <span className="capitalize">🏷️ {c.category}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onJoin(c.id)}
+                  className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 font-medium"
+                >
+                  Join
+                </button>
+              </div>
+            ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CommunityDetailsModal = ({ community, onClose, user, token, onJoin, onCreatePost, onRemoveMember, API_BASE_URL }) => {
+  const [activeTab, setActiveTab] = useState('feed');
+  const [posts, setPosts] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [newPostContent, setNewPostContent] = useState('');
+  const [newPostImages, setNewPostImages] = useState([]); // Array of strings (URLs)
+  const [imageUrlInput, setImageUrlInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [groupOrders, setGroupOrders] = useState([]);
+  const [showCreateOrder, setShowCreateOrder] = useState(false);
+
+  useEffect(() => {
+    if (community?.id && token) {
+      if (activeTab === 'feed') fetchPosts();
+      if (activeTab === 'group_buys') fetchGroupOrders();
+      if (activeTab === 'members') fetchMembers();
+      checkMembership();
+    }
+  }, [community, token, activeTab]);
+
+  const checkMembership = async () => {
+    // For now, heuristic: pass user role or check member list
+    // We will check if user is in fetched member list for admin status
+  };
+
+  const fetchPosts = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/communities/${community.id}/posts`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPosts(data.posts || []);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchGroupOrders = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/communities/${community.id}/group-orders`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGroupOrders(data.orders || []);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleCreateGroupOrder = async (orderData) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/group-orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ ...orderData, community_id: community.id })
+      });
+      if (res.ok) {
+        alert('Group Order Created!');
+        setShowCreateOrder(false);
+        fetchGroupOrders();
+        return true;
+      }
+      alert('Failed to create order');
+      return false;
+    } catch (e) { console.error(e); return false; }
+  };
+
+  const handleJoinOrder = async (orderId, quantity) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/group-orders/${orderId}/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ quantity })
+      });
+      if (res.ok) {
+        alert('Pledge Successful!');
+        fetchGroupOrders();
+        return true;
+      }
+      alert('Failed to join');
+      return false;
+    } catch (e) { console.error(e); return false; }
+  };
+
+  const fetchMembers = async () => {
+    // Assuming endpoint exists or we use community details
+    // If no endpoint, we rely on updated community details or create one
+    // Backend: join_community updates count. get_communities returns basic info.
+    // We might need a get_members endpoint.
+    // For now, MVP: List is empty or placeholder unless backend supports listing members.
+  };
+
+  const handlePostSubmit = async () => {
+    if (!newPostContent.trim()) return;
+    setLoading(true);
+    const success = await onCreatePost(community.id, {
+      content: newPostContent,
+      images: newPostImages,
+      product_id: null
+    });
+    if (success) {
+      setNewPostContent('');
+      setNewPostImages([]);
+      fetchPosts();
+    } else {
+      alert('Failed to post');
+    }
+    setLoading(false);
+  };
+
+  const addImage = () => {
+    if (imageUrlInput) {
+      setNewPostImages([...newPostImages, imageUrlInput]);
+      setImageUrlInput('');
+    }
+  };
+
+  // Carousel component for post
+  const PostImages = ({ images }) => {
+    const [idx, setIdx] = useState(0);
+    if (!images || images.length === 0) return null;
+    return (
+      <div className="relative h-64 bg-gray-100 rounded-lg mb-2 overflow-hidden">
+        <img src={images[idx]} alt="Post" className="w-full h-full object-cover" />
+        {images.length > 1 && (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); setIdx((idx - 1 + images.length) % images.length); }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white rounded-full p-1"
+            >
+              ❮
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setIdx((idx + 1) % images.length); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white rounded-full p-1"
+            >
+              ❯
+            </button>
+          </>
+        )}
+        <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+          {idx + 1} / {images.length}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full h-[85vh] flex flex-col shadow-xl">
+        {/* Header */}
+        <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">{community.name}</h2>
+            <p className="text-sm text-gray-500">{community.member_count} members</p>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 bg-white p-2 rounded-full shadow-sm">✕</button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b">
+          <button
+            className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'feed' ? 'border-b-2 border-emerald-500 text-emerald-600 bg-emerald-50' : 'text-gray-600 hover:bg-gray-50'}`}
+            onClick={() => setActiveTab('feed')}
+          >
+            📰 Feed
+          </button>
+          <button
+            className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'group_buys' ? 'border-b-2 border-emerald-500 text-emerald-600 bg-emerald-50' : 'text-gray-600 hover:bg-gray-50'}`}
+            onClick={() => setActiveTab('group_buys')}
+          >
+            🛒 Group Buys
+          </button>
+          <button
+            className={`flex-1 py-3 font-medium text-sm transition-colors ${activeTab === 'members' ? 'border-b-2 border-emerald-500 text-emerald-600 bg-emerald-50' : 'text-gray-600 hover:bg-gray-50'}`}
+            onClick={() => setActiveTab('members')}
+          >
+            👥 Members
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+          {activeTab === 'feed' && (
+            <div className="max-w-2xl mx-auto">
+              {/* Create Post UI */}
+              <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                <textarea
+                  className="w-full border-none focus:ring-0 text-gray-700 resize-none mb-2"
+                  placeholder="Share something with the community..."
+                  rows={2}
+                  value={newPostContent}
+                  onChange={(e) => setNewPostContent(e.target.value)}
+                />
+                {newPostImages.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto mb-2 pb-2">
+                    {newPostImages.map((img, i) => (
+                      <div key={i} className="relative w-16 h-16 flex-shrink-0">
+                        <img src={img} className="w-full h-full object-cover rounded" />
+                        <button
+                          onClick={() => setNewPostImages(newPostImages.filter((_, idx) => idx !== i))}
+                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-2 border-t">
+                  <div className="flex gap-2">
+                    <input
+                      className="text-xs border rounded px-2 py-1 w-40"
+                      placeholder="Image URL"
+                      value={imageUrlInput}
+                      onChange={e => setImageUrlInput(e.target.value)}
+                    />
+                    <button onClick={addImage} className="text-xs bg-gray-100 px-2 py-1 rounded hover:bg-gray-200">Add info</button>
+                  </div>
+                  <button
+                    onClick={handlePostSubmit}
+                    disabled={loading || !newPostContent}
+                    className={`bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50`}
+                  >
+                    {loading ? 'Posting...' : 'Post'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Feed List */}
+              <div className="space-y-4">
+                {posts.length === 0 ? (
+                  <div className="text-center text-gray-500 py-10">No posts yet. Be the first to share!</div>
+                ) : (
+                  posts.map(post => (
+                    <div key={post.id} className="bg-white border border-gray-100 p-4 rounded-lg shadow-sm">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 font-bold text-xs">
+                            {post.author_name?.[0] || 'U'}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-sm text-gray-900">{post.author_name}</div>
+                            <div className="text-xs text-gray-500">{new Date(post.created_at).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                        {post.author_role === 'admin' && (
+                          <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">Admin</span>
+                        )}
+                      </div>
+
+                      <p className="text-gray-800 mb-3 whitespace-pre-wrap">{post.content}</p>
+
+                      <PostImages images={post.images} />
+
+                      <div className="flex gap-4 mt-3 pt-3 border-t text-sm text-gray-500">
+                        <button className="flex items-center gap-1 hover:text-emerald-600">
+                          <span>❤️</span> {post.likes_count} Likes
+                        </button>
+                        <button className="flex items-center gap-1 hover:text-blue-600">
+                          <span>💬</span> {post.comments_count} Comments
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'group_buys' && (
+            <div className="max-w-4xl mx-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-lg">Active Group Buys</h3>
+                <button
+                  onClick={() => setShowCreateOrder(true)}
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700"
+                >
+                  + Start Group Buy
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {groupOrders.map(order => (
+                  <div key={order.id} className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm hover:shadow-md transition">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full mb-1 inline-block">
+                          {order.status}
+                        </span>
+                        <h4 className="font-bold text-lg text-gray-900">{order.product_name}</h4>
+                        <p className="text-sm text-gray-500">by {order.creator_name}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-xl text-emerald-700">₦{order.price_per_unit.toLocaleString()}</div>
+                        <div className="text-xs text-gray-500">per {order.unit}</div>
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{order.description}</p>
+
+                    {/* Progress Bar */}
+                    <div className="mb-4">
+                      <div className="flex justify-between text-xs font-medium mb-1">
+                        <span className="text-emerald-700">{order.current_quantity} pledged</span>
+                        <span className="text-gray-500">Goal: {order.target_quantity}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div
+                          className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min((order.current_quantity / order.target_quantity) * 100, 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const qty = prompt("How many units to pledge?");
+                          if (qty && !isNaN(qty)) handleJoinOrder(order.id, parseInt(qty));
+                        }}
+                        className="flex-1 bg-emerald-600 text-white py-2 rounded-lg font-medium hover:bg-emerald-700 text-sm"
+                      >
+                        Join Group Buy
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {groupOrders.length === 0 && (
+                  <div className="col-span-full text-center py-12 text-gray-400">
+                    No active group buys at the moment.
+                  </div>
+                )}
+              </div>
+
+              {showCreateOrder && (
+                <CreateGroupOrderModal
+                  onClose={() => setShowCreateOrder(false)}
+                  onSubmit={handleCreateGroupOrder}
+                />
+              )}
+            </div>
+          )}
+
+          {activeTab === 'members' && (
+            <div className="max-w-2xl mx-auto bg-white p-4 rounded-lg shadow-sm">
+              <h3 className="font-bold mb-4">Community Members</h3>
+              <p className="text-gray-500 text-sm">Member list viewing is currently limited.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+const CreateGroupOrderModal = ({ onClose, onSubmit, communities = [] }) => {
+  const [form, setForm] = useState({
+    product_name: '', description: '', price_per_unit: '', target_quantity: '', unit: 'units', deadline: '',
+    community_id: communities.length === 1 ? communities[0].id : ''
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (communities.length > 0 && !form.community_id) {
+      alert('Please select a community');
+      return;
+    }
+    onSubmit(form);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-[60] flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg w-full max-w-md p-6">
+        <h3 className="text-xl font-bold mb-4">Start Group Buy</h3>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {communities.length > 0 && (
+            <select
+              className="w-full border p-2 rounded"
+              value={form.community_id}
+              onChange={e => setForm({ ...form, community_id: e.target.value })}
+              required
+            >
+              <option value="">Select Community</option>
+              {communities.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          )}
+          <input
+            className="w-full border p-2 rounded"
+            placeholder="Product Name"
+            required
+            value={form.product_name}
+            onChange={e => setForm({ ...form, product_name: e.target.value })}
+          />
+          <textarea
+            className="w-full border p-2 rounded"
+            placeholder="Description"
+            rows={2}
+            value={form.description}
+            onChange={e => setForm({ ...form, description: e.target.value })}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="number" className="border p-2 rounded" placeholder="Price/Unit" required
+              value={form.price_per_unit}
+              onChange={e => setForm({ ...form, price_per_unit: e.target.value })}
+            />
+            <input
+              type="text" className="border p-2 rounded" placeholder="Unit (e.g., Bag)" required
+              value={form.unit}
+              onChange={e => setForm({ ...form, unit: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="number" className="border p-2 rounded" placeholder="Target Quantity" required
+              value={form.target_quantity}
+              onChange={e => setForm({ ...form, target_quantity: e.target.value })}
+            />
+            <input
+              type="date" className="border p-2 rounded" required
+              value={form.deadline}
+              onChange={e => setForm({ ...form, deadline: e.target.value })}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 border rounded">Cancel</button>
+            <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
