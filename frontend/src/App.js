@@ -146,7 +146,6 @@ function App() {
   // Global Group Buy State
   const [showGlobalGroupBuyModal, setShowGlobalGroupBuyModal] = useState(false);
   const [globalGroupOrderProduct, setGlobalGroupOrderProduct] = useState(null);
-  const [userCommunities, setUserCommunities] = useState([]);
 
   // Gift card state
   const [showGiftCards, setShowGiftCards] = useState(false);
