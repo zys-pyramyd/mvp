@@ -1923,16 +1923,27 @@ function App() {
   const getFarmDealsCartItems = () => {
     return cart.filter(item => {
       const product = item.product;
-      const isFarmDeals = product.platform === 'pyhub' ||
+      const isFarmDeals = (product.platform === 'pyhub' ||
         product.seller_type === 'farmer' ||
-        product.seller_type === 'agent' ||
-        product.community_id;
+        product.seller_type === 'agent') && !product.community_id;
       return isFarmDeals;
     });
   };
 
+  const getCommunityCartItems = () => {
+    return cart.filter(item => {
+      return item.product?.community_id;
+    });
+  };
+
   const getActiveCartItems = () => {
-    return activeCartTab === 'pyexpress' ? getPyExpressCartItems() : getFarmDealsCartItems();
+    switch (activeCartTab) {
+      case 'pyexpress': return getPyExpressCartItems();
+      case 'farmdeals': return getFarmDealsCartItems();
+      case 'community': return getCommunityCartItems();
+      case 'all': return cart;
+      default: return cart;
+    }
   };
 
 
@@ -7846,24 +7857,42 @@ function App() {
                 </div>
 
                 {/* Cart Tabs */}
-                <div className="flex space-x-2 mt-3">
+                <div className="flex border-b border-gray-200">
                   <button
-                    onClick={() => setActiveCartTab('pyexpress')}
-                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeCartTab === 'pyexpress'
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    onClick={() => setActiveCartTab('all')}
+                    className={`flex-1 py-3 text-sm font-medium transition-colors ${activeCartTab === 'all'
+                      ? 'text-emerald-600 border-b-2 border-emerald-600'
+                      : 'text-gray-500 hover:text-gray-700'
                       }`}
                   >
-                    PyExpress ({getPyExpressCartItems().length})
+                    All Items
+                  </button>
+                  <button
+                    onClick={() => setActiveCartTab('pyexpress')}
+                    className={`flex-1 py-3 text-sm font-medium transition-colors ${activeCartTab === 'pyexpress'
+                      ? 'text-emerald-600 border-b-2 border-emerald-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                  >
+                    PyExpress
                   </button>
                   <button
                     onClick={() => setActiveCartTab('farmdeals')}
-                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeCartTab === 'farmdeals'
-                      ? 'bg-orange-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    className={`flex-1 py-3 text-sm font-medium transition-colors ${activeCartTab === 'farmdeals'
+                      ? 'text-orange-600 border-b-2 border-orange-600'
+                      : 'text-gray-500 hover:text-gray-700'
                       }`}
                   >
-                    Farm Deals ({getFarmDealsCartItems().length})
+                    Farm Deals
+                  </button>
+                  <button
+                    onClick={() => setActiveCartTab('community')}
+                    className={`flex-1 py-3 text-sm font-medium transition-colors ${activeCartTab === 'community'
+                      ? 'text-blue-600 border-b-2 border-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                  >
+                    Community
                   </button>
                 </div>
               </div>
@@ -7875,12 +7904,11 @@ function App() {
                       <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.1 5H17M9 19a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM20 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
                       </svg>
-                      <p className="text-lg">This cart is empty</p>
-                      <p className="text-sm">
-                        {activeCartTab === 'pyexpress'
-                          ? 'Add business products from Home to get started!'
-                          : 'Add farm products from Farm Deals to get started!'}
-                      </p>
+                      <p className="text-gray-500 mb-2">No items in {
+                        activeCartTab === 'all' ? 'Cart' :
+                          activeCartTab === 'community' ? 'Community Cart' :
+                            activeCartTab === 'pyexpress' ? 'PyExpress Cart' : 'Farm Deals Cart'
+                      }</p>
                     </div>
                   </div>
                 ) : (
@@ -7977,15 +8005,28 @@ function App() {
 
                   <button
                     onClick={() => {
-                      calculateOrderSummary();
-                      proceedToCheckout();
+                      if (activeCartTab === 'all') {
+                        // For 'all', we calculate summary for everything and go to Unified Checkout
+                        calculateOrderSummary(); // Make sure this handles 'all' if modified, or just recalc based on active
+                        setCheckoutStep('address'); // Skip directly to address/confpage
+                        setShowCheckout(true);
+                        setShowCart(false);
+                      } else {
+                        calculateOrderSummary();
+                        proceedToCheckout();
+                      }
                     }}
-                    className={`w-full text-white py-3 px-4 rounded-lg font-medium transition-colors ${activeCartTab === 'pyexpress'
-                      ? 'bg-emerald-600 hover:bg-emerald-700'
-                      : 'bg-orange-600 hover:bg-orange-700'
+                    className={`w-full text-white py-3 px-4 rounded-lg font-medium transition-colors ${activeCartTab === 'pyexpress' ? 'bg-emerald-600 hover:bg-emerald-700' :
+                      activeCartTab === 'farmdeals' ? 'bg-orange-600 hover:bg-orange-700' :
+                        activeCartTab === 'community' ? 'bg-blue-600 hover:bg-blue-700' :
+                          'bg-gray-900 hover:bg-black'
                       }`}
                   >
-                    Checkout {activeCartTab === 'pyexpress' ? 'PyExpress' : 'Farm Deals'} ({getActiveCartItems().length} items)
+                    Checkout {
+                      activeCartTab === 'all' ? 'All Items' :
+                        activeCartTab === 'community' ? 'Community Order' :
+                          activeCartTab === 'pyexpress' ? 'PyExpress' : 'Farm Deals'
+                    } ({getActiveCartItems().length} items)
                   </button>
 
                   <button

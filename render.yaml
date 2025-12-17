@@ -21,9 +21,25 @@ services:
         value: production
       - key: PAYSTACK_SECRET_KEY
         sync: false
+      - key: PAYSTACK_PUBLIC_KEY
+        sync: false
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: GEOAPIFY_API_KEY
+        sync: false
+      - key: SMTP_SERVER
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SUPPORT_MAIL
+        sync: false
+      - key: KWIK_ACCESS_TOKEN
         sync: false
     autoDeploy: true
 
