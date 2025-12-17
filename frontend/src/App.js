@@ -2281,19 +2281,7 @@ function App() {
     }));
   };
 
-  // Global Group Buy Handlers
-  const fetchUserCommunities = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${API_BASE_URL}/api/my-communities`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUserCommunities(data.communities || []);
-      }
-    } catch (e) { console.error(e); }
-  };
+
 
   const handleOpenGlobalGroupBuy = async (product) => {
     setGlobalGroupOrderProduct(product);

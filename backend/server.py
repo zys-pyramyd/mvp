@@ -43,7 +43,8 @@ from order.models import (
 )
 
 # Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
-MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
+# Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
+MONGO_URL = os.environ.get('MONGO_URI', os.environ.get('MONGO_URL', 'mongodb://localhost:27017/'))
 JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-here-change-in-production')
 ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')  # For encrypting sensitive user data
 PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_dummy_paystack_key')
@@ -61,7 +62,7 @@ KWIK_ENABLED_STATES = ["Lagos", "Oyo", "FCT Abuja"]  # States where Kwik operate
 
 # Email Configuration
 SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+# Duplicate line removed
 SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
@@ -75,7 +76,7 @@ ADMIN_PASSWORD_HASH = "**********"
 
 # Initialize MongoDB
 try:
-    client = MongoClient(MONGO_URL)
+    client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=5000)
     db = client['pyramyd']
     users_collection = db['users']
     agent_farmers_collection = db['agent_farmers']
@@ -119,6 +120,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+async def root():
+    return {"status": "online", "message": "Pyramyd API is running"}
 
 # Pydantic Models for Registration
 class CompleteRegistration(BaseModel):
@@ -6696,6 +6701,24 @@ async def remove_community_member(
 
         if not target_member:
             raise HTTPException(status_code=404, detail="Member not found")
+
+        # Remove member (Soft delete)
+        community_members_collection.update_one(
+            {"id": target_member["id"]},
+            {"$set": {"is_active": False, "left_at": datetime.utcnow().isoformat()}}
+        )
+
+        # Update count
+        count = community_members_collection.count_documents({"community_id": community_id, "is_active": True})
+        communities_collection.update_one({"id": community_id}, {"$set": {"member_count": count}})
+
+        return {"message": "Member removed successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error removing community member: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to remove member")
 
 
 # --- UNIFIED CHECKOUT & CROSS-PLATFORM LOGIC ---
