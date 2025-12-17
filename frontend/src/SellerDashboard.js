@@ -195,22 +195,21 @@ const SellerDashboard = ({ user, token }) => {
                         </div>
                     )}
                 </div>
-            </div>
-        </div>
 
-                {/* Add Product Modal */ }
-    {
-        showAddProduct && (
-            <AddProductModal
-                onClose={() => setShowAddProduct(false)}
-                onSuccess={() => {
-                    setShowAddProduct(false);
-                    fetchInitialData(); // Refresh data
-                }}
-                token={token}
-            />
-        )
-    }
+
+                {/* Add Product Modal */}
+                {
+                    showAddProduct && (
+                        <AddProductModal
+                            onClose={() => setShowAddProduct(false)}
+                            onSuccess={() => {
+                                setShowAddProduct(false);
+                                fetchInitialData(); // Refresh data
+                            }}
+                            token={token}
+                        />
+                    )
+                }
             </div >
         </div >
     );
