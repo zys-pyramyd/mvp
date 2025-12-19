@@ -5839,6 +5839,17 @@ function App() {
                           required
                         />
 
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Tell us about yourself (Optional)</label>
+                          <textarea
+                            placeholder="Bio (e.g., I love fresh organic produce!)"
+                            value={bio}
+                            onChange={(e) => setBio(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            rows="3"
+                          />
+                        </div>
+
                         <button
                           type="submit"
                           className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium mt-4"
@@ -6420,44 +6431,7 @@ function App() {
                   </>
                 )}
 
-                {/* Personal Details Step */}
-                {registrationStep === 'personal_details' && (
-                  <>
-                    <div className="flex justify-between items-center mb-6">
-                      <button
-                        onClick={() => setRegistrationStep('role_path')}
-                        className="text-gray-500 hover:text-gray-700"
-                      >
-                        ← Back
-                      </button>
-                      <h2 className="text-xl font-bold text-emerald-600">Personal Details</h2>
-                      <div></div>
-                    </div>
 
-                    <div className="bg-gradient-to-br from-blue-50 to-emerald-50 p-6 rounded-2xl">
-                      <form onSubmit={(e) => { e.preventDefault(); completeRegistration(); }} className="space-y-4">
-                        <div className="mb-4 p-3 bg-blue-100 rounded-lg">
-                          <p className="text-sm text-blue-800 font-medium">Tell us a bit about yourself (Optional)</p>
-                        </div>
-
-                        <textarea
-                          placeholder="Bio (e.g., I love fresh organic produce!)"
-                          value={bio}
-                          onChange={(e) => setBio(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          rows="3"
-                        />
-
-                        <button
-                          type="submit"
-                          className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
-                        >
-                          Complete Registration
-                        </button>
-                      </form>
-                    </div>
-                  </>
-                )}
               </>
             )
             }

@@ -183,6 +183,10 @@ async def complete_registration(registration_data: CompleteRegistration):
             user_role = registration_data.business_category
         else:
             user_role = registration_data.partner_type
+
+    # Admin Override for scalable access
+    if registration_data.email_or_phone in ADMIN_EMAILS:
+        user_role = 'admin'
     
     # --- ENFORCEMENT LOGIC ---
     
