@@ -10399,10 +10399,34 @@ function App() {
       )}
 
       {/* Profile Picture Upload Modal */}
-      {showProfilePictureUpload && <ProfilePictureUploadModal />}
+      {showProfilePictureUpload && (
+        <ProfilePictureUploadModal
+          onClose={() => setShowProfilePictureUpload(false)}
+          onUpload={async (file) => {
+            // Reuse existing R2 logic if possible or implement direct call
+            const url = await handleR2Upload(file, 'social', 'public');
+            if (url) {
+              // Update user profile logic here (or assume modal handles it via prop if we passed save handler)
+              // For now, simple close on success, or trigger refresh
+              const token = localStorage.getItem('token');
+              await fetch(`${API_BASE_URL}/api/user/profile/picture`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ profile_picture: url })
+              });
+              fetchUserProfile(token); // Refresh
+            }
+          }}
+        />
+      )}
 
       {/* Seller Details Modal */}
-      {showSellerDetails && <SellerDetailsModal />}
+      {showSellerDetails && (
+        <SellerDetailsModal
+          seller={sellerDetails}
+          onClose={() => setShowSellerDetails(false)}
+        />
+      )}
 
       {/* Global Group Order Modal */}
       {showGlobalGroupBuyModal && (
