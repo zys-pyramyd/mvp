@@ -6,8 +6,62 @@ from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator, EmailStr
-from pymongo import MongoClient
-import bcrypt
+from database import db, client, get_collection
+from auth import get_current_user, create_access_token, get_password_hash, verify_password, JWT_SECRET, ALGORITHM
+from messaging.routes import router as messaging_router
+
+# --- R2 Cloudflare Integration ---
+import boto3
+from botocore.client import Config
+from botocore.exceptions import ClientError
+
+# R2 Configuration
+R2_ACCOUNT_ID = os.environ.get('R2_ACCOUNT_ID')
+R2_ACCESS_KEY_ID = os.environ.get('R2_ACCESS_KEY_ID')
+R2_SECRET_ACCESS_KEY = os.environ.get('R2_SECRET_ACCESS_KEY')
+R2_PRIVATE_BUCKET = os.environ.get('R2_PRIVATE_BUCKET', 'pyramyd-private')
+R2_PUBLIC_BUCKET = os.environ.get('R2_PUBLIC_BUCKET', 'pyramyd-public')
+SIGNED_URL_EXPIRATION = int(os.environ.get('SIGNED_URL_EXPIRATION', 3600))
+
+# Initialize R2 Client
+s3_client = None
+if R2_ACCOUNT_ID and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY:
+    try:
+        s3_client = boto3.client(
+            's3',
+            endpoint_url=f'https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com',
+            aws_access_key_id=R2_ACCESS_KEY_ID,
+            aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+            config=Config(signature_version='s3v4')
+        )
+        print("R2 Client Initialized")
+    except Exception as e:
+        print(f"Failed to initialize R2 client: {e}")
+
+# Folder validaton and Bucket mapping
+ALLOWED_FOLDERS = {
+    'user-registration': {'bucket': R2_PRIVATE_BUCKET, 'privacy': 'private'},
+    'messages': {'bucket': R2_PRIVATE_BUCKET, 'privacy': 'private'},
+    'notifications': {'bucket': R2_PRIVATE_BUCKET, 'privacy': 'private'},
+    'admin': {'bucket': R2_PRIVATE_BUCKET, 'privacy': 'private'},
+    'temp': {'bucket': R2_PRIVATE_BUCKET, 'privacy': 'private'}, 
+    'social': {'bucket': R2_PUBLIC_BUCKET, 'privacy': 'public'},
+    'products': {'bucket': R2_PUBLIC_BUCKET, 'privacy': 'public'}
+}
+
+class UploadSignRequest(BaseModel):
+    folder: str
+    filename: str
+    contentType: str
+
+class DocumentMetadata(BaseModel):
+    type: str 
+    key: str
+    bucket: str
+    filename: str
+
+# Helper functions (Auth helpers moved to auth.py)
+
 import jwt
 from enum import Enum
 from cryptography.fernet import Fernet
@@ -42,27 +96,42 @@ from order.models import (
     GroupBuyingRequest
 )
 
-# Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
-# Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
-MONGO_URL = os.environ.get('MONGO_URI', os.environ.get('MONGO_URL', 'mongodb://localhost:27017/'))
-JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-here-change-in-production')
-ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')  # For encrypting sensitive user data
-PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_dummy_paystack_key')
-PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY', 'pk_test_dummy_paystack_key')
-TWILIO_SID = os.environ.get('TWILIO_ACCOUNT_SID', 'dummy_twilio_sid')
-TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'dummy_twilio_token')
-GEOAPIFY_API_KEY = os.environ.get('GEOAPIFY_API_KEY', '04f9224444654ca5b967366d08eae4f4')
+# Environment variables
+MONGO_URL = os.environ.get('MONGO_URL', os.environ.get('MONGO_URI'))
+ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')
+
+# Third Party APIs
+PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY')
+PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY')
+TWILIO_SID = os.environ.get('TWILIO_ACCOUNT_SID')
+TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
+GEOAPIFY_API_KEY = os.environ.get('GEOAPIFY_API_KEY')
 
 # Kwik Delivery API
-KWIK_ACCESS_TOKEN = os.environ.get('KWIK_ACCESS_TOKEN', 'dummy_kwik_access_token')
+KWIK_ACCESS_TOKEN = os.environ.get('KWIK_ACCESS_TOKEN')
 KWIK_DOMAIN_NAME = os.environ.get('KWIK_DOMAIN_NAME', 'pyramyd.com')
-KWIK_VENDOR_ID = os.environ.get('KWIK_VENDOR_ID', 'dummy_vendor_id')
-KWIK_API_URL = "https://api.kwik.delivery"  # Official Kwik API base URL
-KWIK_ENABLED_STATES = ["Lagos", "Oyo", "FCT Abuja"]  # States where Kwik operates
+KWIK_VENDOR_ID = os.environ.get('KWIK_VENDOR_ID')
+KWIK_API_URL = "https://api.kwik.delivery"
+
+def check_critical_env_vars():
+    """Ensure critical environment variables are set."""
+    missing = []
+    if not MONGO_URL: missing.append("MONGO_URL")
+    if not JWT_SECRET: missing.append("JWT_SECRET")
+    
+    if missing:
+        error_msg = f"CRITICAL SECURITY ERROR: Missing required environment variables: {', '.join(missing)}"
+        print(error_msg)
+
+    if not PAYSTACK_SECRET_KEY: print("WARNING: PAYSTACK_SECRET_KEY missing. Payments will fail.")
+    if not GEOAPIFY_API_KEY: print("WARNING: GEOAPIFY_API_KEY missing. Location services will fail.")
+
+check_critical_env_vars()
+KWIK_API_URL = "https://api.kwik.delivery"
+KWIK_ENABLED_STATES = ["Lagos", "Oyo", "FCT Abuja"]
 
 # Email Configuration
 SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-# Duplicate line removed
 SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
@@ -70,26 +139,21 @@ SUPPORT_EMAIL = os.environ.get('SUPPORT_MAIL','')
 FROM_EMAIL = os.environ.get('FROM_EMAIL', SUPPORT_EMAIL)
 
 # Admin credentials
-ADMIN_EMAIL = os.environ.get('ADMIN_MAIL','')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD','')  # Default password - change after first login
-ADMIN_PASSWORD_HASH = "**********"
+ADMIN_EMAIL = os.environ.get('ADMIN_MAIL')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 
-# Initialize MongoDB
-try:
-    client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=5000)
-    db = client['pyramyd']
+# Collections (from imported db)
+# Note: db is initialized in database.py
+if db is not None:
     users_collection = db['users']
-    agent_farmers_collection = db['agent_farmers']
     agent_farmers_collection = db['agent_farmers']
     ratings_collection = db['ratings']
     community_posts_collection = db['community_posts']
     post_likes_collection = db['post_likes']
     post_comments_collection = db['post_comments']
     group_orders_collection = db['group_orders']
-    print("OK Connected to MongoDB")
-except Exception as e:
-    print(f"X Error connecting to MongoDB: {e}")
-
+else:
+    print("Warning: Database not initialized")
 
 # Initialize FastAPI
 app = FastAPI(
@@ -98,17 +162,18 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Include Routers
+app.include_router(messaging_router)
+
 # CORS Middleware
-# Allow requests from frontend domains
 allowed_origins = [
-    "http://localhost:3000",  # Local development
-    "http://localhost:5000",  # Alternative local port
-    "https://pyramydhyb.com",  # Production domain (if applicable)
-    "https://www.pyramydhyb.com",  # Production domain with www
-    "https://*.vercel.app",  # Vercel preview deployments
+    "http://localhost:3000",
+    "http://localhost:5000",
+    "https://pyramydhyb.com",
+    "https://www.pyramydhyb.com",
+    "https://*.vercel.app",
 ]
 
-# Get Vercel URL from environment if available
 vercel_url = os.environ.get('VERCEL_URL')
 if vercel_url:
     allowed_origins.append(f"https://{vercel_url}")
@@ -124,6 +189,59 @@ app.add_middleware(
 @app.get("/")
 async def root():
     return {"status": "online", "message": "Pyramyd API is running"}
+
+@app.post("/api/upload/sign")
+async def sign_upload(request: UploadSignRequest, current_user: dict = Depends(get_current_user)):
+    """Generate a presigned URL for direct R2 upload"""
+    if not s3_client:
+        raise HTTPException(status_code=503, detail="Storage service unavailable")
+        
+    if request.folder not in ALLOWED_FOLDERS:
+        raise HTTPException(status_code=400, detail="Invalid folder")
+    
+    config = ALLOWED_FOLDERS[request.folder]
+    bucket = config['bucket']
+    
+    file_ext = request.filename.split('.')[-1] if '.' in request.filename else 'bin'
+    safe_filename = f"{uuid.uuid4().hex}.{file_ext}"
+    key = f"{request.folder}/{current_user['id']}/{safe_filename}"
+    
+    try:
+        presigned_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': bucket,
+                'Key': key,
+                'ContentType': request.contentType
+            },
+            ExpiresIn=SIGNED_URL_EXPIRATION 
+        )
+        
+        return {
+            "uploadUrl": presigned_url,
+            "key": key,
+            "bucket": bucket,
+            "publicUrl": f"https://pub-cdn.pyramydhub.com/{key}" if config['privacy'] == 'public' else None
+        }
+    except ClientError as e:
+        print(f"R2 Signing Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate upload URL")
+
+@app.post("/api/user/documents")
+async def save_document_metadata(doc: DocumentMetadata, current_user: dict = Depends(get_current_user)):
+    """Save metadata for an uploaded document"""
+    users_collection.update_one(
+        {"id": current_user["id"]},
+        {"$push": {"documents": {
+            "type": doc.type,
+            "key": doc.key,
+            "bucket": doc.bucket,
+            "filename": doc.filename,
+            "uploaded_at": datetime.now(),
+            "status": "pending_verification"
+        }}}
+    )
+    return {"status": "success", "message": "Document saved"}
 
 # Pydantic Models for Registration
 class CompleteRegistration(BaseModel):
@@ -149,6 +267,8 @@ class CompleteRegistration(BaseModel):
     farm_details: Optional[List[Dict[str, str]]] = None
     registration_status: Optional[str] = None # 'registered' or 'unregistered' for business
     bio: Optional[str] = None
+    profile_picture: Optional[str] = None
+    verification_documents: Optional[Dict[str, str]] = None
 
 class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -254,7 +374,9 @@ async def complete_registration(registration_data: CompleteRegistration):
         username=registration_data.username,
         email=registration_data.email_or_phone,  # Store as email for compatibility
         phone=registration_data.phone,
-        role=user_role
+        role=user_role,
+        profile_picture=registration_data.profile_picture,
+        verification_documents=registration_data.verification_documents
     )
     
     # Create user document with additional fields
@@ -1171,12 +1293,16 @@ def create_kwik_delivery(pickup_address: dict, delivery_address: dict, order_det
 app = FastAPI(title="Pyramyd API", version="1.0.0")
 
 # CORS middleware
+# Get allowed origins from env, default to localhost for dev and the specified production domain
+origins_str = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,https://pyramydhub.com,https://www.pyramydhub.com")
+origins = [origin.strip() for origin in origins_str.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["*"], # Allow all headers for now to prevent auth issues
 )
 
 # Startup Event
@@ -1188,9 +1314,7 @@ async def startup_event():
 async def root():
     return {"status": "ok", "message": "Pyramyd Backend Running", "service": "backend"}
 
-# MongoDB connection
-client = MongoClient(MONGO_URL)
-db = client.pyramyd_db
+
 
 # Initialize GeopyHelper with MongoDB caching
 geo_helper = GeopyHelper(api_key=GEOAPIFY_API_KEY, user_agent="pyramyd_platform", db=db, cache_collection="geocode_cache")
@@ -1223,15 +1347,65 @@ audit_logs_collection = db.audit_logs
 
 # Paystack Payment collections
 paystack_subaccounts_collection = db.paystack_subaccounts
-paystack_transactions_collection = db.paystack_transactions
-paystack_transfer_recipients_collection = db.paystack_transfer_recipients
-paystack_transfers_collection = db.paystack_transfers
-commission_payouts_collection = db.commission_payouts
 
-# Kwik Delivery collection
-kwik_deliveries_collection = db.kwik_deliveries
+# --- Messaging System Models & Endpoints ---
 
-# Endpoints for new features
+class Message(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    sender_id: str
+    recipient_id: str
+    content: Optional[str] = None
+    attachments: Optional[List[str]] = [] # List of R2 keys
+    is_read: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class MessageCreate(BaseModel):
+    recipient_username: str
+    content: Optional[str] = None
+    attachments: Optional[List[str]] = []
+
+@app.post("/api/messages")
+async def send_message(msg_data: MessageCreate, current_user: dict = Depends(get_current_user)):
+    """Send a direct message"""
+    recipient = users_collection.find_one({"username": msg_data.recipient_username})
+    if not recipient:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Validate attachements (Optional: Check if keys exist/belong to user)
+    
+    new_msg = {
+        "id": str(uuid.uuid4()),
+        "sender_id": current_user["id"],
+        "recipient_id": recipient["id"],
+        "content": msg_data.content,
+        "attachments": msg_data.attachments,
+        "is_read": False,
+        "created_at": datetime.utcnow()
+    }
+    
+    messages_collection.insert_one(new_msg)
+    new_msg.pop("_id", None)
+    return new_msg
+
+
+
+@app.get("/api/users/search")
+async def search_users(q: str, current_user: dict = Depends(get_current_user)):
+    """Search users to start a chat"""
+    users = list(users_collection.find(
+        {"username": {"$regex": q, "$options": "i"}, "id": {"$ne": current_user["id"]}},
+        {"first_name": 1, "last_name": 1, "username": 1, "profile_picture": 1}
+    ).limit(10))
+    
+    results = []
+    for u in users:
+        results.append({
+            "username": u.get("username"),
+            "display_name": f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(),
+            "profile_picture": u.get("profile_picture") or "https://via.placeholder.com/40"
+        })
+    return {"users": results}
+
 
 @app.put("/api/products/{product_id}/preorder-time")
 async def update_preorder_time(
@@ -1953,6 +2127,7 @@ class User(BaseModel):
     # Rating information
     average_rating: float = 5.0  # Overall rating as seller/service provider
     total_ratings: int = 0  # Number of ratings received
+    verification_documents: Optional[Dict[str, str]] = None # Private R2 keys for KYC docs
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class SecureAccountDetails(BaseModel):
@@ -6892,16 +7067,6 @@ async def paystack_webhook(request: Request):
 
 
 if __name__ == "__main__":
-    # Load Environment Variables
-    DB_URI = os.getenv("MONGO_URI") # Use the correct env var name
-    if not DB_URI:
-             # Fallback to local MongoDB if not set
-        DB_URI = "mongodb://localhost:27017"
-    
-    client = MongoClient(DB_URI)
-    db = client["pyramyd_db"]
-    print(f"Connected to MongoDB at {DB_URI}")
-    
     # Start Server
     import uvicorn
     # Use PORT from environment or default to 5000 as requested

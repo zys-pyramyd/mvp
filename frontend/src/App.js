@@ -1,11 +1,18 @@
-import { useState, useEffect } from 'react';
-import './App.css';
+import ChatModal from './components/Chat/ChatModal';
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'https://mvp-2-u8e9.onrender.com';
-console.log('API_BASE_URL:', API_BASE_URL);
-import SellerDashboard from './SellerDashboard';
-import AdminDashboard from './AdminDashboard';
-import { NIGERIAN_STATES } from './nigerianStates';
+import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+import { Home, ShoppingCart, User, Menu, X, MessageSquare, Heart, Share2, Search, MapPin, ChevronRight, Star, Filter, Plus, Minus, Trash2, ArrowLeft, Check, Copy, ExternalLink, AlertCircle, Info, Truck, Calendar, Clock, DollarSign, CreditCard, Wallet, Settings, LogOut, Image as ImageIcon, FileText, Globe } from 'lucide-react';
+import { GoogleMap, useLoadScript, Marker } from '@react-google-maps/api';
+import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
+
+// Component Imports
+import CreateGroupOrderModal from './components/GroupOrders/CreateGroupOrderModal';
+import CommunityBrowser from './components/Community/CommunityBrowser';
+import CommunityDetailsModal from './components/Community/CommunityDetailsModal';
+import ProfilePictureUploadModal from './components/ProfilePictureUploadModal';
+import SellerDetailsModal from './components/SellerDetailsModal';
+// ChatModal is already imported at line 1
 
 // Custom Icons as SVG components using provided designs
 const AddToCartIcon = () => (
@@ -90,14 +97,9 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Enhanced messaging state
-  const [showMessaging, setShowMessaging] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [selectedConversation, setSelectedConversation] = useState(null);
-  const [conversations, setConversations] = useState([]);
   const [usernameSearch, setUsernameSearch] = useState('');
-  const [foundUsers, setFoundUsers] = useState([]);
+  const [isChatOpen, setIsChatOpen] = useState(false); // Controls Modal
+
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
   const [mediaRecorder, setMediaRecorder] = useState(null);
@@ -1739,66 +1741,160 @@ function App() {
     }
   };
 
-  const completeRegistration = async () => {
-    try {
-      // Submit complete registration to backend
-      const registrationData = {
-        ...authForm,
-        user_path: selectedUserPath,
-        buyer_type: selectedBuyerType,
-        business_info: businessInfo,
-        partner_type: partnerType,
-        business_category: businessCategory,
-        verification_info: verificationInfo,
-        // Enhanced fields
-        id_type: idType,
-        id_number: idNumber,
-        documents: documents,
-        directors: directors,
-        farm_details: farmDetails,
-        registration_status: registrationStatus,
-        bio: bio
-      };
+  // State for files and consent
+  const [filesToUpload, setFilesToUpload] = useState({});
+  const [gdprConsent, setGdprConsent] = useState(false);
 
-      const response = await fetch(`${API_BASE_URL}/api/auth/complete-registration`, {
+  // R2 Upload Helper
+  const handleR2Upload = async (file, folder, privacy) => {
+    if (!file) return null;
+    try {
+      // 1. Get Signed URL
+      const signRes = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/upload/sign`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(registrationData)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          folder,
+          filename: file.name,
+          contentType: file.type
+        })
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.token);
-        setUser(data.user);
-        setShowAuthModal(false);
+      if (!signRes.ok) throw new Error('Failed to get upload signature');
+      const { uploadUrl, publicUrl, key } = await signRes.json();
 
-        // Reset registration flow
-        setRegistrationStep('basic');
-        setSelectedUserPath('');
-        setSelectedBuyerType('');
-        setPartnerType('');
-        setBusinessCategory('');
+      // 2. Upload to R2
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file
+      });
 
-        setAuthForm({
-          first_name: '',
-          last_name: '',
-          username: '',
-          email_or_phone: '',
-          password: '',
-          phone: '',
-          gender: '',
-          date_of_birth: ''
-        });
-      } else {
-        const error = await response.json();
-        alert(error.detail);
-      }
+      if (!uploadRes.ok) throw new Error('Failed to upload file to R2');
+
+      // Return Public URL for 'social'/'products', Key for 'private' buckets
+      return privacy === 'public' ? publicUrl : key;
     } catch (error) {
-      console.error('Registration error:', error);
-      alert('An error occurred. Please try again.');
+      console.error("R2 Upload Error:", error);
+      return null;
     }
+  };
+
+  const completeRegistration = async () => {
+    // 1. Verify GDPR Consent
+    if (!gdprConsent) {
+      alert("You must consent to the processing of your data to proceed.");
+      return;
+    }
+
+    // Show generic loading state if available, or just proceed
+    // setIsSubmitting(true); 
+
+    try {
+      // 2. Upload Files to R2
+      const uploadedDocs = {};
+      let profilePictureUrl = null;
+
+      // Define mappings: inputName -> { folder, privacy }
+      const fileMappings = {
+        'profile_picture': { folder: 'social', privacy: 'public' },
+        'photo': { folder: 'user-registration', privacy: 'private' }, // Verification Selfie (Private)
+        'nin_document': { folder: 'user-registration', privacy: 'private' },
+        'farm_photo': { folder: 'products', privacy: 'public' }, // Farm public photo
+        'cac_document': { folder: 'user-registration', privacy: 'private' }
+      };
+
+      // Iterate and Upload
+      for (const [key, file] of Object.entries(filesToUpload)) {
+        if (file && fileMappings[key]) {
+          const { folder, privacy } = fileMappings[key];
+          const result = await handleR2Upload(file, folder, privacy);
+
+          if (result) {
+            if (key === 'profile_picture') {
+              profilePictureUrl = result;
+            } else {
+              uploadedDocs[key] = result; // Store Key or Public URL based on logic above? 
+              // logic returns Key for private.
+              // For 'farm_photo' (public), logic returns URL.
+            }
+          }
+        }
+      }
+
+      // 3. Prepare Registration Data
+      const registrationData = {
+        first_name: authForm.first_name,
+        last_name: authForm.last_name,
+        username: authForm.username,
+        email: authForm.email_or_phone.includes('@') ? authForm.email_or_phone : null,
+        phone: !authForm.email_or_phone.includes('@') ? authForm.email_or_phone : authForm.phone,
+        password: authForm.password,
+        role: partnerType || 'buyer',
+        buyer_type: selectedBuyerType,
+        partner_type: partnerType,
+        business_category: businessCategory,
+        // New Fields
+        profile_picture: profilePictureUrl,
+        verification_documents: uploadedDocs,
+        // Send verification text info, excluding file objects
+        verification_info: {
+          ...verificationInfo,
+          // Remove file objects/names from this dict as they are now in verification_documents
+          photo: undefined,
+          nin_document: undefined,
+          farm_photo: undefined,
+          cac_document: undefined
+        },
+        business_info: businessInfo,
+        bio: authForm.bio, // Map bio explicitly
+        address: address
+      };
+
+      console.log('Sending Registration Data:', registrationData);
+
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/auth/complete-registration`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registrationData),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        // Handle Success
+        handleAuth(data.user, data.token); // Auto-login
+
+        // Cleanup and Close
+        setShowAuthModal(false);
+        setFilesToUpload({});
+        setGdprConsent(false);
+        resetForms();
+      } else {
+        alert(data.detail || 'Registration failed');
+      }
+
+    } catch (error) {
+      console.error('Registration/Upload error:', error);
+      alert(error.message);
+    }
+  };
+
+  const resetForms = () => {
+    setRegistrationStep('basic');
+    setSelectedUserPath('');
+    setSelectedBuyerType('');
+    setPartnerType('');
+    setBusinessCategory('');
+    setAuthForm({
+      first_name: '',
+      last_name: '',
+      username: '',
+      email_or_phone: '',
+      password: '',
+      phone: '',
+      gender: '',
+      date_of_birth: ''
+    });
   };
 
   const handleAuth = async (e) => {
@@ -2855,36 +2951,10 @@ function App() {
   };
 
 
-  const startConversation = (targetUser) => {
-    const conversation = {
-      id: `conv_${user.username}_${targetUser.username}`,
-      participants: [user.username, targetUser.username],
-      name: targetUser.first_name + ' ' + targetUser.last_name,
-      avatar: targetUser.username.charAt(0).toUpperCase()
-    };
 
-    setSelectedConversation(conversation);
-    setFoundUsers([]);
-    setUsernameSearch('');
-  };
 
-  const sendMessage = () => {
-    if (newMessage.trim() && selectedConversation) {
-      const message = {
-        id: Date.now(),
-        type: 'text',
-        content: newMessage,
-        sender: user.username,
-        timestamp: new Date().toISOString(),
-        conversation_id: selectedConversation.id
-      };
-      setMessages(prev => [...prev, message]);
-      setNewMessage('');
 
-      // Here you would send to backend
-      // sendMessageToBackend(message);
-    }
-  };
+
 
   const fetchOrders = async () => {
     if (!user) return;
@@ -3536,6 +3606,7 @@ function App() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {communityDetails.recent_products.map((product) => (
                     <div key={product.id} className="border border-gray-200 rounded-lg p-4 hover:border-emerald-300 transition-colors">
+
                       <h4 className="font-semibold text-gray-900 mb-2">{product.title}</h4>
                       <p className="text-sm text-gray-600 mb-2 line-clamp-2">{product.description}</p>
                       <div className="flex items-center justify-between">
@@ -5809,6 +5880,33 @@ function App() {
                     </div>
 
                     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl">
+
+                      {/* Profile Picture Upload */}
+                      <div className="mb-6 text-center">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Profile Picture (Public)</label>
+                        <div className="flex justify-center mb-2">
+                          {documents.profile_picture ? (
+                            <img src={documents.profile_picture} alt="Preview" className="w-24 h-24 rounded-full object-cover border-2 border-emerald-500" />
+                          ) : (
+                            <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-2xl">
+                              📷
+                            </div>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              handleFileUpload(file, 'profile_picture');
+                              setFilesToUpload(prev => ({ ...prev, profile_picture: file }));
+                            }
+                          }}
+                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                        />
+                      </div>
+
                       <form onSubmit={(e) => { e.preventDefault(); completeRegistration(); }} className="space-y-4">
                         <input
                           type="text"
@@ -6264,7 +6362,11 @@ function App() {
                               type="file"
                               accept="image/*"
                               placeholder="Upload your photo"
-                              onChange={(e) => setVerificationInfo(prev => ({ ...prev, photo: e.target.files[0]?.name || '' }))}
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                setVerificationInfo(prev => ({ ...prev, photo: file?.name || '' }));
+                                setFilesToUpload(prev => ({ ...prev, photo: file }));
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               required
                             />
@@ -6288,7 +6390,11 @@ function App() {
                               type="file"
                               accept="image/*"
                               placeholder="Upload your photo"
-                              onChange={(e) => setVerificationInfo(prev => ({ ...prev, photo: e.target.files[0]?.name || '' }))}
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                setVerificationInfo(prev => ({ ...prev, photo: file?.name || '' }));
+                                setFilesToUpload(prev => ({ ...prev, photo: file }));
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               required
                             />
@@ -6296,7 +6402,11 @@ function App() {
                               type="file"
                               accept="image/*"
                               placeholder="Upload farm photo"
-                              onChange={(e) => setVerificationInfo(prev => ({ ...prev, farm_photo: e.target.files[0]?.name || '' }))}
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                setVerificationInfo(prev => ({ ...prev, farm_photo: file?.name || '' }));
+                                setFilesToUpload(prev => ({ ...prev, farm_photo: file }));
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               required
                             />
@@ -6425,6 +6535,23 @@ function App() {
                         )}
 
 
+
+                        {/* GDPR Consent Checkbox */}
+                        <div className="flex items-start mt-4 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <input
+                            type="checkbox"
+                            checked={gdprConsent}
+                            onChange={(e) => setGdprConsent(e.target.checked)}
+                            className="mt-1 mr-3"
+                            required
+                          />
+                          <label className="text-sm text-gray-700">
+                            I consent to the collection and processing of my personal data and documents for identity verification purposes in accordance with the
+                            <span className="font-semibold text-emerald-600"> Privacy Policy</span> and
+                            <span className="font-semibold text-emerald-600"> GDPR/NDPR Regulations</span>.
+                            I understand that my sensitive documents (IDs) are stored securely in a private location and can be deleted upon request.
+                          </label>
+                        </div>
 
                         <button
                           type="submit"
@@ -10285,6 +10412,15 @@ function App() {
           communities={userCommunities}
         />
       )}
+
+      {/* --- CHAT MODAL --- */}
+      {/* --- CHAT MODAL --- */}
+      <ChatModal
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        user={user}
+        API_BASE_URL={API_BASE_URL}
+      />
 
     </div >
   );

@@ -6,8 +6,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from geo_helper import GeopyHelper
 
-# Use the key from the user's snippet
-API_KEY = "04f9224444654ca5b967366d08eae4f4"
+# Use the key from env
+API_KEY = os.environ.get("GEOAPIFY_API_KEY")
 
 def test_lagos_distance():
     print("Testing Distance Calculation for Lagos Addresses...")

@@ -223,13 +223,70 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
         price_per_unit: '',
         unit: 'kg',
         quantity: '',
-        location: '', // State
+        location: '',
         city: '',
         pickup_address: '',
-        country: 'Nigeria', // Fixed
-        seller_delivery_fee: 0
+        country: 'Nigeria',
+        seller_delivery_fee: 0,
+        images: []
     });
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
+
+    const handleImageUpload = async (e) => {
+        const files = Array.from(e.target.files);
+        setUploading(true);
+
+        try {
+            const uploadedUrls = [];
+            for (const file of files) {
+                // 1. Get Signed URL
+                const signRes = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/upload/sign`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        folder: 'products',
+                        filename: file.name,
+                        contentType: file.type
+                    })
+                });
+
+                if (!signRes.ok) throw new Error('Failed to get upload signature');
+                const { uploadUrl, publicUrl } = await signRes.json();
+
+                // 2. Upload to R2
+                const uploadRes = await fetch(uploadUrl, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': file.type },
+                    body: file
+                });
+
+                if (!uploadRes.ok) throw new Error('Failed to upload image');
+                uploadedUrls.push(publicUrl);
+            }
+
+            setFormData(prev => ({
+                ...prev,
+                images: [...prev.images, ...uploadedUrls]
+            }));
+
+        } catch (error) {
+            console.error("Upload error:", error);
+            alert("Failed to upload image(s)");
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const removeImage = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            images: prev.images.filter((_, i) => i !== index)
+        }));
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -332,6 +389,39 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
                                 <option value="crate">crate</option>
                             </select>
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Product Images</label>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                            {formData.images.map((url, i) => (
+                                <div key={i} className="relative w-20 h-20 border rounded overflow-hidden">
+                                    <img src={url} alt="Product" className="w-full h-full object-cover" />
+                                    <button
+                                        type="button"
+                                        onClick={() => removeImage(i)}
+                                        className="absolute top-0 right-0 bg-red-500 text-white rounded-bl p-1 text-xs"
+                                    >✕</button>
+                                </div>
+                            ))}
+                            <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded flex items-center justify-center relative hover:bg-gray-50">
+                                {uploading ? (
+                                    <span className="text-xs text-gray-500">Uploading...</span>
+                                ) : (
+                                    <>
+                                        <span className="text-2xl text-gray-400">+</span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            onChange={handleImageUpload}
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                        />
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-4">First image will be the cover photo.</p>
                     </div>
 
                     <div>
