@@ -7,7 +7,8 @@ import { GoogleMap, useLoadScript, Marker } from '@react-google-maps/api';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
 
 // Component Imports
-import CreateGroupOrderModal from './components/GroupOrders/CreateGroupOrderModal';
+// Component Imports
+// import CreateGroupOrderModal from './components/GroupOrders/CreateGroupOrderModal';
 import CommunityBrowser from './components/Community/CommunityBrowser';
 import CommunityDetailsModal from './components/Community/CommunityDetailsModal';
 import ProfilePictureUploadModal from './components/ProfilePictureUploadModal';
@@ -146,8 +147,9 @@ function App() {
   const [showAddBankAccount, setShowAddBankAccount] = useState(false);
 
   // Global Group Buy State
-  const [showGlobalGroupBuyModal, setShowGlobalGroupBuyModal] = useState(false);
-  const [globalGroupOrderProduct, setGlobalGroupOrderProduct] = useState(null);
+  // Global Group Buy State
+  // const [showGlobalGroupBuyModal, setShowGlobalGroupBuyModal] = useState(false);
+  // const [globalGroupOrderProduct, setGlobalGroupOrderProduct] = useState(null);
 
   // Gift card state
   const [showGiftCards, setShowGiftCards] = useState(false);
@@ -1433,6 +1435,45 @@ function App() {
       console.error('Error fetching communities:', error);
     }
     return null;
+  };
+
+  const handleR2UploadHelper = async (file, folder = 'temp', privacy = 'private') => {
+    if (!file) return null;
+    try {
+      const token = localStorage.getItem('token');
+      // 1. Get Signed URL
+      const signResponse = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/upload/sign`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          folder,
+          filename: file.name,
+          contentType: file.type
+        })
+      });
+
+      if (!signResponse.ok) throw new Error('Failed to get upload URL');
+      const { uploadUrl, publicUrl, key } = await signResponse.json();
+
+      // 2. Upload to R2 directly
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file
+      });
+
+      if (!uploadResponse.ok) throw new Error('Direct upload failed');
+
+      // 3. Return the URL (public if available, else key)
+      return publicUrl || key;
+    } catch (error) {
+      console.error("R2 Upload Error:", error);
+      alert("Upload failed. Please try again.");
+      return null;
+    }
   };
 
   const fetchFeaturedCommunityProducts = async () => {
@@ -10395,6 +10436,7 @@ function App() {
           onCreatePost={handleCreatePost}
           onRemoveMember={handleRemoveMember}
           API_BASE_URL={API_BASE_URL}
+          onUpload={handleR2UploadHelper}
         />
       )}
 
@@ -10429,13 +10471,13 @@ function App() {
       )}
 
       {/* Global Group Order Modal */}
-      {showGlobalGroupBuyModal && (
+      {/* {showGlobalGroupBuyModal && (
         <CreateGroupOrderModal
           onClose={() => setShowGlobalGroupBuyModal(false)}
           onSubmit={handleSubmitGlobalGroupOrder}
           communities={userCommunities}
         />
-      )}
+      )} */}
 
       {/* --- CHAT MODAL --- */}
       {/* --- CHAT MODAL --- */}

@@ -165,6 +165,9 @@ app = FastAPI(
 # Include Routers
 app.include_router(messaging_router)
 
+from community.routes import router as community_router
+app.include_router(community_router)
+
 # CORS Middleware
 allowed_origins = [
     "http://localhost:3000",
