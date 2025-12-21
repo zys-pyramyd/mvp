@@ -83,6 +83,8 @@ const PreOrderTimer = ({ deadline }) => {
 };
 
 function App() {
+  const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+
   const [user, setUser] = useState(null);
   // Initialize with Home page (formerly PyExpress) as default
   const [currentPlatform, setCurrentPlatform] = useState('home');
