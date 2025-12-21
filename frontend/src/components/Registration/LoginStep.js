@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const LoginStep = ({ formData, updateFormData, onLogin, switchToRegister }) => {
+const LoginStep = ({ formData, updateFormData, onLogin, switchToRegister, onCancel }) => {
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e) => {
@@ -37,13 +37,22 @@ const LoginStep = ({ formData, updateFormData, onLogin, switchToRegister }) => {
                     />
                 </div>
 
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:bg-emerald-400"
-                >
-                    {loading ? 'Signing In...' : 'Sign In'}
-                </button>
+                <div className="flex space-x-3">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="flex-1 bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:bg-emerald-400"
+                    >
+                        {loading ? 'Signing In...' : 'Sign In'}
+                    </button>
+                </div>
             </form>
 
             <p className="text-center text-sm text-gray-600 mt-4">

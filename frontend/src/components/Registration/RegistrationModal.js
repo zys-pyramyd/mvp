@@ -83,6 +83,7 @@ const RegistrationModal = ({ onClose, onLogin, onRegister }) => {
                     updateFormData={updateFormData}
                     onLogin={onLogin}
                     switchToRegister={() => setAuthMode('register')}
+                    onCancel={onClose}
                 />
             );
         }
@@ -94,6 +95,7 @@ const RegistrationModal = ({ onClose, onLogin, onRegister }) => {
                         formData={formData}
                         updateFormData={updateFormData}
                         onNext={() => setStep('path_selection')}
+                        onCancel={onClose}
                     />
                 );
             case 'path_selection':

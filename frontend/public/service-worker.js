@@ -1,7 +1,7 @@
 // Pyramyd PWA Service Worker
 // Version 1.0.0
 
-const CACHE_NAME = 'pyramyd-v5';
+const CACHE_NAME = 'pyramyd-v6-fix';
 const OFFLINE_QUEUE = 'pyramyd-offline-queue';
 
 // Assets to cache on install
@@ -63,6 +63,10 @@ self.addEventListener('fetch', (event) => {
 // Handle static asset requests
 async function handleStaticRequest(request) {
   // Strategy: Network-First for ALL static assets (HTML, CSS, JS, Images)
+  // CRITICAL: Prevent SW from handling non-GET requests (e.g. POST uploads) in this fallback
+  if (request.method !== 'GET') {
+    return fetch(request);
+  }
 
   try {
     // 1. Try Network first
