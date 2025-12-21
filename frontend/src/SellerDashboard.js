@@ -83,6 +83,10 @@ const SellerDashboard = ({ user, token }) => {
         }
     };
 
+    const [showAddFarmer, setShowAddFarmer] = useState(false);
+
+    // ... (existing fetchInitialData)
+
     return (
         <div className="min-h-screen bg-gray-50 p-4 md:p-8">
             <div className="max-w-7xl mx-auto">
@@ -93,6 +97,14 @@ const SellerDashboard = ({ user, token }) => {
                         <p className="text-gray-500 capitalize">{user.role} Control Center • @{user.username}</p>
                     </div>
                     <div className="flex gap-2">
+                        {user.role === 'agent' && activeTab === 'farmers' && (
+                            <button
+                                onClick={() => setShowAddFarmer(true)}
+                                className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700"
+                            >
+                                + Register Farmer
+                            </button>
+                        )}
                         <button
                             onClick={() => setShowAddProduct(true)}
                             className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700"
@@ -102,7 +114,8 @@ const SellerDashboard = ({ user, token }) => {
                     </div>
                 </div>
 
-                {/* Navigation Tabs */}
+                {/* ... (Existing Tabs and Content) ... */}
+
                 <div className="flex border-b bg-white rounded-t-lg px-4 overflow-x-auto">
                     <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} label="📊 Overview" />
                     {user.role === 'agent' && (
@@ -119,14 +132,11 @@ const SellerDashboard = ({ user, token }) => {
 
                     {!loading && activeTab === 'overview' && stats && (
                         <div className="space-y-8">
-                            {/* Stats Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <StatCard title="Total Revenue" value={`₦${stats.revenue?.total_revenue?.toLocaleString() || 0}`} subtitle="Lifetime Earnings" icon="💰" color="bg-emerald-100 text-emerald-800" />
                                 <StatCard title="Total Orders" value={stats.orders?.total_orders || 0} subtitle={`${stats.orders?.completed_orders || 0} completed`} icon="🛍️" color="bg-blue-100 text-blue-800" />
                                 <StatCard title="Pending Revenue" value={`₦${stats.revenue?.pending_revenue?.toLocaleString() || 0}`} subtitle="In processing" icon="⏳" color="bg-orange-100 text-orange-800" />
                             </div>
-
-                            {/* Charts/Graphs Placeholders */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 <div className="border rounded-xl p-4">
                                     <h3 className="font-bold text-gray-800 mb-4">Recent Sales</h3>
@@ -154,9 +164,9 @@ const SellerDashboard = ({ user, token }) => {
 
                     {!loading && activeTab === 'farmers' && (
                         <div>
+                            {/* ... (Existing Farmers List) ... */}
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-xl font-bold">Managed Farmers</h2>
-                                <button className="text-emerald-600 text-sm font-medium hover:underline">Add New Farmer</button>
                             </div>
                             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {farmers.map(farmer => (
@@ -174,6 +184,11 @@ const SellerDashboard = ({ user, token }) => {
                                         </div>
                                     </div>
                                 ))}
+                                {farmers.length === 0 && (
+                                    <div className="col-span-full text-center py-12 text-gray-400">
+                                        No farmers registered yet. Click "Register Farmer" to add one.
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -189,29 +204,94 @@ const SellerDashboard = ({ user, token }) => {
 
                     {!loading && activeTab === 'inventory' && (
                         <div className="text-center py-12 text-gray-400">
-                            Inventory Management Component (Coming Soon)
-                            <br />
-                            <small>Currently managed via "Add Product" flow</small>
+                            {/* List products, including those managed for farmers */}
+                            <p>Manage your inventory and products here.</p>
                         </div>
                     )}
                 </div>
 
+                {/* Modals */}
+                {showAddProduct && (
+                    <AddProductModal onClose={() => setShowAddProduct(false)} onSuccess={() => { setShowAddProduct(false); fetchInitialData(); }} token={token} />
+                )}
+                {showAddFarmer && (
+                    <AddFarmerModal onClose={() => setShowAddFarmer(false)} onSuccess={() => { setShowAddFarmer(false); fetchInitialData(); }} token={token} />
+                )}
+            </div>
+        </div>
+    );
+};
 
-                {/* Add Product Modal */}
-                {
-                    showAddProduct && (
-                        <AddProductModal
-                            onClose={() => setShowAddProduct(false)}
-                            onSuccess={() => {
-                                setShowAddProduct(false);
-                                fetchInitialData(); // Refresh data
-                            }}
-                            token={token}
-                        />
-                    )
-                }
-            </div >
-        </div >
+const AddFarmerModal = ({ onClose, onSuccess, token }) => {
+    const [step, setStep] = useState(1);
+    const [loading, setLoading] = useState(false);
+    // Simplified Farmer Data
+    const [formData, setFormData] = useState({
+        first_name: '', last_name: '', phone: '', gender: '', date_of_birth: '',
+        address: '', farm_size: '', farm_location: '', crops: '',
+        headshot: '' // We will allow camera capture here soon
+    });
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/agent/farmers/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(formData)
+            });
+            if (res.ok) {
+                alert("Farmer Registered Successfully!");
+                onSuccess();
+            } else {
+                const err = await res.json();
+                alert(err.detail || "Failed to register farmer");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error registering farmer");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl max-w-lg w-full p-6">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">Register New Farmer</h2>
+                    <button onClick={onClose}>✕</button>
+                </div>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <input className="border p-2 rounded" placeholder="First Name" required value={formData.first_name} onChange={e => setFormData({ ...formData, first_name: e.target.value })} />
+                        <input className="border p-2 rounded" placeholder="Last Name" required value={formData.last_name} onChange={e => setFormData({ ...formData, last_name: e.target.value })} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <input className="border p-2 rounded" placeholder="Phone Number" required value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+                        <select className="border p-2 rounded" value={formData.gender} onChange={e => setFormData({ ...formData, gender: e.target.value })} required>
+                            <option value="">Gender</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
+                    <input type="date" className="border p-2 rounded w-full" required value={formData.date_of_birth} onChange={e => setFormData({ ...formData, date_of_birth: e.target.value })} />
+                    <textarea className="border p-2 rounded w-full" placeholder="Home Address" required value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} rows="2"></textarea>
+
+                    <h3 className="font-bold text-gray-700 pt-2">Farm Details</h3>
+                    <input className="border p-2 rounded w-full" placeholder="Farm Location (City/State)" required value={formData.farm_location} onChange={e => setFormData({ ...formData, farm_location: e.target.value })} />
+                    <div className="grid grid-cols-2 gap-4">
+                        <input className="border p-2 rounded" placeholder="Size (e.g. 5 acres)" required value={formData.farm_size} onChange={e => setFormData({ ...formData, farm_size: e.target.value })} />
+                        <input className="border p-2 rounded" placeholder="Main Crops (e.g. Maize)" required value={formData.crops} onChange={e => setFormData({ ...formData, crops: e.target.value })} />
+                    </div>
+
+                    <button type="submit" disabled={loading} className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 disabled:bg-gray-400">
+                        {loading ? 'Registering...' : 'Register Farmer'}
+                    </button>
+                </form>
+            </div>
+        </div>
     );
 };
 
@@ -228,10 +308,49 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
         pickup_address: '',
         country: 'Nigeria',
         seller_delivery_fee: 0,
-        images: []
+        images: [],
+        farmer_id: '' // For agents
     });
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [managedFarmers, setManagedFarmers] = useState([]); // Agents: list of farmers
+
+    // Fetch farmers for agents
+    React.useEffect(() => {
+        const fetchFarmers = async () => {
+            // We can reuse the same endpoint or pass it down. 
+            // For modularity, let's fetch if we think we are an agent? 
+            // Actually, better to check user role or passed prop 'isAgent'.
+            // Let's assume we can fetch if token is present.
+            try {
+                const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/agent/farmers`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setManagedFarmers(data.farmers || []);
+                }
+            } catch (e) {
+                console.error("Failed to fetch farmers for dropdown", e);
+            }
+        };
+        // Simple check if we might be an agent (or just try fetching, API will reject if not)
+        fetchFarmers();
+    }, [token]);
+
+    const handleFarmerSelect = (e) => {
+        const farmerId = e.target.value;
+        const selectedFarmer = managedFarmers.find(f => f.id === farmerId);
+
+        setFormData(prev => ({
+            ...prev,
+            farmer_id: farmerId,
+            // Auto-fill location from farmer if available
+            location: selectedFarmer?.state || prev.location,
+            city: selectedFarmer?.city || prev.city,
+            pickup_address: selectedFarmer?.address || prev.pickup_address
+        }));
+    };
 
     const handleImageUpload = async (e) => {
         const files = Array.from(e.target.files);
@@ -326,6 +445,23 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Agent: Select Farmer */}
+                    {managedFarmers.length > 0 && (
+                        <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                            <label className="block text-sm font-bold text-emerald-800 mb-1">Post on behalf of Farmer</label>
+                            <select
+                                className="w-full border rounded p-2"
+                                value={formData.farmer_id}
+                                onChange={handleFarmerSelect}
+                            >
+                                <option value="">Select Farmer (Optional - you are seller)</option>
+                                {managedFarmers.map(f => (
+                                    <option key={f.id} value={f.id}>{f.first_name} {f.last_name} ({f.location || 'No Loc'})</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-emerald-600 mt-1">If selected, sales will be recorded against this farmer.</p>
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Product Title</label>

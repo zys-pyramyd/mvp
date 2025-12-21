@@ -193,6 +193,44 @@ app.add_middleware(
 async def root():
     return {"status": "online", "message": "Pyramyd API is running"}
 
+@app.post("/api/upload/sign-public")
+async def sign_upload_public(request: UploadSignRequest):
+    """Generate a presigned URL for public/registration uploads (Restricted folders)"""
+    if not s3_client:
+        raise HTTPException(status_code=503, detail="Storage service unavailable")
+        
+    # Strictly allow only registration folder for unauthenticated uploads
+    if request.folder != 'user-registration':
+        raise HTTPException(status_code=403, detail="Unauthorized folder access")
+    
+    config = ALLOWED_FOLDERS[request.folder]
+    bucket = config['bucket']
+    
+    file_ext = request.filename.split('.')[-1] if '.' in request.filename else 'bin'
+    safe_filename = f"{uuid.uuid4().hex}.{file_ext}" # No user ID available yet, use random UUID
+    key = f"{request.folder}/temp/{safe_filename}"
+    
+    try:
+        presigned_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': bucket,
+                'Key': key,
+                'ContentType': request.contentType
+            },
+            ExpiresIn=SIGNED_URL_EXPIRATION 
+        )
+        
+        return {
+            "uploadUrl": presigned_url,
+            "key": key,
+            "bucket": bucket,
+            "publicUrl": None
+        }
+    except ClientError as e:
+        print(f"R2 Signing Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate upload URL")
+
 @app.post("/api/upload/sign")
 async def sign_upload(request: UploadSignRequest, current_user: dict = Depends(get_current_user)):
     """Generate a presigned URL for direct R2 upload"""
@@ -266,8 +304,8 @@ class CompleteRegistration(BaseModel):
     id_type: Optional[str] = None
     id_number: Optional[str] = None
     documents: Optional[Dict[str, str]] = None  # URLs or base64 of uploaded docs
-    directors: Optional[List[Dict[str, str]]] = None
-    farm_details: Optional[List[Dict[str, str]]] = None
+    directors: Optional[List[dict]] = None
+    farm_details: Optional[List[dict]] = None
     registration_status: Optional[str] = None # 'registered' or 'unregistered' for business
     bio: Optional[str] = None
     profile_picture: Optional[str] = None
@@ -317,11 +355,11 @@ async def complete_registration(registration_data: CompleteRegistration):
     if user_role in ['agent', 'farmer']:
         # Require ID, Headshot, Address Proof
         if not registration_data.id_type or not registration_data.id_number:
-             raise HTTPException(status_code=400, detail="Identity verification (ID Type & Number) is required for Agents and Farmers.")
+             raise HTTPException(status_code=400, detail="Identity verification (ID Type & Number) is required.")
         
         docs = registration_data.documents or {}
         if not docs.get('headshot'):
-             raise HTTPException(status_code=400, detail="Headshot is required.")
+             raise HTTPException(status_code=400, detail="Profile Picture (Headshot) is required.")
         if not docs.get('id_document'): # Slip/Card upload
              raise HTTPException(status_code=400, detail="ID Document upload is required.")
         if not docs.get('proof_of_address'):
@@ -333,7 +371,6 @@ async def complete_registration(registration_data: CompleteRegistration):
 
     # 2. Business Enforcement
     # Business roles can be: food_servicing, food_processor, farm_input, fintech, agriculture, supplier, others
-    # We check if the assigned role implies a business
     is_business_role = registration_data.partner_type == 'business'
     
     if is_business_role:
@@ -347,26 +384,25 @@ async def complete_registration(registration_data: CompleteRegistration):
         docs = registration_data.documents or {}
         
         if reg_status == 'registered':
-            # Registered Business: Directors, CAC, Proof of Address
-            if not registration_data.directors or len(registration_data.directors) < 1:
-                 raise HTTPException(status_code=400, detail="At least one Director/Manager is required for registered businesses.")
+            # Registered Business: CAC, TIN, Proof of Address (Director check removed per request)
             if not docs.get('cac_document'):
                  raise HTTPException(status_code=400, detail="CAC Document is required for registered businesses.")
             if not docs.get('proof_of_address'):
                  raise HTTPException(status_code=400, detail="Proof of Business Address is required.")
+            if not registration_data.business_info.get('tin'):
+                 raise HTTPException(status_code=400, detail="TIN is required for registered businesses.")
                  
         elif reg_status == 'unregistered':
             # Unregistered Business: Treat like Agent (ID, Headshot, Bio)
             if not registration_data.id_type or not registration_data.id_number:
                  raise HTTPException(status_code=400, detail="Identity verification is required for unregistered businesses.")
             if not docs.get('headshot'):
-                 raise HTTPException(status_code=400, detail="Headshot is required.")
+                 raise HTTPException(status_code=400, detail="Headshot (Camera) is required.")
             if not docs.get('id_document'):
-                 raise HTTPException(status_code=400, detail="ID Document upload is required.")
+                 raise HTTPException(status_code=400, detail="ID Document/NIN upload is required.")
             if not docs.get('proof_of_address'):
                  raise HTTPException(status_code=400, detail="Proof of Address is required.")
-            if not registration_data.bio:
-                 raise HTTPException(status_code=400, detail="Bio is required.")
+            # Bio is optional/implied by business info
 
     # --- END ENFORCEMENT ---
 
@@ -557,6 +593,46 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/auth/login")
+async def login(login_data: LoginRequest):
+    # Find user by email, username, or phone
+    user = db.users.find_one({"$or": [
+        {"email": login_data.username},
+        {"username": login_data.username},
+        {"phone": login_data.username},
+        {"email_or_phone": login_data.username}
+    ]})
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+    if not verify_password(login_data.password, user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+    token = create_token(user["id"])
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user_id": user["id"],
+        "username": user["username"],
+        "role": user.get("role", "buyer"),
+         "user": {
+            "id": user["id"],
+            "first_name": user.get("first_name"),
+            "last_name": user.get("last_name"),
+            "username": user["username"],
+            "email": user.get("email"),
+            "role": user.get("role"),
+            "profile_picture": user.get("profile_picture")
+        }
+    }
 
 ADMIN_EMAILS = ["abdulazeezshakrullah@gmail.com", "abdulazeezshakrullah@pyramydhub.com"]
 
@@ -1462,7 +1538,9 @@ async def search_communities(
             results["communities"] = communities
         
         if type in ["all", "product"]:
-            products = list(community_products_collection.find({
+            # Search products that belong to a community
+            products = list(db.products.find({
+                "community_id": {"$exists": True, "$ne": None},
                 "$or": [
                     {"title": {"$regex": q, "$options": "i"}},
                     {"description": {"$regex": q, "$options": "i"}},
@@ -1690,6 +1768,10 @@ class ProductCreate(BaseModel):
     is_preorder: bool = False
     preorder_available_date: Optional[datetime] = None
     preorder_end_date: Optional[datetime] = None
+    # Agent/Community fields
+    farmer_id: Optional[str] = None
+    community_id: Optional[str] = None
+    community_name: Optional[str] = None
 
 class Product(ProductCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -1697,7 +1779,10 @@ class Product(ProductCreate):
     seller_name: str
     seller_type: Optional[str] = None
     seller_profile_picture: Optional[str] = None
+    seller_profile_picture: Optional[str] = None
     business_name: Optional[str] = None
+    managed_by_agent_id: Optional[str] = None
+    community_id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     original_price: Optional[float] = None
     original_price: Optional[float] = None
@@ -3178,87 +3263,10 @@ async def get_vendor_platform_charges(platform_type: str = "home"):
         print(f"Error getting vendor charges: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get vendor charges")
 
-@app.post("/api/products")
-async def create_product(product_data: ProductCreate, current_user: dict = Depends(get_current_user)):
-    if not current_user.get('role'):
-        raise HTTPException(status_code=400, detail="Please select a role first")
-    
-    # KYC Compliance Check for Product Creation
-    validate_kyc_compliance(current_user, "post_products")
-    
-    # Check if user can create products
-    allowed_roles = ['farmer', 'agent', 'supplier_farm_inputs', 'supplier_food_produce', 'processor']
-    if current_user.get('role') not in allowed_roles:
-        raise HTTPException(status_code=403, detail="Not authorized to create products")
-    
-    # Determine platform based on user role and product category
-    user_role = current_user.get('role')
-    product_platform = product_data.platform
-    
-    # Enforce platform restrictions
-    if user_role == 'farmer':
-        product_platform = 'pyhub'
-    elif user_role == 'supplier_farm_inputs':
-        product_platform = 'pyhub'
-        # Validate that the product category is appropriate for farm inputs
-        farm_input_categories = ['fertilizer', 'herbicides', 'pesticides', 'seeds']
-        if product_data.category.value not in farm_input_categories:
-            raise HTTPException(status_code=400, detail="Farm input suppliers can only list farm input products")
-    elif user_role == 'supplier_food_produce':
-        product_platform = 'pyexpress'
-        # Validate that the product category is appropriate for food produce
-        food_categories = ['sea_food', 'grain', 'legumes', 'vegetables', 'spices', 'fruits', 'fish', 'meat', 'packaged_goods']
-        if product_data.category.value not in food_categories:
-            raise HTTPException(status_code=400, detail="Food produce suppliers can only list food products")
-    elif user_role == 'processor':
-        product_platform = 'pyexpress'
-    
-    # Create product with seller profile picture
-    product = Product(
-        seller_id=current_user['id'],
-        seller_name=current_user['username'],
-        seller_type=current_user.get('role'),
-        seller_profile_picture=current_user.get('profile_picture'),  # Include seller's profile picture
-        business_name=current_user.get('business_name'),  # Include business name for transparency
-        platform=product_platform,
-        **{k: v for k, v in product_data.dict().items() if k != 'platform'}
-    )
-    
-    # Apply service charges based on role
-    if current_user.get('role') == 'farmer':
-        # 30% markup for farmers on PyHub
-        product.price_per_unit = product_data.price_per_unit * 1.30
-    elif current_user.get('role') in ['supplier_food_produce', 'processor']:
-        # 10% service charge deduction for PyExpress suppliers
-        product.price_per_unit = product_data.price_per_unit * 0.90
-    
-    # Calculate discount if applicable
-    if product_data.has_discount and product_data.discount_value:
-        product.original_price = product.price_per_unit
-        
-        if product_data.discount_type == "percentage":
-            # Calculate percentage discount
-            discount_amount = product.price_per_unit * (product_data.discount_value / 100)
-            product.discount_amount = round(discount_amount, 2)
-            product.price_per_unit = round(product.price_per_unit - discount_amount, 2)
-        elif product_data.discount_type == "fixed":
-            # Apply fixed discount
-            product.discount_amount = product_data.discount_value
-            product.price_per_unit = round(product.price_per_unit - product_data.discount_value, 2)
-            
-        # Ensure price doesn't go negative
-        if product.price_per_unit < 0:
-            raise HTTPException(status_code=400, detail="Discount cannot exceed product price")
-    
-    # Validate logistics management
-    if product_data.logistics_managed_by == "seller":
-        if product_data.seller_delivery_fee is None:
-            raise HTTPException(status_code=400, detail="Delivery fee is required when seller manages logistics")
-    
-    product_dict = product.dict()
-    db.products.insert_one(product_dict)
-    
-    return {"message": "Product created successfully", "product_id": product.id}
+
+
+
+
 
 @app.get("/api/products/{product_id}")
 async def get_product(product_id: str):
@@ -6371,7 +6379,262 @@ async def submit_farmer_kyc(kyc_data: FarmerKYC, current_user: dict = Depends(ge
         
         farmer_kyc_collection.insert_one(kyc_record)
         
-        # Update user KYC status
+# --- AGENT FEATURES ---
+
+class AgentRegisterFarmer(BaseModel):
+    first_name: str
+    last_name: str
+    phone: str
+    gender: str
+    date_of_birth: str
+    address: str
+    farm_location: str
+    farm_size: str
+    crops: str
+    headshot: Optional[str] = None
+
+@app.post("/api/agent/farmers/register")
+async def register_farmer_by_agent(data: AgentRegisterFarmer, current_user: dict = Depends(get_current_user)):
+    """Allows an agent to register a farmer under their management"""
+    if current_user.get("role") != "agent":
+        raise HTTPException(status_code=403, detail="Only agents can register farmers")
+        
+    # Check if phone already registered
+    if db.users.find_one({"phone": data.phone}):
+        raise HTTPException(status_code=400, detail="Farmer phone number already registered")
+        
+    farmer_id = str(uuid.uuid4())
+    username = f"farmer_{data.first_name.lower()}_{uuid.uuid4().hex[:4]}"
+    
+    # Create Farmer User
+    farmer = {
+        "id": farmer_id,
+        "first_name": data.first_name,
+        "last_name": data.last_name,
+        "username": username,
+        "phone": data.phone, # No email required for managed farmer
+        "role": "farmer",
+        "gender": data.gender,
+        "date_of_birth": data.date_of_birth,
+        "address": data.address,
+        "is_managed": True,
+        "managed_by": current_user["id"],
+        "farm_details": [{
+            "address": data.farm_location,
+            "size": data.farm_size,
+            "products": [c.strip() for c in data.crops.split(',')]
+        }],
+        "profile_picture": data.headshot,
+        "created_at": datetime.utcnow()
+    }
+    
+    db.users.insert_one(farmer)
+    
+    # Link to Agent
+    db.agent_farmers.insert_one({
+        "agent_id": current_user["id"],
+        "farmer_id": farmer_id,
+        "created_at": datetime.utcnow()
+    })
+    
+    return {"message": "Farmer registered successfully", "farmer_id": farmer_id}
+
+@app.get("/api/agent/farmers")
+async def get_agent_farmers(current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") != "agent":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    links = list(db.agent_farmers.find({"agent_id": current_user["id"]}))
+    farmer_ids = [l["farmer_id"] for l in links]
+    
+    farmers = list(db.users.find({"id": {"$in": farmer_ids}}, {"_id": 0, "password": 0}))
+    
+    # Enrich with stats (mocked or real)
+    for f in farmers:
+        # Get product count
+        f["product_count"] = db.products.count_documents({"farmer_id": f["id"]})
+        # Get total sales (mock for now or aggregated)
+        f["total_sales"] = 0 
+        f["location"] = f["farm_details"][0]["address"] if f.get("farm_details") else "Unknown"
+        
+    return {"farmers": farmers}
+    
+# Update Product Model in server.py (Find existing Product class and update it or add new fields dynamically)
+# Since we are using dicts mostly in the endpoints, we'll just check the body.
+
+
+
+@app.post("/api/products")
+async def create_product(product_data: ProductCreate, current_user: dict = Depends(get_current_user)):
+    if not current_user.get('role'):
+        raise HTTPException(status_code=400, detail="Please select a role first")
+
+    # KYC Compliance Check
+    validate_kyc_compliance(current_user, "post_products")
+    
+    # Check if user can create products (Base Permission)
+    allowed_roles = ['farmer', 'agent', 'supplier_farm_inputs', 'supplier_food_produce', 'processor']
+    if current_user.get('role') not in allowed_roles:
+         # Exception: Community creation might be open to others? 
+         # For now sticking to base roles.
+        raise HTTPException(status_code=403, detail="Not authorized to create products")
+
+    # Initialize variables
+    managed_by_agent_id = None
+    seller_id = current_user['id']
+    seller_name = current_user['username']
+    seller_type = current_user.get('role')
+    product_platform = product_data.platform
+    
+    # --- CASE 1: AGENT POSTING FOR FARMER ---
+    if product_data.farmer_id:
+        if current_user.get('role') != 'agent':
+             raise HTTPException(status_code=403, detail="Only agents can post for others")
+        
+        # Verify agent manages this farmer
+        link = db.agent_farmers.find_one({"agent_id": current_user['id'], "farmer_id": product_data.farmer_id})
+        if not link:
+            raise HTTPException(status_code=403, detail="You do not manage this farmer")
+            
+        # Switch seller identity to the farmer
+        managed_by_agent_id = current_user['id']
+        farmer_user = users_collection.find_one({"id": product_data.farmer_id})
+        if not farmer_user:
+             raise HTTPException(status_code=404, detail="Farmer not found")
+             
+        seller_id = farmer_user['id']
+        seller_name = farmer_user['username']
+        seller_type = 'farmer' # Effectively a farmer listing
+
+    # --- CASE 2: COMMUNITY LISTING ---
+    if product_data.community_id:
+        # User must provide community name
+        if not product_data.community_name:
+             raise HTTPException(status_code=400, detail="Community name is required for community listings")
+        
+        # Validate Community Existence
+        community = communities_collection.find_one({"id": product_data.community_id})
+        if not community:
+             raise HTTPException(status_code=404, detail="Community not found")
+        
+        # Verify User Membership (Affiliation)
+        member = community_members_collection.find_one({
+            "community_id": product_data.community_id, 
+            "user_id": current_user['id'], # The one posting must be a member
+            "is_active": True
+        })
+        if not member:
+             raise HTTPException(status_code=403, detail="You must be a member of the community to list products")
+             
+        # Platform for community is usually PyHub or PyExpress depending on goods?
+        # Typically PyHub for local community exchange, but logic remains same as per role.
+        
+    # --- CASE 3: STANDARD (FARMER/BUSINESS) ---
+    # Implicitly handled if neither of above. 'seller_id' remains current_user.
+
+    # --- Platform Determination Logic (Role Based) ---
+    user_role = seller_type # Use effective seller type
+    
+    # Enforce platform restrictions based on EFFECTIVE role
+    if user_role == 'farmer':
+        product_platform = 'pyhub'
+    elif user_role == 'supplier_farm_inputs':
+        product_platform = 'pyhub'
+        farm_input_categories = ['fertilizer', 'herbicides', 'pesticides', 'seeds']
+        if product_data.category.value not in farm_input_categories:
+            raise HTTPException(status_code=400, detail="Farm input suppliers can only list farm input products")
+    elif user_role == 'supplier_food_produce':
+        product_platform = 'pyexpress'
+        food_categories = ['sea_food', 'grain', 'legumes', 'vegetables', 'spices', 'fruits', 'fish', 'meat', 'packaged_goods']
+        if product_data.category.value not in food_categories:
+            raise HTTPException(status_code=400, detail="Food produce suppliers can only list food products")
+    elif user_role == 'processor':
+        product_platform = 'pyexpress'
+    
+    # --- Product Creation ---
+    product = Product(
+        seller_id=seller_id,
+        seller_name=seller_name,
+        seller_type=seller_type,
+        seller_profile_picture=current_user.get('profile_picture'), 
+        business_name=current_user.get('business_name'),
+        platform=product_platform,
+        managed_by_agent_id=managed_by_agent_id,
+        community_id=product_data.community_id, # Link product to community
+        **{k: v for k, v in product_data.dict().items() if k != 'platform'}
+    )
+    
+    # --- Pricing & Service Charges ---
+    if user_role == 'farmer':
+        # 30% markup for farmers on PyHub
+        product.price_per_unit = product_data.price_per_unit * 1.30
+    elif user_role in ['supplier_food_produce', 'processor']:
+        # 10% service charge deduction for PyExpress suppliers
+        product.price_per_unit = product_data.price_per_unit * 0.90
+    
+    # --- Discounts ---
+    if product_data.has_discount and product_data.discount_value:
+        product.original_price = product.price_per_unit
+        
+        if product_data.discount_type == "percentage":
+            discount_amount = product.price_per_unit * (product_data.discount_value / 100)
+            product.discount_amount = round(discount_amount, 2)
+            product.price_per_unit = round(product.price_per_unit - discount_amount, 2)
+        elif product_data.discount_type == "fixed":
+            product.discount_amount = product_data.discount_value
+            product.price_per_unit = round(product.price_per_unit - product_data.discount_value, 2)
+            
+        if product.price_per_unit < 0:
+            raise HTTPException(status_code=400, detail="Discount cannot exceed product price")
+    
+    # --- Logistics ---
+    if product_data.logistics_managed_by == "seller":
+        if product_data.seller_delivery_fee is None:
+            raise HTTPException(status_code=400, detail="Delivery fee is required when seller manages logistics")
+    
+    # --- Database Insertion ---
+    product_dict = product.dict()
+    db.products.insert_one(product_dict)
+    
+    # If Community Product, Increment Count
+    if product_data.community_id:
+         communities_collection.update_one(
+             {"id": product_data.community_id},
+             {"$inc": {"product_count": 1}}
+         )
+    
+    return {"message": "Product created successfully", "product_id": product.id}
+@app.post("/api/kyc/farmer")
+async def submit_farmer_kyc(
+    kyc_data: FarmerKYCSubmission,
+    current_user: dict = Depends(get_current_user)
+):
+    """Submit KYC for farmer (Self or Agent assisted)"""
+    try:
+        user_id = current_user["id"]
+        
+        # Determine target user (if agent is submitting for farmer)
+        if kyc_data.verification_method == "agent_verified":
+            if current_user["role"] != "agent":
+                raise HTTPException(status_code=403, detail="Only agents can submit verified KYC")
+            # Logic to find farmer would go here, but for now assuming it updates current_user or specific farmer passed
+            
+        estimated_time = "24-48 hours" if kyc_data.verification_method == "self_verified" else "Instant"
+        
+        # Create KYC record
+        kyc_record = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "type": "farmer",
+            "status": "pending" if kyc_data.verification_method == "self_verified" else "verified",
+            "verification_method": kyc_data.verification_method,
+            "data": kyc_data.dict(),
+            "submitted_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        
+        db.kyc_submissions.insert_one(kyc_record)
+        
         users_collection.update_one(
             {"id": user_id},
             {
@@ -6561,10 +6824,10 @@ async def get_community_details(community_id: str):
         for member in members:
             member.pop('_id', None)
         
-        # Get recent products
-        products = list(community_products_collection.find(
-            {"community_id": community_id, "is_active": True}
-        ).limit(6))
+        # Get recent products (Top 5/6)
+        products = list(db.products.find(
+            {"community_id": community_id, "status": "active"}
+        ).sort("created_at", -1).limit(6))
         
         for product in products:
             product.pop('_id', None)
@@ -6579,6 +6842,33 @@ async def get_community_details(community_id: str):
     except Exception as e:
         print(f"Error getting community details: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get community details")
+
+@app.get("/api/communities/{community_id}/products")
+async def get_community_products(
+    community_id: str,
+    limit: int = 20,
+    skip: int = 0
+):
+    """Get all products for a specific community"""
+    try:
+        products = list(db.products.find(
+            {"community_id": community_id, "status": "active"}
+        ).sort("created_at", -1).skip(skip).limit(limit))
+        
+        count = db.products.count_documents({"community_id": community_id, "status": "active"})
+        
+        for product in products:
+            product.pop('_id', None)
+            
+        return {
+            "products": products,
+            "total": count,
+            "limit": limit,
+            "skip": skip
+        }
+    except Exception as e:
+        print(f"Error getting community products: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get community products")
 
 @app.post("/api/communities/{community_id}/join")
 async def join_community(community_id: str, current_user: dict = Depends(get_current_user)):
