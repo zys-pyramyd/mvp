@@ -2,6 +2,7 @@ import os
 import pymongo
 from pymongo import MongoClient
 import sys
+import certifi
 
 # Environment variables
 MONGO_URL = os.environ.get('MONGO_URL', os.environ.get('MONGO_URI'))
@@ -20,7 +21,8 @@ def connect_db():
              print("CRITICAL SECURITY ERROR: Missing MONGO_URL environment variable")
              return None
              
-        client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=5000)
+        # Add tlsCAFile=certifi.where() to fix SSL errors on Render/Linux
+        client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=5000, tlsCAFile=certifi.where())
         db = client['pyramyd']
         print("OK Connected to MongoDB (Module)")
         return db

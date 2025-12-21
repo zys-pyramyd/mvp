@@ -106,20 +106,7 @@ async function handleApiRequest(request) {
 
   // CRITICAL: NEVER cache non-GET requests
   if (request.method !== 'GET') {
-    try {
-      return await fetch(request);
-    } catch (error) {
-      // If offline/failed, queue specific write operations
-      if (request.method === 'POST' || request.method === 'PUT') {
-        await queueOfflineRequest(request);
-        return new Response(JSON.stringify({ queued: true, message: 'Request queued' }), {
-          status: 202, headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      return new Response(JSON.stringify({ error: 'Offline' }), {
-        status: 503, headers: { 'Content-Type': 'application/json' }
-      });
-    }
+    return fetch(request);
   }
 
   const cache = await caches.open(CACHE_NAME);
