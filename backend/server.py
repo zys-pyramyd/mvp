@@ -6565,6 +6565,15 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
          )
     
     return {"message": "Product created successfully", "product_id": product.id}
+
+class FarmerKYCSubmission(BaseModel):
+    verification_method: str = "self_verified"  # "self_verified" or "agent_verified"
+    verifying_agent_id: Optional[str] = None
+    farm_size_hectares: Optional[float] = None
+    primary_crops: Optional[List[str]] = []
+    farm_location: Optional[str] = None
+    additional_notes: Optional[str] = None
+
 @app.post("/api/kyc/farmer")
 async def submit_farmer_kyc(
     kyc_data: FarmerKYCSubmission,
