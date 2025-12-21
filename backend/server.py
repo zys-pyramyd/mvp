@@ -170,11 +170,7 @@ app.include_router(community_router)
 
 # CORS Middleware
 allowed_origins = [
-    "http://localhost:3000",
-    "http://localhost:5000",
-    "https://pyramydhyb.com",
-    "https://www.pyramydhyb.com",
-    "https://*.vercel.app",
+    "*"
 ]
 
 vercel_url = os.environ.get('VERCEL_URL')
@@ -196,14 +192,22 @@ async def root():
 @app.post("/api/upload/sign-public")
 async def sign_upload_public(request: UploadSignRequest):
     """Generate a presigned URL for public/registration uploads (Restricted folders)"""
+    print(f"DEBUG: Internal sign-public called for folder={request.folder}, filename={request.filename}")
+    
     if not s3_client:
+        print("DEBUG: S3 Client is None")
         raise HTTPException(status_code=503, detail="Storage service unavailable")
         
     # Strictly allow only registration folder for unauthenticated uploads
     if request.folder != 'user-registration':
+        print(f"DEBUG: Unauthorized folder access: {request.folder}")
         raise HTTPException(status_code=403, detail="Unauthorized folder access")
     
-    config = ALLOWED_FOLDERS[request.folder]
+    config = ALLOWED_FOLDERS.get(request.folder)
+    if not config:
+        print(f"DEBUG: Invalid folder config for {request.folder}")
+        raise HTTPException(status_code=400, detail="Invalid folder configuration")
+
     bucket = config['bucket']
     
     file_ext = request.filename.split('.')[-1] if '.' in request.filename else 'bin'
@@ -220,6 +224,7 @@ async def sign_upload_public(request: UploadSignRequest):
             },
             ExpiresIn=SIGNED_URL_EXPIRATION 
         )
+        print(f"DEBUG: Successfully generated URL for {key}")
         
         return {
             "uploadUrl": presigned_url,
@@ -229,7 +234,10 @@ async def sign_upload_public(request: UploadSignRequest):
         }
     except ClientError as e:
         print(f"R2 Signing Error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate upload URL")
+        raise HTTPException(status_code=500, detail=f"Failed to generate upload URL: {str(e)}")
+    except Exception as e:
+        print(f"Unexpected Error in sign-public: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @app.post("/api/upload/sign")
 async def sign_upload(request: UploadSignRequest, current_user: dict = Depends(get_current_user)):
@@ -6330,54 +6338,7 @@ async def submit_agent_kyc(kyc_data: AgentKYC, current_user: dict = Depends(get_
         print(f"Error submitting agent KYC: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to submit agent KYC")
 
-@app.post("/api/kyc/farmer/submit")
-async def submit_farmer_kyc(kyc_data: FarmerKYC, current_user: dict = Depends(get_current_user)):
-    """Submit KYC for farmers (self-registering or agent-verified)"""
-    try:
-        user_id = current_user["id"]
-        
-        # Ensure user is a farmer
-        if current_user.get("role") != "farmer":
-            raise HTTPException(status_code=403, detail="Only farmers can submit farmer KYC")
-        
-        # Validate identification number format
-        if kyc_data.identification_type == "NIN" and len(kyc_data.identification_number) != 11:
-            raise HTTPException(status_code=400, detail="NIN must be exactly 11 digits")
-        elif kyc_data.identification_type == "BVN" and len(kyc_data.identification_number) != 11:
-            raise HTTPException(status_code=400, detail="BVN must be exactly 11 digits")
-        
-        # If agent-verified, validate the agent
-        if kyc_data.verification_method == "agent_verified":
-            if not kyc_data.verifying_agent_id:
-                raise HTTPException(status_code=400, detail="Verifying agent ID required for agent verification")
-            
-            # Check if the agent exists and is KYC approved
-            verifying_agent = users_collection.find_one({"id": kyc_data.verifying_agent_id})
-            if not verifying_agent:
-                raise HTTPException(status_code=404, detail="Verifying agent not found")
-            
-            if verifying_agent.get("role") != "agent":
-                raise HTTPException(status_code=400, detail="Verifying user must be an agent")
-            
-            if verifying_agent.get("kyc_status") != "approved":
-                raise HTTPException(status_code=400, detail="Verifying agent must have approved KYC status")
-        
-        # Store KYC data
-        kyc_record = kyc_data.dict()
-        kyc_record["user_id"] = user_id
-        kyc_record["submission_date"] = datetime.utcnow().isoformat()
-        
-        # Set status based on verification method
-        if kyc_data.verification_method == "agent_verified":
-            kyc_record["status"] = "agent_pending"  # Faster processing for agent-verified farmers
-            estimated_time = "24-48 hours (agent-verified)"
-        else:
-            kyc_record["status"] = "pending"  # Standard processing for self-verified
-            estimated_time = "2-5 business days (self-verified)"
-        
-        kyc_record["kyc_type"] = "farmer"
-        
-        farmer_kyc_collection.insert_one(kyc_record)
+
         
 # --- AGENT FEATURES ---
 

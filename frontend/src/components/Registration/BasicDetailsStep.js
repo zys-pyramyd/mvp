@@ -11,8 +11,9 @@ const BasicDetailsStep = ({ formData, updateFormData, onNext }) => {
             setError('Passwords do not match');
             return;
         }
-        if (formData.password.length < 6) {
-            setError('Password must be at least 6 characters');
+        const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/;
+        if (!passwordRegex.test(formData.password)) {
+            setError('Password must be at least 8 characters and include a letter, a number, and a symbol (@$!%*#?&)');
             return;
         }
 

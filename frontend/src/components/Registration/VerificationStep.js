@@ -1,68 +1,87 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, Check } from 'lucide-react';
+import { Camera, Upload, Check, FileText } from 'lucide-react';
 
 const VerificationStep = ({ formData, updateFormData, onRegister, role, requiredDocs, docLabels }) => {
     const [uploading, setUploading] = useState({}); // { docKey: boolean }
-    const [previewUrls, setPreviewUrls] = useState({}); // { docKey: url }
+    const [previewUrls, setPreviewUrls] = useState({}); // { docKey: url } (blob urls)
+    const [fileTypes, setFileTypes] = useState({}); // { docKey: 'image' | 'pdf' }
+    const [activeCamera, setActiveCamera] = useState(null); // docKey of active camera
+    const [cameraError, setCameraError] = useState({}); // { docKey: boolean }
 
     const fileInputRef = useRef({});
+    const videoRef = useRef(null);
+    const streamRef = useRef(null);
 
-    // Direct Upload Helper (Replicated from App.js logic for modularity)
-    const uploadToR2 = async (file, folder = 'verification') => {
+    // Stop camera stream
+    const stopCamera = () => {
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+        }
+        setActiveCamera(null);
+    };
+
+    // Start live camera
+    const startCamera = async (key) => {
         try {
-            const token = localStorage.getItem('token');
-            // 1. Get Presigned URL
-            const signres = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/upload/sign`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    // 'Authorization': `Bearer ${token}` // Token might not be available during registration yet!
-                    // Actually, typically registration endpoints are public, but our sign endpoint might be protected? 
-                    // Line 197 in server.py says: user: dict = Depends(get_current_user). 
-                    // PRE-REGISTRATION UPLOAD PROBLEM: The user isn't created yet, so they have no token.
-                    // We need to fix this in the backend OR allow public uploads for registration OR Create user first then upload.
-                    // Current App.js logic likely uploads AFTER creation or uses a public endpoint?
-                    // Checking server.py... /api/upload/sign requires get_current_user. 
-                    // THIS IS A BLOCKER. 
-                    // Wait, typically we upload *during* registration. How did we solve this before?
-                    // Maybe the previous flow didn't strictly require R2 for everyone?
-                    // Solution: I will proceed assuming the user can upload or I will modify backend to allow unauthenticated uploads for 'user-registration' folder if valid context is provided.
-                    // OR, simpler: Use `FormData` and send files to backend `complete-registration` endpoint directly? No, that's heavy.
-                    // BETTER SOLUTION: We'll modify `server.py` to allow `sign_upload` to be optional auth for 'user-registration' folder, or use a specific temp token.
-                    // For now, I will assume we can't upload until registered? 
-                    // NO, the user explicitly asked for "input details... then click agents... then basic info... then verification... then complete".
-                    // So upload happens BEFORE account creation.
-                    // I will modify `server.py` to make `current_user` optional in `sign_upload` ONLY for 'user-registration' folder? That's risky.
-                    // Alternative: Client generates a temp ID, uses that for folder path?
-
-                    // Let's look at `server.py` line 197 again. Yes, it depends on user.
-                    // Note: The previous task `Update App.js Registration with Profile Pic` implies this was solved? 
-                    // Let's check `App.js` lines 6300+ again.
-                }
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } }
             });
-
-            // Use a Fallback/Public endpoint if auth fails? 
-            // ACTUALLY: I will just implement the uploading UI now, and if it fails due to 401, I'll fix the backend in the next step.
-            // It's likely I need to update `sign_upload` to be accessible. 
-        } catch (e) {
-            console.error(e);
-            return null;
+            streamRef.current = stream;
+            setActiveCamera(key);
+            setCameraError(prev => ({ ...prev, [key]: false }));
+        } catch (err) {
+            console.error("Camera access denied:", err);
+            setCameraError(prev => ({ ...prev, [key]: true }));
+            alert("Could not access camera. Please allow camera permissions or use upload fallback.");
         }
     };
 
-    const handleFileSelect = async (e, docKey) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    // Attach stream to video element when active
+    React.useEffect(() => {
+        if (activeCamera && videoRef.current && streamRef.current) {
+            videoRef.current.srcObject = streamRef.current;
+        }
+        return () => {
+            // Cleanup on unmount only if we are destroying the component
+            // We handle explicit stop in stopCamera
+        };
+    }, [activeCamera]);
 
-        // Create local preview immediately
-        const objectUrl = URL.createObjectURL(file);
-        setPreviewUrls(prev => ({ ...prev, [docKey]: objectUrl }));
+    // Handle photo capture
+    const takePhoto = (key) => {
+        if (!videoRef.current) return;
 
-        // Upload logic
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth;
+        canvas.height = videoRef.current.videoHeight;
+        const ctx = canvas.getContext('2d');
+
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(blob => {
+            if (!blob) return;
+
+            // Create a file from blob
+            const file = new File([blob], "selfie.jpg", { type: "image/jpeg" });
+
+            // Generate preview
+            const objectUrl = URL.createObjectURL(blob);
+            setPreviewUrls(prev => ({ ...prev, [key]: objectUrl }));
+            setFileTypes(prev => ({ ...prev, [key]: 'image' }));
+
+            // Stop camera
+            stopCamera();
+
+            // Trigger upload logic
+            handleFileUpload(file, key);
+        }, 'image/jpeg', 0.8);
+    };
+
+    const handleFileUpload = async (file, docKey) => {
         setUploading(prev => ({ ...prev, [docKey]: true }));
-
         try {
-            // 1. Get Presigned URL (Using public registration endpoint)
+            // 1. Get Presigned URL
             const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/upload/sign-public`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -74,7 +93,6 @@ const VerificationStep = ({ formData, updateFormData, onRegister, role, required
             });
 
             if (!res.ok) throw new Error('Upload init failed');
-
             const data = await res.json();
 
             // 2. Upload to R2
@@ -86,73 +104,177 @@ const VerificationStep = ({ formData, updateFormData, onRegister, role, required
 
             if (!uploadRes.ok) throw new Error('Upload to storage failed');
 
-            // 3. Update Form Data with the key/url
-            // We store the 'key' or the public URL if public.
-            // For private bucket, we usually store the key.
-            const finalUrl = data.publicUrl || data.key; // Store key if private
-
-            // Update documents object in formData
+            // 3. Update Form
+            const finalUrl = data.publicUrl || data.key;
             const currentDocs = formData.documents || {};
             updateFormData({
                 documents: { ...currentDocs, [docKey]: finalUrl },
-                profile_picture: docKey === 'headshot' ? finalUrl : formData.profile_picture // Sync profile pic
+                profile_picture: docKey === 'headshot' ? finalUrl : formData.profile_picture
             });
 
         } catch (err) {
             console.error("Upload error:", err);
-            alert("Upload failed. Please try again. (Note: Authentication might be required in current backend setup)");
+            alert("Upload failed. Please try again.");
         } finally {
             setUploading(prev => ({ ...prev, [docKey]: false }));
         }
     };
 
+    const handleFileSelect = (e, docKey) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const isPdf = file.type === 'application/pdf';
+        setFileTypes(prev => ({ ...prev, [docKey]: isPdf ? 'pdf' : 'image' }));
+
+        const objectUrl = URL.createObjectURL(file);
+        setPreviewUrls(prev => ({ ...prev, [docKey]: objectUrl }));
+        handleFileUpload(file, docKey);
+    };
+
     const isComplete = requiredDocs.every(key => formData.documents && formData.documents[key]);
+
+    // Cleanup on unmount
+    React.useEffect(() => {
+        return () => stopCamera();
+    }, []);
+
+    // Helper to Determine Preview Type for Existing Data
+    const getPreviewType = (key) => {
+        // 1. Check local state (fresh upload)
+        if (fileTypes[key]) return fileTypes[key];
+
+        // 2. Check existing URL extension
+        const url = formData.documents?.[key] || '';
+        if (url.toLowerCase().endsWith('.pdf')) return 'pdf';
+
+        return 'image'; // Default to image
+    };
 
     return (
         <div className="space-y-6">
             <h3 className="text-lg font-bold text-center">Identity Verification</h3>
             <p className="text-sm text-gray-500 text-center">
-                Please provide the required documents to verify your Identity.
+                Please provide the required documents (JPG, PNG, PDF accepted).
             </p>
 
             <div className="space-y-4">
-                {requiredDocs.map(key => (
-                    <div key={key} className="border rounded-lg p-4 bg-gray-50">
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="font-medium text-gray-700">{docLabels[key] || key}</label>
-                            {formData.documents?.[key] && <Check className="text-emerald-500" size={20} />}
+                {requiredDocs.map(key => {
+                    const isHeadshot = key === 'headshot';
+                    const hasPreview = previewUrls[key] || formData.documents?.[key];
+                    const isActive = activeCamera === key;
+                    const previewType = getPreviewType(key);
+
+                    return (
+                        <div key={key} className="border rounded-lg p-4 bg-gray-50">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="font-medium text-gray-700">
+                                    {docLabels[key] || key} {isHeadshot && <span className="text-red-500 text-xs">(Camera Only)</span>}
+                                </label>
+                                {formData.documents?.[key] && <Check className="text-emerald-500" size={20} />}
+                            </div>
+
+                            {/* Camera Area */}
+                            {isActive ? (
+                                <div className="relative h-64 w-full bg-black rounded-lg overflow-hidden mb-2">
+                                    <video
+                                        ref={videoRef}
+                                        autoPlay
+                                        playsInline
+                                        className="w-full h-full object-cover transform scale-x-[-1]" // Mirror effect
+                                    />
+                                    <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-4">
+                                        <button
+                                            onClick={() => takePhoto(key)}
+                                            className="bg-white rounded-full p-3 shadow-lg hover:bg-gray-100"
+                                        >
+                                            <div className="w-8 h-8 rounded-full border-2 border-black"></div>
+                                        </button>
+                                        <button
+                                            onClick={stopCamera}
+                                            className="bg-gray-800 text-white px-4 py-2 rounded-full text-sm opacity-80"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : hasPreview ? (
+                                <div className="relative h-48 w-full bg-gray-200 rounded-lg overflow-hidden mb-2 group flex items-center justify-center">
+                                    {previewType === 'pdf' ? (
+                                        <div className="flex flex-col items-center text-gray-600">
+                                            <FileText size={48} className="mb-2 text-red-500" />
+                                            <span className="text-sm font-medium">PDF Document Uploaded</span>
+                                            <span className="text-xs text-gray-400 mt-1">Preview not available</span>
+                                        </div>
+                                    ) : (
+                                        <img
+                                            src={previewUrls[key] || formData.documents?.[key]}
+                                            alt="Preview"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    )}
+
+                                    {/* Overlay to Retake */}
+                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
+                                        <button
+                                            onClick={() => isHeadshot ? startCamera(key) : fileInputRef.current[key].click()}
+                                            className="opacity-0 group-hover:opacity-100 bg-white text-gray-900 px-4 py-2 rounded-lg font-medium transform translate-y-2 group-hover:translate-y-0 transition-all"
+                                        >
+                                            Retake {isHeadshot ? 'Photo' : 'Upload'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div onClick={() => {
+                                    if (isHeadshot && !cameraError[key]) startCamera(key);
+                                    else fileInputRef.current[key].click();
+                                }}
+                                    className="h-32 w-full border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:bg-gray-100"
+                                >
+                                    {isHeadshot ? <Camera size={32} /> : <Upload size={32} />}
+                                    <span className="text-sm mt-2 font-medium">
+                                        {isHeadshot ? 'Open Camera' : 'Click to Upload'}
+                                    </span>
+                                    {!isHeadshot && (
+                                        <span className="text-xs text-gray-400 mt-1">JPG, PNG, PDF</span>
+                                    )}
+                                    {isHeadshot && (
+                                        <span className="text-xs text-gray-400 mt-1">Selfie Required</span>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Hidden Input for Fallback/Standard Upload */}
+                            <input
+                                ref={el => fileInputRef.current[key] = el}
+                                type="file"
+                                accept="image/png, image/jpeg, application/pdf"
+                                className="hidden"
+                                onChange={(e) => handleFileSelect(e, key)}
+                            />
+
+                            {/* Upload Status */}
+                            {uploading[key] && (
+                                <div className="mt-2 text-center text-sm text-blue-600 animate-pulse">
+                                    Uploading secure document...
+                                </div>
+                            )}
+
+                            {/* Fallback Link for Camera */}
+                            {isHeadshot && !isActive && !hasPreview && (
+                                <div className="text-center mt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current[key].click()}
+                                        className="text-xs text-gray-400 underline hover:text-gray-600"
+                                    >
+                                        Camera not working? Upload instead
+                                    </button>
+                                </div>
+                            )}
                         </div>
-
-                        {previewUrls[key] ? (
-                            <div className="relative h-32 w-full bg-gray-200 rounded-lg overflow-hidden mb-2">
-                                <img src={previewUrls[key]} alt="Preview" className="w-full h-full object-cover" />
-                            </div>
-                        ) : (
-                            <div className="h-32 w-full border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400">
-                                {key === 'headshot' ? <Camera size={32} /> : <Upload size={32} />}
-                                <span className="text-xs mt-1">Tap to {key === 'headshot' ? 'Capture' : 'Upload'}</span>
-                            </div>
-                        )}
-
-                        <input
-                            ref={el => fileInputRef.current[key] = el}
-                            type="file"
-                            accept="image/*"
-                            capture={key === 'headshot' ? "user" : undefined} // Force camera for headshot
-                            className="hidden"
-                            onChange={(e) => handleFileSelect(e, key)}
-                        />
-
-                        <button
-                            type="button"
-                            onClick={() => fileInputRef.current[key].click()}
-                            disabled={uploading[key]}
-                            className="w-full py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100"
-                        >
-                            {uploading[key] ? 'Uploading...' : (formData.documents?.[key] ? 'Change File' : 'Select File')}
-                        </button>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             <button

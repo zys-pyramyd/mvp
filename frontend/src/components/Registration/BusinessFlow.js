@@ -148,12 +148,13 @@ const BusinessFlow = ({ step, formData, updateFormData, setStep, onRegister }) =
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date Established</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date Operation Started *</label>
                 <input
                     type="date"
                     value={formData.business_info?.date_established || ''}
                     onChange={(e) => updateFormData({ business_info: { ...formData.business_info, date_established: e.target.value } })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    required
                 />
             </div>
 
