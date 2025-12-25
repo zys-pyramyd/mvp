@@ -2,23 +2,18 @@ import React, { useState } from 'react';
 import VerificationStep from './VerificationStep';
 
 const BuyerFlow = ({ step, formData, updateFormData, setStep, onRegister }) => {
-    // 1: Personal Details, 2: Profile Picture (Verification)
-    const [localStep, setLocalStep] = useState(step === 'verification' ? 2 : 1);
-
     const handleDetailsSubmit = (e) => {
         e.preventDefault();
-        // Move to verification step
         setStep('verification');
-        setLocalStep(2);
     };
 
-    // Step 2: Verification (Profile Picture Only)
-    if (step === 'verification' || localStep === 2) {
+    // Step 2: Verification
+    if (step === 'verification') {
         return (
             <VerificationStep
-                formData={formData}
                 updateFormData={updateFormData}
                 onRegister={onRegister}
+                onBack={() => setStep('details')}
                 role="buyer"
                 requiredDocs={['headshot']} // Only require headshot for buyers
                 docLabels={{

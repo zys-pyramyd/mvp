@@ -2,21 +2,27 @@ import React, { useState } from 'react';
 import VerificationStep from './VerificationStep';
 
 const BusinessFlow = ({ step, formData, updateFormData, setStep, onRegister }) => {
-    const [localStep, setLocalStep] = useState(step === 'verification' ? 3 : 1); // 1: Info, 2: Status/Docs Info, 3: Verification Upgrade
+    // 1: Info, 2: Status/Docs Info, 3: Verification Upgrade
+    // Parent step 'verification' maps to 3. 'details' maps to 1 or 2.
+    const [internalStep, setInternalStep] = useState(step === 'verification' ? 3 : 1);
+
+    React.useEffect(() => {
+        if (step === 'verification') setInternalStep(3);
+        else if (step === 'details' && internalStep === 3) setInternalStep(2);
+        else if (step === 'details' && internalStep === 1) setInternalStep(1);
+    }, [step]);
 
     const handleInfoSubmit = (e) => {
         e.preventDefault();
-        setLocalStep(2);
+        setInternalStep(2);
     };
 
     const handleStatusSubmit = (e) => {
         e.preventDefault();
         setStep('verification');
-        setLocalStep(3);
     };
 
-    // Verification Step Logic
-    if (step === 'verification' || localStep === 3) {
+    if (step === 'verification') {
         const isRegistered = formData.registration_status === 'registered';
 
         const requiredDocs = isRegistered
@@ -39,6 +45,7 @@ const BusinessFlow = ({ step, formData, updateFormData, setStep, onRegister }) =
                 formData={formData}
                 updateFormData={updateFormData}
                 onRegister={onRegister}
+                onBack={() => setInternalStep(2)}
                 role="business"
                 requiredDocs={requiredDocs}
                 docLabels={docLabels}
@@ -47,7 +54,7 @@ const BusinessFlow = ({ step, formData, updateFormData, setStep, onRegister }) =
     }
 
     // Step 2: Registration Status
-    if (localStep === 2) {
+    if (internalStep === 2 && step !== 'verification') {
         return (
             <form onSubmit={handleStatusSubmit} className="space-y-6">
                 <h3 className="text-lg font-bold">Registration Status</h3>
@@ -100,7 +107,7 @@ const BusinessFlow = ({ step, formData, updateFormData, setStep, onRegister }) =
                 )}
 
                 <div className="flex justify-between pt-4">
-                    <button type="button" onClick={() => setLocalStep(1)} className="text-gray-500 hover:text-gray-700">Back</button>
+                    <button type="button" onClick={() => setInternalStep(1)} className="text-gray-500 hover:text-gray-700">Back</button>
                     <button
                         type="submit"
                         disabled={!formData.registration_status}

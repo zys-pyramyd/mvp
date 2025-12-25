@@ -91,6 +91,71 @@ const BasicDetailsStep = ({ formData, updateFormData, onNext, onCancel }) => {
                 </div>
             </div>
 
+            <div className="pt-4 border-t border-gray-200">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Address Details</h4>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Address Number & Street Name</label>
+                        <input
+                            type="text"
+                            value={formData.address_street || ''}
+                            onChange={(e) => updateFormData({ address_street: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            placeholder="e.g. 12, Awolowo Way"
+                            required
+                        />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">City / Town</label>
+                            <input
+                                type="text"
+                                value={formData.city || ''}
+                                onChange={(e) => updateFormData({ city: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                placeholder="e.g. Ikeja"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                            <select
+                                value={formData.state || ''}
+                                onChange={(e) => updateFormData({ state: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                required
+                            >
+                                <option value="">Select State</option>
+                                {["Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"].map(state => (
+                                    <option key={state} value={state}>{state}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Nearest Landmark (Optional)</label>
+                            <input
+                                type="text"
+                                value={formData.landmark || ''}
+                                onChange={(e) => updateFormData({ landmark: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                placeholder="e.g. Opposite Shoprite"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                            <input
+                                type="text"
+                                value="Nigeria"
+                                disabled
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {error && <p className="text-red-500 text-sm">{error}</p>}
 
             <div className="flex space-x-3 mt-6">

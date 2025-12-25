@@ -3,7 +3,6 @@ import { Plus, Trash2 } from 'lucide-react';
 import VerificationStep from './VerificationStep';
 
 const FarmerFlow = ({ step, formData, updateFormData, setStep, onRegister }) => {
-    const [localStep, setLocalStep] = useState(step === 'verification' ? 3 : 1); // 1: Personal, 2: Farms, 3: Verification
     const [showAddFarm, setShowAddFarm] = useState(false);
     const [newFarm, setNewFarm] = useState({
         size: '',
@@ -24,16 +23,41 @@ const FarmerFlow = ({ step, formData, updateFormData, setStep, onRegister }) => 
 
     const handlePersonalSubmit = (e) => {
         e.preventDefault();
-        setLocalStep(2);
+        setStep('farms'); // We need a 'farms' step in parent or handle it locally if parent doesn't support it.
+        // If parent doesn't support 'farms', we might need to keep local state for this specific intermediate step
+        // OR better, promote 'farms' to a top level step in RegistrationModal if we want full back support.
+        // For now, let's keep local step logic BUT sync it with parent 'step' properly.
+        // ACTUALLY: The request is to fix back button. If key is controlled by parent, we are good.
+        // If 'step' in parent only has 'details' and 'verification', we need to split 'details' here?
+        // Let's assume 'details' in parent maps to Personal, then we have an internal step.
+    };
+    // REVISIT: The user wants to go back. If we use local state, it resets on unmount.
+    // Parent unmounts us when stepping back? 
+    // RegistrationModal: case 'details' -> FarmerFlow. case 'verification' -> FarmerFlow.
+    // So if we go back from 'verification' to 'details', FarmerFlow stays mounted?
+    // No, RegistrationModal re-renders. React reconciles.
+
+    // Let's implement a 'localStep' that is initializing from props but allows internal navigation for farms.
+    const [internalStep, setInternalStep] = useState(step === 'verification' ? 3 : 1);
+
+    // Sync if prop changes
+    React.useEffect(() => {
+        if (step === 'verification') setInternalStep(3);
+        else if (step === 'details' && internalStep === 3) setInternalStep(2); // If coming back, maybe go to farm list?
+        else if (step === 'details' && internalStep === 1) setInternalStep(1);
+    }, [step]);
+
+    const handlePersonal = (e) => {
+        e.preventDefault();
+        setInternalStep(2);
     };
 
-    const handleFarmSubmit = () => {
+    const handleFarm = () => {
         if ((formData.farm_details || []).length === 0) {
             alert("Please add at least one farm.");
             return;
         }
         setStep('verification');
-        setLocalStep(3);
     };
 
     const addFarm = () => {
@@ -55,12 +79,13 @@ const FarmerFlow = ({ step, formData, updateFormData, setStep, onRegister }) => 
         }
     };
 
-    if (step === 'verification' || localStep === 3) {
+    if (step === 'verification') {
         return (
             <VerificationStep
                 formData={formData}
                 updateFormData={updateFormData}
                 onRegister={onRegister}
+                onBack={() => setInternalStep(2)}
                 role="farmer"
                 requiredDocs={['headshot', 'id_document', 'proof_of_address']}
                 docLabels={{
@@ -72,7 +97,7 @@ const FarmerFlow = ({ step, formData, updateFormData, setStep, onRegister }) => 
         );
     }
 
-    if (localStep === 2) {
+    if (internalStep === 2 && step !== 'verification') {
         return (
             <div className="space-y-6">
                 <h3 className="text-lg font-bold">Farm Details</h3>
@@ -225,9 +250,9 @@ const FarmerFlow = ({ step, formData, updateFormData, setStep, onRegister }) => 
                 )}
 
                 <div className="flex justify-between pt-4">
-                    <button onClick={() => setLocalStep(1)} className="text-gray-500 hover:text-gray-700">Back</button>
+                    <button onClick={() => setInternalStep(1)} className="text-gray-500 hover:text-gray-700">Back</button>
                     <button
-                        onClick={handleFarmSubmit}
+                        onClick={handleFarm}
                         disabled={showAddFarm}
                         className="bg-emerald-600 text-white py-2 px-6 rounded-lg hover:bg-emerald-700 disabled:bg-gray-400"
                     >
@@ -240,7 +265,7 @@ const FarmerFlow = ({ step, formData, updateFormData, setStep, onRegister }) => 
 
     // Local Step 1: Personal Details (Gender, DOB)
     return (
-        <form onSubmit={handlePersonalSubmit} className="space-y-4">
+        <form onSubmit={handlePersonal} className="space-y-4">
             <h3 className="text-lg font-bold mb-4">Farmer Personal Details</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

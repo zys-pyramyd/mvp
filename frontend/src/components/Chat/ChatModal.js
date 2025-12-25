@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const ChatModal = ({ isOpen, onClose, user, API_BASE_URL }) => {
+const ChatModal = ({ isOpen, onClose, user, API_BASE_URL, initialContext }) => {
     // --- Messaging System Logic ---
     const [conversations, setConversations] = useState([]);
     const [activeConversation, setActiveConversation] = useState(null); // { user: {...}, ... }
@@ -18,6 +18,42 @@ const ChatModal = ({ isOpen, onClose, user, API_BASE_URL }) => {
             return () => clearInterval(interval);
         }
     }, [user, isOpen]);
+
+    // Handle Initial Context (Deep Linking)
+    useEffect(() => {
+        if (isOpen && initialContext) {
+            const { recipient, message } = initialContext;
+
+            if (message) setMessageInput(message);
+
+            if (recipient) {
+                // 1. Check if conversation already exists
+                const existing = conversations.find(c => c.user.username === recipient);
+                if (existing) {
+                    setActiveConversation(existing);
+                } else {
+                    // 2. If not, we need to fetch the user profile to start a new one
+                    // We'll use the search endpoint for now as it's available
+                    const findUser = async () => {
+                        try {
+                            const token = localStorage.getItem('token');
+                            const res = await fetch(`${API_BASE_URL}/api/users/search?q=${recipient}`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            if (res.ok) {
+                                const data = await res.json();
+                                const targetUser = data.users.find(u => u.username === recipient);
+                                if (targetUser) {
+                                    startConversation(targetUser);
+                                }
+                            }
+                        } catch (err) { console.error("Error finding user for context", err); }
+                    };
+                    findUser();
+                }
+            }
+        }
+    }, [isOpen, initialContext, conversations.length]); // Depend on conversations.length to retry if they load later
 
     // Poll for messages when chat is open
     useEffect(() => {

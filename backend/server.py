@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator, EmailStr
-from database import db, client, get_collection
+from database import db, client, get_db, get_collection
 from auth import get_current_user, create_access_token, get_password_hash, verify_password, JWT_SECRET, ALGORITHM
 from messaging.routes import router as messaging_router
 
@@ -155,12 +155,53 @@ if db is not None:
 else:
     print("Warning: Database not initialized")
 
+from database import db, client, get_db, get_collection
+from auth import get_current_user, create_access_token, get_password_hash, verify_password, JWT_SECRET, ALGORITHM
+from messaging.routes import router as messaging_router
+
+# ... (Previous imports remain same)
+
 # Initialize FastAPI
 app = FastAPI(
     title="Pyramyd API",
     description="Backend for Pyramyd Market",
     version="1.0.0"
 )
+
+import threading
+import time
+
+# Startup check that does NOT crash the app
+@app.on_event("startup")
+def startup():
+    def warm_db():
+        print("Starting background DB warmup...")
+        for i in range(5):
+            try:
+                # Use get_db() to access the lazy client
+                db_instance = get_db()
+                # Run a cheap command
+                db_instance.command("ping")
+                print("MongoDB warmed and connected")
+                break
+            except Exception as e:
+                print(f"MongoDB warming attempt {i+1} failed: {e}")
+                time.sleep(5)
+    
+    # Start warmup in background thread
+    threading.Thread(target=warm_db, daemon=True).start()
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint to wake up server"""
+    try:
+         # Optional: Check DB status here too, or just return online
+         get_db().command("ping")
+         db_status = "connected"
+    except Exception:
+         db_status = "disconnected"
+         
+    return {"status": "online", "db_status": db_status}
 
 # Include Routers
 app.include_router(messaging_router)
@@ -301,6 +342,13 @@ class CompleteRegistration(BaseModel):
     password: str
     phone: str
     user_path: str
+    # Address Fields
+    address_street: Optional[str] = None # Number and Street Name
+    city: Optional[str] = None # Town/City
+    landmark: Optional[str] = None # Nearest Landmark (Optional)
+    state: Optional[str] = None # State (Dropdown)
+    country: str = "Nigeria" # Default Nigeria
+    
     buyer_type: Optional[str] = None
     partner_type: Optional[str] = None
     business_category: Optional[str] = None
@@ -328,7 +376,11 @@ class User(BaseModel):
     phone: str
     role: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
-
+    # Address
+    address_street: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
 
 
 @app.post("/api/auth/complete-registration")
@@ -423,7 +475,12 @@ async def complete_registration(registration_data: CompleteRegistration):
         phone=registration_data.phone,
         role=user_role,
         profile_picture=registration_data.profile_picture,
-        verification_documents=registration_data.verification_documents
+        verification_documents=registration_data.verification_documents,
+        # Address Mapping
+        address_street=registration_data.address_street,
+        city=registration_data.city,
+        state=registration_data.state,
+        country=registration_data.country
     )
     
     # Create user document with additional fields
@@ -439,6 +496,7 @@ async def complete_registration(registration_data: CompleteRegistration):
     user_dict['id_type'] = registration_data.id_type
     user_dict['id_number'] = registration_data.id_number
     user_dict['documents'] = registration_data.documents or {}
+    user_dict['landmark'] = registration_data.landmark
     user_dict['directors'] = registration_data.directors or []
     user_dict['farm_details'] = registration_data.farm_details or []
     user_dict['registration_status'] = registration_data.registration_status
@@ -4972,6 +5030,23 @@ async def update_delivery_status(
             "delivery_status": status_data.get("status"),
             "updated_at": datetime.utcnow()
         }
+        
+        # Secure Delivery Logic
+        response_data = {"message": "Delivery status updated", "status": status_data.get("status")}
+        
+        if status_data.get("status") == "delivered":
+            # Instead of marking as delivered immediately, mark as verification_pending
+            # Generate 6-digit OTP
+            import random
+            otp = str(random.randint(100000, 999999))
+            
+            update_fields["delivery_status"] = "verification_pending"
+            update_fields["delivery_code"] = otp
+            
+            response_data["status"] = "verification_pending"
+            response_data["delivery_code"] = otp
+            response_data["message"] = "Delivery requires buyer confirmation"
+
         if status_data.get("notes"):
             update_fields["delivery_notes"] = status_data.get("notes")
 
@@ -4980,12 +5055,63 @@ async def update_delivery_status(
             {"$set": update_fields}
         )
         
-        return {"message": "Delivery status updated", "status": status_data.get("status")}
+        return response_data
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error updating delivery status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/delivery/confirm")
+async def confirm_delivery(
+    confirmation_data: dict, # {order_id: str, code: str}
+    current_user: dict = Depends(get_current_user)
+):
+    """Confirm delivery with OTP (Buyer only)"""
+    try:
+        order_id = confirmation_data.get("order_id")
+        code = confirmation_data.get("code")
+        
+        if not order_id or not code:
+            raise HTTPException(status_code=400, detail="Order ID and Code are required")
+            
+        order = db.orders.find_one({"order_id": order_id})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+            
+        # Verify user is the buyer
+        if order.get("buyer_username") != current_user["username"]:
+             raise HTTPException(status_code=403, detail="Only the buyer can confirm delivery")
+             
+        # Verify Status
+        if order.get("delivery_status") != "verification_pending":
+             raise HTTPException(status_code=400, detail="Order is not pending verification")
+             
+        # Verify Code
+        if order.get("delivery_code") != code:
+             raise HTTPException(status_code=400, detail="Invalid delivery code")
+             
+        # Complete Delivery
+        db.orders.update_one(
+            {"order_id": order_id},
+            {
+                "$set": {
+                    "delivery_status": "delivered",
+                    "delivered_at": datetime.now(),
+                    "updated_at": datetime.utcnow(),
+                    "status": "completed" # Also update main order status
+                },
+                "$unset": {"delivery_code": ""} # Remove code after use
+            }
+        )
+        
+        return {"message": "Delivery confirmed successfully", "status": "delivered"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error confirming delivery: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to confirm delivery")
 
 @app.get("/api/agent/deliveries")
 async def get_agent_deliveries(current_user: dict = Depends(get_current_user)):

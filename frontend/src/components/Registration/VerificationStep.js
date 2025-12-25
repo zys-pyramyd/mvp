@@ -1,12 +1,16 @@
 import React, { useState, useRef } from 'react';
 import { Camera, Upload, Check, FileText } from 'lucide-react';
+import TermsOfUseModal from '../Legal/TermsOfUseModal';
+import PrivacyPolicyModal from '../Legal/PrivacyPolicyModal';
 
-const VerificationStep = ({ formData, updateFormData, onRegister, role, requiredDocs, docLabels }) => {
+const VerificationStep = ({ formData, updateFormData, onRegister, onBack, role, requiredDocs, docLabels }) => {
     const [uploading, setUploading] = useState({}); // { docKey: boolean }
     const [previewUrls, setPreviewUrls] = useState({}); // { docKey: url } (blob urls)
     const [fileTypes, setFileTypes] = useState({}); // { docKey: 'image' | 'pdf' }
     const [activeCamera, setActiveCamera] = useState(null); // docKey of active camera
     const [cameraError, setCameraError] = useState({}); // { docKey: boolean }
+    const [showTerms, setShowTerms] = useState(false);
+    const [showPrivacy, setShowPrivacy] = useState(false);
 
     const fileInputRef = useRef({});
     const videoRef = useRef(null);
@@ -277,15 +281,40 @@ const VerificationStep = ({ formData, updateFormData, onRegister, role, required
                 })}
             </div>
 
-            <button
-                onClick={() => onRegister(formData)}
-                disabled={!isComplete}
-                className="w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium mt-6 disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-                Complete Registration
-            </button>
-        </div>
-    );
+            {/* Terms and Conditions Checkbox */}
+            <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <label className="flex items-start space-x-3 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={formData.agreedToTerms || false}
+                        onChange={(e) => updateFormData({ agreedToTerms: e.target.checked })}
+                        className="mt-1 h-4 w-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                    />
+                    <div className="text-xs text-gray-600 leading-relaxed">
+                        <span className="font-medium text-gray-800">
+                            I have read and agree to the <button type="button" onClick={() => setShowTerms(true)} className="text-emerald-600 hover:text-emerald-700 underline">Pyramyd Terms of Use</button> and <button type="button" onClick={() => setShowPrivacy(true)} className="text-emerald-600 hover:text-emerald-700 underline">Privacy Policy</button>. By clicking submit, I authorize the verification of my identity and agree to the <button type="button" onClick={() => setShowTerms(true)} className="text-emerald-600 hover:text-emerald-700 underline">delivery validation guidelines</button>.
+                        </span>
+                    </div>
+                </label>
+            </div>
+
+            <div className="flex justify-between mt-6">
+                {onBack && (
+                    <button onClick={onBack} className="text-gray-500 hover:text-gray-700 px-4 py-3">
+                        Back
+                    </button>
+                )}
+                <button
+                    onClick={() => onRegister(formData)}
+                    disabled={!isComplete || !formData.agreedToTerms}
+                    className={`bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium flex-1 ml-4 disabled:bg-gray-300 disabled:cursor-not-allowed ${!onBack ? 'w-full' : ''}`}
+                >
+                    Complete Registration
+                </button>
+                {showTerms && <TermsOfUseModal onClose={() => setShowTerms(false)} zIndex={60} />}
+                {showPrivacy && <PrivacyPolicyModal onClose={() => setShowPrivacy(false)} zIndex={60} />}
+            </div>
+            );
 };
 
-export default VerificationStep;
+            export default VerificationStep;

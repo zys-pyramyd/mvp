@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { NIGERIAN_STATES } from './nigerianStates';
 
-const SellerDashboard = ({ user, token }) => {
+const SellerDashboard = ({ user, token, onOpenChat }) => {
     const [activeTab, setActiveTab] = useState('overview'); // overview, farmers, deliveries, inventory
     const [stats, setStats] = useState(null);
     const [farmers, setFarmers] = useState([]);
     const [deliveries, setDeliveries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAddProduct, setShowAddProduct] = useState(false);
+    const [deliveryCode, setDeliveryCode] = useState(null);
+    const [deliveryBuyer, setDeliveryBuyer] = useState(null);
+    const [showDeliveryCodeModal, setShowDeliveryCodeModal] = useState(false);
 
     useEffect(() => {
         fetchInitialData();
@@ -53,7 +56,7 @@ const SellerDashboard = ({ user, token }) => {
         }
     };
 
-    const updateDeliveryStatus = async (orderId, newStatus, notes) => {
+    const updateDeliveryStatus = async (orderId, newStatus, notes, buyerUsername) => {
         try {
             const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/delivery/status`, {
                 method: 'POST',
@@ -69,11 +72,21 @@ const SellerDashboard = ({ user, token }) => {
             });
 
             if (response.ok) {
-                alert('Status updated!');
+                const data = await response.json();
+
+                if (data.status === 'verification_pending') {
+                    setDeliveryCode(data.delivery_code);
+                    setDeliveryBuyer(buyerUsername);
+                    setShowDeliveryCodeModal(true);
+                    // Standard alert logic moved to after modal close or separate notice
+                } else {
+                    alert('Status updated!');
+                }
+
                 // Refresh deliveries
                 const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/agent/deliveries`, { headers: { 'Authorization': `Bearer ${token}` } });
-                const data = await res.json();
-                setDeliveries(data.orders || []);
+                const updatedData = await res.json();
+                setDeliveries(updatedData.orders || []);
             } else {
                 alert('Failed to update status');
             }
@@ -217,8 +230,41 @@ const SellerDashboard = ({ user, token }) => {
                 {showAddFarmer && (
                     <AddFarmerModal onClose={() => setShowAddFarmer(false)} onSuccess={() => { setShowAddFarmer(false); fetchInitialData(); }} token={token} />
                 )}
+                {showDeliveryCodeModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-60">
+                        <div className="bg-white rounded-xl max-w-sm w-full p-6 text-center">
+                            <h3 className="text-xl font-bold mb-2">Secure Delivery Code</h3>
+                            <p className="text-gray-600 mb-4">Share this code with the buyer to confirm delivery.</p>
+                            <div className="text-4xl font-mono font-bold text-emerald-600 tracking-wider mb-6 bg-emerald-50 py-4 rounded-lg border border-emerald-100">
+                                {deliveryCode}
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => {
+                                        // Copy to clipboard logic if needed
+                                        setShowDeliveryCodeModal(false);
+                                    }}
+                                    className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200"
+                                >
+                                    Close
+                                </button>
+                                {onOpenChat && (
+                                    <button
+                                        onClick={() => {
+                                            onOpenChat(deliveryBuyer, `Hello, I have delivered your order. Please confirm receipt using this code: ${deliveryCode}`);
+                                            setShowDeliveryCodeModal(false);
+                                        }}
+                                        className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 font-bold flex items-center justify-center gap-2"
+                                    >
+                                        <span>💬 Share Code</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
-        </div>
+        </div >
     );
 };
 
@@ -277,7 +323,50 @@ const AddFarmerModal = ({ onClose, onSuccess, token }) => {
                         </select>
                     </div>
                     <input type="date" className="border p-2 rounded w-full" required value={formData.date_of_birth} onChange={e => setFormData({ ...formData, date_of_birth: e.target.value })} />
-                    <textarea className="border p-2 rounded w-full" placeholder="Home Address" required value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} rows="2"></textarea>
+
+                    <div className="space-y-3 pt-2">
+                        <h4 className="text-sm font-semibold text-gray-700">Address Details</h4>
+                        <input
+                            className="border p-2 rounded w-full"
+                            placeholder="Address Number & Street Name"
+                            required
+                            value={formData.address_street || ''}
+                            onChange={e => setFormData({ ...formData, address_street: e.target.value })}
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                            <input
+                                className="border p-2 rounded"
+                                placeholder="City / Town"
+                                required
+                                value={formData.city || ''}
+                                onChange={e => setFormData({ ...formData, city: e.target.value })}
+                            />
+                            <select
+                                value={formData.state || ''}
+                                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                                className="border p-2 rounded"
+                                required
+                            >
+                                <option value="">Select State</option>
+                                {["Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"].map(state => (
+                                    <option key={state} value={state}>{state}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <input
+                                className="border p-2 rounded"
+                                placeholder="Landmark (Optional)"
+                                value={formData.landmark || ''}
+                                onChange={e => setFormData({ ...formData, landmark: e.target.value })}
+                            />
+                            <input
+                                className="border p-2 rounded bg-gray-100 text-gray-500"
+                                value="Nigeria"
+                                disabled
+                            />
+                        </div>
+                    </div>
 
                     <h3 className="font-bold text-gray-700 pt-2">Farm Details</h3>
                     <input className="border p-2 rounded w-full" placeholder="Farm Location (City/State)" required value={formData.farm_location} onChange={e => setFormData({ ...formData, farm_location: e.target.value })} />
@@ -679,7 +768,7 @@ const DeliveryCard = ({ order, onUpdate }) => {
                     value={status}
                     onChange={(e) => {
                         setStatus(e.target.value);
-                        onUpdate(order.order_id, e.target.value, order.delivery_notes);
+                        onUpdate(order.order_id, e.target.value, order.delivery_notes, order.buyer_username);
                     }}
                     className="border rounded p-2 text-sm bg-gray-50"
                 >
@@ -689,7 +778,7 @@ const DeliveryCard = ({ order, onUpdate }) => {
                     <option value="delivered">✅ Delivered</option>
                 </select>
             </div>
-        </div>
+        </div >
     )
 }
 

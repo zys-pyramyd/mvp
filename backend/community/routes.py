@@ -49,7 +49,7 @@ def join_community(id: str, current_user: dict = Depends(get_current_user)):
 # --- Posts & Marketplace ---
 
 @router.get("/{id}/posts", response_model=List[Post])
-def get_community_posts(id: str, type: Optional[str] = None):
+def get_community_posts(id: str, type: Optional[str] = None, skip: int = 0, limit: int = 20):
     """
     Get posts for a community. 
     Optional 'type' query param to filter for 'product' (Marketplace) or 'regular' (Feed).
@@ -64,7 +64,7 @@ def get_community_posts(id: str, type: Optional[str] = None):
     if type == 'product':
         query["is_available"] = True
         
-    posts = list(db.community_posts.find(query).sort("created_at", -1))
+    posts = list(db.community_posts.find(query).sort("created_at", -1).skip(skip).limit(limit))
     return posts
 
 @router.post("/{id}/posts", response_model=Post)

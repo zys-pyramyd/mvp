@@ -15,6 +15,10 @@ import ProfilePictureUploadModal from './components/ProfilePictureUploadModal';
 import SellerDetailsModal from './components/SellerDetailsModal';
 // ChatModal is already imported at line 1
 import RegistrationModal from './components/Registration/RegistrationModal';
+import TermsOfUseModal from './components/Legal/TermsOfUseModal';
+import PrivacyPolicyModal from './components/Legal/PrivacyPolicyModal';
+import AboutUsModal from './components/Legal/AboutUsModal';
+import Footer from './components/Layout/Footer';
 
 // Custom Icons as SVG components using provided designs
 const AddToCartIcon = () => (
@@ -103,12 +107,16 @@ function App() {
 
   const [usernameSearch, setUsernameSearch] = useState('');
   const [isChatOpen, setIsChatOpen] = useState(false); // Controls Modal
+  const [chatConfig, setChatConfig] = useState(null); // { recipient: 'username', message: '...' }
 
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [showOrderTracking, setShowOrderTracking] = useState(false);
   const [orders, setOrders] = useState([]);
+  const [confirmOrderId, setConfirmOrderId] = useState(null);
+  const [deliveryCodeInput, setDeliveryCodeInput] = useState('');
+  const [confirmingDelivery, setConfirmingDelivery] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   // Drop-off locations state
@@ -220,6 +228,11 @@ function App() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Terms of Use State
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
+
   const fetchNotifications = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -233,6 +246,11 @@ function App() {
         setUnreadCount(data.filter(n => !n.is_read).length);
       }
     } catch (e) { console.error(e); }
+  };
+
+  const openChat = (recipient, message) => {
+    setChatConfig({ recipient, message });
+    setIsChatOpen(true);
   };
 
   useEffect(() => {
@@ -478,6 +496,9 @@ function App() {
   ];
 
   useEffect(() => {
+    // Warmup backend
+    fetch("/api/health").catch(() => { });
+
     // Check for saved token
     const token = localStorage.getItem('token');
     if (token) {
@@ -2805,6 +2826,42 @@ function App() {
   };
 
   // Pre-order Functions (replacing Group Buying Functions)
+  const handleConfirmDelivery = async () => {
+    if (!deliveryCodeInput) return alert("Please enter the delivery code");
+
+    setConfirmingDelivery(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/delivery/confirm`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          order_id: confirmOrderId,
+          code: deliveryCodeInput
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert("Delivery confirmed successfully!");
+        setConfirmOrderId(null);
+        setDeliveryCodeInput('');
+        fetchOrders(); // Refresh status
+      } else {
+        alert(data.detail || "Failed to confirm delivery");
+      }
+    } catch (error) {
+      console.error("Confirmation error:", error);
+      alert("An error occurred during confirmation");
+    } finally {
+      setConfirmingDelivery(false);
+    }
+  };
+
+  // TODO: Implement pre-order functionality
   // TODO: Implement pre-order functionality
   /*
   const searchBuyers = async (username) => {
@@ -4246,6 +4303,26 @@ function App() {
                         Report an Issue
                       </button>
 
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          setShowTermsModal(true);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        📜 Terms of Use
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          setShowPrivacyModal(true);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        🛡️ Privacy Policy
+                      </button>
+
                       <div className="border-t border-gray-100">
                         <button
                           onClick={logout}
@@ -4795,7 +4872,7 @@ function App() {
             {/* Pre-Order Sales Section - Only show on Home page */}
             {/* Seller/Agent Dashboard (Replaces Agent Delivery Dashboard) */}
             {currentPlatform === 'agent_deliveries' && (
-              <SellerDashboard user={user} token={localStorage.getItem('token')} />
+              <SellerDashboard user={user} token={localStorage.getItem('token')} onOpenChat={openChat} />
             )}
 
             {/* Admin Dashboard */}
@@ -7035,6 +7112,18 @@ function App() {
                             }`}>
                             {order.status.replace('_', ' ').toUpperCase()}
                           </span>
+                          {/* Secure Delivery Confirmation Button */}
+                          {order.delivery_status === 'verification_pending' && (
+                            <button
+                              onClick={() => {
+                                setConfirmOrderId(order.order_id);
+                                setDeliveryCodeInput('');
+                              }}
+                              className="ml-2 px-3 py-1 bg-emerald-600 text-white text-xs rounded-full hover:bg-emerald-700 animate-pulse"
+                            >
+                              Confirm Receipt
+                            </button>
+                          )}
                         </div>
 
                         <div className="text-sm text-gray-600 mb-2">
@@ -7060,6 +7149,41 @@ function App() {
           </div>
         )
       }
+
+      {/* Delivery Confirmation Modal */}
+      {confirmOrderId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6">
+            <h3 className="text-xl font-bold mb-4">Confirm Delivery</h3>
+            <p className="text-gray-600 text-sm mb-4">
+              The seller has delivered your order. Please enter the 6-digit code provided by the seller to release payment.
+            </p>
+            <input
+              type="text"
+              placeholder="Enter 6-digit Code"
+              value={deliveryCodeInput}
+              onChange={(e) => setDeliveryCodeInput(e.target.value)}
+              className="w-full border p-3 rounded-lg text-center text-lg tracking-widest mb-4 font-mono"
+              maxLength={6}
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmOrderId(null)}
+                className="flex-1 py-2 border rounded-lg hover:bg-gray-50 text-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelivery}
+                disabled={confirmingDelivery || deliveryCodeInput.length < 6}
+                className="flex-1 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-bold"
+              >
+                {confirmingDelivery ? 'Verifying...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Drop-off Location Modal */}
       {
@@ -9095,14 +9219,35 @@ function App() {
         />
       )} */}
 
+      {/* Footer */}
+      {(currentPlatform === 'home' || currentPlatform === 'buy_from_farm') && (
+        <Footer
+          onOpenTerms={() => setShowTermsModal(true)}
+          onOpenPrivacy={() => setShowPrivacyModal(true)}
+          onOpenAbout={() => setShowAboutModal(true)}
+        />
+      )}
+
       {/* --- CHAT MODAL --- */}
       {/* --- CHAT MODAL --- */}
       <ChatModal
         isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
+        onClose={() => { setIsChatOpen(false); setChatConfig(null); }}
         user={user}
         API_BASE_URL={API_BASE_URL}
+        initialContext={chatConfig}
       />
+
+      {/* --- TERMS OF USE MODAL --- */}
+      {showTermsModal && (
+        <TermsOfUseModal onClose={() => setShowTermsModal(false)} />
+      )}
+      {showPrivacyModal && (
+        <PrivacyPolicyModal onClose={() => setShowPrivacyModal(false)} />
+      )}
+      {showAboutModal && (
+        <AboutUsModal onClose={() => setShowAboutModal(false)} />
+      )}
 
     </div >
   );

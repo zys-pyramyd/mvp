@@ -2,20 +2,19 @@ import React, { useState } from 'react';
 import VerificationStep from './VerificationStep'; // We will create this reusable component next
 
 const AgentFlow = ({ step, formData, updateFormData, setStep, onRegister }) => {
-    const [localStep, setLocalStep] = useState(step === 'verification' ? 2 : 1); // 1: Details, 2: Verification
 
     const handleDetailsSubmit = (e) => {
         e.preventDefault();
         setStep('verification'); // Update main stepper
-        setLocalStep(2);
     };
 
-    if (step === 'verification' || localStep === 2) {
+    if (step === 'verification') {
         return (
             <VerificationStep
                 formData={formData}
                 updateFormData={updateFormData}
                 onRegister={onRegister}
+                onBack={() => setStep('details')}
                 role="agent"
                 requiredDocs={['headshot', 'id_document', 'proof_of_address']}
                 docLabels={{

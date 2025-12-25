@@ -28,20 +28,78 @@ const CommunityDetailsModal = ({ community, onClose, user, token, API_BASE_URL, 
     const [editingCommentId, setEditingCommentId] = useState(null);
     const [editCommentContent, setEditCommentContent] = useState('');
 
+    // Pagination State
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [isFetchingMore, setIsFetchingMore] = useState(false);
+    const observerTarget = useRef(null);
+
     useEffect(() => {
-        fetchPosts();
+        // Reset posts when community or tab changes
+        setPosts([]);
+        setPage(0);
+        setHasMore(true);
+        fetchPosts(0, true);
     }, [community, activeTab]);
 
-    const fetchPosts = async () => {
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            entries => {
+                if (entries[0].isIntersecting && hasMore && !loading && !isFetchingMore) {
+                    fetchPosts(page + 1);
+                }
+            },
+            { threshold: 1.0 }
+        );
+
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current);
+        }
+
+        return () => {
+            if (observerTarget.current) {
+                observer.unobserve(observerTarget.current);
+            }
+        };
+    }, [hasMore, loading, isFetchingMore, page]);
+
+    const fetchPosts = async (pageNum = 0, isReset = false) => {
         if (!community?.id) return;
+        if (pageNum > 0) setIsFetchingMore(true);
+        else setLoading(true);
+
         try {
-            const typeParam = activeTab === 'marketplace' ? '?type=product' : '';
-            const response = await fetch(`${API_BASE_URL}/api/communities/${community.id}/posts${typeParam}`);
+            const limit = 10;
+            const skip = pageNum * limit;
+            const typeParam = activeTab === 'marketplace' ? '&type=product' : '';
+            const response = await fetch(`${API_BASE_URL}/api/communities/${community.id}/posts?skip=${skip}&limit=${limit}${typeParam}`);
+
             if (response.ok) {
-                setPosts(await response.json());
+                const newPosts = await response.json();
+
+                if (newPosts.length < limit) {
+                    setHasMore(false);
+                } else {
+                    setHasMore(true); // Ensure hasMore is true if full page returned
+                }
+
+                if (isReset || pageNum === 0) {
+                    setPosts(newPosts);
+                } else {
+                    // Filter duplicates just in case
+                    setPosts(prev => {
+                        const existingIds = new Set(prev.map(p => p.id));
+                        const uniqueNew = newPosts.filter(p => !existingIds.has(p.id));
+                        return [...prev, ...uniqueNew];
+                    });
+                }
+                setPage(pageNum);
             }
         } catch (error) {
             console.error("Failed to fetch posts", error);
+        } finally {
+            setLoading(false);
+            setIsFetchingMore(false);
         }
     };
 
@@ -84,7 +142,11 @@ const CommunityDetailsModal = ({ community, onClose, user, token, API_BASE_URL, 
                 setIsProductPost(false);
                 setProductName('');
                 setProductPrice('');
-                fetchPosts();
+                setIsProductPost(false);
+                setProductName('');
+                setProductPrice('');
+                // Refresh feed
+                fetchPosts(0, true);
             }
         } catch (error) {
             console.error("Error creating post", error);
@@ -113,7 +175,7 @@ const CommunityDetailsModal = ({ community, onClose, user, token, API_BASE_URL, 
 
             if (response.ok) {
                 setEditingPost(null);
-                fetchPosts();
+                fetchPosts(0, true);
             }
         } catch (error) {
             console.error("Update failed", error);
@@ -127,7 +189,7 @@ const CommunityDetailsModal = ({ community, onClose, user, token, API_BASE_URL, 
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            fetchPosts();
+            fetchPosts(0, true); // Refresh
         } catch (error) {
             console.error("Delete failed", error);
         }
@@ -143,7 +205,10 @@ const CommunityDetailsModal = ({ community, onClose, user, token, API_BASE_URL, 
             });
             if (response.ok) {
                 setNewComment('');
-                fetchPosts(); // Refresh to show new comment
+                setNewComment('');
+                // Refresh just the affected post? Ideally yes, but current architecture refreshes all.
+                // Keeping simple for MVP
+                fetchPosts(0, true);
             }
         } catch (error) {
             console.error("Comment failed", error);
@@ -159,7 +224,7 @@ const CommunityDetailsModal = ({ community, onClose, user, token, API_BASE_URL, 
             });
             if (response.ok) {
                 setEditingCommentId(null);
-                fetchPosts();
+                fetchPosts(0, true);
             }
         } catch (error) {
             console.error("Edit comment failed", error);
@@ -435,7 +500,17 @@ const CommunityDetailsModal = ({ community, onClose, user, token, API_BASE_URL, 
                             </div>
                         ))}
 
-                        {posts.length === 0 && <div className="text-center py-10 text-gray-500">No posts yet.</div>}
+                        {posts.length === 0 && !loading && <div className="text-center py-10 text-gray-500">No posts yet.</div>}
+
+                        {/* Loading Indicator for Infinite Scroll */}
+                        {(loading || isFetchingMore) && (
+                            <div className="flex justify-center p-4">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                            </div>
+                        )}
+
+                        {/* Invisible Target for Observer */}
+                        <div ref={observerTarget} className="h-4"></div>
                     </div>
                 </div>
             </div>
