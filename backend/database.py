@@ -53,8 +53,12 @@ try:
 except Exception:
     db = None
 
-def get_collection(name):
-    database = get_db()
     if database is not None:
         return database[name]
     return None
+
+def get_client():
+    global _client
+    if _client is None:
+        get_db() # This initializes _client
+    return _client

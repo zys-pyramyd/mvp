@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator, EmailStr
-from database import db, client, get_db, get_collection
+from database import db, get_client, get_db, get_collection
 from auth import get_current_user, create_access_token, get_password_hash, verify_password, JWT_SECRET, ALGORITHM
 from messaging.routes import router as messaging_router
 
