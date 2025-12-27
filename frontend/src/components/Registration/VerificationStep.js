@@ -314,7 +314,8 @@ const VerificationStep = ({ formData, updateFormData, onRegister, onBack, role, 
                 {showTerms && <TermsOfUseModal onClose={() => setShowTerms(false)} zIndex={60} />}
                 {showPrivacy && <PrivacyPolicyModal onClose={() => setShowPrivacy(false)} zIndex={60} />}
             </div>
-            );
+        </div>
+    );
 };
 
-            export default VerificationStep;
+export default VerificationStep;

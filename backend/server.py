@@ -700,6 +700,74 @@ async def login(login_data: LoginRequest):
         }
     }
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    otp: str
+    new_password: str
+
+@app.post("/api/auth/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    user = users_collection.find_one({"email": request.email})
+    if not user:
+        # Don't reveal user existence
+        return {"message": "If this email is registered, you will receive a password reset code."}
+    
+    # Generate simple 6-digit OTP
+    otp = str(uuid.uuid4().int)[:6]
+    
+    # Store OTP with expiration (15 mins)
+    users_collection.update_one(
+        {"email": request.email},
+        {"$set": {
+            "reset_otp": otp, 
+            "reset_otp_expires": datetime.utcnow() + timedelta(minutes=15)
+        }}
+    )
+    
+    # Send Email (Mocking for now if SMTP not full configured, but logic is here)
+    try:
+        # In a real scenario, use SMTP/SendGrid to send 'otp' to 'request.email'
+        print(f" [MOCK EMAIL SERVICE] Password Reset OTP for {request.email}: {otp}")
+        # If email service is configured, uncomment:
+        # send_email(to_email=request.email, subject="Password Reset", body=f"Your code is {otp}")
+        pass
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+    
+    return {"message": "If this email is registered, you will receive a password reset code."}
+
+@app.post("/api/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    user = users_collection.find_one({"email": request.email})
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid request")
+        
+    # Verify OTP
+    stored_otp = user.get("reset_otp")
+    otp_expires = user.get("reset_otp_expires")
+    
+    if not stored_otp or stored_otp != request.otp:
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+        
+    if not otp_expires or datetime.utcnow() > otp_expires:
+        raise HTTPException(status_code=400, detail="Code expired")
+        
+    # Reset Password
+    new_hashed = hash_password(request.new_password)
+    users_collection.update_one(
+        {"email": request.email},
+        {"$set": {
+            "password": new_hashed,
+            "reset_otp": None,
+            "reset_otp_expires": None
+        }}
+    )
+    
+    return {"message": "Password reset successfully. You can now login."}
+
 ADMIN_EMAILS = ["abdulazeezshakrullah@gmail.com", "abdulazeezshakrullah@pyramydhub.com"]
 
 @app.on_event("startup")
@@ -6388,6 +6456,198 @@ async def submit_unregistered_entity_kyc(
         print(f"Error submitting unregistered entity KYC: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to submit KYC")
 
+# ==================== ADMIN ENDPOINTS ====================
+
+@app.get("/api/admin/stats")
+async def get_admin_stats(current_user: dict = Depends(get_current_user)):
+    """Get admin dashboard stats"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    try:
+        # Mock Logic for stats - replace with real DB counts
+        total_transactions = db.orders.count_documents({})
+        total_revenue = 0 # Calculate from orders if needed
+        active_users = users_collection.count_documents({"is_active": True})
+        pending_orders = db.orders.count_documents({"status": "pending"})
+        # Count all pending verifications (KYC or delivery)
+        pending_kyc = users_collection.count_documents({"verification_status": "pending"})
+        
+        return {
+            "totalTransactions": total_transactions,
+            "totalRevenue": 5000000, # Mock revenue
+            "activeUsers": active_users,
+            "pendingOrders": pending_orders,
+            "pendingKYC": pending_kyc
+        }
+    except Exception as e:
+        print(f"Error getting admin stats: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get stats")
+
+@app.get("/api/admin/kyc/pending")
+async def get_pending_kyc(current_user: dict = Depends(get_current_user)):
+    """Get list of users pending verification"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    try:
+        users = list(users_collection.find(
+            {"verification_status": "pending"},
+            {"password": 0, "wallet_balance": 0} # Exclude sensitive fields
+        ))
+        
+        # Clean up id and resolve documents
+        for user in users:
+            user["id"] = user.get("id")
+            if "_id" in user:
+                del user["_id"]
+                
+            # Document Resolution
+            documents = {}
+            kyc_data = None
+            
+            if user.get("registered_business_kyc"):
+                kyc_data = user["registered_business_kyc"]
+            elif user.get("unregistered_entity_kyc"):
+                kyc_data = user["unregistered_entity_kyc"]
+            
+            if kyc_data:
+                for key, val in kyc_data.items():
+                    if key.endswith("_id") and val and isinstance(val, str):
+                        doc_name = key.replace("_id", "")
+                        # Construct URL that frontend can use (will append token tokens)
+                        documents[doc_name] = f"/api/admin/documents/{val}"
+            
+            # Inject documents into kyc sub-objects so frontend can find them easily
+            if user.get("registered_business_kyc"):
+                user["registered_business_kyc"]["documents"] = documents
+            if user.get("unregistered_entity_kyc"):
+                user["unregistered_entity_kyc"]["documents"] = documents
+                
+        return users
+    except Exception as e:
+        print(f"Error getting pending KYC: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get pending applications")
+
+class KYCReviewAction(BaseModel):
+    user_id: str
+    action: str # approve, reject
+    reason: Optional[str] = None
+
+@app.post("/api/admin/kyc/review")
+async def review_kyc(
+    action: KYCReviewAction,
+    current_user: dict = Depends(get_current_user)
+):
+    """Approve or Reject KYC application"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    try:
+        new_status = "verified" if action.action == "approve" else "rejected"
+        update_data = {
+            "verification_status": new_status,
+            "verification_updated_at": datetime.utcnow()
+        }
+        
+        if action.reason:
+            update_data["verification_note"] = action.reason
+            
+        result = users_collection.update_one(
+            {"id": action.user_id},
+            {"$set": update_data}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        return {"message": f"User KYC {new_status}"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error reviewing KYC: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to review application")
+
+@app.get("/api/admin/users/search")
+async def search_users(
+    query: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Search users by name or username for admin chat"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    try:
+        users = list(users_collection.find(
+            {
+                "$or": [
+                    {"username": {"$regex": query, "$options": "i"}},
+                    {"first_name": {"$regex": query, "$options": "i"}},
+                    {"last_name": {"$regex": query, "$options": "i"}}
+                ]
+            },
+            {"id": 1, "username": 1, "first_name": 1, "last_name": 1, "role": 1, "profile_picture": 1}
+        ).limit(20))
+        
+        for user in users:
+            user.pop('_id', None)
+            
+        return {"users": users}
+    except Exception as e:
+        print(f"Error searching users: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to search users")
+
+class CreateAdminRequest(BaseModel):
+    email: EmailStr
+    username: str
+    password: str
+    first_name: str
+    last_name: str
+    role: str = "admin" # Default to admin, but could be agents etc.
+
+@app.post("/api/admin/create-user")
+async def create_user_admin(
+    user_data: CreateAdminRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Admin endpoint to manually create new users (admins, agents, etc.)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    # Check if user exists
+    if users_collection.find_one({"$or": [{"email": user_data.email}, {"username": user_data.username}]}):
+        raise HTTPException(status_code=400, detail="User with this email or username already exists")
+        
+    try:
+        hashed_password = hash_password(user_data.password)
+        
+        new_user = {
+            "id": str(uuid.uuid4()),
+            "first_name": user_data.first_name,
+            "last_name": user_data.last_name,
+            "username": user_data.username,
+            "email": user_data.email,
+            "password": hashed_password,
+            "role": user_data.role,
+            "is_verified": True, # Admin created users are verified by default
+            "verification_status": "verified",
+            "created_at": datetime.utcnow(),
+            "created_by": current_user["id"]
+        }
+        
+        users_collection.insert_one(new_user)
+        
+        # Don't return sensitive info
+        new_user.pop("password")
+        new_user.pop("_id")
+        
+        return {"message": f"User {user_data.username} created successfully", "user": new_user}
+        
+    except Exception as e:
+        print(f"Error creating user: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create user")
+
 @app.post("/api/kyc/agent/submit")
 async def submit_agent_kyc(kyc_data: AgentKYC, current_user: dict = Depends(get_current_user)):
     """Submit KYC for agents with specialized requirements"""
@@ -7455,6 +7715,197 @@ async def paystack_webhook(request: Request):
     return {"status": "success"}
 
 
+# ==================== PAYSTACK SUBACCOUNT MANAGEMENT ====================
+
+class SubaccountCreate(BaseModel):
+    business_name: str
+    bank_code: str
+    account_number: str
+    percentage_charge: float = 0.0
+
+@app.post("/api/payment/subaccount")
+async def create_paystack_subaccount(
+    data: SubaccountCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a Paystack subaccount for the user (Seller/Farmer/Agent)"""
+    try:
+        user_id = current_user["id"]
+        
+        # 1. Create Subaccount on Paystack
+        payload = {
+            "business_name": data.business_name,
+            "settlement_bank": data.bank_code,
+            "account_number": data.account_number,
+            "percentage_charge": data.percentage_charge,
+            "description": f"Subaccount for {current_user['username']}"
+        }
+        
+        # Ensure we don't recreate if already exists? Paystack allows multiple, but we want one per user effectively.
+        # Actually Paystack checks account number.
+        
+        response = paystack_request("POST", "/subaccount", payload)
+        paystack_data = response["data"]
+        
+        subaccount_code = paystack_data["subaccount_code"]
+        
+        # 2. Store safely in database
+        # We store the subaccount_code and masked bank details
+        
+        db.users.update_one(
+            {"id": user_id},
+            {"$set": {
+                "paystack_subaccount_code": subaccount_code,
+                "bank_details": {
+                    "bank_code": data.bank_code,
+                    "account_number": data.account_number[-4:], # Store only last 4 digits
+                    "business_name": data.business_name,
+                    "is_verified": True # Assuming Paystack verification during creation
+                }
+            }}
+        )
+        
+        return {
+            "message": "Subaccount created successfully",
+            "subaccount_code": subaccount_code
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error creating subaccount: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create subaccount: {str(e)}")
+
+@app.get("/api/payment/subaccount/{user_id}")
+async def get_details_subaccount(user_id: str):
+    """Get subaccount code for a user (Public/Protected)"""
+    # This is called by App.js to split payments
+    try:
+        user = db.users.find_one({"id": user_id})
+        if not user or "paystack_subaccount_code" not in user:
+            # Fallback or 404
+            # return {"subaccount_code": None}
+            raise HTTPException(status_code=404, detail="Subaccount not found")
+            
+        return {
+            "subaccount_code": user["paystack_subaccount_code"],
+            "bank_details": user.get("bank_details")
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting subaccount: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get subaccount")
+
+
+@app.get("/api/admin/documents/{doc_id}")
+async def get_admin_document(
+    doc_id: str,
+    token: str
+):
+    """View KYC document (Admin Only)"""
+    try:
+        # Manually verify token since it's a query param for direct link access
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+             raise HTTPException(status_code=401, detail="Invalid token")
+             
+        user = db.users.find_one({"username": username})
+        if not user or user["role"] != "admin":
+             raise HTTPException(status_code=403, detail="Admin access required")
+             
+        doc = kyc_documents_collection.find_one({"id": doc_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+            
+        # Return file content
+        # Assuming file_data is stored as Base64 string in Mongo (from upload logic)
+        import base64
+        from fastapi.responses import Response
+        
+        # If it's already bytes, fine. If string, decode.
+        file_content = doc["file_data"]
+        if isinstance(file_content, str):
+            try:
+                # Handle possible dataURI prefix
+                if "base64," in file_content:
+                    file_content = file_content.split("base64,")[1]
+                file_content = base64.b64decode(file_content)
+            except:
+                pass # Return as is if fail?
+                
+        return Response(content=file_content, media_type=doc["mime_type"])
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception as e:
+        print(f"Error serving document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to serve document")
+
+@app.post("/api/paystack/webhook")
+async def paystack_webhook(request: Request):
+    """
+    Handle Paystack Webhooks for payment confirmation.
+    """
+    try:
+        # Verify Signature
+        payload = await request.body()
+        signature = request.headers.get("x-paystack-signature")
+        
+        if not signature or not verify_paystack_signature(payload, signature):
+            raise HTTPException(status_code=400, detail="Invalid signature")
+            
+        event_data = await request.json()
+        event = event_data.get("event")
+        data = event_data.get("data", {})
+        
+        if event == "charge.success":
+            reference = data.get("reference")
+            
+            # Find all orders with this reference
+            result = db.orders.update_many(
+                {"payment_reference": reference},
+                {"$set": {
+                    "status": "confirmed",  
+                    "payment_status": "paid",
+                    "paid_at": datetime.utcnow()
+                }}
+            )
+            print(f"Webhook: Updated {result.modified_count} orders for ref {reference}")
+            
+        elif event == "transfer.success":
+             # Handle payout success
+             transfer_code = data.get("transfer_code")
+             
+             # Find commission payout
+             payout = db.commission_payouts.find_one({"transfer_code": transfer_code})
+             if payout:
+                 db.commission_payouts.update_one(
+                     {"_id": payout["_id"]},
+                     {"$set": {"status": "success", "paid_at": datetime.utcnow()}}
+                 )
+                 print(f"Webhook: Payout success for {transfer_code}")
+
+        elif event == "transfer.failed":
+             transfer_code = data.get("transfer_code")
+             db.commission_payouts.update_one(
+                 {"transfer_code": transfer_code},
+                 {"$set": {"status": "failed", "reason": data.get("reason", "Unknown")}}
+             )
+             print(f"Webhook: Payout failed for {transfer_code}")
+             
+    except Exception as e:
+        print(f"Webhook Error: {str(e)}")
+        # Don't fail the webhook response to Paystack
+        return {"status": "error", "message": str(e)}
+        
+    return {"status": "success"}
+
+
 if __name__ == "__main__":
     # Start Server
     import uvicorn
@@ -7463,3 +7914,4 @@ if __name__ == "__main__":
     print(f"Starting server on port {port}...")
     # Using string import allows reloading
     uvicorn.run("server:app", host="0.0.0.0", port=port, reload=True)
+

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
 
-const Footer = ({ onOpenTerms, onOpenPrivacy, onOpenAbout }) => {
+const Footer = ({ onOpenTerms, onOpenPrivacy, onOpenAbout, onNavigate }) => {
     return (
         <footer className="bg-emerald-900 text-white pt-12 pb-6">
             <div className="container mx-auto px-4">
@@ -39,7 +39,7 @@ const Footer = ({ onOpenTerms, onOpenPrivacy, onOpenAbout }) => {
                             <li><button onClick={onOpenAbout} className="hover:text-white hover:underline text-left">About Us</button></li>
                             <li><button onClick={onOpenTerms} className="hover:text-white hover:underline text-left">Terms of Use</button></li>
                             <li><button onClick={onOpenPrivacy} className="hover:text-white hover:underline text-left">Privacy Policy</button></li>
-                            <li><a href="#" className="hover:text-white hover:underline">Help Center</a></li>
+                            <li><a href="mailto:support@pyramydhub.com" className="hover:text-white hover:underline">Help Center</a></li>
                         </ul>
                     </div>
 
@@ -47,11 +47,16 @@ const Footer = ({ onOpenTerms, onOpenPrivacy, onOpenAbout }) => {
                     <div>
                         <h3 className="text-lg font-bold mb-4">Services</h3>
                         <ul className="space-y-2 text-emerald-100 text-sm">
-                            <li>PyExpress Delivery</li>
-                            <li>Farm Deals</li>
-                            <li>Agent Network</li>
-                            <li>Logistics Partners</li>
-                            <li>Community Marketplace</li>
+                            <li>
+                                <button onClick={() => onNavigate && onNavigate('home')} className="hover:text-white hover:underline text-left">
+                                    PyExpress Delivery
+                                </button>
+                            </li>
+                            <li>
+                                <button onClick={() => onNavigate && onNavigate('buy_from_farm')} className="hover:text-white hover:underline text-left">
+                                    Farm Deals
+                                </button>
+                            </li>
                         </ul>
                     </div>
 
@@ -69,7 +74,7 @@ const Footer = ({ onOpenTerms, onOpenPrivacy, onOpenAbout }) => {
                             </li>
                             <li className="flex items-center gap-3">
                                 <Mail size={18} className="shrink-0" />
-                                <span>support@pyramyd.com</span>
+                                <span>support@pyramydhub.com</span>
                             </li>
                         </ul>
                     </div>

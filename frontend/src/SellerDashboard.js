@@ -137,6 +137,7 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
                     <TabButton active={activeTab === 'deliveries'} onClick={() => setActiveTab('deliveries')} label="📦 Deliveries" />
                     <TabButton active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} label="📋 Inventory" />
                     <TabButton active={activeTab === 'wallet'} onClick={() => setActiveTab('wallet')} label="💰 My Earnings" />
+                    <TabButton active={activeTab === 'account'} onClick={() => setActiveTab('account')} label="🏦 Account Settings" />
                 </div>
 
                 {/* Content Area */}
@@ -145,6 +146,48 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
 
                     {!loading && activeTab === 'overview' && stats && (
                         <div className="space-y-8">
+                            {/* Verification Status Badge */}
+                            <div className={`p-4 rounded-lg flex justify-between items-center ${user.verification_status === 'verified' ? 'bg-emerald-50 border border-emerald-200' :
+                                    user.verification_status === 'pending' ? 'bg-yellow-50 border border-yellow-200' :
+                                        user.verification_status === 'rejected' ? 'bg-red-50 border border-red-200' :
+                                            'bg-gray-50 border border-gray-200'
+                                }`}>
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${user.verification_status === 'verified' ? 'bg-emerald-100 text-emerald-600' :
+                                            user.verification_status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
+                                                user.verification_status === 'rejected' ? 'bg-red-100 text-red-600' :
+                                                    'bg-gray-200 text-gray-500'
+                                        }`}>
+                                        {user.verification_status === 'verified' ? '✓' :
+                                            user.verification_status === 'pending' ? '⏳' :
+                                                user.verification_status === 'rejected' ? '✕' : '?'}
+                                    </div>
+                                    <div>
+                                        <h3 className={`font-bold ${user.verification_status === 'verified' ? 'text-emerald-900' :
+                                                user.verification_status === 'pending' ? 'text-yellow-900' :
+                                                    user.verification_status === 'rejected' ? 'text-red-900' :
+                                                        'text-gray-900'
+                                            }`}>
+                                            Account Status: {user.verification_status ? user.verification_status.charAt(0).toUpperCase() + user.verification_status.slice(1) : 'Unverified'}
+                                        </h3>
+                                        {user.verification_status === 'rejected' && user.verification_note && (
+                                            <p className="text-sm text-red-700 mt-1">Reason: {user.verification_note}</p>
+                                        )}
+                                        {user.verification_status === 'pending' && (
+                                            <p className="text-sm text-yellow-700">Your documents are currently under review. This usually takes 24-48 hours.</p>
+                                        )}
+                                    </div>
+                                </div>
+                                {user.verification_status === 'rejected' && (
+                                    <button
+                                        onClick={() => window.location.href = '/register?mode=resubmit'} // Simple redirect to registration for re-submission
+                                        className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-700"
+                                    >
+                                        Resubmit KYC
+                                    </button>
+                                )}
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <StatCard title="Total Revenue" value={`₦${stats.revenue?.total_revenue?.toLocaleString() || 0}`} subtitle="Lifetime Earnings" icon="💰" color="bg-emerald-100 text-emerald-800" />
                                 <StatCard title="Total Orders" value={stats.orders?.total_orders || 0} subtitle={`${stats.orders?.completed_orders || 0} completed`} icon="🛍️" color="bg-blue-100 text-blue-800" />
@@ -220,6 +263,10 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
                             {/* List products, including those managed for farmers */}
                             <p>Manage your inventory and products here.</p>
                         </div>
+                    )}
+
+                    {!loading && activeTab === 'account' && (
+                        <AccountSettings user={user} token={token} />
                     )}
                 </div>
 
@@ -397,8 +444,13 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
         pickup_address: '',
         country: 'Nigeria',
         seller_delivery_fee: 0,
+        seller_delivery_fee: 0,
         images: [],
-        farmer_id: '' // For agents
+        farmer_id: '', // For agents
+        min_order_quantity: 1,
+        is_preorder: false,
+        preorder_deadline: '',
+        target_quantity: ''
     });
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -501,13 +553,18 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
         setLoading(true);
 
         try {
+            const payload = {
+                ...formData,
+                type: formData.is_preorder ? 'preorder' : 'standard'
+            };
+
             const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/products`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
 
             if (response.ok) {
@@ -614,6 +671,55 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
                                 <option value="crate">crate</option>
                             </select>
                         </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Min. Order Qty</label>
+                            <input
+                                type="number"
+                                min="1"
+                                className="w-full border rounded p-2"
+                                value={formData.min_order_quantity}
+                                onChange={e => setFormData({ ...formData, min_order_quantity: e.target.value })}
+                                placeholder="Default: 1"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Pre-order Section */}
+                    <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                        <div className="flex items-center gap-2 mb-3">
+                            <input
+                                type="checkbox"
+                                id="is_preorder"
+                                checked={formData.is_preorder}
+                                onChange={e => setFormData({ ...formData, is_preorder: e.target.checked })}
+                                className="w-4 h-4 text-orange-600 rounded"
+                            />
+                            <label htmlFor="is_preorder" className="font-bold text-orange-800">Enable Pre-order / Group Buy</label>
+                        </div>
+
+                        {formData.is_preorder && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Target Quantity</label>
+                                    <input
+                                        type="number"
+                                        className="w-full border rounded p-2"
+                                        value={formData.target_quantity}
+                                        onChange={e => setFormData({ ...formData, target_quantity: e.target.value })}
+                                        placeholder="Goal to reach"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Deadline</label>
+                                    <input
+                                        type="date"
+                                        className="w-full border rounded p-2"
+                                        value={formData.preorder_deadline}
+                                        onChange={e => setFormData({ ...formData, preorder_deadline: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div>
@@ -735,6 +841,172 @@ const TabButton = ({ active, onClick, label }) => (
         {label}
     </button>
 );
+
+const NIGERIAN_BANKS = [
+    { code: "044", name: "Access Bank" },
+    { code: "023", name: "Citibank" },
+    { code: "050", name: "Ecobank Nigeria" },
+    { code: "070", name: "Fidelity Bank" },
+    { code: "011", name: "First Bank of Nigeria" },
+    { code: "214", name: "First City Monument Bank" },
+    { code: "058", name: "Guaranty Trust Bank" },
+    { code: "030", name: "Heritage Bank" },
+    { code: "301", name: "Jaiz Bank" },
+    { code: "082", name: "Keystone Bank" },
+    { code: "014", name: "Mainstreet Bank" },
+    { code: "076", name: "Skye Bank" },
+    { code: "221", name: "Stanbic IBTC Bank" },
+    { code: "068", name: "Standard Chartered Bank" },
+    { code: "232", name: "Sterling Bank" },
+    { code: "032", name: "Union Bank of Nigeria" },
+    { code: "033", name: "United Bank for Africa" },
+    { code: "215", name: "Unity Bank" },
+    { code: "035", name: "Wema Bank" },
+    { code: "057", name: "Zenith Bank" }
+];
+
+const AccountSettings = ({ user, token }) => {
+    const [formData, setFormData] = useState({
+        business_name: user?.business_name || '',
+        bank_code: '',
+        account_number: ''
+    });
+    const [loading, setLoading] = useState(false);
+    const [currentAccount, setCurrentAccount] = useState(null);
+
+    useEffect(() => {
+        fetchAccountDetails();
+    }, []);
+
+    const fetchAccountDetails = async () => {
+        try {
+            const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/payment/subaccount/${user.id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setCurrentAccount(data);
+                if (data.bank_details) {
+                    setFormData(prev => ({
+                        ...prev,
+                        business_name: data.bank_details.business_name || prev.business_name,
+                        bank_code: data.bank_details.bank_code || '',
+                        // Don't auto-fill full account number for security, user must re-enter to change
+                    }));
+                }
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/payment/subaccount`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(formData)
+            });
+
+            if (res.ok) {
+                alert('Account details updated successfully!');
+                fetchAccountDetails();
+            } else {
+                const err = await res.json();
+                alert(err.detail || 'Failed to update account');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error updating account');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="max-w-2xl mx-auto">
+            <div className="bg-white rounded-xl border p-6 mb-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Payout Account Settings</h2>
+                <p className="text-gray-500 mb-6 font-medium">
+                    Please provide your bank details to receive payments.
+                    <span className="block text-xs mt-1 text-emerald-600">
+                        🔒 Your details are sent securely to our payment partner (Paystack) and are not stored in plain text.
+                    </span>
+                </p>
+
+                {currentAccount && currentAccount.bank_details && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+                        <div className="text-2xl">✅</div>
+                        <div>
+                            <h3 className="font-bold text-emerald-900">Active Payout Account</h3>
+                            <p className="text-emerald-800 text-sm">
+                                {currentAccount.bank_details.business_name}<br />
+                                {NIGERIAN_BANKS.find(b => b.code === currentAccount.bank_details.bank_code)?.name || currentAccount.bank_details.bank_code} • {currentAccount.bank_details.account_number}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Business / Account Name</label>
+                        <input
+                            type="text"
+                            required
+                            className="w-full border rounded-lg p-3"
+                            value={formData.business_name}
+                            onChange={e => setFormData({ ...formData, business_name: e.target.value })}
+                            placeholder="e.g. My Farm Ventures"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Bank Name</label>
+                            <select
+                                required
+                                className="w-full border rounded-lg p-3"
+                                value={formData.bank_code}
+                                onChange={e => setFormData({ ...formData, bank_code: e.target.value })}
+                            >
+                                <option value="">Select Bank</option>
+                                {NIGERIAN_BANKS.map(bank => (
+                                    <option key={bank.code} value={bank.code}>{bank.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Account Number</label>
+                            <input
+                                type="text"
+                                required
+                                maxLength="10"
+                                pattern="\d{10}"
+                                className="w-full border rounded-lg p-3"
+                                value={formData.account_number}
+                                onChange={e => setFormData({ ...formData, account_number: e.target.value.replace(/\D/g, '') })}
+                                placeholder="10-digit Account Number"
+                            />
+                        </div>
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-emerald-600 text-white font-bold py-3 rounded-lg hover:bg-emerald-700 transition disabled:opacity-50"
+                    >
+                        {loading ? 'Verifying & Saving...' : 'Save Bank Details'}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+};
 
 const StatCard = ({ title, value, subtitle, icon, color }) => (
     <div className="bg-white border rounded-xl p-5 shadow-sm flex items-center gap-4">

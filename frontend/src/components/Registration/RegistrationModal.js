@@ -147,7 +147,7 @@ const RegistrationModal = ({ onClose, onLogin, onRegister }) => {
                 <div className="p-6">
                     <div className="flex justify-between items-center mb-6">
                         <div className="flex items-center">
-                            {authMode === 'register' && step !== 'basic' && (
+                            {authMode === 'register' && (
                                 <button onClick={handleBack} className="mr-3 text-gray-500 hover:text-gray-700">
                                     <ArrowLeft size={24} />
                                 </button>

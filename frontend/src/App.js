@@ -13,6 +13,8 @@ import CommunityBrowser from './components/Community/CommunityBrowser';
 import CommunityDetailsModal from './components/Community/CommunityDetailsModal';
 import ProfilePictureUploadModal from './components/ProfilePictureUploadModal';
 import SellerDetailsModal from './components/SellerDetailsModal';
+import PersonalDashboard from './components/Dashboard/PersonalDashboard'; // Imported PersonalDashboard
+import RatingModal from './components/Reviews/RatingModal'; // Imported RatingModal
 // ChatModal is already imported at line 1
 import RegistrationModal from './components/Registration/RegistrationModal';
 import TermsOfUseModal from './components/Legal/TermsOfUseModal';
@@ -97,6 +99,9 @@ function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('login');
   const [showRoleSelection, setShowRoleSelection] = useState(false);
+  const [showPersonalDashboard, setShowPersonalDashboard] = useState(false); // Added Personal Dashboard State
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedOrderForRating, setSelectedOrderForRating] = useState(null);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [cart, setCart] = useState([]);
@@ -132,7 +137,7 @@ function App() {
   const [selectedDeliveryMethod, setSelectedDeliveryMethod] = useState('dropoff');
 
   // Rating system state
-  const [showRatingModal, setShowRatingModal] = useState(false);
+  // showRatingModal is already declared above
   const [ratingModalData, setRatingModalData] = useState(null);
   const [userRatings, setUserRatings] = useState({});
   const [productRatings, setProductRatings] = useState({});
@@ -185,6 +190,8 @@ function App() {
   const [showCommunityBrowser, setShowCommunityBrowser] = useState(false);
   const [selectedCommunity, setSelectedCommunity] = useState(null);
   const [userCommunities, setUserCommunities] = useState([]);
+  const [communityFeed, setCommunityFeed] = useState([]);
+  const [feedLoading, setFeedLoading] = useState(false);
   const [featuredCommunityProducts, setFeaturedCommunityProducts] = useState([]);
   const [showCommunityDetails, setShowCommunityDetails] = useState(false);
   const [communityDetails, setCommunityDetails] = useState(null);
@@ -1381,6 +1388,40 @@ function App() {
       return null;
     }
   };
+
+  // Fetch Community Feed (Aggregated from user communities)
+  const fetchCommunityFeed = async () => {
+    if (!user || userCommunities.length === 0) return;
+    setFeedLoading(true);
+    try {
+      // Fetch posts from each community the user has joined
+      // Limit to 3 posts per community for the initial feed to keep it fast
+      const promises = userCommunities.map(comm =>
+        fetch(`${API_BASE_URL}/api/communities/${comm.id}/posts?limit=3`)
+          .then(res => res.json())
+          .then(posts => posts.map(p => ({ ...p, community_name: comm.name, community_id: comm.id })))
+          .catch(err => [])
+      );
+
+      const results = await Promise.all(promises);
+      const allPosts = results.flat();
+
+      // Sort by newest first
+      allPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      setCommunityFeed(allPosts);
+    } catch (error) {
+      console.error("Error fetching feed:", error);
+    } finally {
+      setFeedLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentPlatform === 'communities' && user) {
+      fetchCommunityFeed();
+    }
+  }, [currentPlatform, userCommunities]);
 
   const fetchUserCommunities = async () => {
     if (!user) return;
@@ -2681,18 +2722,34 @@ function App() {
         sum + (item.product.price_per_unit * item.quantity), 0
       );
 
-      // Determine platform type
-      const platformType = checkoutPlatform === 'pyexpress' ? 'home' : 'farmhub';
+      // Determine platform type from first product in cart
+      const platformType = cartItems[0]?.product?.platform === 'farm_deals' ? 'farmhub' : 'home';
 
       // Get first product for vendor info (for PyExpress)
       const firstProduct = cartItems[0].product;
       let subaccountCode = null;
 
       // For PyExpress/Home, we need the vendor's subaccount
+      // For PyExpress/Home, we need the vendor's subaccount
       if (platformType === 'home') {
-        // TODO: Fetch vendor's subaccount code from backend
-        // For now, we'll let backend handle this
-        subaccountCode = firstProduct.seller_subaccount_code || null;
+        // Fetch seller's subaccount code
+        if (firstProduct.seller_id) {
+          try {
+            // Try to get subaccount from backend
+            const subRes = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/payment/subaccount/${firstProduct.seller_id}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (subRes.ok) {
+              const subData = await subRes.json();
+              subaccountCode = subData.subaccount_code;
+            } else {
+              // Fallback: Check if product has it (legacy)
+              subaccountCode = firstProduct.seller_subaccount_code || null;
+            }
+          } catch (err) {
+            console.error("Failed to fetch subaccount:", err);
+          }
+        }
       }
 
       // Prepare payment data with enhanced delivery parameters
@@ -2804,6 +2861,39 @@ function App() {
 
 
 
+
+  const handleRateProduct = (order) => {
+    setSelectedOrderForRating(order);
+    setShowRatingModal(true);
+  };
+
+  const handleSubmitRating = async (ratingData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/products/${ratingData.product_id}/rate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          order_id: ratingData.order_id,
+          rating: ratingData.rating,
+          comment: ratingData.comment
+        })
+      });
+
+      if (response.ok) {
+        alert('Thank you for your feedback! ⭐');
+        // Optimistically update local state if needed
+      } else {
+        alert('Failed to submit rating. Please try again.');
+      }
+    } catch (error) {
+      console.error('Rating submission error:', error);
+      alert('An error occurred. Please try again.');
+    }
+  };
 
   const fetchOrders = async () => {
     if (!user) return;
@@ -3967,7 +4057,25 @@ function App() {
                       <button
                         onClick={() => {
                           setShowProfileMenu(false);
-                          // Add dashboard functionality where users manage all activities
+                          if (user.role === 'personal') {
+                            setShowPersonalDashboard(true);
+                          } else {
+                            // Route to specific dashboard based on role
+                            if (user.role === 'farmer') {
+                              setShowFarmerDashboard(true);
+                              fetchFarmerDashboard();
+                            } else if (user.role === 'agent') {
+                              setShowAgentDashboard(true);
+                              fetchAgentDashboard();
+                            } else if (user.partner_type === 'business' && user.business_category === 'logistics_business') {
+                              setShowLogisticsDashboard(true);
+                              fetchMyDrivers();
+                            } else {
+                              // Fallback (or generic seller dashboard)
+                              setShowSellerDashboard(true);
+                              fetchMyOrders('seller');
+                            }
+                          }
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-50 font-medium"
                       >
@@ -4176,18 +4284,7 @@ function App() {
                         📈 Market Prices
                       </button>
 
-                      {/* Driver Portal Access (for drivers) */}
-                      {user.role === 'driver' && (
-                        <button
-                          onClick={() => {
-                            setShowProfileMenu(false);
-                            alert('Driver Portal Access - Feature coming soon!\nTrack your deliveries, earnings, and ratings.');
-                          }}
-                          className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-50 font-medium"
-                        >
-                          🚛 Driver Portal
-                        </button>
-                      )}
+
 
                       {/* Group Buying menu item - commented out for pre-order functionality */}
                       {/* 
@@ -4343,245 +4440,232 @@ function App() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentPlatform === 'communities' ? (
-          /* Communities Platform Content */
-          <div>
-            {/* Communities Header */}
-            <div className="mb-6 sm:mb-8">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                <div>
-                  <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Communities</h1>
-                  <p className="text-sm sm:text-base text-gray-600 mt-1">Connect with farmers, traders, and agricultural professionals</p>
-                </div>
-                <div className="flex gap-2 sm:gap-3 flex-wrap">
-                  <button
-                    onClick={() => setShowCommunityBrowser(true)}
-                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors font-medium"
-                  >
-                    Find Communities
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (!user) {
-                        setShowAuthModal(true);
-                        setAuthMode('login');
-                      } else {
-                        setShowCreateCommunity(true);
-                      }
-                    }}
-                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors font-medium"
-                  >
-                    Create Community
-                  </button>
-                </div>
-              </div>
-            </div>
+          /* Communities Platform Content - Redesigned 2-Column Layout */
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* LEFT COLUMN: Communities & Feed (60%) */}
+            <div className="w-full lg:w-3/5 space-y-8">
 
-            {/* Featured Community Products */}
-            {featuredCommunityProducts.length > 0 && (
-              <div className="mb-6 sm:mb-8">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Featured Products from Communities</h2>
-                <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-                  {featuredCommunityProducts.map((product) => (
-                    <div
-                      key={product.id}
-                      className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-emerald-300 transition-colors cursor-pointer"
-                      onClick={() => {
-                        // View product or community
-                        fetchCommunityDetails(product.community_id);
-                        setShowCommunityDetails(true);
-                      }}
+              {/* Communities Header */}
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Communities</h1>
+                    <p className="text-gray-600">Connect with farmers and traders</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowCommunityBrowser(true)}
+                      className="px-4 py-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg font-medium"
                     >
-                      {/* Product Image */}
-                      {product.images && product.images.length > 0 ? (
-                        <img
-                          src={product.images[0]}
-                          alt={product.title}
-                          className="w-full h-24 sm:h-32 object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-24 sm:h-32 bg-gray-200 flex items-center justify-center">
-                          <span className="text-gray-400 text-xs">📦</span>
-                        </div>
-                      )}
-
-                      {/* Product Info */}
-                      <div className="p-2 sm:p-3">
-                        <h3 className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
-                          {product.title}
-                        </h3>
-                        <p className="text-xs text-emerald-600 truncate mt-0.5">
-                          {product.community_name}
-                        </p>
-                        <p className="text-sm sm:text-base font-bold text-gray-900 mt-1">
-                          ₦{product.price}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                      Find Communities
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!user) {
+                          setShowAuthModal(true);
+                          setAuthMode('login');
+                        } else {
+                          setShowCreateCommunity(true);
+                        }
+                      }}
+                      className="px-4 py-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg font-medium"
+                    >
+                      Create
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {/* My Communities */}
-            {user && userCommunities.length > 0 && (
-              <div className="mb-6 sm:mb-8">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">My Communities</h2>
-                <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {userCommunities.map((community) => (
-                    <div key={community.id} className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-emerald-300 transition-colors">
-                      <div className="flex items-start justify-between mb-2 sm:mb-3">
-                        <div className="flex-1 min-w-0 pr-2">
-                          <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">{community.name}</h3>
-                          <p className="text-xs sm:text-sm text-gray-600">{community.category}</p>
-                        </div>
-                        <span className={`px-2 py-0.5 sm:py-1 text-xs rounded-full flex-shrink-0 ${community.privacy_type === 'public'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-orange-100 text-orange-700'
-                          }`}>
-                          {community.privacy_type}
-                        </span>
-                      </div>
+                {/* Featured Communities & My Communities - Horizontal Scroll */}
+                <div className="mb-8">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      {user && userCommunities.length > 0 ? 'Your Communities' : 'Featured Communities'}
+                    </h2>
+                  </div>
 
-                      <p className="text-xs sm:text-sm text-gray-700 mb-2 sm:mb-3 line-clamp-2">{community.description}</p>
-
-                      <div className="flex items-center justify-between text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
-                        <span>{community.member_count || 0} members</span>
-                        {community.location && <span className="truncate ml-2">{community.location}</span>}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setSelectedCommunity(community);
-                            // Here you would navigate to community details
-                          }}
-                          className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
-                        >
-                          View
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (window.confirm('Are you sure you want to leave this community?')) {
-                              try {
-                                await leaveCommunity(community.id);
-                                alert('Successfully left community');
-                              } catch (error) {
-                                alert('Failed to leave community: ' + error.message);
-                              }
-                            }
-                          }}
-                          className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                        >
-                          Leave
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Featured Communities */}
-            <div className="mb-6 sm:mb-8">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Featured Communities</h2>
-              <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {communities.slice(0, 6).map((community) => (
-                  <div
-                    key={community.id}
-                    className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-emerald-300 transition-colors cursor-pointer"
-                    onClick={() => {
-                      fetchCommunityDetails(community.id);
-                      setShowCommunityDetails(true);
-                    }}
-                  >
-                    {/* Community Header with Profile Picture */}
-                    <div className="flex items-start gap-3 mb-2 sm:mb-3">
-                      {/* Profile Picture */}
-                      <div className="flex-shrink-0">
-                        {community.profile_picture ? (
-                          <img
-                            src={community.profile_picture}
-                            alt={community.name}
-                            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border-2 border-emerald-500"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-base sm:text-lg border-2 border-emerald-600">
-                            {community.name.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Community Name and Category */}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">{community.name}</h3>
-                        <p className="text-xs sm:text-sm text-gray-600">{community.category}</p>
-                      </div>
-
-                      {/* Privacy Badge */}
-                      <span className={`px-2 py-0.5 sm:py-1 text-xs rounded-full flex-shrink-0 ${community.privacy_type === 'public'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-orange-100 text-orange-700'
-                        }`}>
-                        {community.privacy_type || 'public'}
-                      </span>
-                    </div>
-
-                    <p className="text-xs sm:text-sm text-gray-700 mb-2 sm:mb-3 line-clamp-2">{community.description}</p>
-
-                    <div className="flex items-center justify-between text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
-                      <span>{community.member_count || 0} members</span>
-                      {community.location && <span className="truncate ml-2">{community.location}</span>}
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation(); // Prevent card click
+                  <div className="flex overflow-x-auto pb-4 space-x-4 scrollbar-hide">
+                    {/* Show User Communities first if logged in */}
+                    {user && userCommunities.map(community => (
+                      <div
+                        key={community.id}
+                        onClick={() => {
                           fetchCommunityDetails(community.id);
                           setShowCommunityDetails(true);
                         }}
-                        className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+                        className="min-w-[200px] bg-white border border-emerald-200 rounded-xl p-4 cursor-pointer hover:shadow-md transition-shadow flex-shrink-0"
                       >
-                        View Details
-                      </button>
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation(); // Prevent card click
-                          try {
-                            await joinCommunity(community.id);
-                            alert('Successfully joined community!');
-                          } catch (error) {
-                            alert('Failed to join community: ' + error.message);
-                          }
-                        }}
-                        className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
-                      >
-                        Join
-                      </button>
-                    </div>
+                        <div className="font-bold text-gray-900 truncate">{community.name}</div>
+                        <div className="text-xs text-gray-500 mb-2">{community.members_count || 0} members</div>
+                        <button className="w-full py-1.5 text-xs bg-emerald-50 text-emerald-700 rounded font-medium mt-2">View</button>
+                      </div>
+                    ))}
+
+                    {/* Show Featured/All Communities */}
+                    {communities.slice(0, 5).map(community => (
+                      (!user || !userCommunities.find(c => c.id === community.id)) && (
+                        <div
+                          key={community.id}
+                          onClick={() => {
+                            fetchCommunityDetails(community.id);
+                            setShowCommunityDetails(true);
+                          }}
+                          className="min-w-[200px] bg-white border border-gray-200 rounded-xl p-4 cursor-pointer hover:shadow-lg transition-shadow flex-shrink-0"
+                        >
+                          <div className="font-bold text-gray-900 truncate">{community.name}</div>
+                          <div className="text-xs text-gray-500 mb-2">{community.description}</div>
+                          <button className="w-full py-1.5 text-xs bg-gray-50 text-gray-700 hover:bg-emerald-600 hover:text-white rounded font-medium mt-2 transition-colors">Join</button>
+                        </div>
+                      )
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
 
-              {communities.length === 0 && (
-                <div className="text-center py-8 sm:py-12 bg-gray-50 rounded-lg">
-                  <div className="text-gray-500 mb-3 sm:mb-4">
-                    <svg className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
+              {/* Community Feed - Endless Scroll */}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Community Feed</h2>
+
+                {feedLoading ? (
+                  <div className="text-center py-10">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto"></div>
+                    <p className="text-sm text-gray-500 mt-2">Loading updates...</p>
                   </div>
-                  <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No communities yet</h3>
-                  <p className="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4 px-4">Be the first to create a community and connect with others!</p>
-                  {user && (
-                    <button
-                      onClick={() => setShowCreateCommunity(true)}
-                      className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors font-medium"
-                    >
-                      Create First Community
-                    </button>
-                  )}
+                ) : communityFeed.length > 0 ? (
+                  <div className="space-y-6">
+                    {communityFeed.map(post => (
+                      <div key={`${post.community_id}-${post.id}`} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                        {/* Post Header */}
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-500">
+                            {post.username?.[0]}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-gray-900">{post.username}</span>
+                              <span className="text-xs text-gray-400">•</span>
+                              <span
+                                className="text-xs text-emerald-600 font-medium cursor-pointer hover:underline"
+                                onClick={() => {
+                                  fetchCommunityDetails(post.community_id);
+                                  setShowCommunityDetails(true);
+                                }}
+                              >
+                                in {post.community_name}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-500">{new Date(post.created_at).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+
+                        {/* Post Content */}
+                        <p className="text-gray-800 text-sm mb-3 whitespace-pre-wrap">{post.content}</p>
+
+                        {/* Product Attachment */}
+                        {post.type === 'product' && (
+                          <div className="bg-emerald-50 rounded-lg p-3 mb-3 border border-emerald-100">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <h4 className="font-bold text-emerald-900">{post.product_name}</h4>
+                                <div className="text-emerald-700 font-bold">₦{post.product_price?.toLocaleString()}</div>
+                              </div>
+                              <span className={`text-xs px-2 py-1 rounded font-bold ${post.is_available ? 'bg-white text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                {post.is_available ? 'Available' : 'Sold Out'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Images */}
+                        {post.images && post.images.length > 0 && (
+                          <div className={`grid gap-1 mb-3 ${post.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                            {post.images.slice(0, 4).map((img, idx) => (
+                              <img key={idx} src={img} alt="Post" className="rounded-lg w-full h-48 object-cover" />
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex gap-4 pt-3 border-t text-sm text-gray-500">
+                          <button className="flex items-center gap-1 hover:text-red-500 transition-colors"><Heart size={16} /> Like</button>
+                          <button
+                            className="flex items-center gap-1 hover:text-blue-500 transition-colors"
+                            onClick={() => {
+                              fetchCommunityDetails(post.community_id);
+                              setShowCommunityDetails(true);
+                            }}
+                          >
+                            <MessageSquare size={16} /> Comment
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-xl p-8 text-center">
+                    <p className="text-gray-600">Join communities to see their updates here!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: Featured Products (40%) */}
+            <div className="w-full lg:w-2/5">
+              <div className="sticky top-24">
+
+                {/* Promo Box - Moved Up */}
+                <div className="mb-8 bg-gradient-to-br from-emerald-900 to-emerald-700 rounded-xl p-6 text-white text-center">
+                  <h3 className="font-bold text-lg mb-2">Grow Your Business</h3>
+                  <p className="text-emerald-100 text-sm mb-4">Create a community page for your farm or business today.</p>
+                  <button
+                    onClick={() => setShowCreateCommunity(true)}
+                    className="bg-white text-emerald-900 px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-50 transition-colors"
+                  >
+                    Get Started
+                  </button>
                 </div>
-              )}
+
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Featured Store Items</h2>
+
+                {featuredCommunityProducts.length === 0 ? (
+                  <div className="text-gray-500 text-sm">No featured products yet.</div>
+                ) : (
+                  <div className="space-y-4">
+                    {featuredCommunityProducts.map(product => (
+                      <div
+                        key={product.id}
+                        className="bg-white border border-gray-200 rounded-lg p-3 flex gap-4 hover:shadow-md transition-shadow cursor-pointer group"
+                        onClick={() => {
+                          fetchCommunityDetails(product.community_id);
+                          setShowCommunityDetails(true);
+                        }}
+                      >
+                        {/* Image */}
+                        <div className="w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
+                          {product.images && product.images[0] ? (
+                            <img src={product.images[0]} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-400">📦</div>
+                          )}
+                        </div>
+
+                        {/* Details */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 truncate">{product.title}</h3>
+                          <div className="text-emerald-600 font-bold mt-1">₦{product.price?.toLocaleString()}</div>
+
+                          <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                            <span>From:</span>
+                            <span className="font-medium text-emerald-600 hover:underline truncate max-w-[120px]">
+                              @{product.community_name}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+              </div>
             </div>
           </div>
         ) : (
@@ -5500,14 +5584,19 @@ function App() {
   // Auth Modal JSX starts...
       // Enhanced Registration Modal
       {/* Enhanced Registration Modal */}
-      <RegistrationModal
-        showAuthModal={showAuthModal}
-        setShowAuthModal={setShowAuthModal}
-        authMode={authMode}
-        setAuthMode={setAuthMode}
-        onLogin={handleNewLogin}
-        onRegister={handleNewRegistration}
-      />
+      {
+        showAuthModal && (
+          <RegistrationModal
+            showAuthModal={showAuthModal}
+            setShowAuthModal={setShowAuthModal}
+            authMode={authMode}
+            setAuthMode={setAuthMode}
+            onLogin={handleNewLogin}
+            onRegister={handleNewRegistration}
+            onClose={() => setShowAuthModal(false)}
+          />
+        )
+      }
 
       {/* Comprehensive Checkout Page */}
       {
@@ -7134,9 +7223,19 @@ function App() {
 
                         <div className="space-y-1">
                           {order.items.map((item, index) => (
-                            <div key={index} className="flex justify-between text-sm">
-                              <span>{item.title} × {item.quantity}</span>
-                              <span>₦{item.total.toLocaleString()}</span>
+                            <div key={index} className="flex flex-col gap-2 py-2 border-b border-gray-100 last:border-0">
+                              <div className="flex justify-between text-sm">
+                                <span>{item.title} × {item.quantity}</span>
+                                <span>₦{item.total.toLocaleString()}</span>
+                              </div>
+                              {order.status === 'delivered' && (
+                                <button
+                                  onClick={() => handleRateProduct({ ...item, order_id: order.id, product_name: item.title, product_id: item.product_id || item.id })} // Assuming item has product_id
+                                  className="self-end text-xs px-3 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full hover:bg-yellow-100 flex items-center gap-1"
+                                >
+                                  <Star size={12} fill="currentColor" /> Rate Product
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -7151,39 +7250,41 @@ function App() {
       }
 
       {/* Delivery Confirmation Modal */}
-      {confirmOrderId && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
-          <div className="bg-white rounded-xl max-w-sm w-full p-6">
-            <h3 className="text-xl font-bold mb-4">Confirm Delivery</h3>
-            <p className="text-gray-600 text-sm mb-4">
-              The seller has delivered your order. Please enter the 6-digit code provided by the seller to release payment.
-            </p>
-            <input
-              type="text"
-              placeholder="Enter 6-digit Code"
-              value={deliveryCodeInput}
-              onChange={(e) => setDeliveryCodeInput(e.target.value)}
-              className="w-full border p-3 rounded-lg text-center text-lg tracking-widest mb-4 font-mono"
-              maxLength={6}
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmOrderId(null)}
-                className="flex-1 py-2 border rounded-lg hover:bg-gray-50 text-gray-700"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmDelivery}
-                disabled={confirmingDelivery || deliveryCodeInput.length < 6}
-                className="flex-1 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-bold"
-              >
-                {confirmingDelivery ? 'Verifying...' : 'Confirm'}
-              </button>
+      {
+        confirmOrderId && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+            <div className="bg-white rounded-xl max-w-sm w-full p-6">
+              <h3 className="text-xl font-bold mb-4">Confirm Delivery</h3>
+              <p className="text-gray-600 text-sm mb-4">
+                The seller has delivered your order. Please enter the 6-digit code provided by the seller to release payment.
+              </p>
+              <input
+                type="text"
+                placeholder="Enter 6-digit Code"
+                value={deliveryCodeInput}
+                onChange={(e) => setDeliveryCodeInput(e.target.value)}
+                className="w-full border p-3 rounded-lg text-center text-lg tracking-widest mb-4 font-mono"
+                maxLength={6}
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmOrderId(null)}
+                  className="flex-1 py-2 border rounded-lg hover:bg-gray-50 text-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelivery}
+                  disabled={confirmingDelivery || deliveryCodeInput.length < 6}
+                  className="flex-1 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-bold"
+                >
+                  {confirmingDelivery ? 'Verifying...' : 'Confirm'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Add Drop-off Location Modal */}
       {
@@ -7775,6 +7876,12 @@ function App() {
                             const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
                             const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg';
                             const specification = selectedProduct.unit_specification || 'standard';
+
+                            // MOQ Check
+                            if (selectedProduct.min_order_quantity && quantity < selectedProduct.min_order_quantity) {
+                              alert(`Minimum order quantity for this product is ${selectedProduct.min_order_quantity} ${selectedProduct.unit || 'units'}`);
+                              return;
+                            }
 
                             const productId = selectedProduct.id || selectedProduct._id;
                             const deliveryOptions = productDeliveryOptions[productId];
@@ -9148,65 +9255,93 @@ function App() {
       }
 
       {/* Communities Modals */}
-      {showCreateCommunity && (
-        <CreateCommunityModal
-          onClose={() => setShowCreateCommunity(false)}
-          onSuccess={() => {
-            fetchCommunities();
-          }}
-          token={localStorage.getItem('token')}
-          API_BASE_URL={API_BASE_URL}
-        />
-      )}
-      {showCommunityBrowser && (
-        <CommunityBrowser
-          onClose={() => setShowCommunityBrowser(false)}
-          communities={communities}
-          onJoin={handleJoinCommunity}
-          user={user}
-        />
-      )}
-      {showCommunityDetails && (
-        <CommunityDetailsModal
-          community={selectedCommunity || {}}
-          onClose={() => setShowCommunityDetails(false)}
-          user={user}
-          token={localStorage.getItem('token')}
-          onJoin={handleJoinCommunity}
-          onCreatePost={handleCreatePost}
-          onRemoveMember={handleRemoveMember}
-          API_BASE_URL={API_BASE_URL}
-          onUpload={handleR2UploadHelper}
-        />
-      )}
+      {
+        showCreateCommunity && (
+          <CreateCommunityModal
+            onClose={() => setShowCreateCommunity(false)}
+            onSuccess={() => {
+              fetchCommunities();
+            }}
+            token={localStorage.getItem('token')}
+            API_BASE_URL={API_BASE_URL}
+          />
+        )
+      }
+      {
+        showCommunityBrowser && (
+          <CommunityBrowser
+            onClose={() => setShowCommunityBrowser(false)}
+            communities={communities}
+            onJoin={handleJoinCommunity}
+            user={user}
+          />
+        )
+      }
+      {
+        showCommunityDetails && (
+          <CommunityDetailsModal
+            community={selectedCommunity || {}}
+            onClose={() => setShowCommunityDetails(false)}
+            user={user}
+            token={localStorage.getItem('token')}
+            onJoin={handleJoinCommunity}
+            onCreatePost={handleCreatePost}
+            onRemoveMember={handleRemoveMember}
+            API_BASE_URL={API_BASE_URL}
+            onUpload={handleR2UploadHelper}
+          />
+        )
+      }
 
       {/* Profile Picture Upload Modal */}
-      {showProfilePictureUpload && (
-        <ProfilePictureUploadModal
-          onClose={() => setShowProfilePictureUpload(false)}
-          onUpload={async (file) => {
-            // Reuse existing R2 logic if possible or implement direct call
-            const url = await handleR2Upload(file, 'social', 'public');
-            if (url) {
-              // Update user profile logic here (or assume modal handles it via prop if we passed save handler)
-              // For now, simple close on success, or trigger refresh
-              const token = localStorage.getItem('token');
-              await fetch(`${API_BASE_URL}/api/user/profile/picture`, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ profile_picture: url })
-              });
-              fetchUserProfile(token); // Refresh
-            }
-          }}
+      {
+        showProfilePictureUpload && (
+          <ProfilePictureUploadModal
+            onClose={() => setShowProfilePictureUpload(false)}
+            onUpload={async (file) => {
+              // Reuse existing R2 logic if possible or implement direct call
+              const url = await handleR2Upload(file, 'social', 'public');
+              if (url) {
+                // Update user profile logic here (or assume modal handles it via prop if we passed save handler)
+                // For now, simple close on success, or trigger refresh
+                const token = localStorage.getItem('token');
+                await fetch(`${API_BASE_URL}/api/user/profile/picture`, {
+                  method: 'PUT',
+                  headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ profile_picture: url })
+                });
+                fetchUserProfile(token); // Refresh
+              }
+            }}
+          />
+        )
+      }
+
+      {/* Seller Details Modal */}
+      {
+        showSellerDetails && (
+          <SellerDetailsModal
+            seller={sellerDetails}
+            onClose={() => setShowSellerDetails(false)}
+          />
+        )
+      }
+
+      {/* Personal Dashboard */}
+      {showPersonalDashboard && (
+        <PersonalDashboard
+          user={user}
+          onClose={() => setShowPersonalDashboard(false)}
+          API_BASE_URL={API_BASE_URL}
         />
       )}
 
-      {/* Seller Details Modal */}
-      {showSellerDetails && (
-        <SellerDetailsModal
-          seller={sellerDetails}
-          onClose={() => setShowSellerDetails(false)}
+      {/* Rating Modal */}
+      {showRatingModal && selectedOrderForRating && (
+        <RatingModal
+          orderItem={selectedOrderForRating}
+          onClose={() => setShowRatingModal(false)}
+          onSubmit={handleSubmitRating}
         />
       )}
 
@@ -9220,13 +9355,16 @@ function App() {
       )} */}
 
       {/* Footer */}
-      {(currentPlatform === 'home' || currentPlatform === 'buy_from_farm') && (
-        <Footer
-          onOpenTerms={() => setShowTermsModal(true)}
-          onOpenPrivacy={() => setShowPrivacyModal(true)}
-          onOpenAbout={() => setShowAboutModal(true)}
-        />
-      )}
+      {
+        (currentPlatform === 'home' || currentPlatform === 'buy_from_farm' || currentPlatform === 'communities') && (
+          <Footer
+            onOpenTerms={() => setShowTermsModal(true)}
+            onOpenPrivacy={() => setShowPrivacyModal(true)}
+            onOpenAbout={() => setShowAboutModal(true)}
+            onNavigate={(page) => setCurrentPlatform(page)}
+          />
+        )
+      }
 
       {/* --- CHAT MODAL --- */}
       {/* --- CHAT MODAL --- */}
@@ -9239,15 +9377,21 @@ function App() {
       />
 
       {/* --- TERMS OF USE MODAL --- */}
-      {showTermsModal && (
-        <TermsOfUseModal onClose={() => setShowTermsModal(false)} />
-      )}
-      {showPrivacyModal && (
-        <PrivacyPolicyModal onClose={() => setShowPrivacyModal(false)} />
-      )}
-      {showAboutModal && (
-        <AboutUsModal onClose={() => setShowAboutModal(false)} />
-      )}
+      {
+        showTermsModal && (
+          <TermsOfUseModal onClose={() => setShowTermsModal(false)} />
+        )
+      }
+      {
+        showPrivacyModal && (
+          <PrivacyPolicyModal onClose={() => setShowPrivacyModal(false)} />
+        )
+      }
+      {
+        showAboutModal && (
+          <AboutUsModal onClose={() => setShowAboutModal(false)} />
+        )
+      }
 
     </div >
   );
