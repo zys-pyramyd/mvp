@@ -1,7 +1,7 @@
 // Pyramyd PWA Service Worker
 // Version 1.0.0
 
-const CACHE_NAME = 'pyramyd-v1';
+const CACHE_NAME = 'pyramyd-v6-fix';
 const OFFLINE_QUEUE = 'pyramyd-offline-queue';
 
 // Assets to cache on install
@@ -54,11 +54,12 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(handleApiRequest(request));
   } else {
-    // Static assets: cache-first strategy
+    // Static assets strategy
     event.respondWith(handleStaticRequest(request));
   }
 });
 
+<<<<<<< HEAD
 // Handle static asset requests (cache-first)
 // Handle static asset requests (Network-First with Cache Fallback)
 async function handleStaticRequest(request) {
@@ -71,9 +72,30 @@ async function handleStaticRequest(request) {
     // If successful, update the cache
     if (response.status === 200) {
       cache.put(request, response.clone());
+=======
+// Handle static asset requests
+// Handle static asset requests
+async function handleStaticRequest(request) {
+  // Strategy: Network-First for ALL static assets (HTML, CSS, JS, Images)
+  // CRITICAL: Prevent SW from handling non-GET requests (e.g. POST uploads) in this fallback
+  if (request.method !== 'GET') {
+    return fetch(request);
+  }
+
+  try {
+    // 1. Try Network first
+    const networkResponse = await fetch(request);
+
+    // If successful (200 OK), cache it and return
+    if (networkResponse.status === 200) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, networkResponse.clone());
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
     }
-    return response;
+
+    return networkResponse;
   } catch (error) {
+<<<<<<< HEAD
     // Note: 'Only-if-cached' mode error handling?
     // Network failed, try cache
     console.log('[SW] Network failed for static asset, trying cache:', request.url);
@@ -84,22 +106,54 @@ async function handleStaticRequest(request) {
 
     // Return offline page for navigation requests if both fail
     if (request.destination === 'document') {
+=======
+    // 2. If Network fails (offline), try Cache
+    console.log('[SW] Network failed, checking cache:', request.url);
+    const cache = await caches.open(CACHE_NAME);
+    const cachedResponse = await cache.match(request);
+
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+
+    // 3. Fallback for navigation requests
+    if (request.mode === 'navigate') {
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
       return cache.match('/index.html');
     }
+
     throw error;
   }
 }
 
 // Handle API requests (network-first with cache fallback)
+// Handle API requests (network-first with cache fallback)
 async function handleApiRequest(request) {
+  const url = new URL(request.url);
+
+  // CRITICAL: NEVER cache Auth routes
+  if (url.pathname.includes('/auth/')) {
+    return fetch(request);
+  }
+
+  // CRITICAL: NEVER cache non-GET requests
+  if (request.method !== 'GET') {
+    return fetch(request);
+  }
+
   const cache = await caches.open(CACHE_NAME);
 
   try {
     // Try network first
     const response = await fetch(request);
 
+<<<<<<< HEAD
     // Cache successful GET requests
     if (request.method === 'GET' && response.status === 200) {
+=======
+    // Cache ONLY successful GET requests
+    if (response.status === 200) {
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
       cache.put(request, response.clone());
     }
 
@@ -108,13 +162,12 @@ async function handleApiRequest(request) {
     console.log('[SW] Network failed, trying cache:', request.url);
 
     // If GET request, try cache
-    if (request.method === 'GET') {
-      const cached = await cache.match(request);
-      if (cached) {
-        return cached;
-      }
+    const cached = await cache.match(request);
+    if (cached) {
+      return cached;
     }
 
+<<<<<<< HEAD
     // If POST/PUT request (like product creation), queue it for later
     if (request.method === 'POST' || request.method === 'PUT') {
       await queueOfflineRequest(request);
@@ -130,6 +183,8 @@ async function handleApiRequest(request) {
       );
     }
 
+=======
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
     // Return error for other cases
     return new Response(
       JSON.stringify({ error: 'No network connection', offline: true }),
@@ -140,6 +195,7 @@ async function handleApiRequest(request) {
     );
   }
 }
+
 
 // Queue offline requests
 async function queueOfflineRequest(request) {

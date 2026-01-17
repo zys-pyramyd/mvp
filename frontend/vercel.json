@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "rewrites": [
     {
       "source": "/(.*)",
@@ -6,3 +7,17 @@
     }
   ]
 }
+=======
+    "buildCommand": "npm run build",
+    "outputDirectory": "build",
+    "devCommand": "npm start",
+    "installCommand": "npm install",
+    "framework": "create-react-app",
+    "rewrites": [
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
+        }
+    ]
+}
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49

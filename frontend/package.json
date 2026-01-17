@@ -8,7 +8,10 @@
     "react": "18",
     "react-dom": "18",
     "react-router-dom": "^7.5.1",
-    "react-scripts": "5.0.1"
+    "react-scripts": "5.0.1",
+    "lucide-react": "^0.263.1",
+    "@react-google-maps/api": "^2.19.2",
+    "use-places-autocomplete": "^4.0.1"
   },
   "scripts": {
     "start": "craco start",
@@ -33,7 +36,7 @@
     "@craco/craco": "^7.1.0",
     "@eslint/js": "9.23.0",
     "autoprefixer": "^10.4.20",
-    "eslint": "9.23.0",
+    "eslint": "8.57.0",
     "eslint-plugin-import": "2.31.0",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.4",

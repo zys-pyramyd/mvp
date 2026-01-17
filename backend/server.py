@@ -1,13 +1,71 @@
 import os
 import uuid
 from datetime import datetime, timedelta
+<<<<<<< HEAD
 from typing import Optional, List, Union
+=======
+from typing import Optional, List, Dict, Tuple
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
-from pymongo import MongoClient
-import bcrypt
+from pydantic import BaseModel, Field, validator, EmailStr
+from database import db, get_client, get_db, get_collection
+from auth import get_current_user, create_access_token, get_password_hash, verify_password, JWT_SECRET, ALGORITHM
+from messaging.routes import router as messaging_router
+
+# --- R2 Cloudflare Integration ---
+import boto3
+from botocore.client import Config
+from botocore.exceptions import ClientError
+
+# R2 Configuration
+R2_ACCOUNT_ID = os.environ.get('R2_ACCOUNT_ID')
+R2_ACCESS_KEY_ID = os.environ.get('R2_ACCESS_KEY_ID')
+R2_SECRET_ACCESS_KEY = os.environ.get('R2_SECRET_ACCESS_KEY')
+R2_PRIVATE_BUCKET = os.environ.get('R2_PRIVATE_BUCKET', 'pyramyd-private')
+R2_PUBLIC_BUCKET = os.environ.get('R2_PUBLIC_BUCKET', 'pyramyd-public')
+SIGNED_URL_EXPIRATION = int(os.environ.get('SIGNED_URL_EXPIRATION', 3600))
+
+# Initialize R2 Client
+s3_client = None
+if R2_ACCOUNT_ID and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY:
+    try:
+        s3_client = boto3.client(
+            's3',
+            endpoint_url=f'https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com',
+            aws_access_key_id=R2_ACCESS_KEY_ID,
+            aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+            config=Config(signature_version='s3v4')
+        )
+        print("R2 Client Initialized")
+    except Exception as e:
+        print(f"Failed to initialize R2 client: {e}")
+
+# Folder validaton and Bucket mapping
+ALLOWED_FOLDERS = {
+    'user-registration': {'bucket': R2_PRIVATE_BUCKET, 'privacy': 'private'},
+    'messages': {'bucket': R2_PRIVATE_BUCKET, 'privacy': 'private'},
+    'notifications': {'bucket': R2_PRIVATE_BUCKET, 'privacy': 'private'},
+    'admin': {'bucket': R2_PRIVATE_BUCKET, 'privacy': 'private'},
+    'temp': {'bucket': R2_PRIVATE_BUCKET, 'privacy': 'private'}, 
+    'social': {'bucket': R2_PUBLIC_BUCKET, 'privacy': 'public'},
+    'products': {'bucket': R2_PUBLIC_BUCKET, 'privacy': 'public'}
+}
+
+class UploadSignRequest(BaseModel):
+    folder: str
+    filename: str
+    contentType: str
+
+class DocumentMetadata(BaseModel):
+    type: str 
+    key: str
+    bucket: str
+    filename: str
+
+# Helper functions (Auth helpers moved to auth.py)
+
 import jwt
 from enum import Enum
 from cryptography.fernet import Fernet
@@ -15,6 +73,7 @@ import base64
 import hashlib
 import hmac
 import requests
+<<<<<<< HEAD
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 import logging
@@ -57,22 +116,480 @@ ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@example.com')
 # but for simple setup:
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD') 
 ADMIN_PASSWORD_HASH = os.environ.get('ADMIN_PASSWORD_HASH')
+=======
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from geo_helper import GeopyHelper
+from payment.paystack import (
+    PaystackSubaccount, 
+    PaystackTransaction, 
+    PaystackTransferRecipient, 
+    CommissionPayout,
+    PAYSTACK_API_URL,
+    paystack_request,
+    naira_to_kobo,
+    kobo_to_naira,
+    verify_paystack_signature
+)
+from payment.farm_deals_payment import initialize_farmhub_payment
+from payment.pyexpress_payment import initialize_pyexpress_payment
+from payment.community_payment import initialize_community_payment
+from order.models import (
+    Order, 
+    CartItem, 
+    GroupOrder, 
+    OutsourcedOrder, 
+    AgentPurchaseOption, 
+    GroupBuyingRequest
+)
 
-# Paystack API Base URL
-PAYSTACK_API_URL = "https://api.paystack.co"
+# Environment variables
+MONGO_URL = os.environ.get('MONGO_URL', os.environ.get('MONGO_URI'))
+ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')
 
+# Third Party APIs
+PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY')
+PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY')
+TWILIO_SID = os.environ.get('TWILIO_ACCOUNT_SID')
+TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
+GEOAPIFY_API_KEY = os.environ.get('GEOAPIFY_API_KEY')
+
+# Kwik Delivery API
+KWIK_ACCESS_TOKEN = os.environ.get('KWIK_ACCESS_TOKEN')
+KWIK_DOMAIN_NAME = os.environ.get('KWIK_DOMAIN_NAME', 'pyramyd.com')
+KWIK_VENDOR_ID = os.environ.get('KWIK_VENDOR_ID')
+KWIK_API_URL = "https://api.kwik.delivery"
+
+def check_critical_env_vars():
+    """Ensure critical environment variables are set."""
+    missing = []
+    if not MONGO_URL: missing.append("MONGO_URL")
+    if not JWT_SECRET: missing.append("JWT_SECRET")
+    
+    if missing:
+        error_msg = f"CRITICAL SECURITY ERROR: Missing required environment variables: {', '.join(missing)}"
+        print(error_msg)
+
+    if not PAYSTACK_SECRET_KEY: print("WARNING: PAYSTACK_SECRET_KEY missing. Payments will fail.")
+    if not GEOAPIFY_API_KEY: print("WARNING: GEOAPIFY_API_KEY missing. Location services will fail.")
+
+check_critical_env_vars()
+KWIK_API_URL = "https://api.kwik.delivery"
+KWIK_ENABLED_STATES = ["Lagos", "Oyo", "FCT Abuja"]
+
+# Email Configuration
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+SUPPORT_EMAIL = os.environ.get('SUPPORT_MAIL','')
+FROM_EMAIL = os.environ.get('FROM_EMAIL', SUPPORT_EMAIL)
+
+# Admin credentials
+ADMIN_EMAIL = os.environ.get('ADMIN_MAIL')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+
+# Collections (from imported db)
+# Note: db is initialized in database.py
+if db is not None:
+    users_collection = db['users']
+    agent_farmers_collection = db['agent_farmers']
+    ratings_collection = db['ratings']
+    community_posts_collection = db['community_posts']
+    post_likes_collection = db['post_likes']
+    post_comments_collection = db['post_comments']
+    group_orders_collection = db['group_orders']
+else:
+    print("Warning: Database not initialized")
+
+from database import db, client, get_db, get_collection
+from auth import get_current_user, create_access_token, get_password_hash, verify_password, JWT_SECRET, ALGORITHM
+from messaging.routes import router as messaging_router
+
+# ... (Previous imports remain same)
+
+# Initialize FastAPI
+app = FastAPI(
+    title="Pyramyd API",
+    description="Backend for Pyramyd Market",
+    version="1.0.0"
+)
+
+import threading
+import time
+
+# Startup check that does NOT crash the app
+@app.on_event("startup")
+def startup():
+    def warm_db():
+        print("Starting background DB warmup...")
+        for i in range(5):
+            try:
+                # Use get_db() to access the lazy client
+                db_instance = get_db()
+                # Run a cheap command
+                db_instance.command("ping")
+                print("MongoDB warmed and connected")
+                break
+            except Exception as e:
+                print(f"MongoDB warming attempt {i+1} failed: {e}")
+                time.sleep(5)
+    
+    # Start warmup in background thread
+    threading.Thread(target=warm_db, daemon=True).start()
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint to wake up server"""
+    try:
+         # Optional: Check DB status here too, or just return online
+         get_db().command("ping")
+         db_status = "connected"
+    except Exception:
+         db_status = "disconnected"
+         
+    return {"status": "online", "db_status": db_status}
+
+# Include Routers
+app.include_router(messaging_router)
+
+from community.routes import router as community_router
+app.include_router(community_router)
+
+# CORS Middleware
+allowed_origins = [
+    "*"
+]
+
+vercel_url = os.environ.get('VERCEL_URL')
+if vercel_url:
+    allowed_origins.append(f"https://{vercel_url}")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+async def root():
+    return {"status": "online", "message": "Pyramyd API is running"}
+
+@app.post("/api/upload/sign-public")
+async def sign_upload_public(request: UploadSignRequest):
+    """Generate a presigned URL for public/registration uploads (Restricted folders)"""
+    print(f"DEBUG: Internal sign-public called for folder={request.folder}, filename={request.filename}")
+    
+    if not s3_client:
+        print("DEBUG: S3 Client is None")
+        raise HTTPException(status_code=503, detail="Storage service unavailable")
+        
+    # Strictly allow only registration folder for unauthenticated uploads
+    if request.folder != 'user-registration':
+        print(f"DEBUG: Unauthorized folder access: {request.folder}")
+        raise HTTPException(status_code=403, detail="Unauthorized folder access")
+    
+    config = ALLOWED_FOLDERS.get(request.folder)
+    if not config:
+        print(f"DEBUG: Invalid folder config for {request.folder}")
+        raise HTTPException(status_code=400, detail="Invalid folder configuration")
+
+    bucket = config['bucket']
+    
+    file_ext = request.filename.split('.')[-1] if '.' in request.filename else 'bin'
+    safe_filename = f"{uuid.uuid4().hex}.{file_ext}" # No user ID available yet, use random UUID
+    key = f"{request.folder}/temp/{safe_filename}"
+    
+    try:
+        presigned_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': bucket,
+                'Key': key,
+                'ContentType': request.contentType
+            },
+            ExpiresIn=SIGNED_URL_EXPIRATION 
+        )
+        print(f"DEBUG: Successfully generated URL for {key}")
+        
+        return {
+            "uploadUrl": presigned_url,
+            "key": key,
+            "bucket": bucket,
+            "publicUrl": None
+        }
+    except ClientError as e:
+        print(f"R2 Signing Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate upload URL: {str(e)}")
+    except Exception as e:
+        print(f"Unexpected Error in sign-public: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+@app.post("/api/upload/sign")
+async def sign_upload(request: UploadSignRequest, current_user: dict = Depends(get_current_user)):
+    """Generate a presigned URL for direct R2 upload"""
+    if not s3_client:
+        raise HTTPException(status_code=503, detail="Storage service unavailable")
+        
+    if request.folder not in ALLOWED_FOLDERS:
+        raise HTTPException(status_code=400, detail="Invalid folder")
+    
+    config = ALLOWED_FOLDERS[request.folder]
+    bucket = config['bucket']
+    
+    file_ext = request.filename.split('.')[-1] if '.' in request.filename else 'bin'
+    safe_filename = f"{uuid.uuid4().hex}.{file_ext}"
+    key = f"{request.folder}/{current_user['id']}/{safe_filename}"
+    
+    try:
+        presigned_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': bucket,
+                'Key': key,
+                'ContentType': request.contentType
+            },
+            ExpiresIn=SIGNED_URL_EXPIRATION 
+        )
+        
+        return {
+            "uploadUrl": presigned_url,
+            "key": key,
+            "bucket": bucket,
+            "publicUrl": f"https://pub-cdn.pyramydhub.com/{key}" if config['privacy'] == 'public' else None
+        }
+    except ClientError as e:
+        print(f"R2 Signing Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate upload URL")
+
+@app.post("/api/user/documents")
+async def save_document_metadata(doc: DocumentMetadata, current_user: dict = Depends(get_current_user)):
+    """Save metadata for an uploaded document"""
+    users_collection.update_one(
+        {"id": current_user["id"]},
+        {"$push": {"documents": {
+            "type": doc.type,
+            "key": doc.key,
+            "bucket": doc.bucket,
+            "filename": doc.filename,
+            "uploaded_at": datetime.now(),
+            "status": "pending_verification"
+        }}}
+    )
+    return {"status": "success", "message": "Document saved"}
+
+# Pydantic Models for Registration
+class CompleteRegistration(BaseModel):
+    first_name: str
+    last_name: str
+    username: str
+    email_or_phone: str
+    password: str
+    phone: str
+    user_path: str
+    # Address Fields
+    address_street: Optional[str] = None # Number and Street Name
+    city: Optional[str] = None # Town/City
+    landmark: Optional[str] = None # Nearest Landmark (Optional)
+    state: Optional[str] = None # State (Dropdown)
+    country: str = "Nigeria" # Default Nigeria
+    
+    buyer_type: Optional[str] = None
+    partner_type: Optional[str] = None
+    business_category: Optional[str] = None
+    business_info: Optional[dict] = None
+    verification_info: Optional[dict] = None
+    gender: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    # Enhanced fields
+    id_type: Optional[str] = None
+    id_number: Optional[str] = None
+    documents: Optional[Dict[str, str]] = None  # URLs or base64 of uploaded docs
+    directors: Optional[List[dict]] = None
+    farm_details: Optional[List[dict]] = None
+    registration_status: Optional[str] = None # 'registered' or 'unregistered' for business
+    bio: Optional[str] = None
+    profile_picture: Optional[str] = None
+    verification_documents: Optional[Dict[str, str]] = None
+
+class User(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    first_name: str
+    last_name: str
+    username: str
+    email: str
+    phone: str
+    role: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    # Address
+    address_street: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
+
+
+@app.post("/api/auth/complete-registration")
+async def complete_registration(registration_data: CompleteRegistration):
+    # Check if user exists
+    if db.users.find_one({"$or": [
+        {"email_or_phone": registration_data.email_or_phone}, 
+        {"username": registration_data.username}
+    ]}):
+        raise HTTPException(status_code=400, detail="User already exists")
+    
+    # Determine user role based on registration path
+    user_role = None
+    if registration_data.user_path == 'buyer':
+        if registration_data.buyer_type == 'skip':
+            user_role = 'general_buyer'
+        else:
+            user_role = registration_data.buyer_type
+    elif registration_data.user_path == 'partner':
+        if registration_data.partner_type == 'business':
+            user_role = registration_data.business_category
+        else:
+            user_role = registration_data.partner_type
+
+    # Admin Override for scalable access
+    if registration_data.email_or_phone in ADMIN_EMAILS:
+        user_role = 'admin'
+    
+    # --- ENFORCEMENT LOGIC ---
+    
+    # 1. Agent & Farmer Enforcement
+    if user_role in ['agent', 'farmer']:
+        # Require ID, Headshot, Address Proof
+        if not registration_data.id_type or not registration_data.id_number:
+             raise HTTPException(status_code=400, detail="Identity verification (ID Type & Number) is required.")
+        
+        docs = registration_data.documents or {}
+        if not docs.get('headshot'):
+             raise HTTPException(status_code=400, detail="Profile Picture (Headshot) is required.")
+        if not docs.get('id_document'): # Slip/Card upload
+             raise HTTPException(status_code=400, detail="ID Document upload is required.")
+        if not docs.get('proof_of_address'):
+             raise HTTPException(status_code=400, detail="Proof of Address is required.")
+             
+        if user_role == 'farmer':
+            if not registration_data.farm_details:
+                raise HTTPException(status_code=400, detail="Farm details are required for Farmers.")
+
+    # 2. Business Enforcement
+    # Business roles can be: food_servicing, food_processor, farm_input, fintech, agriculture, supplier, others
+    is_business_role = registration_data.partner_type == 'business'
+    
+    if is_business_role:
+        if not registration_data.business_info:
+             raise HTTPException(status_code=400, detail="Business Information is required.")
+        
+        reg_status = registration_data.registration_status
+        if not reg_status:
+             raise HTTPException(status_code=400, detail="Business Registration Status (registered/unregistered) is required.")
+
+        docs = registration_data.documents or {}
+        
+        if reg_status == 'registered':
+            # Registered Business: CAC, TIN, Proof of Address (Director check removed per request)
+            if not docs.get('cac_document'):
+                 raise HTTPException(status_code=400, detail="CAC Document is required for registered businesses.")
+            if not docs.get('proof_of_address'):
+                 raise HTTPException(status_code=400, detail="Proof of Business Address is required.")
+            if not registration_data.business_info.get('tin'):
+                 raise HTTPException(status_code=400, detail="TIN is required for registered businesses.")
+                 
+        elif reg_status == 'unregistered':
+            # Unregistered Business: Treat like Agent (ID, Headshot, Bio)
+            if not registration_data.id_type or not registration_data.id_number:
+                 raise HTTPException(status_code=400, detail="Identity verification is required for unregistered businesses.")
+            if not docs.get('headshot'):
+                 raise HTTPException(status_code=400, detail="Headshot (Camera) is required.")
+            if not docs.get('id_document'):
+                 raise HTTPException(status_code=400, detail="ID Document/NIN upload is required.")
+            if not docs.get('proof_of_address'):
+                 raise HTTPException(status_code=400, detail="Proof of Address is required.")
+            # Bio is optional/implied by business info
+
+    # --- END ENFORCEMENT ---
+
+    # Create user with complete information
+    user = User(
+        first_name=registration_data.first_name,
+        last_name=registration_data.last_name,
+        username=registration_data.username,
+        email=registration_data.email_or_phone,  # Store as email for compatibility
+        phone=registration_data.phone,
+        role=user_role,
+        profile_picture=registration_data.profile_picture,
+        verification_documents=registration_data.verification_documents,
+        # Address Mapping
+        address_street=registration_data.address_street,
+        city=registration_data.city,
+        state=registration_data.state,
+        country=registration_data.country
+    )
+    
+    # Create user document with additional fields
+    user_dict = user.dict()
+    user_dict['password'] = hash_password(registration_data.password)
+    user_dict['gender'] = registration_data.gender
+    user_dict['date_of_birth'] = registration_data.date_of_birth
+    user_dict['user_path'] = registration_data.user_path
+    user_dict['business_info'] = registration_data.business_info or {}
+    user_dict['verification_info'] = registration_data.verification_info or {}
+    
+    # Store enhanced fields
+    user_dict['id_type'] = registration_data.id_type
+    user_dict['id_number'] = registration_data.id_number
+    user_dict['documents'] = registration_data.documents or {}
+    user_dict['landmark'] = registration_data.landmark
+    user_dict['directors'] = registration_data.directors or []
+    user_dict['farm_details'] = registration_data.farm_details or []
+    user_dict['registration_status'] = registration_data.registration_status
+    user_dict['bio'] = registration_data.bio
+    
+    user_dict['is_verified'] = False  # Will be updated after verification process
+    
+    db.users.insert_one(user_dict)
+    
+    # Generate token
+    token = create_token(user.id)
+    
+    return {
+        "message": "Registration completed successfully",
+        "token": token,
+        "user": {
+            "id": user.id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "username": user.username,
+            "email": user.email,
+            "role": user_role,
+            "user_path": registration_data.user_path
+        }
+    }
+
+
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
+
+
+<<<<<<< HEAD
 # Farm Deals Fixed Split Group
 FARMHUB_SPLIT_GROUP = os.environ.get('FARMHUB_SPLIT_GROUP')
 FARMHUB_SUBACCOUNT = os.environ.get('FARMHUB_SUBACCOUNT')
+=======
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
 
 # Commission rates
 AGENT_BUYER_COMMISSION_RATE = 0.04  # 4% for agent buyers
-FARMHUB_SERVICE_CHARGE = 0.10  # 10% service charge
-COMMUNITY_COMMISSION = 0.025  # 2.5% commission
-COMMUNITY_SERVICE = 0.10  # 10% service charge
 
-# State-based delivery fees (in Naira)
-STATE_DELIVERY_FEES = {
+
+
+# Base delivery fees for each state in Nigeria (in Naira)
+# These fees are used as the base for geocoded distance calculations
+BASE_DELIVERY_FEES = STATE_DELIVERY_FEES = {
     # Lagos and neighbors - Tier 1
     "Lagos": 1500,
     "Ogun": 2000,
@@ -127,54 +644,112 @@ STATE_DELIVERY_FEES = {
     "Taraba": 4000,
 }
 
-def get_delivery_fee_by_state(state: str) -> float:
-    """Get delivery fee based on customer's state"""
-    return STATE_DELIVERY_FEES.get(state, 3000)  # Default 3000 if state not found
+# HOME platform operates only in these states (24-hour delivery)
+HOME_PLATFORM_STATES = ["Lagos", "Oyo", "FCT Abuja"]
 
+# Perishable product categories (require faster/special handling)
+PERISHABLE_CATEGORIES = ["fish_meat", "spices_vegetables"]
+
+def get_base_delivery_fee(state: str) -> float:
+    """Get base delivery fee for a state"""
+    return BASE_DELIVERY_FEES.get(state, 3000)  # Default 3000 if state not found
+
+def get_delivery_fee_by_state(state: str) -> float:
+    """Get delivery fee based on customer's state (backward compatibility)"""
+    return get_base_delivery_fee(state)
+
+<<<<<<< HEAD
 def get_database():
     return db
+=======
+# Generate encryption key if not provided (for development only)
+if not ENCRYPTION_KEY:
+    ENCRYPTION_KEY = Fernet.generate_key().decode()
+    print(f"WARNING: Using auto-generated encryption key. Set ENCRYPTION_KEY in production!")
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
 
 
 
 # Security Utils
 from app.utils.security import encrypt_data, decrypt_data
 
-# Paystack Helper Functions
-def paystack_request(method: str, endpoint: str, data: dict = None) -> dict:
-    """Make authenticated request to Paystack API"""
-    headers = {
-        "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
-        "Content-Type": "application/json"
+
+
+
+# --- AUTHENTICATION & SECURITY ---
+security = HTTPBearer()
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+def create_token(user_id: str) -> str:
+    payload = {
+        'user_id': user_id,
+        'exp': datetime.utcnow() + timedelta(days=30)
     }
-    url = f"{PAYSTACK_API_URL}{endpoint}"
-    
+    return jwt.encode(payload, JWT_SECRET, algorithm='HS256')
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
-        if method == "GET":
-            response = requests.get(url, headers=headers)
-        elif method == "POST":
-            response = requests.post(url, headers=headers, json=data)
-        elif method == "PUT":
-            response = requests.put(url, headers=headers, json=data)
-        else:
-            raise ValueError(f"Unsupported method: {method}")
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+        user_id = payload.get('user_id')
+        user = db.users.find_one({'id': user_id})
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/auth/login")
+async def login(login_data: LoginRequest):
+    # Find user by email, username, or phone
+    user = db.users.find_one({"$or": [
+        {"email": login_data.username},
+        {"username": login_data.username},
+        {"phone": login_data.username},
+        {"email_or_phone": login_data.username}
+    ]})
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
         
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Paystack API error: {str(e)}")
-        if hasattr(e.response, 'text'):
-            print(f"Response: {e.response.text}")
-        raise HTTPException(status_code=500, detail=f"Paystack API error: {str(e)}")
+    if not verify_password(login_data.password, user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+    token = create_token(user["id"])
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user_id": user["id"],
+        "username": user["username"],
+        "role": user.get("role", "buyer"),
+         "user": {
+            "id": user["id"],
+            "first_name": user.get("first_name"),
+            "last_name": user.get("last_name"),
+            "username": user["username"],
+            "email": user.get("email"),
+            "role": user.get("role"),
+            "profile_picture": user.get("profile_picture")
+        }
+    }
 
-def verify_paystack_signature(payload: bytes, signature: str) -> bool:
-    """Verify Paystack webhook signature"""
-    computed_signature = hmac.new(
-        PAYSTACK_SECRET_KEY.encode('utf-8'),
-        payload,
-        hashlib.sha512
-    ).hexdigest()
-    return hmac.compare_digest(computed_signature, signature)
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
 
+<<<<<<< HEAD
 def create_transfer_recipient(name: str, account_number: str, bank_code: str) -> str:
     """Create a Paystack Transfer Recipient"""
     payload = {
@@ -206,10 +781,414 @@ def initiate_transfer(amount_naira: float, recipient_code: str, reference: str, 
 def naira_to_kobo(amount: float) -> int:
     """Convert Naira to Kobo (sub-unit)"""
     return int(amount * 100)
+=======
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    otp: str
+    new_password: str
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
 
-def kobo_to_naira(amount: int) -> float:
-    """Convert Kobo to Naira"""
-    return amount / 100
+@app.post("/api/auth/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    user = users_collection.find_one({"email": request.email})
+    if not user:
+        # Don't reveal user existence
+        return {"message": "If this email is registered, you will receive a password reset code."}
+    
+    # Generate simple 6-digit OTP
+    otp = str(uuid.uuid4().int)[:6]
+    
+    # Store OTP with expiration (15 mins)
+    users_collection.update_one(
+        {"email": request.email},
+        {"$set": {
+            "reset_otp": otp, 
+            "reset_otp_expires": datetime.utcnow() + timedelta(minutes=15)
+        }}
+    )
+    
+    # Send Email (Mocking for now if SMTP not full configured, but logic is here)
+    try:
+        # In a real scenario, use SMTP/SendGrid to send 'otp' to 'request.email'
+        print(f" [MOCK EMAIL SERVICE] Password Reset OTP for {request.email}: {otp}")
+        # If email service is configured, uncomment:
+        # send_email(to_email=request.email, subject="Password Reset", body=f"Your code is {otp}")
+        pass
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+    
+    return {"message": "If this email is registered, you will receive a password reset code."}
+
+@app.post("/api/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    user = users_collection.find_one({"email": request.email})
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid request")
+        
+    # Verify OTP
+    stored_otp = user.get("reset_otp")
+    otp_expires = user.get("reset_otp_expires")
+    
+    if not stored_otp or stored_otp != request.otp:
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+        
+    if not otp_expires or datetime.utcnow() > otp_expires:
+        raise HTTPException(status_code=400, detail="Code expired")
+        
+    # Reset Password
+    new_hashed = hash_password(request.new_password)
+    users_collection.update_one(
+        {"email": request.email},
+        {"$set": {
+            "password": new_hashed,
+            "reset_otp": None,
+            "reset_otp_expires": None
+        }}
+    )
+    
+    return {"message": "Password reset successfully. You can now login."}
+
+ADMIN_EMAILS = ["abdulazeezshakrullah@gmail.com", "abdulazeezshakrullah@pyramydhub.com"]
+
+@app.on_event("startup")
+async def startup_db_client():
+    print("Checking for admin users...")
+    try:
+        initial_password = "AdminInitialPassword123!" # Default initial password
+        hashed = hash_password(initial_password)
+        
+        for email in ADMIN_EMAILS:
+            user = db.users.find_one({"email": email})
+            if not user:
+                print(f"Creating admin user: {email}")
+                new_admin = {
+                    "id": str(uuid.uuid4()),
+                    "email": email,
+                    "password": hashed,
+                    "role": "admin",
+                    "username": email.split('@')[0],
+                    "first_name": "Abdulazeez",
+                    "last_name": "Shakrullah",
+                    "is_verified": True,
+                    "created_at": datetime.utcnow()
+                }
+                db.users.insert_one(new_admin)
+                print(f"Admin created: {email}, Default Password: {initial_password}")
+            else:
+                if user.get("role") != "admin":
+                    db.users.update_one({"_id": user["_id"]}, {"$set": {"role": "admin"}})
+                    print(f"Updated role to admin for {email}")
+    except Exception as e:
+        print(f"Error seeding admins: {e}")
+
+def get_kyc_requirements(user: dict) -> dict:
+    """Get specific KYC requirements based on user type"""
+    role = user.get("role", "")
+    business_category = user.get("business_category", "")
+    is_registered_business = user.get("is_registered_business", False)
+    
+    # Agent-specific KYC requirements
+    if role == "agent":
+        return {
+            "type": "agent",
+            "title": "Agent KYC Requirements",
+            "description": "Specialized requirements for agricultural agents",
+            "review_time": "1-3 business days",
+            "documents": [
+                "Headshot Photo (Camera captured)",
+                "National ID Document (NIN or BVN)",
+                "Utility Bill (Address verification)",
+                "Bank Statement (Financial verification)",
+                "Certificate of Incorporation (If registered business)",
+                "TIN Certificate (If registered business)"
+            ],
+            "information_required": [
+                "Business name and address",
+                "Personal identification details",
+                "Agricultural experience",
+                "Target operation locations",
+                "Expected farmer network size"
+            ],
+            "endpoint": "/api/kyc/agent/submit",
+            "benefits_after_approval": [
+                "Register and verify farmers",
+                "Earn commission on farmer sales",
+                "Access agent dashboard",
+                "Build farmer network"
+            ]
+        }
+    
+    # Farmer-specific KYC requirements  
+    elif role == "farmer":
+        return {
+            "type": "farmer",
+            "title": "Farmer KYC Requirements", 
+            "description": "Verification requirements for farmers",
+            "review_time": "24-48 hours (agent-verified) or 2-5 business days (self-verified)",
+            "documents": [
+                "Headshot Photo (Camera captured)",
+                "National ID Document (NIN or BVN)", 
+                "Farm Photo (Show your farming area)",
+                "Land Ownership Document (Certificate or lease agreement)"
+            ],
+            "information_required": [
+                "Personal identification details",
+                "Farm location and size",
+                "Primary crops grown",
+                "Farming experience",
+                "Land ownership status"
+            ],
+            "verification_options": [
+                {
+                    "method": "agent_verified",
+                    "title": "Agent Verification (Recommended)",
+                    "description": "Get verified by a registered agent for faster processing",
+                    "processing_time": "24-48 hours",
+                    "benefits": ["Faster approval", "Agent support", "Market access guidance"]
+                },
+                {
+                    "method": "self_verified", 
+                    "title": "Self Verification",
+                    "description": "Submit documents directly for verification",
+                    "processing_time": "2-5 business days",
+                    "benefits": ["Direct submission", "Full document control"]
+                }
+            ],
+            "endpoint": "/api/kyc/farmer/submit"
+        }
+    
+    # Business KYC requirements (existing)
+    elif role == "business":
+        if is_registered_business:
+            return {
+                "type": "registered_business",
+                "title": "Registered Business KYC",
+                "description": "Requirements for registered businesses",
+                "review_time": "2-5 business days",
+                "documents": [
+                    "Business Registration Number",
+                    "TIN Certificate", 
+                    "Certificate of Incorporation",
+                    "Business Address Verification (Utility Bill)"
+                ],
+                "endpoint": "/api/kyc/registered-business/submit"
+            }
+        else:
+            return {
+                "type": "unregistered_business",
+                "title": "Unregistered Business KYC", 
+                "description": "Requirements for unregistered businesses",
+                "review_time": "2-5 business days",
+                "documents": [
+                    "NIN or BVN",
+                    "Headshot Photo (Camera)",
+                    "National ID Document",
+                    "Utility Bill (Address Verification)"
+                ],
+                "endpoint": "/api/kyc/unregistered-entity/submit"
+            }
+    
+    # Default for other roles
+    else:
+        return {
+            "type": "unregistered_entity", 
+            "title": "Standard KYC Requirements",
+            "documents": [
+                "NIN or BVN",
+                "Headshot Photo (Camera)",
+                "National ID Document", 
+                "Utility Bill (Address Verification)"
+            ],
+            "endpoint": "/api/kyc/unregistered-entity/submit"
+        }
+
+def validate_kyc_compliance(user: dict, action: str = "general"):
+    """
+    Validate if user is KYC compliant for specific actions.
+    """
+    # Personal accounts don't require KYC
+    if user.get("role") == "personal":
+        return True
+    
+    # Check if KYC is required and approved
+    kyc_status = user.get("kyc_status", "not_started")
+    user_role = user.get("role", "")
+    
+    # Enhanced restrictions for agents - they must complete KYC before ANY platform actions
+    if user_role == "agent":
+        if kyc_status == "not_started":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "AGENT_KYC_REQUIRED",
+                    "message": "Agents must complete their KYC verification before performing any actions on the platform. Please submit your KYC documents to get started.",
+                    "kyc_status": kyc_status,
+                    "verification_time": "Verification takes within 24 hours to verify",
+                    "access_level": "view_only",
+                    "required_actions": get_kyc_requirements(user)
+                }
+            )
+        elif kyc_status == "pending":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "AGENT_KYC_PENDING", 
+                    "message": "Your KYC is under review. You can access the platform to view but cannot onboard farmers or publish farm produce until your status changes to verified.",
+                    "kyc_status": kyc_status,
+                    "verification_time": "Verification typically completes within 24 hours",
+                    "access_level": "view_only"
+                }
+            )
+        elif kyc_status == "rejected":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "AGENT_KYC_REJECTED",
+                    "message": "Your KYC was rejected. Please resubmit with correct documents. You can only view the platform until verification is completed.",
+                    "kyc_status": kyc_status,
+                    "access_level": "view_only",
+                    "required_actions": get_kyc_requirements(user)
+                }
+            )
+    
+    # For other roles (business, farmer, etc.) - standard KYC validation
+    if kyc_status != "approved":
+        status_messages = {
+            "not_started": "Please complete your KYC verification to perform this action",
+            "pending": "Your KYC is under review. You can perform this action once approved", 
+            "rejected": "Your KYC was rejected. Please resubmit with correct documents to continue"
+        }
+        
+        action_context = {
+            "sales": "receive payments or complete sales",
+            "register_farmers": "register farmers to your network",
+            "post_products": "post products for sale", 
+            "collect_payments": "collect payments from customers"
+        }
+        
+        context = action_context.get(action, "perform this action")
+        message = f"KYC verification required to {context}. {status_messages.get(kyc_status, 'KYC verification required')}"
+        
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "KYC_REQUIRED",
+                "message": message,
+                "kyc_status": kyc_status,
+                "required_actions": get_kyc_requirements(user)
+            }
+        )
+    
+    return True
+
+def send_order_completion_email(order_data: dict):
+    """Send order completion notification to support email"""
+    try:
+        if not SMTP_USERNAME or not SMTP_PASSWORD:
+            print("⚠️ Email credentials not configured. Skipping email notification.")
+            return False
+
+        # Create email content
+        subject = f"Order Completed: {order_data.get('order_id', 'N/A')}"
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+                <h2 style="color: #2ecc71; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">Order Completed Successfully</h2>
+                
+                <div style="margin: 20px 0;">
+                    <h3 style="color: #27ae60;">Order Details</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Order ID:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">{order_data.get('order_id', 'N/A')}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Buyer:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">{order_data.get('buyer_username', 'N/A')}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Seller:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">{order_data.get('seller_username', 'N/A')}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Total Amount:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">₦{order_data.get('total_amount', 0):,.2f}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Delivery Method:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">{order_data.get('delivery_method', 'N/A')}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Delivery Address:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">{order_data.get('shipping_address', 'N/A')}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Completed At:</strong></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">{order_data.get('delivered_at', datetime.utcnow()).strftime('%Y-%m-%d %H:%M:%S') if isinstance(order_data.get('delivered_at'), datetime) else 'N/A'}</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div style="margin: 20px 0;">
+                    <h3 style="color: #27ae60;">Product Details</h3>
+                    {_format_product_details(order_data.get('product_details', {}))}
+                </div>
+                
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #777; font-size: 12px;">
+                    <p>This is an automated notification from Pyramyd Hub.</p>
+                    <p>For inquiries, contact: {SUPPORT_EMAIL}</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = FROM_EMAIL
+        msg['To'] = SUPPORT_EMAIL
+        
+        # Attach HTML content
+        html_part = MIMEText(html_content, 'html')
+        msg.attach(html_part)
+        
+        # Send email
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
+        
+        print(f"✅ Order completion email sent for order: {order_data.get('order_id')}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Failed to send order completion email: {str(e)}")
+        return False
+
+def _format_product_details(product_details: dict) -> str:
+    """Format product details for email"""
+    if not product_details:
+        return "<p>No product details available</p>"
+    
+    return f"""
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Product Name:</strong></td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">{product_details.get('title', 'N/A')}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Quantity:</strong></td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">{product_details.get('quantity', 0)} {product_details.get('unit', '')}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Unit Price:</strong></td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">₦{product_details.get('unit_price', 0):,.2f}</td>
+        </tr>
+    </table>
+    """
 
 # Commission structure for agents (updated rates)
 AGENT_COMMISSION_RATES = {
@@ -294,6 +1273,7 @@ def calculate_agent_commission(product_total: float, agent_user_id: str, db) -> 
         'tier_info': tier_info
     }
 
+<<<<<<< HEAD
 # Kwik Delivery functions removed
 
 
@@ -303,6 +1283,317 @@ from fastapi import FastAPI, HTTPException, Depends, status, Request
 import app.api.kyc as kyc
 import app.api.auth as auth
 import app.api.communities as communities
+=======
+# Kwik Delivery Integration
+def kwik_request(method: str, endpoint: str, data: dict = None) -> dict:
+    """
+    Make authenticated request to Kwik Delivery API.
+    Kwik API requires access_token in the request body, not headers.
+    """
+    headers = {
+        "Content-Type": "application/json"
+    }
+    url = f"{KWIK_API_URL}{endpoint}"
+
+    # Add access_token to request body (Kwik's authentication method)
+    if data is None:
+        data = {}
+    data['access_token'] = KWIK_ACCESS_TOKEN
+
+    try:
+        if method == "GET":
+            # For GET requests, send as query params
+            response = requests.get(url, headers=headers, params=data)
+        elif method == "POST":
+            # For POST requests, send in body
+            response = requests.post(url, headers=headers, json=data)
+        else:
+            raise ValueError(f"Unsupported method: {method}")
+
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Kwik API error: {str(e)}")
+        if hasattr(e, 'response') and hasattr(e.response, 'text'):
+            print(f"Response: {e.response.text}")
+        # Don't raise exception, return None to fallback to state-based fees
+        return None
+
+def estimate_fare_kwik(pickup_address: dict, delivery_address: dict, vehicle_id: int = 0) -> dict:
+    """
+    Estimate delivery fare using Kwik API.
+
+    Args:
+        pickup_address: dict with 'address', 'name', 'phone', 'latitude', 'longitude', 'email'
+        delivery_address: dict with 'address', 'name', 'phone', 'latitude', 'longitude', 'email'
+        vehicle_id: 0 for Bike/Motorcycle, other IDs for different vehicle types
+
+    Returns:
+        dict with 'estimated_fare', 'distance_km', 'success' or None if failed
+    """
+    payload = {
+        "domain_name": KWIK_DOMAIN_NAME,
+        "vendor_id": KWIK_VENDOR_ID,
+        "is_multiple_tasks": 1,
+        "has_pickup": 1,
+        "has_delivery": 1,
+        "vehicle_id": vehicle_id,
+        "pickups": [
+            {
+                "address": pickup_address.get('address', ''),
+                "name": pickup_address.get('name', 'Vendor'),
+                "phone": pickup_address.get('phone', '+234'),
+                "latitude": str(pickup_address.get('latitude', '')),
+                "longitude": str(pickup_address.get('longitude', '')),
+                "email": pickup_address.get('email', 'vendor@pyramyd.com')
+            }
+        ],
+        "deliveries": [
+            {
+                "address": delivery_address.get('address', ''),
+                "name": delivery_address.get('name', 'Customer'),
+                "phone": delivery_address.get('phone', '+234'),
+                "latitude": str(delivery_address.get('latitude', '')),
+                "longitude": str(delivery_address.get('longitude', '')),
+                "email": delivery_address.get('email', 'customer@example.com')
+            }
+        ]
+    }
+
+    # Endpoint might be /task/estimate_fare or similar - verify with Kwik docs
+    result = kwik_request("POST", "/task/estimate_fare", payload)
+
+    if result and result.get('status') == 'success':
+        # Parse the response - structure may vary, adjust based on actual API response
+        data = result.get('data', {})
+        return {
+            'success': True,
+            'estimated_fare': data.get('delivery_charge', 0),  # In Naira
+            'distance_km': data.get('distance', 0),
+            'currency': 'NGN',
+            'vehicle_type': vehicle_id
+        }
+
+    return None
+
+def calculate_delivery_fee(product_total: float, buyer_state: str, product_data: dict = None,
+                          pickup_address: dict = None, delivery_address: dict = None, 
+                          platform_type: str = "home", quantity: float = 1, 
+                          buyer_location: str = None, seller_location: str = None,
+                          buyer_city: str = None, seller_city: str = None) -> dict:
+    """
+    Smart delivery fee calculator with vendor priority and platform-specific logic.
+    Priority: Vendor logistics > Kwik API (for HOME in enabled states) > Platform-specific geocode calculation
+
+    Args:
+        product_total: Total product value in Naira
+        buyer_state: Customer's state
+        product_data: Optional product info (for vendor-managed logistics and perishable check)
+        pickup_address: Optional pickup location (for Kwik fare estimation)
+        delivery_address: Optional delivery location (for Kwik fare estimation)
+        platform_type: Platform type - "home", "farmhub", or "community"
+        quantity: Quantity of product (for farmhub/community calculation)
+        buyer_location: Buyer's full address/location string (for geocoding)
+        seller_location: Seller's full address/location string (for geocoding)
+        buyer_city: Buyer's city (used in geocoding if provided)
+        seller_city: Seller's city (used in geocoding if provided)
+
+    Returns:
+        dict with delivery_fee, delivery_method, estimated_delivery_days, and other metadata
+    """
+    delivery_info = {
+        'delivery_fee': 0.0,
+        'delivery_method': 'unknown',
+        'kwik_available': False,
+        'vendor_managed': False,
+        'estimated_delivery_days': None
+    }
+
+    # Priority 1: Check if vendor manages logistics
+    if product_data and product_data.get('logistics_managed_by') == 'seller':
+        vendor_fee = product_data.get('seller_delivery_fee', 0.0)
+        delivery_info.update({
+            'delivery_fee': vendor_fee,
+            'delivery_method': 'vendor_managed',
+            'vendor_managed': True,
+            'is_free': vendor_fee == 0.0,
+            'estimated_delivery_days': '3-14 days' if platform_type in ['farmhub', 'community'] else '24 hours'
+        })
+        return delivery_info
+
+    # Priority 2: Standard Platform Delivery (Distance or Zone based)
+    # We skipped Kwik as per user request. 
+    
+    # Continue to standard calculation below...
+
+
+    # Priority 3: Platform-specific geocode-based calculation
+    # Get base delivery fee for the state
+    base_fee = get_base_delivery_fee(buyer_state)
+    
+    # Try to calculate distance using geocoding
+    distance_km = None
+    if buyer_location or buyer_city:
+        try:
+            # Build buyer address string (include city if provided)
+            buyer_addr = buyer_location or ""
+            if buyer_city and buyer_city not in buyer_addr:
+                buyer_addr = f"{buyer_addr}, {buyer_city}" if buyer_addr else buyer_city
+            if buyer_state and buyer_state not in buyer_addr:
+                buyer_addr = f"{buyer_addr}, {buyer_state}, Nigeria"
+            
+            # Build seller address string (include city if provided)
+            seller_addr = seller_location or ""
+            if seller_city and seller_city not in seller_addr:
+                seller_addr = f"{seller_addr}, {seller_city}" if seller_addr else seller_city
+            # Add Nigeria to help with geocoding
+            if "Nigeria" not in seller_addr:
+                seller_addr = f"{seller_addr}, Nigeria"
+            
+            buyer_coords = geo_helper.geocode_address(buyer_addr.strip())
+            seller_coords = geo_helper.geocode_address(seller_addr.strip())
+            
+            if buyer_coords and seller_coords:
+                distance_km = geo_helper.distance_km(buyer_coords, seller_coords)
+        except Exception as e:
+            print(f"Geocoding error: {str(e)}")
+            distance_km = None
+    
+    # Calculate platform-specific delivery fee
+    if platform_type == "home":
+        # HOME: base_fee + (distance * 1000), max 40,000
+        if distance_km:
+            calculated_fee = base_fee + (distance_km * 1000)
+            delivery_fee = min(calculated_fee, 40000)  # Cap at 40,000
+            delivery_info.update({
+                'delivery_fee': delivery_fee,
+                'delivery_method': 'geocode_distance_based',
+                'distance_km': distance_km,
+                'base_fee': base_fee,
+                'estimated_delivery_days': '24 hours'
+            })
+        else:
+            # Fallback to base fee if geocoding fails
+            delivery_info.update({
+                'delivery_fee': base_fee,
+                'delivery_method': 'state_based_fallback',
+                'base_fee': base_fee,
+                'estimated_delivery_days': '24 hours'
+            })
+    
+    elif platform_type in ["farmhub", "community"]:
+        # FARMHUB/COMMUNITY: base_fee + (distance * quantity * multiplier)
+        # Check if product is perishable (multiplier = 15, else 10)
+        is_perishable = False
+        if product_data:
+            category = product_data.get('category', '')
+            is_perishable = category in PERISHABLE_CATEGORIES
+        
+        multiplier = 15 if is_perishable else 10
+        
+        if distance_km:
+            calculated_fee = base_fee + (distance_km * quantity * multiplier)
+            delivery_info.update({
+                'delivery_fee': calculated_fee,
+                'delivery_method': 'geocode_distance_quantity_based',
+                'distance_km': distance_km,
+                'base_fee': base_fee,
+                'quantity': quantity,
+                'is_perishable': is_perishable,
+                'multiplier': multiplier,
+                'estimated_delivery_days': '3-14 days'
+            })
+        else:
+            # Fallback to base fee if geocoding fails
+            delivery_info.update({
+                'delivery_fee': base_fee,
+                'delivery_method': 'state_based_fallback',
+                'base_fee': base_fee,
+                'estimated_delivery_days': '3-14 days'
+            })
+    else:
+        # Default fallback for unknown platforms
+        delivery_info.update({
+            'delivery_fee': base_fee,
+            'delivery_method': 'state_based_default',
+            'base_fee': base_fee
+        })
+
+    return delivery_info
+
+def create_kwik_delivery(pickup_address: dict, delivery_address: dict, order_details: dict, vehicle_id: int = 0) -> dict:
+    """
+    Create a delivery task on Kwik API using official API structure.
+
+    Args:
+        pickup_address: dict with 'address', 'name', 'phone', 'latitude', 'longitude', 'email'
+        delivery_address: dict with 'address', 'name', 'phone', 'latitude', 'longitude', 'email'
+        order_details: dict with 'order_id', 'description', 'amount', 'collect_cod' (bool)
+        vehicle_id: 0 for Bike/Motorcycle, other IDs for different vehicle types
+
+    Returns:
+        dict with tracking info or None if failed
+    """
+    # Determine payment method and COD amount
+    collect_cod = order_details.get('collect_cod', False)
+    total_amount_kobo = naira_to_kobo(order_details.get('amount', 0)) if collect_cod else 0
+
+    # Payment method: 524288 for EOMB (End of Month Billing), check Kwik docs for other methods
+    # If platform already collected payment, amount should be 0
+    payment_method = 524288  # EOMB - adjust based on your Kwik account setup
+
+    kwik_payload = {
+        "domain_name": KWIK_DOMAIN_NAME,
+        "vendor_id": KWIK_VENDOR_ID,
+        "is_multiple_tasks": 1,
+        "has_pickup": 1,
+        "has_delivery": 1,
+        "vehicle_id": vehicle_id,
+        "auto_assignment": 1,  # Automatically assign to available driver
+        "amount": total_amount_kobo,  # Total amount in kobo (if COD) or 0
+        "payment_method": payment_method,
+        "pickups": [
+            {
+                "address": pickup_address.get('address', ''),
+                "name": pickup_address.get('name', 'Pyramyd Vendor'),
+                "phone": pickup_address.get('phone', '+234'),
+                "latitude": str(pickup_address.get('latitude', '')),
+                "longitude": str(pickup_address.get('longitude', '')),
+                "email": pickup_address.get('email', 'vendor@pyramyd.com')
+            }
+        ],
+        "deliveries": [
+            {
+                "address": delivery_address.get('address', ''),
+                "name": delivery_address.get('name', 'Customer'),
+                "phone": delivery_address.get('phone', '+234'),
+                "latitude": str(delivery_address.get('latitude', '')),
+                "longitude": str(delivery_address.get('longitude', '')),
+                "email": delivery_address.get('email', 'customer@example.com')
+            }
+        ],
+        "delivery_instruction": f"Order Ref: {order_details.get('order_id', '')}. {order_details.get('description', 'Handle with care.')}"
+    }
+
+    # Official endpoint for task creation
+    result = kwik_request("POST", "/task/create_pickup_and_delivery_task", kwik_payload)
+
+    if result and result.get('status') == 'success':
+        # Parse response - adjust field names based on actual Kwik API response
+        data = result.get('data', {})
+        return {
+            'success': True,
+            'kwik_task_id': data.get('task_id') or data.get('delivery_id'),
+            'tracking_url': data.get('tracking_url'),
+            'tracking_id': data.get('tracking_id'),
+            'estimated_time': data.get('estimated_time'),
+            'driver_name': data.get('driver_name'),
+            'driver_phone': data.get('driver_phone'),
+            'status': data.get('status', 'assigned')
+        }
+
+    return None
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
 
 app = FastAPI(title="Pyramyd API", version="1.0.0")
 
@@ -315,21 +1606,37 @@ app.include_router(rfq.router, prefix="/api/requests", tags=["rfq"])
 
 
 # CORS middleware
+<<<<<<< HEAD
 # CORS middleware
 origins_str = os.environ.get("ALLOWED_ORIGINS", "*")
+=======
+# Get allowed origins from env, default to localhost for dev and the specified production domain
+origins_str = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,https://pyramydhub.com,https://www.pyramydhub.com")
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
 origins = [origin.strip() for origin in origins_str.split(",")]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["*"], # Allow all headers for now to prevent auth issues
 )
 
-# MongoDB connection
-client = MongoClient(MONGO_URL)
-db = client.pyramyd_db
+# Startup Event
+@app.on_event("startup")
+async def startup_event():
+    print(f"Application starting up on port {os.environ.get('PORT', '8001')}...")
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Pyramyd Backend Running", "service": "backend"}
+
+
+
+# Initialize GeopyHelper with MongoDB caching
+geo_helper = GeopyHelper(api_key=GEOAPIFY_API_KEY, user_agent="pyramyd_platform", db=db, cache_collection="geocode_cache")
+
 users_collection = db.users
 messages_collection = db.messages
 dropoff_locations_collection = db.dropoff_locations
@@ -358,19 +1665,221 @@ audit_logs_collection = db.audit_logs
 
 # Paystack Payment collections
 paystack_subaccounts_collection = db.paystack_subaccounts
-paystack_transactions_collection = db.paystack_transactions
-paystack_transfer_recipients_collection = db.paystack_transfer_recipients
-paystack_transfers_collection = db.paystack_transfers
-commission_payouts_collection = db.commission_payouts
 
+<<<<<<< HEAD
 # Kwik Delivery collection
 disputes_collection = db.disputes
 buyer_requests_collection = db.buyer_requests
 request_offers_collection = db.request_offers
 settlement_logs_collection = db.settlement_logs
+=======
+# --- Messaging System Models & Endpoints ---
 
-# Security
-security = HTTPBearer()
+class Message(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    sender_id: str
+    recipient_id: str
+    content: Optional[str] = None
+    attachments: Optional[List[str]] = [] # List of R2 keys
+    is_read: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class MessageCreate(BaseModel):
+    recipient_username: str
+    content: Optional[str] = None
+    attachments: Optional[List[str]] = []
+
+@app.post("/api/messages")
+async def send_message(msg_data: MessageCreate, current_user: dict = Depends(get_current_user)):
+    """Send a direct message"""
+    recipient = users_collection.find_one({"username": msg_data.recipient_username})
+    if not recipient:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Validate attachements (Optional: Check if keys exist/belong to user)
+    
+    new_msg = {
+        "id": str(uuid.uuid4()),
+        "sender_id": current_user["id"],
+        "recipient_id": recipient["id"],
+        "content": msg_data.content,
+        "attachments": msg_data.attachments,
+        "is_read": False,
+        "created_at": datetime.utcnow()
+    }
+    
+    messages_collection.insert_one(new_msg)
+    new_msg.pop("_id", None)
+    return new_msg
+
+
+
+@app.get("/api/users/search")
+async def search_users(q: str, current_user: dict = Depends(get_current_user)):
+    """Search users to start a chat"""
+    users = list(users_collection.find(
+        {"username": {"$regex": q, "$options": "i"}, "id": {"$ne": current_user["id"]}},
+        {"first_name": 1, "last_name": 1, "username": 1, "profile_picture": 1}
+    ).limit(10))
+    
+    results = []
+    for u in users:
+        results.append({
+            "username": u.get("username"),
+            "display_name": f"{u.get('first_name', '')} {u.get('last_name', '')}".strip(),
+            "profile_picture": u.get("profile_picture") or "https://via.placeholder.com/40"
+        })
+    return {"users": results}
+
+
+@app.put("/api/products/{product_id}/preorder-time")
+async def update_preorder_time(
+    product_id: str,
+    time_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update pre-order availability time"""
+    # Verify ownership
+    product = db.products.find_one({"id": product_id})
+    if not product:
+         raise HTTPException(status_code=404, detail="Product not found")
+         
+    if product["seller_id"] != current_user["id"]:
+         raise HTTPException(status_code=403, detail="Not authorized")
+    
+    db.products.update_one(
+        {"id": product_id},
+        {"$set": {
+            "preorder_available_date": time_data.get("available_date"),
+            "preorder_end_date": time_data.get("end_date"),
+            "is_preorder": True
+        }}
+    )
+    
+    return {"message": "Pre-order time updated"}
+
+@app.get("/api/communities/search")
+async def search_communities(
+    q: str,  # Search query
+    type: str = "all"  # all, community, product
+):
+    """Search communities and products"""
+    try:
+        results = {
+            "communities": [],
+            "products": []
+        }
+        
+        if type in ["all", "community"]:
+            communities = list(communities_collection.find({
+                "$or": [
+                    {"name": {"$regex": q, "$options": "i"}},
+                    {"description": {"$regex": q, "$options": "i"}},
+                    {"category": {"$regex": q, "$options": "i"}}
+                ]
+            }).limit(10))
+            
+            for community in communities:
+                community.pop('_id', None)
+            results["communities"] = communities
+        
+        if type in ["all", "product"]:
+            # Search products that belong to a community
+            products = list(db.products.find({
+                "community_id": {"$exists": True, "$ne": None},
+                "$or": [
+                    {"title": {"$regex": q, "$options": "i"}},
+                    {"description": {"$regex": q, "$options": "i"}},
+                    {"category": {"$regex": q, "$options": "i"}}
+                ]
+            }).limit(10))
+            
+            for product in products:
+                product.pop('_id', None)
+            results["products"] = products
+        
+        return results
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/admin/stats")
+async def get_admin_stats(current_user: dict = Depends(get_current_user)):
+    """Admin dashboard statistics"""
+    # Verify admin - logic can be improved to check specific admin roles or email list
+    # For MVP, we might just check if role is 'admin' or email matches specific env var
+    # As per checklist, we should use ADMIN_EMAIL
+    if current_user["email"] != ADMIN_EMAIL and current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Aggregate stats
+    total_transactions = paystack_transactions_collection.count_documents({"status": "success"})
+    
+    # Calculate revenue
+    revenue_pipeline = [
+        {"$match": {"status": "success"}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}} # Amount is usually in kobo
+    ]
+    revenue_result = list(paystack_transactions_collection.aggregate(revenue_pipeline))
+    total_revenue = (revenue_result[0]["total"] / 100) if revenue_result else 0
+    
+    return {
+        "totalTransactions": total_transactions,
+        "totalRevenue": total_revenue,
+        "activeUsers": users_collection.count_documents({}),
+        "pendingOrders": db.orders.count_documents({"status": "pending"}),
+        "pendingKYC": users_collection.count_documents({"kyc_status": "pending"})
+    }
+
+@app.get("/api/agent/farmers")
+async def get_agent_farmers(current_user: dict = Depends(get_current_user)):
+    """Get list of farmers managed by the agent with performance stats"""
+    if current_user["role"] != "agent":
+        raise HTTPException(status_code=403, detail="Only agents can access this endpoint")
+        
+    try:
+        # Get relationships
+        relationships = list(agent_farmers_collection.find({"agent_id": current_user["id"]}))
+        farmer_ids = [r["farmer_id"] for r in relationships]
+        
+        farmers = []
+        for farmer_id in farmer_ids:
+            # Get farmer profile
+            farmer = users_collection.find_one({"id": farmer_id})
+            if not farmer:
+                continue
+                
+            # Get stats
+            product_count = db.products.count_documents({"seller_id": farmer_id})
+            
+            # Sales stats
+            sales_pipeline = [
+                {"$match": {"delivery_handler_id": farmer_id, "status": {"$ne": "cancelled"}}},
+                {"$group": {"_id": None, "total_sales": {"$sum": "$total_amount"}, "order_count": {"$sum": 1}}}
+            ]
+            sales_result = list(db.orders.aggregate(sales_pipeline))
+            sales_data = sales_result[0] if sales_result else {"total_sales": 0, "order_count": 0}
+            
+            farmers.append({
+                "id": farmer["id"],
+                "username": farmer["username"],
+                "first_name": farmer.get("first_name", ""),
+                "last_name": farmer.get("last_name", ""),
+                "profile_picture": farmer.get("profile_picture"),
+                "product_count": product_count,
+                "total_sales": sales_data["total_sales"],
+                "total_orders": sales_data["order_count"],
+                "joined_at": farmer.get("created_at")
+            })
+            
+        return {"farmers": farmers}
+        
+    except Exception as e:
+        print(f"Error getting agent farmers: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
+
 
 # --- Auto-Release / Payout Logic ---
 from app.services.payout_service import process_order_payout
@@ -465,10 +1974,21 @@ class KYCStatus(str, Enum):
     REJECTED = "rejected"
 
 class ProductCategory(str, Enum):
-    GRAINS_LEGUMES = "grains_legumes"
-    FISH_MEAT = "fish_meat"
+    GRAINS_CEREALS = "grains_cereals"
+    GRAINS_LEGUMES = "grains_legumes" # Kept for backward compatibility
+    BEANS_VARIETIES = "beans_varieties"
+    FLOUR_BAKINGS = "flour_bakings"
     SPICES_VEGETABLES = "spices_vegetables" 
+    FISH_MEAT = "fish_meat"
+    SEA_FOODS = "sea_foods"
     TUBERS_ROOTS = "tubers_roots"
+    FRUITS = "fruits"
+    CASH_CROP = "cash_crop"
+    FERTILIZER = "fertilizer"
+    HERBICIDES = "herbicides"
+    PESTICIDES = "pesticides"
+    SEEDS = "seeds"
+    PACKAGED_GOODS = "packaged_goods"
 
 class GrainsLegumesSubcategory(str, Enum):
     RICE = "rice"  # e.g. local rice, ofada rice, basmati rice
@@ -535,6 +2055,72 @@ NIGERIAN_STATES = [
     "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
 ]
 
+
+class ProductCreate(BaseModel):
+    title: str
+    description: str
+    category: ProductCategory
+    price_per_unit: float
+    unit: str
+    quantity: int
+    images: List[str] = []
+    location: str # This constitutes the State
+    city: Optional[str] = None
+    pickup_address: Optional[str] = None
+    platform: str = "home"
+    has_discount: bool = False
+    discount_value: float = 0.0
+    discount_type: str = "percentage"
+    logistics_managed_by: str = "platform"
+    seller_delivery_fee: float = 0.0
+    # Additional Product Details
+    about_product: Optional[str] = None
+    product_benefits: Optional[List[str]] = []
+    usage_instructions: Optional[str] = None
+    # Pre-order specific fields
+    is_preorder: bool = False
+    preorder_available_date: Optional[datetime] = None
+    preorder_end_date: Optional[datetime] = None
+    # Agent/Community fields
+    farmer_id: Optional[str] = None
+    community_id: Optional[str] = None
+    community_name: Optional[str] = None
+
+class Product(ProductCreate):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    seller_id: str
+    seller_name: str
+    seller_type: Optional[str] = None
+    seller_profile_picture: Optional[str] = None
+    seller_profile_picture: Optional[str] = None
+    business_name: Optional[str] = None
+    managed_by_agent_id: Optional[str] = None
+    community_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    original_price: Optional[float] = None
+    original_price: Optional[float] = None
+    discount_amount: float = 0.0
+    city: Optional[str] = None
+    pickup_address: Optional[str] = None
+
+
+
+class RatingType(str, Enum):
+    USER = "user"
+    PRODUCT = "product"
+    DRIVER = "driver"
+
+class RatingCreate(BaseModel):
+    rating_value: float
+    comment: Optional[str] = None
+    rating_type: str
+    rated_entity_id: str
+    rated_entity_username: Optional[str] = None
+    order_id: Optional[str] = None
+
+
+
+
 class OrderStatus(str, Enum):
     PENDING = "pending"
     CONFIRMED = "confirmed"
@@ -559,7 +2145,7 @@ def generate_tracking_id(country_code: str = "NGA") -> str:
 
 class Order(BaseModel):
     id: Optional[str] = None
-    order_id: str
+    order_id: str = Field(default_factory=lambda: f"PY_ORD-{uuid.uuid4().hex[:12].upper()}")
     buyer_username: str
     seller_username: str
     product_details: dict
@@ -576,6 +2162,23 @@ class Order(BaseModel):
     agent_fee_percentage: float = 0.05  # Updated agent fee (5%)
     payment_timing: str = "after_delivery"  # "after_delivery" for offline, "during_transit" for platform
     status: OrderStatus = OrderStatus.PENDING
+    delivery_handler_id: Optional[str] = None
+    delivery_notes: Optional[str] = None
+
+class KYCDocument(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    document_type: str  # headshot, nin, drivers_license, voters_card, cac
+    document_image: str  # Base64 encoded
+    verified: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class BusinessKYC(BaseModel):
+    cac_document: str  # Base64
+    registration_id: str
+    company_name: str
+    director_name: str
+    director_phone: str
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
@@ -745,6 +2348,10 @@ class DriverCreate(BaseModel):
     color: str
     year: Optional[int] = None
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
 
 class PreOrderStatus(str, Enum):
     DRAFT = "draft"
@@ -882,9 +2489,27 @@ class UserRegister(BaseModel):
     first_name: str
     last_name: str
     username: str
-    email: str
+    email: Optional[EmailStr] = None
     password: str
     phone: Optional[str] = None
+
+    @validator('phone')
+    def validate_phone(cls, v):
+        if v:
+            # Basic phone validation - allow +234... or 0...
+            import re
+            # Remove spaces and hyphens
+            clean_phone = re.sub(r'[\s-]', '', v)
+            # Check for E.164 format (e.g., +234...) or local format (0...)
+            if not re.match(r'^(\+\d{1,3}|0)\d{9,14}$', clean_phone):
+                raise ValueError('Invalid phone number format')
+        return v
+    
+    @validator('email', always=True)
+    def validate_email_or_phone(cls, v, values):
+        if not v and not values.get('phone'):
+            raise ValueError('Either email or phone number must be provided')
+        return v
 
 class UserLogin(BaseModel):
     email_or_phone: str
@@ -895,7 +2520,7 @@ class User(BaseModel):
     first_name: str
     last_name: str
     username: str
-    email: str
+    email: Optional[EmailStr] = None
     phone: Optional[str] = None
     role: Optional[UserRole] = None
     is_verified: bool = False
@@ -914,6 +2539,7 @@ class User(BaseModel):
     # Rating information
     average_rating: float = 5.0  # Overall rating as seller/service provider
     total_ratings: int = 0  # Number of ratings received
+    verification_documents: Optional[Dict[str, str]] = None # Private R2 keys for KYC docs
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class SecureAccountDetails(BaseModel):
@@ -935,6 +2561,7 @@ class SecureAccountDetails(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
+<<<<<<< HEAD
 # Paystack Models
 class PaystackSubaccount(BaseModel):
     """Paystack subaccount for vendors/farmers/communities"""
@@ -1250,6 +2877,8 @@ class IdentificationType(str, Enum):
     NATIONAL_ID = "national_id"
     VOTERS_CARD = "voters_card"
     DRIVERS_LICENSE = "drivers_license"
+=======
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
 
 class DocumentType(str, Enum):
     CERTIFICATE_OF_INCORPORATION = "certificate_of_incorporation"
@@ -1257,6 +2886,7 @@ class DocumentType(str, Enum):
     UTILITY_BILL = "utility_bill"
     NATIONAL_ID_DOC = "national_id_doc"
     HEADSHOT_PHOTO = "headshot_photo"
+    DRIVERS_LICENSE = "drivers_license"
 
 class KYCDocument(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -1270,6 +2900,20 @@ class KYCDocument(BaseModel):
     verified: bool = False
     verification_notes: Optional[str] = None
 
+class BusinessType(str, Enum):
+    SOLE_PROPRIETORSHIP = "sole_proprietorship"
+    PARTNERSHIP = "partnership"
+    LIMITED_LIABILITY_COMPANY = "limited_liability_company"
+    COOPERATIVE = "cooperative"
+    NGO = "ngo"
+
+class IdentificationType(str, Enum):
+    NIN = "nin"
+    BVN = "bvn"
+    DRIVERS_LICENSE = "drivers_license"
+    VOTERS_CARD = "voters_card"
+    INTERNATIONAL_PASSPORT = "international_passport"
+
 class RegisteredBusinessKYC(BaseModel):
     business_registration_number: str
     tax_identification_number: str
@@ -1280,6 +2924,21 @@ class RegisteredBusinessKYC(BaseModel):
     contact_person_email: str
     # Documents will be uploaded separately
     certificate_of_incorporation_id: Optional[str] = None
+
+class NotificationType(str, Enum):
+    MENTION = "mention"
+    LIKE = "like"
+    COMMENT = "comment"
+    SYSTEM = "system"
+
+class Notification(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    message: str
+    type: NotificationType
+    is_read: bool = False
+    link: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     tin_certificate_id: Optional[str] = None
     utility_bill_id: Optional[str] = None
 
@@ -1434,7 +3093,9 @@ class FarmlandRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     farmer_id: str
     location: str  # Farmland location
-    size_hectares: float
+    size: float
+    size_unit: str = "hectare"  # acre, hectare, square_meter, square_kilometer
+    size_hectares: Optional[float] = None  # Deprecated/Calculated
     crop_types: List[str]  # Types of crops grown
     soil_type: Optional[str] = None
     irrigation_method: Optional[str] = None
@@ -2151,7 +3812,13 @@ async def health_check():
 @app.post("/api/auth/register")
 async def register(user_data: UserRegister):
     # Check if user exists
-    if db.users.find_one({"$or": [{"email": user_data.email}, {"username": user_data.username}]}):
+    query = {"$or": [{"username": user_data.username}]}
+    if user_data.email:
+        query["$or"].append({"email": user_data.email})
+    if user_data.phone:
+        query["$or"].append({"phone": user_data.phone})
+        
+    if db.users.find_one(query):
         raise HTTPException(status_code=400, detail="User already exists")
     
     # Create user
@@ -2181,6 +3848,7 @@ async def register(user_data: UserRegister):
             "last_name": user.last_name,
             "username": user.username,
             "email": user.email,
+            "phone": user.phone,
             "role": user.role
         }
     }
@@ -2211,15 +3879,20 @@ async def login(login_data: UserLogin):
         "token": token,
         "user": {
             "id": user['id'],
-            "first_name": user['first_name'],
-            "last_name": user['last_name'],
-            "username": user['username'],
+            "first_name": user.get('first_name', ''),
+            "last_name": user.get('last_name', ''),
+            "username": user.get('username', ''),
             "email": user.get('email', user.get('email_or_phone')),
             "role": user.get('role'),
             "platform": platform
         }
     }
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
 @app.get("/api/user/profile")
 async def get_profile(current_user: dict = Depends(get_current_user)):
     user_data = {
@@ -2417,87 +4090,107 @@ async def get_products(
 async def get_categories():
     return [{"value": cat.value, "label": cat.value.replace("_", " ").title()} for cat in ProductCategory]
 
-@app.post("/api/products")
-async def create_product(product_data: ProductCreate, current_user: dict = Depends(get_current_user)):
-    if not current_user.get('role'):
-        raise HTTPException(status_code=400, detail="Please select a role first")
+@app.get("/api/platform/vendor-charges")
+async def get_vendor_platform_charges(platform_type: str = "home"):
+    """
+    Get transparent breakdown of platform charges for vendors.
+    This shows vendors what they will pay/receive before posting products.
     
-    # KYC Compliance Check for Product Creation
-    validate_kyc_compliance(current_user, "post_products")
-    
-    # Check if user can create products
-    allowed_roles = ['farmer', 'agent', 'supplier_farm_inputs', 'supplier_food_produce', 'processor']
-    if current_user.get('role') not in allowed_roles:
-        raise HTTPException(status_code=403, detail="Not authorized to create products")
-    
-    # Determine platform based on user role and product category
-    user_role = current_user.get('role')
-    product_platform = product_data.platform
-    
-    # Enforce platform restrictions
-    if user_role == 'farmer':
-        product_platform = 'pyhub'
-    elif user_role == 'supplier_farm_inputs':
-        product_platform = 'pyhub'
-        # Validate that the product category is appropriate for farm inputs
-        farm_input_categories = ['fertilizer', 'herbicides', 'pesticides', 'seeds']
-        if product_data.category.value not in farm_input_categories:
-            raise HTTPException(status_code=400, detail="Farm input suppliers can only list farm input products")
-    elif user_role == 'supplier_food_produce':
-        product_platform = 'pyexpress'
-        # Validate that the product category is appropriate for food produce
-        food_categories = ['sea_food', 'grain', 'legumes', 'vegetables', 'spices', 'fruits', 'fish', 'meat', 'packaged_goods']
-        if product_data.category.value not in food_categories:
-            raise HTTPException(status_code=400, detail="Food produce suppliers can only list food products")
-    elif user_role == 'processor':
-        product_platform = 'pyexpress'
-    
-    # Create product with seller profile picture
-    product = Product(
-        seller_id=current_user['id'],
-        seller_name=current_user['username'],
-        seller_type=current_user.get('role'),
-        seller_profile_picture=current_user.get('profile_picture'),  # Include seller's profile picture
-        business_name=current_user.get('business_name'),  # Include business name for transparency
-        platform=product_platform,
-        **{k: v for k, v in product_data.dict().items() if k != 'platform'}
-    )
-    
-    # Apply service charges based on role
-    if current_user.get('role') == 'farmer':
-        # 30% markup for farmers on PyHub
-        product.price_per_unit = product_data.price_per_unit * 1.30
-    elif current_user.get('role') in ['supplier_food_produce', 'processor']:
-        # 10% service charge deduction for PyExpress suppliers
-        product.price_per_unit = product_data.price_per_unit * 0.90
-    
-    # Calculate discount if applicable
-    if product_data.has_discount and product_data.discount_value:
-        product.original_price = product.price_per_unit
-        
-        if product_data.discount_type == "percentage":
-            # Calculate percentage discount
-            discount_amount = product.price_per_unit * (product_data.discount_value / 100)
-            product.discount_amount = round(discount_amount, 2)
-            product.price_per_unit = round(product.price_per_unit - discount_amount, 2)
-        elif product_data.discount_type == "fixed":
-            # Apply fixed discount
-            product.discount_amount = product_data.discount_value
-            product.price_per_unit = round(product.price_per_unit - product_data.discount_value, 2)
-            
-        # Ensure price doesn't go negative
-        if product.price_per_unit < 0:
-            raise HTTPException(status_code=400, detail="Discount cannot exceed product price")
-    
-    # Validate logistics management
-    if product_data.logistics_managed_by == "seller":
-        if product_data.seller_delivery_fee is None:
-            raise HTTPException(status_code=400, detail="Delivery fee is required when seller manages logistics")
-    
-    product_dict = product.dict()
-    db.products.insert_one(product_dict)
-    
-    return {"message": "Product created successfully", "product_id": product.id}
+    Query params:
+    - platform_type: "home", "farmhub", or "community"
+    """
+    try:
+        if platform_type == "farmhub":
+            return {
+                "platform": "FARMHUB (Farm Deals)",
+                "platform_type": "farmhub",
+                "vendor_commission": {
+                    "rate": "10%",
+                    "description": "Service charge extracted from your sales",
+                    "example": "If you sell ₦10,000 worth of products, ₦1,000 goes to platform"
+                },
+                "buyer_service_charge": {
+                    "rate": "0%",
+                    "description": "No additional charge to buyers"
+                },
+                "vendor_receives": "90% of product price",
+                "delivery_fees": "Platform manages delivery (varies by distance and quantity)",
+                "example_calculation": {
+                    "product_price": 10000,
+                    "vendor_commission_deducted": 1000,
+                    "vendor_receives": 9000,
+                    "buyer_pays_product": 10000,
+                    "buyer_pays_service": 0,
+                    "buyer_pays_delivery": "Varies",
+                    "note": "Vendor gets 90%, platform gets 10% + delivery fees"
+                }
+            }
+        elif platform_type == "home":
+            return {
+                "platform": "HOME (PyExpress)",
+                "platform_type": "home",
+                "vendor_commission": {
+                    "rate": "2.5%",
+                    "description": "Commission extracted from your sales",
+                    "example": "If you sell ₦10,000 worth of products, ₦250 goes to platform"
+                },
+                "buyer_service_charge": {
+                    "rate": "3%",
+                    "description": "Service charge paid by buyer (added to their total)",
+                    "example": "Buyer pays ₦10,000 product + ₦300 service charge"
+                },
+                "vendor_receives": "97.5% of product price",
+                "buyer_sees": "Product price + 3% service charge + delivery",
+                "delivery_fees": "Platform manages delivery (varies by distance, capped at ₦40,000)",
+                "transparency_note": "⚠️ IMPORTANT: You receive 97.5% of your product price. The 3% service charge is paid by the buyer, not deducted from your sales.",
+                "example_calculation": {
+                    "product_price": 10000,
+                    "vendor_commission_deducted": 250,
+                    "vendor_receives": 9750,
+                    "buyer_pays_product": 10000,
+                    "buyer_pays_service_charge": 300,
+                    "buyer_pays_delivery": "Varies",
+                    "total_platform_revenue": "₦250 (from vendor) + ₦300 (from buyer) + delivery = ₦550 + delivery",
+                    "note": "Vendor gets 97.5%, buyer pays 3% service charge, platform gets both"
+                }
+            }
+        else:  # community
+            return {
+                "platform": "COMMUNITY",
+                "platform_type": "community",
+                "vendor_commission": {
+                    "rate": "2.5%",
+                    "description": "Commission extracted from your sales",
+                    "example": "If you sell ₦10,000 worth of products, ₦250 goes to platform"
+                },
+                "buyer_service_charge": {
+                    "rate": "5%",
+                    "description": "Service charge paid by buyer (added to their total)",
+                    "example": "Buyer pays ₦10,000 product + ₦500 service charge"
+                },
+                "vendor_receives": "97.5% of product price",
+                "buyer_sees": "Product price + 5% service charge + delivery",
+                "delivery_fees": "Platform manages delivery (varies by distance and quantity)",
+                "transparency_note": "⚠️ IMPORTANT: You receive 97.5% of your product price. The 5% service charge is paid by the buyer, not deducted from your sales.",
+                "example_calculation": {
+                    "product_price": 10000,
+                    "vendor_commission_deducted": 250,
+                    "vendor_receives": 9750,
+                    "buyer_pays_product": 10000,
+                    "buyer_pays_service_charge": 500,
+                    "buyer_pays_delivery": "Varies",
+                    "total_platform_revenue": "₦250 (from vendor) + ₦500 (from buyer) + delivery = ₦750 + delivery",
+                    "note": "Vendor gets 97.5%, buyer pays 5% service charge, platform gets both"
+                }
+            }
+    except Exception as e:
+        print(f"Error getting vendor charges: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get vendor charges")
+
+
+
+
+
 
 @app.get("/api/products/{product_id}")
 async def get_product(product_id: str):
@@ -2509,6 +4202,7 @@ async def get_product(product_id: str):
     return product
 
 @app.post("/api/orders")
+<<<<<<< HEAD
 async def create_order(items: List[CartItem], delivery_address: str, payment_method: str = "card", current_user: dict = Depends(get_current_user)):
     if not items:
         raise HTTPException(status_code=400, detail="No items in order")
@@ -2724,6 +4418,13 @@ async def create_order(items: List[CartItem], delivery_address: str, payment_met
         "total_amount": grand_total_with_fees,
         "status": transaction_status
     }
+=======
+async def create_order(items: List[CartItem], delivery_address: str, current_user: dict = Depends(get_current_user)):
+    # KYC Compliance Check for Order Creation
+    validate_kyc_compliance(current_user, "collect_payments")
+    
+    return process_create_order(items, delivery_address, current_user, db)
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
 
 @app.get("/api/orders")
 async def get_orders(current_user: dict = Depends(get_current_user)):
@@ -2736,11 +4437,9 @@ async def get_orders(current_user: dict = Depends(get_current_user)):
     }).sort("created_at", -1))
     
     # Clean up response
-    for order in orders:
-        order.pop('_id', None)
-    
     return orders
 
+<<<<<<< HEAD
 class DeliveryConfirmation(BaseModel):
     tracking_id: str
 
@@ -2782,9 +4481,11 @@ class OutsourcedOrder(BaseModel):
     accepting_agent_id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+=======
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
 @app.post("/api/agent/purchase")
 async def agent_purchase(
-    items: List[CartItem], 
+    items: List[CartItem],
     purchase_option: AgentPurchaseOption,
     current_user: dict = Depends(get_current_user)
 ):
@@ -2982,47 +4683,7 @@ async def create_group_order(
     current_user: dict = Depends(get_current_user)
 ):
     """Create a group buying order"""
-    if current_user.get('role') != 'agent':
-        raise HTTPException(status_code=403, detail="Only agents can create group orders")
-    
-    # Calculate commission
-    total_amount = order_data['selectedPrice']['price_per_unit'] * order_data['quantity']
-    
-    if order_data['commissionType'] == 'pyramyd':
-        agent_commission = total_amount * 0.05  # 5% commission
-    else:
-        agent_commission = 0  # Will be collected after delivery
-    
-    # Create group order
-    group_order = GroupOrder(
-        agent_id=current_user['id'],
-        produce=order_data['produce'],
-        category=order_data['category'],
-        location=order_data['location'],
-        total_quantity=order_data['quantity'],
-        buyers=order_data['buyers'],
-        selected_farm=order_data['selectedPrice'],
-        commission_type=order_data['commissionType'],
-        total_amount=total_amount,
-        agent_commission=agent_commission
-    )
-    
-    # Save to database
-    order_dict = group_order.dict()
-    db.group_orders.insert_one(order_dict)
-    
-    # Update product quantity (real-time stock management)
-    db.products.update_one(
-        {"id": order_data['selectedPrice']['product_id']},
-        {"$inc": {"quantity_available": -order_data['quantity']}}
-    )
-    
-    return {
-        "message": "Group order created successfully",
-        "order_id": group_order.id,
-        "total_amount": total_amount,
-        "agent_commission": agent_commission
-    }
+    return process_create_group_order(order_data, current_user, db)
 
 @app.post("/api/outsource-order")
 async def create_outsourced_order(
@@ -3034,27 +4695,7 @@ async def create_outsourced_order(
     current_user: dict = Depends(get_current_user)
 ):
     """Create an outsourced order for agents to bid on"""
-    allowed_roles = ['agent', 'processor', 'supplier']
-    if current_user.get('role') not in allowed_roles:
-        raise HTTPException(status_code=403, detail="Only agents, processors, and suppliers can outsource orders")
-    
-    outsourced_order = OutsourcedOrder(
-        requester_id=current_user['id'],
-        produce=produce,
-        category=category,
-        quantity=quantity,
-        expected_price=expected_price,
-        location=location
-    )
-    
-    order_dict = outsourced_order.dict()
-    db.outsourced_orders.insert_one(order_dict)
-    
-    return {
-        "message": "Order outsourced successfully",
-        "order_id": outsourced_order.id,
-        "status": "open"
-    }
+    return process_create_outsourced_order(produce, category, quantity, expected_price, location, current_user, db)
 
 @app.get("/api/outsourced-orders")
 async def get_outsourced_orders(current_user: dict = Depends(get_current_user)):
@@ -4377,6 +6018,9 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
             "agent_fee_percentage": 0.05,
             "payment_timing": payment_timing,
             "status": OrderStatus.PENDING,
+            "delivery_status": "pending",  # Unified delivery status
+            "delivery_handler_id": product.get("seller_id"), # Seller is default handler
+            "delivery_notes": "",
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
@@ -4530,6 +6174,14 @@ async def update_order_status(order_id: str, status_update: OrderStatusUpdate, c
             {"$set": update_data}
         )
         
+        # Send email notification when order is completed/delivered
+        if status_update.status in [OrderStatus.DELIVERED, "completed"]:
+            # Get updated order with all details
+            updated_order = db.orders.find_one({"order_id": order_id})
+            if updated_order:
+                updated_order.pop('_id', None)
+                send_order_completion_email(updated_order)
+        
         return {
             "message": f"Order status updated to {status_update.status}",
             "order_id": order_id,
@@ -4543,6 +6195,7 @@ async def update_order_status(order_id: str, status_update: OrderStatusUpdate, c
         print(f"Error updating order status: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to update order status")
 
+<<<<<<< HEAD
 # --- Refactored Payout Logic ---
 async def process_order_payout(order_id: str):
     """
@@ -4728,10 +6381,89 @@ async def confirm_delivery(
     """
     try:
         # 1. Fetch Order
+=======
+@app.post("/api/delivery/status")
+async def update_delivery_status(
+    status_data: dict,  # {order_id: str, status: str, notes: str}
+    current_user: dict = Depends(get_current_user)
+):
+    """Update delivery status (Agent/Farmer only)"""
+    try:
+        order = db.orders.find_one({"order_id": status_data.get("order_id")})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+            
+        # Verify permission: User must be the seller OR an agent managing the seller
+        is_authorized = False
+        if current_user["id"] == order.get("delivery_handler_id"):
+            is_authorized = True
+        elif current_user["role"] == "agent":
+             # Check if agent manages this farmer/seller
+             managed_farmer = agent_farmers_collection.find_one({
+                 "agent_id": current_user["id"],
+                 "farmer_id": order.get("delivery_handler_id")
+             })
+             if managed_farmer:
+                 is_authorized = True
+                 
+        if not is_authorized:
+             raise HTTPException(status_code=403, detail="Not authorized to manage this delivery")
+
+        update_fields = {
+            "delivery_status": status_data.get("status"),
+            "updated_at": datetime.utcnow()
+        }
+        
+        # Secure Delivery Logic
+        response_data = {"message": "Delivery status updated", "status": status_data.get("status")}
+        
+        if status_data.get("status") == "delivered":
+            # Instead of marking as delivered immediately, mark as verification_pending
+            # Generate 6-digit OTP
+            import random
+            otp = str(random.randint(100000, 999999))
+            
+            update_fields["delivery_status"] = "verification_pending"
+            update_fields["delivery_code"] = otp
+            
+            response_data["status"] = "verification_pending"
+            response_data["delivery_code"] = otp
+            response_data["message"] = "Delivery requires buyer confirmation"
+
+        if status_data.get("notes"):
+            update_fields["delivery_notes"] = status_data.get("notes")
+
+        db.orders.update_one(
+            {"order_id": status_data.get("order_id")},
+            {"$set": update_fields}
+        )
+        
+        return response_data
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating delivery status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/delivery/confirm")
+async def confirm_delivery(
+    confirmation_data: dict, # {order_id: str, code: str}
+    current_user: dict = Depends(get_current_user)
+):
+    """Confirm delivery with OTP (Buyer only)"""
+    try:
+        order_id = confirmation_data.get("order_id")
+        code = confirmation_data.get("code")
+        
+        if not order_id or not code:
+            raise HTTPException(status_code=400, detail="Order ID and Code are required")
+            
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
         order = db.orders.find_one({"order_id": order_id})
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
             
+<<<<<<< HEAD
         # 2. Verify User is Buyer
         if order["buyer_username"] != current_user["username"]:
             raise HTTPException(status_code=403, detail="Only the buyer can confirm delivery")
@@ -4756,12 +6488,43 @@ async def confirm_delivery(
             "funds_distributed": True
         }
 
+=======
+        # Verify user is the buyer
+        if order.get("buyer_username") != current_user["username"]:
+             raise HTTPException(status_code=403, detail="Only the buyer can confirm delivery")
+             
+        # Verify Status
+        if order.get("delivery_status") != "verification_pending":
+             raise HTTPException(status_code=400, detail="Order is not pending verification")
+             
+        # Verify Code
+        if order.get("delivery_code") != code:
+             raise HTTPException(status_code=400, detail="Invalid delivery code")
+             
+        # Complete Delivery
+        db.orders.update_one(
+            {"order_id": order_id},
+            {
+                "$set": {
+                    "delivery_status": "delivered",
+                    "delivered_at": datetime.now(),
+                    "updated_at": datetime.utcnow(),
+                    "status": "completed" # Also update main order status
+                },
+                "$unset": {"delivery_code": ""} # Remove code after use
+            }
+        )
+        
+        return {"message": "Delivery confirmed successfully", "status": "delivered"}
+        
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error confirming delivery: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to confirm delivery")
 
+<<<<<<< HEAD
 # --- Background Task (Auto-Release) ---
 async def check_for_overdue_orders():
     """
@@ -4805,6 +6568,36 @@ async def start_scheduler():
     scheduler.add_job(check_for_overdue_orders, IntervalTrigger(hours=24)) # Run daily
     scheduler.start()
     logger.info("Auto-Release Scheduler started.")
+=======
+@app.get("/api/agent/deliveries")
+async def get_agent_deliveries(current_user: dict = Depends(get_current_user)):
+    """Get deliveries for farmers managed by this agent"""
+    if current_user["role"] != "agent":
+        raise HTTPException(status_code=403, detail="Only agents can access this endpoint")
+        
+    try:
+        # Get list of managed farmers
+        managed_farmers = list(agent_farmers_collection.find({"agent_id": current_user["id"]}))
+        farmer_ids = [f["farmer_id"] for f in managed_farmers]
+        
+        # Also include the agent's own sales if any
+        farmer_ids.append(current_user["id"])
+        
+        # Find pending deliveries
+        orders = list(db.orders.find({
+            "delivery_handler_id": {"$in": farmer_ids},
+            "status": {"$ne": "cancelled"} # Show all active orders
+        }).sort("created_at", -1))
+        
+        for order in orders:
+            order.pop('_id', None)
+            
+        return {"orders": orders}
+    except Exception as e:
+        print(f"Error getting agent deliveries: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
 
 @app.get("/api/orders/my-orders")
 async def get_my_orders(order_type: str = "buyer", current_user: dict = Depends(get_current_user)):
@@ -6052,6 +7845,198 @@ async def submit_unregistered_entity_kyc(
         print(f"Error submitting unregistered entity KYC: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to submit KYC")
 
+# ==================== ADMIN ENDPOINTS ====================
+
+@app.get("/api/admin/stats")
+async def get_admin_stats(current_user: dict = Depends(get_current_user)):
+    """Get admin dashboard stats"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    try:
+        # Mock Logic for stats - replace with real DB counts
+        total_transactions = db.orders.count_documents({})
+        total_revenue = 0 # Calculate from orders if needed
+        active_users = users_collection.count_documents({"is_active": True})
+        pending_orders = db.orders.count_documents({"status": "pending"})
+        # Count all pending verifications (KYC or delivery)
+        pending_kyc = users_collection.count_documents({"verification_status": "pending"})
+        
+        return {
+            "totalTransactions": total_transactions,
+            "totalRevenue": 5000000, # Mock revenue
+            "activeUsers": active_users,
+            "pendingOrders": pending_orders,
+            "pendingKYC": pending_kyc
+        }
+    except Exception as e:
+        print(f"Error getting admin stats: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get stats")
+
+@app.get("/api/admin/kyc/pending")
+async def get_pending_kyc(current_user: dict = Depends(get_current_user)):
+    """Get list of users pending verification"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    try:
+        users = list(users_collection.find(
+            {"verification_status": "pending"},
+            {"password": 0, "wallet_balance": 0} # Exclude sensitive fields
+        ))
+        
+        # Clean up id and resolve documents
+        for user in users:
+            user["id"] = user.get("id")
+            if "_id" in user:
+                del user["_id"]
+                
+            # Document Resolution
+            documents = {}
+            kyc_data = None
+            
+            if user.get("registered_business_kyc"):
+                kyc_data = user["registered_business_kyc"]
+            elif user.get("unregistered_entity_kyc"):
+                kyc_data = user["unregistered_entity_kyc"]
+            
+            if kyc_data:
+                for key, val in kyc_data.items():
+                    if key.endswith("_id") and val and isinstance(val, str):
+                        doc_name = key.replace("_id", "")
+                        # Construct URL that frontend can use (will append token tokens)
+                        documents[doc_name] = f"/api/admin/documents/{val}"
+            
+            # Inject documents into kyc sub-objects so frontend can find them easily
+            if user.get("registered_business_kyc"):
+                user["registered_business_kyc"]["documents"] = documents
+            if user.get("unregistered_entity_kyc"):
+                user["unregistered_entity_kyc"]["documents"] = documents
+                
+        return users
+    except Exception as e:
+        print(f"Error getting pending KYC: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get pending applications")
+
+class KYCReviewAction(BaseModel):
+    user_id: str
+    action: str # approve, reject
+    reason: Optional[str] = None
+
+@app.post("/api/admin/kyc/review")
+async def review_kyc(
+    action: KYCReviewAction,
+    current_user: dict = Depends(get_current_user)
+):
+    """Approve or Reject KYC application"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    try:
+        new_status = "verified" if action.action == "approve" else "rejected"
+        update_data = {
+            "verification_status": new_status,
+            "verification_updated_at": datetime.utcnow()
+        }
+        
+        if action.reason:
+            update_data["verification_note"] = action.reason
+            
+        result = users_collection.update_one(
+            {"id": action.user_id},
+            {"$set": update_data}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        return {"message": f"User KYC {new_status}"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error reviewing KYC: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to review application")
+
+@app.get("/api/admin/users/search")
+async def search_users(
+    query: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Search users by name or username for admin chat"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    try:
+        users = list(users_collection.find(
+            {
+                "$or": [
+                    {"username": {"$regex": query, "$options": "i"}},
+                    {"first_name": {"$regex": query, "$options": "i"}},
+                    {"last_name": {"$regex": query, "$options": "i"}}
+                ]
+            },
+            {"id": 1, "username": 1, "first_name": 1, "last_name": 1, "role": 1, "profile_picture": 1}
+        ).limit(20))
+        
+        for user in users:
+            user.pop('_id', None)
+            
+        return {"users": users}
+    except Exception as e:
+        print(f"Error searching users: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to search users")
+
+class CreateAdminRequest(BaseModel):
+    email: EmailStr
+    username: str
+    password: str
+    first_name: str
+    last_name: str
+    role: str = "admin" # Default to admin, but could be agents etc.
+
+@app.post("/api/admin/create-user")
+async def create_user_admin(
+    user_data: CreateAdminRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Admin endpoint to manually create new users (admins, agents, etc.)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    # Check if user exists
+    if users_collection.find_one({"$or": [{"email": user_data.email}, {"username": user_data.username}]}):
+        raise HTTPException(status_code=400, detail="User with this email or username already exists")
+        
+    try:
+        hashed_password = hash_password(user_data.password)
+        
+        new_user = {
+            "id": str(uuid.uuid4()),
+            "first_name": user_data.first_name,
+            "last_name": user_data.last_name,
+            "username": user_data.username,
+            "email": user_data.email,
+            "password": hashed_password,
+            "role": user_data.role,
+            "is_verified": True, # Admin created users are verified by default
+            "verification_status": "verified",
+            "created_at": datetime.utcnow(),
+            "created_by": current_user["id"]
+        }
+        
+        users_collection.insert_one(new_user)
+        
+        # Don't return sensitive info
+        new_user.pop("password")
+        new_user.pop("_id")
+        
+        return {"message": f"User {user_data.username} created successfully", "user": new_user}
+        
+    except Exception as e:
+        print(f"Error creating user: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create user")
+
 @app.post("/api/kyc/agent/submit")
 async def submit_agent_kyc(kyc_data: AgentKYC, current_user: dict = Depends(get_current_user)):
     """Submit KYC for agents with specialized requirements"""
@@ -6128,56 +8113,273 @@ async def submit_agent_kyc(kyc_data: AgentKYC, current_user: dict = Depends(get_
         print(f"Error submitting agent KYC: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to submit agent KYC")
 
-@app.post("/api/kyc/farmer/submit")
-async def submit_farmer_kyc(kyc_data: FarmerKYC, current_user: dict = Depends(get_current_user)):
-    """Submit KYC for farmers (self-registering or agent-verified)"""
+
+        
+# --- AGENT FEATURES ---
+
+class AgentRegisterFarmer(BaseModel):
+    first_name: str
+    last_name: str
+    phone: str
+    gender: str
+    date_of_birth: str
+    address: str
+    farm_location: str
+    farm_size: str
+    crops: str
+    headshot: Optional[str] = None
+
+@app.post("/api/agent/farmers/register")
+async def register_farmer_by_agent(data: AgentRegisterFarmer, current_user: dict = Depends(get_current_user)):
+    """Allows an agent to register a farmer under their management"""
+    if current_user.get("role") != "agent":
+        raise HTTPException(status_code=403, detail="Only agents can register farmers")
+        
+    # Check if phone already registered
+    if db.users.find_one({"phone": data.phone}):
+        raise HTTPException(status_code=400, detail="Farmer phone number already registered")
+        
+    farmer_id = str(uuid.uuid4())
+    username = f"farmer_{data.first_name.lower()}_{uuid.uuid4().hex[:4]}"
+    
+    # Create Farmer User
+    farmer = {
+        "id": farmer_id,
+        "first_name": data.first_name,
+        "last_name": data.last_name,
+        "username": username,
+        "phone": data.phone, # No email required for managed farmer
+        "role": "farmer",
+        "gender": data.gender,
+        "date_of_birth": data.date_of_birth,
+        "address": data.address,
+        "is_managed": True,
+        "managed_by": current_user["id"],
+        "farm_details": [{
+            "address": data.farm_location,
+            "size": data.farm_size,
+            "products": [c.strip() for c in data.crops.split(',')]
+        }],
+        "profile_picture": data.headshot,
+        "created_at": datetime.utcnow()
+    }
+    
+    db.users.insert_one(farmer)
+    
+    # Link to Agent
+    db.agent_farmers.insert_one({
+        "agent_id": current_user["id"],
+        "farmer_id": farmer_id,
+        "created_at": datetime.utcnow()
+    })
+    
+    return {"message": "Farmer registered successfully", "farmer_id": farmer_id}
+
+@app.get("/api/agent/farmers")
+async def get_agent_farmers(current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") != "agent":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    links = list(db.agent_farmers.find({"agent_id": current_user["id"]}))
+    farmer_ids = [l["farmer_id"] for l in links]
+    
+    farmers = list(db.users.find({"id": {"$in": farmer_ids}}, {"_id": 0, "password": 0}))
+    
+    # Enrich with stats (mocked or real)
+    for f in farmers:
+        # Get product count
+        f["product_count"] = db.products.count_documents({"farmer_id": f["id"]})
+        # Get total sales (mock for now or aggregated)
+        f["total_sales"] = 0 
+        f["location"] = f["farm_details"][0]["address"] if f.get("farm_details") else "Unknown"
+        
+    return {"farmers": farmers}
+    
+# Update Product Model in server.py (Find existing Product class and update it or add new fields dynamically)
+# Since we are using dicts mostly in the endpoints, we'll just check the body.
+
+
+
+@app.post("/api/products")
+async def create_product(product_data: ProductCreate, current_user: dict = Depends(get_current_user)):
+    if not current_user.get('role'):
+        raise HTTPException(status_code=400, detail="Please select a role first")
+
+    # KYC Compliance Check
+    validate_kyc_compliance(current_user, "post_products")
+    
+    # Check if user can create products (Base Permission)
+    allowed_roles = ['farmer', 'agent', 'supplier_farm_inputs', 'supplier_food_produce', 'processor']
+    if current_user.get('role') not in allowed_roles:
+         # Exception: Community creation might be open to others? 
+         # For now sticking to base roles.
+        raise HTTPException(status_code=403, detail="Not authorized to create products")
+
+    # Initialize variables
+    managed_by_agent_id = None
+    seller_id = current_user['id']
+    seller_name = current_user['username']
+    seller_type = current_user.get('role')
+    product_platform = product_data.platform
+    
+    # --- CASE 1: AGENT POSTING FOR FARMER ---
+    if product_data.farmer_id:
+        if current_user.get('role') != 'agent':
+             raise HTTPException(status_code=403, detail="Only agents can post for others")
+        
+        # Verify agent manages this farmer
+        link = db.agent_farmers.find_one({"agent_id": current_user['id'], "farmer_id": product_data.farmer_id})
+        if not link:
+            raise HTTPException(status_code=403, detail="You do not manage this farmer")
+            
+        # Switch seller identity to the farmer
+        managed_by_agent_id = current_user['id']
+        farmer_user = users_collection.find_one({"id": product_data.farmer_id})
+        if not farmer_user:
+             raise HTTPException(status_code=404, detail="Farmer not found")
+             
+        seller_id = farmer_user['id']
+        seller_name = farmer_user['username']
+        seller_type = 'farmer' # Effectively a farmer listing
+
+    # --- CASE 2: COMMUNITY LISTING ---
+    if product_data.community_id:
+        # User must provide community name
+        if not product_data.community_name:
+             raise HTTPException(status_code=400, detail="Community name is required for community listings")
+        
+        # Validate Community Existence
+        community = communities_collection.find_one({"id": product_data.community_id})
+        if not community:
+             raise HTTPException(status_code=404, detail="Community not found")
+        
+        # Verify User Membership (Affiliation)
+        member = community_members_collection.find_one({
+            "community_id": product_data.community_id, 
+            "user_id": current_user['id'], # The one posting must be a member
+            "is_active": True
+        })
+        if not member:
+             raise HTTPException(status_code=403, detail="You must be a member of the community to list products")
+             
+        # Platform for community is usually PyHub or PyExpress depending on goods?
+        # Typically PyHub for local community exchange, but logic remains same as per role.
+        
+    # --- CASE 3: STANDARD (FARMER/BUSINESS) ---
+    # Implicitly handled if neither of above. 'seller_id' remains current_user.
+
+    # --- Platform Determination Logic (Role Based) ---
+    user_role = seller_type # Use effective seller type
+    
+    # Enforce platform restrictions based on EFFECTIVE role
+    if user_role == 'farmer':
+        product_platform = 'pyhub'
+    elif user_role == 'supplier_farm_inputs':
+        product_platform = 'pyhub'
+        farm_input_categories = ['fertilizer', 'herbicides', 'pesticides', 'seeds']
+        if product_data.category.value not in farm_input_categories:
+            raise HTTPException(status_code=400, detail="Farm input suppliers can only list farm input products")
+    elif user_role == 'supplier_food_produce':
+        product_platform = 'pyexpress'
+        food_categories = ['sea_food', 'grain', 'legumes', 'vegetables', 'spices', 'fruits', 'fish', 'meat', 'packaged_goods']
+        if product_data.category.value not in food_categories:
+            raise HTTPException(status_code=400, detail="Food produce suppliers can only list food products")
+    elif user_role == 'processor':
+        product_platform = 'pyexpress'
+    
+    # --- Product Creation ---
+    product = Product(
+        seller_id=seller_id,
+        seller_name=seller_name,
+        seller_type=seller_type,
+        seller_profile_picture=current_user.get('profile_picture'), 
+        business_name=current_user.get('business_name'),
+        platform=product_platform,
+        managed_by_agent_id=managed_by_agent_id,
+        community_id=product_data.community_id, # Link product to community
+        **{k: v for k, v in product_data.dict().items() if k != 'platform'}
+    )
+    
+    # --- Pricing & Service Charges ---
+    if user_role == 'farmer':
+        # 30% markup for farmers on PyHub
+        product.price_per_unit = product_data.price_per_unit * 1.30
+    elif user_role in ['supplier_food_produce', 'processor']:
+        # 10% service charge deduction for PyExpress suppliers
+        product.price_per_unit = product_data.price_per_unit * 0.90
+    
+    # --- Discounts ---
+    if product_data.has_discount and product_data.discount_value:
+        product.original_price = product.price_per_unit
+        
+        if product_data.discount_type == "percentage":
+            discount_amount = product.price_per_unit * (product_data.discount_value / 100)
+            product.discount_amount = round(discount_amount, 2)
+            product.price_per_unit = round(product.price_per_unit - discount_amount, 2)
+        elif product_data.discount_type == "fixed":
+            product.discount_amount = product_data.discount_value
+            product.price_per_unit = round(product.price_per_unit - product_data.discount_value, 2)
+            
+        if product.price_per_unit < 0:
+            raise HTTPException(status_code=400, detail="Discount cannot exceed product price")
+    
+    # --- Logistics ---
+    if product_data.logistics_managed_by == "seller":
+        if product_data.seller_delivery_fee is None:
+            raise HTTPException(status_code=400, detail="Delivery fee is required when seller manages logistics")
+    
+    # --- Database Insertion ---
+    product_dict = product.dict()
+    db.products.insert_one(product_dict)
+    
+    # If Community Product, Increment Count
+    if product_data.community_id:
+         communities_collection.update_one(
+             {"id": product_data.community_id},
+             {"$inc": {"product_count": 1}}
+         )
+    
+    return {"message": "Product created successfully", "product_id": product.id}
+
+class FarmerKYCSubmission(BaseModel):
+    verification_method: str = "self_verified"  # "self_verified" or "agent_verified"
+    verifying_agent_id: Optional[str] = None
+    farm_size_hectares: Optional[float] = None
+    primary_crops: Optional[List[str]] = []
+    farm_location: Optional[str] = None
+    additional_notes: Optional[str] = None
+
+@app.post("/api/kyc/farmer")
+async def submit_farmer_kyc(
+    kyc_data: FarmerKYCSubmission,
+    current_user: dict = Depends(get_current_user)
+):
+    """Submit KYC for farmer (Self or Agent assisted)"""
     try:
         user_id = current_user["id"]
         
-        # Ensure user is a farmer
-        if current_user.get("role") != "farmer":
-            raise HTTPException(status_code=403, detail="Only farmers can submit farmer KYC")
-        
-        # Validate identification number format
-        if kyc_data.identification_type == "NIN" and len(kyc_data.identification_number) != 11:
-            raise HTTPException(status_code=400, detail="NIN must be exactly 11 digits")
-        elif kyc_data.identification_type == "BVN" and len(kyc_data.identification_number) != 11:
-            raise HTTPException(status_code=400, detail="BVN must be exactly 11 digits")
-        
-        # If agent-verified, validate the agent
+        # Determine target user (if agent is submitting for farmer)
         if kyc_data.verification_method == "agent_verified":
-            if not kyc_data.verifying_agent_id:
-                raise HTTPException(status_code=400, detail="Verifying agent ID required for agent verification")
+            if current_user["role"] != "agent":
+                raise HTTPException(status_code=403, detail="Only agents can submit verified KYC")
+            # Logic to find farmer would go here, but for now assuming it updates current_user or specific farmer passed
             
-            # Check if the agent exists and is KYC approved
-            verifying_agent = users_collection.find_one({"id": kyc_data.verifying_agent_id})
-            if not verifying_agent:
-                raise HTTPException(status_code=404, detail="Verifying agent not found")
-            
-            if verifying_agent.get("role") != "agent":
-                raise HTTPException(status_code=400, detail="Verifying user must be an agent")
-            
-            if verifying_agent.get("kyc_status") != "approved":
-                raise HTTPException(status_code=400, detail="Verifying agent must have approved KYC status")
+        estimated_time = "24-48 hours" if kyc_data.verification_method == "self_verified" else "Instant"
         
-        # Store KYC data
-        kyc_record = kyc_data.dict()
-        kyc_record["user_id"] = user_id
-        kyc_record["submission_date"] = datetime.utcnow().isoformat()
+        # Create KYC record
+        kyc_record = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "type": "farmer",
+            "status": "pending" if kyc_data.verification_method == "self_verified" else "verified",
+            "verification_method": kyc_data.verification_method,
+            "data": kyc_data.dict(),
+            "submitted_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
+        }
         
-        # Set status based on verification method
-        if kyc_data.verification_method == "agent_verified":
-            kyc_record["status"] = "agent_pending"  # Faster processing for agent-verified farmers
-            estimated_time = "24-48 hours (agent-verified)"
-        else:
-            kyc_record["status"] = "pending"  # Standard processing for self-verified
-            estimated_time = "2-5 business days (self-verified)"
+        db.kyc_submissions.insert_one(kyc_record)
         
-        kyc_record["kyc_type"] = "farmer"
-        
-        farmer_kyc_collection.insert_one(kyc_record)
-        
-        # Update user KYC status
         users_collection.update_one(
             {"id": user_id},
             {
@@ -6367,10 +8569,10 @@ async def get_community_details(community_id: str):
         for member in members:
             member.pop('_id', None)
         
-        # Get recent products
-        products = list(community_products_collection.find(
-            {"community_id": community_id, "is_active": True}
-        ).limit(6))
+        # Get recent products (Top 5/6)
+        products = list(db.products.find(
+            {"community_id": community_id, "status": "active"}
+        ).sort("created_at", -1).limit(6))
         
         for product in products:
             product.pop('_id', None)
@@ -6385,6 +8587,33 @@ async def get_community_details(community_id: str):
     except Exception as e:
         print(f"Error getting community details: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get community details")
+
+@app.get("/api/communities/{community_id}/products")
+async def get_community_products(
+    community_id: str,
+    limit: int = 20,
+    skip: int = 0
+):
+    """Get all products for a specific community"""
+    try:
+        products = list(db.products.find(
+            {"community_id": community_id, "status": "active"}
+        ).sort("created_at", -1).skip(skip).limit(limit))
+        
+        count = db.products.count_documents({"community_id": community_id, "status": "active"})
+        
+        for product in products:
+            product.pop('_id', None)
+            
+        return {
+            "products": products,
+            "total": count,
+            "limit": limit,
+            "skip": skip
+        }
+    except Exception as e:
+        print(f"Error getting community products: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get community products")
 
 @app.post("/api/communities/{community_id}/join")
 async def join_community(community_id: str, current_user: dict = Depends(get_current_user)):
@@ -6490,221 +8719,145 @@ async def promote_member(
         print(f"Error promoting member: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to promote member")
 
-@app.get("/api/kyc/documents/my-documents")
-async def get_my_kyc_documents(current_user: dict = Depends(get_current_user)):
-    """Get user's uploaded KYC documents"""
-    try:
-        user_id = current_user["id"]
-        
-        documents = list(kyc_documents_collection.find(
-            {"user_id": user_id},
-            {"file_data": 0}  # Exclude file data for performance
-        ).sort("uploaded_at", -1))
-        
-        # Clean up response
-        for doc in documents:
-            doc.pop('_id', None)
-            if isinstance(doc.get("uploaded_at"), datetime):
-                doc["uploaded_at"] = doc["uploaded_at"].isoformat()
-        
-        return {
-            "documents": documents,
-            "total_documents": len(documents)
-        }
-        
-    except Exception as e:
-        print(f"Error getting KYC documents: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get KYC documents")
-
-# ==================== FARMER DASHBOARD ENDPOINTS ====================
-
-@app.post("/api/farmer/farmland")
-async def add_farmland_record(
-    farmland_data: dict,
+@app.post("/api/communities/{community_id}/posts")
+async def create_community_post(
+    community_id: str,
+    post_data: dict,
     current_user: dict = Depends(get_current_user)
 ):
-    """Add farmland record (farmers only)"""
+    """Create a new post in a community (Admin/Creator only)"""
     try:
-        if current_user.get("role") != "farmer":
-            raise HTTPException(status_code=403, detail="Only farmers can add farmland records")
-        
-        farmer_id = current_user["id"]
-        
-        # Validate required fields
-        required_fields = ["location", "size_hectares", "crop_types"]
-        for field in required_fields:
-            if not farmland_data.get(field):
-                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
-        
-        farmland = {
+        # Verify community exists
+        community = communities_collection.find_one({"id": community_id})
+        if not community:
+            raise HTTPException(status_code=404, detail="Community not found")
+
+        # Verify permission (Admin/Creator)
+        member = community_members_collection.find_one({
+            "community_id": community_id,
+            "user_id": current_user["id"],
+            "is_active": True
+        })
+
+        if not member or member["role"] not in ["admin", "creator"]:
+            raise HTTPException(status_code=403, detail="Only admins can post in this community")
+
+        # Create Post
+        post = {
             "id": str(uuid.uuid4()),
-            "farmer_id": farmer_id,
-            "location": farmland_data["location"],
-            "size_hectares": float(farmland_data["size_hectares"]),
-            "crop_types": farmland_data["crop_types"],
-            "soil_type": farmland_data.get("soil_type"),
-            "irrigation_method": farmland_data.get("irrigation_method"),
-            "coordinates": farmland_data.get("coordinates"),
-            "created_at": datetime.utcnow(),
-            "updated_at": None
+            "community_id": community_id,
+            "user_id": current_user["id"],
+            "author_name": f"{current_user['first_name']} {current_user['last_name']}",
+            "author_role": member["role"],
+            "content": post_data.get("content"),
+            "images": post_data.get("images", []), # List of image URLs
+            "product_id": post_data.get("product_id"), # Optional: Link to a product
+            "likes_count": 0,
+            "comments_count": 0,
+            "created_at": datetime.utcnow().isoformat(),
+            "is_active": True
         }
-        
-        farmland_records_collection.insert_one(farmland)
-        
-        # Log the action
-        log_audit_action(farmer_id, "farmland_added", "farmland", farmland["id"], {
-            "location": farmland_data["location"],
-            "size_hectares": farmland_data["size_hectares"]
-        })
-        
-        return {
-            "message": "Farmland record added successfully",
-            "farmland_id": farmland["id"],
-            "location": farmland_data["location"],
-            "size_hectares": farmland_data["size_hectares"]
-        }
-        
+
+        community_posts_collection.insert_one(post)
+        post.pop('_id', None)
+
+        return {"message": "Post created successfully", "post": post}
+
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error adding farmland record: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to add farmland record")
+        print(f"Error creating post: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create post")
 
-@app.get("/api/farmer/farmland")
-async def get_farmer_farmland(current_user: dict = Depends(get_current_user)):
-    """Get farmer's farmland records"""
-    try:
-        if current_user.get("role") != "farmer":
-            raise HTTPException(status_code=403, detail="Only farmers can access farmland records")
-        
-        farmer_id = current_user["id"]
-        
-        farmlands = list(farmland_records_collection.find({"farmer_id": farmer_id}).sort("created_at", -1))
-        
-        # Clean up response
-        for farmland in farmlands:
-            farmland.pop('_id', None)
-            if isinstance(farmland.get("created_at"), datetime):
-                farmland["created_at"] = farmland["created_at"].isoformat()
-            if isinstance(farmland.get("updated_at"), datetime):
-                farmland["updated_at"] = farmland["updated_at"].isoformat()
-        
-        # Calculate summary statistics
-        total_hectares = sum(f.get("size_hectares", 0) for f in farmlands)
-        unique_crops = set()
-        for farmland in farmlands:
-            unique_crops.update(farmland.get("crop_types", []))
-        
-        return {
-            "farmlands": farmlands,
-            "summary": {
-                "total_farmlands": len(farmlands),
-                "total_hectares": total_hectares,
-                "unique_crop_types": len(unique_crops),
-                "crop_types": list(unique_crops)
-            }
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error getting farmland records: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get farmland records")
-
-@app.get("/api/farmer/dashboard")
-async def get_farmer_dashboard(current_user: dict = Depends(get_current_user)):
-    """Get comprehensive farmer dashboard data"""
-    try:
-        if current_user.get("role") != "farmer":
-            raise HTTPException(status_code=403, detail="Only farmers can access farmer dashboard")
-        
-        farmer_id = current_user["id"]
-        
-        # Get farmer's products
-        products = list(db.products.find({"seller_id": farmer_id}))
-        preorders = list(db.preorders.find({"seller_id": farmer_id}))
-        all_products = products + preorders
-        
-        # Get farmer's orders
-        product_ids = [p["id"] for p in all_products]
-        orders = list(db.orders.find({"product_details.product_id": {"$in": product_ids}}))
-        
-        # Get farmland data
-        farmlands = list(farmland_records_collection.find({"farmer_id": farmer_id}))
-        
-        # Calculate metrics
-        total_revenue = sum(order.get("total_amount", 0) for order in orders if order.get("status") in ["completed", "delivered"])
-        pending_orders = len([o for o in orders if o.get("status") in ["pending", "confirmed"]])
-        total_hectares = sum(f.get("size_hectares", 0) for f in farmlands)
-        
-        # Recent activities (last 10 activities)
-        recent_orders = sorted(orders, key=lambda x: x.get("created_at", datetime.min), reverse=True)[:5]
-        
-        dashboard_data = {
-            "farmer_profile": {
-                "name": f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}".strip(),
-                "username": current_user["username"],
-                "kyc_status": current_user.get("kyc_status", "not_started"),
-                "average_rating": current_user.get("average_rating", 5.0),
-                "total_ratings": current_user.get("total_ratings", 0)
-            },
-            "business_metrics": {
-                "total_products": len(all_products),
-                "active_products": len([p for p in all_products if p.get("quantity_available", 0) > 0]),
-                "total_revenue": total_revenue,
-                "pending_orders": pending_orders,
-                "total_farmlands": len(farmlands),
-                "total_hectares": total_hectares
-            },
-            "recent_orders": [
-                {
-                    "order_id": order.get("order_id"),
-                    "buyer": order.get("buyer_username"),
-                    "product": order.get("product_details", {}).get("name"),
-                    "amount": order.get("total_amount"),
-                    "status": order.get("status"),
-                    "date": order.get("created_at").isoformat() if isinstance(order.get("created_at"), datetime) else None
-                }
-                for order in recent_orders
-            ]
-        }
-        
-        return dashboard_data
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error getting farmer dashboard: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get farmer dashboard")
-
-# ==================== AGENT DASHBOARD ENDPOINTS ====================
-
-@app.post("/api/agent/farmers/add")
-async def add_farmer_to_agent(
-    farmer_data: dict,
+@app.get("/api/communities/{community_id}/posts")
+async def get_community_posts(
+    community_id: str,
+    limit: int = 20,
+    skip: int = 0,
     current_user: dict = Depends(get_current_user)
 ):
-    """Add a farmer to agent's network with KYC validation"""
+    """Get posts for a community"""
     try:
-        # Validate agent can register farmers (includes KYC check)
-        validate_agent_farmer_registration(current_user, farmer_data)
-        
-        agent_id = current_user["id"]
-        
-        # Validate required fields
-        required_fields = ["farmer_name", "farmer_location"]
-        for field in required_fields:
-            if not farmer_data.get(field):
-                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
-        
-        # Check if farmer already exists in agent's network
-        existing = agent_farmers_collection.find_one({
-            "agent_id": agent_id,
-            "farmer_name": farmer_data["farmer_name"],
-            "farmer_location": farmer_data["farmer_location"]
+        # Check membership (Optional: Public communities might allow viewing without joining)
+        # For now, let's allow anyone to view public communities, members for private
+        community = communities_collection.find_one({"id": community_id})
+        if not community:
+            raise HTTPException(status_code=404, detail="Community not found")
+
+        if community.get("privacy") == "private":
+             member = community_members_collection.find_one({
+                "community_id": community_id,
+                "user_id": current_user["id"],
+                "is_active": True
+            })
+             if not member:
+                 raise HTTPException(status_code=403, detail="Must be a member to view posts")
+
+        posts = list(community_posts_collection.find(
+            {"community_id": community_id, "is_active": True}
+        ).sort("created_at", -1).skip(skip).limit(limit))
+
+        for post in posts:
+            post.pop('_id', None)
+            # Check if user liked this post
+            like = post_likes_collection.find_one({
+                "post_id": post["id"],
+                "user_id": current_user["id"]
+            })
+            post["has_liked"] = bool(like)
+
+        return {"posts": posts}
+
+    except Exception as e:
+        print(f"Error getting posts: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch posts")
+
+@app.post("/api/communities/{community_id}/members/add")
+async def add_community_member(
+    community_id: str,
+    member_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add a member to community (Admin/Creator only)"""
+    try:
+        # Verify permission
+        current_member = community_members_collection.find_one({
+            "community_id": community_id,
+            "user_id": current_user["id"],
+            "is_active": True
         })
         
+        if not current_member or current_member["role"] not in ["admin", "creator"]:
+            raise HTTPException(status_code=403, detail="Only admins can add members")
+
+        target_identifier = member_data.get("identifier") # Email or Phone or Username
+        if not target_identifier:
+             raise HTTPException(status_code=400, detail="Member email, phone or username required")
+
+        # Find User
+        target_user = users_collection.find_one({
+            "$or": [
+                {"email": target_identifier},
+                {"phone": target_identifier},
+                {"username": target_identifier},
+                {"email_or_phone": target_identifier}
+            ]
+        })
+
+        if not target_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check if already member
+        existing = community_members_collection.find_one({
+            "community_id": community_id,
+            "user_id": target_user["id"]
+        })
+
+        if existing and existing["is_active"]:
+             raise HTTPException(status_code=400, detail="User is already a member")
+
         if existing:
+<<<<<<< HEAD
             raise HTTPException(status_code=400, detail="Farmer with this name and location already exists in your network")
         
         agent_farmer = {
@@ -6983,44 +9136,39 @@ async def create_kwik_delivery_endpoint(
         if kwik_result:
             # Save Kwik delivery info
             kwik_delivery_doc = {
-                "id": str(uuid.uuid4()),
-                "order_id": order_id,
-                "kwik_delivery_id": kwik_result['kwik_delivery_id'],
-                "tracking_url": kwik_result['tracking_url'],
-                "estimated_time": kwik_result.get('estimated_time'),
-                "pickup_address": pickup_address,
-                "delivery_address": delivery_address,
-                "status": "pending",
-                "created_at": datetime.utcnow()
-            }
-            kwik_deliveries_collection.insert_one(kwik_delivery_doc)
-            
-            # Update order with Kwik delivery info
-            db.orders.update_one(
-                {"order_id": order_id},
-                {"$set": {
-                    "kwik_delivery_id": kwik_result['kwik_delivery_id'],
-                    "tracking_url": kwik_result['tracking_url'],
-                    "delivery_method": "kwik_delivery"
-                }}
+=======
+            # Reactivate
+             community_members_collection.update_one(
+                {"id": existing["id"]},
+                {"$set": {"is_active": True, "role": "member", "joined_at": datetime.utcnow().isoformat()}}
             )
-            
-            return {
-                "success": True,
-                "message": "Kwik delivery created successfully",
-                "kwik_delivery_id": kwik_result['kwik_delivery_id'],
-                "tracking_url": kwik_result['tracking_url'],
-                "estimated_time": kwik_result.get('estimated_time')
-            }
         else:
-            raise HTTPException(status_code=500, detail="Failed to create Kwik delivery. Falling back to standard delivery.")
-        
+            # Add new
+            new_member = {
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
+                "id": str(uuid.uuid4()),
+                "community_id": community_id,
+                "user_id": target_user["id"],
+                "username": target_user["username"],
+                "role": "member",
+                "joined_at": datetime.utcnow().isoformat(),
+                "is_active": True
+            }
+            community_members_collection.insert_one(new_member)
+
+        # Update count
+        count = community_members_collection.count_documents({"community_id": community_id, "is_active": True})
+        communities_collection.update_one({"id": community_id}, {"$set": {"member_count": count}})
+
+        return {"message": "Member added successfully"}
+
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error creating Kwik delivery: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create Kwik delivery")
+        print(f"Error adding member: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add member")
 
+<<<<<<< HEAD
 @app.get("/api/delivery/kwik/track/{kwik_delivery_id}")
 async def track_kwik_delivery(kwik_delivery_id: str):
     """Track a Kwik delivery"""
@@ -7390,610 +9538,274 @@ async def approve_kyc(user_id: str, current_user: dict = Depends(get_current_use
 
 @app.post("/api/admin/users/{user_id}/kyc/reject")
 async def reject_kyc(
+=======
+@app.delete("/api/communities/{community_id}/members/{user_id}")
+async def remove_community_member(
+    community_id: str,
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
     user_id: str,
-    rejection_data: dict,
     current_user: dict = Depends(get_current_user)
 ):
-    """Reject user KYC with reason (admin only)"""
+    """Remove a member from community (Admin/Creator only)"""
     try:
-        if current_user.get("role") != "admin":
-            raise HTTPException(status_code=403, detail="Admin access required")
+         # Verify permission
+        current_member = community_members_collection.find_one({
+            "community_id": community_id,
+            "user_id": current_user["id"],
+            "is_active": True
+        })
         
-        reason = rejection_data.get("reason", "KYC documents rejected")
+        if not current_member or current_member["role"] not in ["admin", "creator"]:
+            raise HTTPException(status_code=403, detail="Only admins can remove members")
+            
+        # Prevent removing self (must leave instead)
+        if user_id == current_user["id"]:
+             raise HTTPException(status_code=400, detail="Cannot remove yourself. Use leave endpoint.")
+
+        # Check target member
+        target_member = community_members_collection.find_one({
+            "community_id": community_id,
+            "user_id": user_id,
+            "is_active": True
+        })
+
+        if not target_member:
+            raise HTTPException(status_code=404, detail="Member not found")
+
+        # Remove member (Soft delete)
+        community_members_collection.update_one(
+            {"id": target_member["id"]},
+            {"$set": {"is_active": False, "left_at": datetime.utcnow().isoformat()}}
+        )
+
+        # Update count
+        count = community_members_collection.count_documents({"community_id": community_id, "is_active": True})
+        communities_collection.update_one({"id": community_id}, {"$set": {"member_count": count}})
+
+        return {"message": "Member removed successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error removing community member: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to remove member")
+
+
+# --- UNIFIED CHECKOUT & CROSS-PLATFORM LOGIC ---
+
+class UnifiedCheckoutItem(BaseModel):
+    product_id: str
+    quantity: float
+    unit: str
+    unit_specification: Optional[str] = None
+    delivery_method: str = "platform"  # platform, offline, dropoff
+    delivery_address: Optional[str] = None
+    dropoff_location_id: Optional[str] = None
+
+class UnifiedCheckoutRequest(BaseModel):
+    items: List[UnifiedCheckoutItem]
+    callback_url: str
+
+@app.post("/api/checkout/unified")
+async def unified_checkout(
+    payload: UnifiedCheckoutRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Handle unified checkout for mixed cart items.
+    Creates individual orders but initializes a single payment.
+    """
+    total_amount_kobo = 0
+    created_order_ids = []
+    
+    # 1. Validate & Create Orders
+    for item in payload.items:
+        product = db.products.find_one({"id": item.product_id})
+        if not product:
+            continue
+            
+        # Calculate Costs
+        item_price = product["price_per_unit"]
+        total_item_cost = item_price * item.quantity
         
-        result = users_collection.update_one(
+        # Calculate Delivery/Service Fees
+        delivery_fee = 0
+        if item.delivery_method == "platform":
+            delivery_fee = 1000 # Placeholder fixed fee
+            
+        platform_type = product.get("platform", "home")
+        
+        # Create Order Record
+        order_id = f"PY_ORD-{uuid.uuid4().hex[:8].upper()}"
+        new_order = {
+             "order_id": order_id,
+             "buyer_id": current_user["id"],
+             "buyer_username": current_user["username"],
+             "seller_id": product["seller_id"],
+             "product_id": product["id"],
+             "product_details": product,
+             "quantity": item.quantity,
+             "unit": item.unit,
+             "total_amount": total_item_cost + delivery_fee,
+             "delivery_fee": delivery_fee,
+             "status": "pending_payment",
+             "payment_status": "pending",
+             "created_at": datetime.utcnow(),
+             "platform": platform_type,
+             "delivery_method": item.delivery_method,
+             "delivery_address": item.delivery_address,
+             "unified_checkout_group": "PENDING_GROUP_ID", # Link orders together
+             "is_unified": True
+        }
+        
+        # Insert Order
+        result = db.orders.insert_one(new_order)
+        created_order_ids.append(order_id)
+        
+        # Add to total for payment
+        total_amount_kobo += naira_to_kobo(total_item_cost + delivery_fee)
+
+    # 2. Initialize Payment (Aggregated)
+    if total_amount_kobo > 0:
+        paystack_data = {
+            "email": current_user["email"],
+            "amount": total_amount_kobo,
+            "callback_url": payload.callback_url,
+            "metadata": {
+                 "unified_checkout": True,
+                 "order_ids": created_order_ids
+            }
+        }
+        
+        # Note: We need a valid reference
+        reference = f"PY_UNI-{uuid.uuid4().hex[:12]}"
+        paystack_data["reference"] = reference
+        
+        # Update orders with reference
+        db.orders.update_many(
+            {"order_id": {"$in": created_order_ids}},
+            {"$set": {"payment_reference": reference}}
+        )
+
+        response = paystack_request("POST", "/transaction/initialize", paystack_data)
+        
+        return {
+             "authorization_url": response["data"]["authorization_url"],
+             "reference": reference,
+             "total_amount": kobo_to_naira(total_amount_kobo)
+        }
+    
+    return {"message": "No valid items to checkout"}
+
+@app.post("/api/paystack/webhook")
+async def paystack_webhook(request: Request):
+    """
+    Handle Paystack Webhooks for payment confirmation.
+    """
+    try:
+        # Verify Signature
+        payload = await request.body()
+        signature = request.headers.get("x-paystack-signature")
+        
+        if not signature or not verify_paystack_signature(payload, signature):
+            raise HTTPException(status_code=400, detail="Invalid signature")
+            
+        event_data = await request.json()
+        event = event_data.get("event")
+        data = event_data.get("data", {})
+        
+        if event == "charge.success":
+            reference = data.get("reference")
+            
+            # Find all orders with this reference
+            result = db.orders.update_many(
+                {"payment_reference": reference},
+                {"$set": {
+                    "status": "confirmed",  
+                    "payment_status": "paid",
+                    "paid_at": datetime.utcnow()
+                }}
+            )
+            print(f"Webhook: Updated {result.modified_count} orders for ref {reference}")
+            
+        elif event == "transfer.success":
+             # Handle payout success
+             transfer_code = data.get("transfer_code")
+             
+             # Find commission payout
+             payout = db.commission_payouts.find_one({"transfer_code": transfer_code})
+             if payout:
+                 db.commission_payouts.update_one(
+                     {"_id": payout["_id"]},
+                     {"$set": {"status": "success", "paid_at": datetime.utcnow()}}
+                 )
+                 print(f"Webhook: Payout success for {transfer_code}")
+
+        elif event == "transfer.failed":
+             transfer_code = data.get("transfer_code")
+             db.commission_payouts.update_one(
+                 {"transfer_code": transfer_code},
+                 {"$set": {"status": "failed", "reason": data.get("reason", "Unknown")}}
+             )
+             print(f"Webhook: Payout failed for {transfer_code}")
+             
+    except Exception as e:
+        print(f"Webhook Error: {str(e)}")
+        # Don't fail the webhook response to Paystack
+        return {"status": "error", "message": str(e)}
+        
+    return {"status": "success"}
+
+
+# ==================== PAYSTACK SUBACCOUNT MANAGEMENT ====================
+
+class SubaccountCreate(BaseModel):
+    business_name: str
+    bank_code: str
+    account_number: str
+    percentage_charge: float = 0.0
+
+@app.post("/api/payment/subaccount")
+async def create_paystack_subaccount(
+    data: SubaccountCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a Paystack subaccount for the user (Seller/Farmer/Agent)"""
+    try:
+        user_id = current_user["id"]
+        
+        # 1. Create Subaccount on Paystack
+        payload = {
+            "business_name": data.business_name,
+            "settlement_bank": data.bank_code,
+            "account_number": data.account_number,
+            "percentage_charge": data.percentage_charge,
+            "description": f"Subaccount for {current_user['username']}"
+        }
+        
+        # Ensure we don't recreate if already exists? Paystack allows multiple, but we want one per user effectively.
+        # Actually Paystack checks account number.
+        
+        response = paystack_request("POST", "/subaccount", payload)
+        paystack_data = response["data"]
+        
+        subaccount_code = paystack_data["subaccount_code"]
+        
+        # 2. Store safely in database
+        # We store the subaccount_code and masked bank details
+        
+        db.users.update_one(
             {"id": user_id},
             {"$set": {
-                "kyc_status": "rejected",
-                "kyc_rejection_reason": reason,
-                "kyc_rejected_at": datetime.utcnow(),
-                "kyc_rejected_by": current_user.get("id")
+                "paystack_subaccount_code": subaccount_code,
+                "bank_details": {
+                    "bank_code": data.bank_code,
+                    "account_number": data.account_number[-4:], # Store only last 4 digits
+                    "business_name": data.business_name,
+                    "is_verified": True # Assuming Paystack verification during creation
+                }
             }}
         )
-        
-        if result.modified_count == 0:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        # Log action
-        audit_log = {
-            "id": str(uuid.uuid4()),
-            "user_id": current_user.get("id"),
-            "action": "kyc_rejected",
-            "details": {"target_user_id": user_id, "reason": reason},
-            "timestamp": datetime.utcnow()
-        }
-        audit_logs_collection.insert_one(audit_log)
-        
-        return {"message": "KYC rejected successfully"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error rejecting KYC: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to reject KYC")
-
-        raise HTTPException(status_code=500, detail="Failed to get audit logs")
-
-# ==================== CATEGORY AND BUSINESS MANAGEMENT ENDPOINTS ====================
-
-@app.get("/api/categories/business")
-async def get_business_categories():
-    """Get all available business categories"""
-    try:
-        categories = {}
-        
-        # Food servicing subcategories
-        categories["food_servicing"] = {
-            "name": "Food Servicing",
-            "description": "Hotels, restaurants, cafes and food service businesses",
-            "subcategories": ["hotels", "restaurants", "cafes", "catering", "food_trucks"]
-        }
-        
-        categories["food_processor"] = {
-            "name": "Food Processor", 
-            "description": "Food processing and manufacturing businesses",
-            "subcategories": ["grain_processing", "meat_processing", "dairy_processing", "beverage_production", "packaging"]
-        }
-        
-        categories["farm_input"] = {
-            "name": "Farm Input",
-            "description": "Suppliers of fertilizers, herbicides, seeds and farming materials",
-            "subcategories": ["fertilizers", "herbicides", "seeds", "farming_equipment", "irrigation"]
-        }
-        
-        categories["fintech"] = {
-            "name": "Fintech",
-            "description": "Financial technology and services",
-            "subcategories": ["payments", "lending", "insurance", "digital_banking", "cryptocurrency"]
-        }
-        
-        categories["agriculture"] = {
-            "name": "Agriculture",
-            "description": "Agricultural production and related services",
-            "subcategories": ["crop_farming", "livestock", "aquaculture", "agricultural_consulting", "farm_management"]
-        }
-        
-        categories["supplier"] = {
-            "name": "Supplier",
-            "description": "Wholesalers and retailers",
-            "subcategories": ["wholesale", "retail", "distribution", "import_export", "marketplace"]
-        }
-        
-        categories["others"] = {
-            "name": "Others",
-            "description": "Other business types not listed above",
-            "subcategories": ["logistics", "technology", "consulting", "manufacturing", "services"]
-        }
-        
-        return {
-            "categories": categories,
-            "registration_statuses": ["registered", "unregistered"]
-        }
-        
-    except Exception as e:
-        print(f"Error getting business categories: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get business categories")
-
-@app.get("/api/categories/products")
-async def get_product_categories():
-    """Get all available product categories and subcategories with examples"""
-    try:
-        categories = {}
-        
-        # Grains & Legumes
-        categories["grains_legumes"] = {
-            "name": "Grains & Legumes",
-            "description": "Cereals, grains, beans and legume products",
-            "subcategories": {
-                "rice": {
-                    "name": "Rice", 
-                    "examples": ["Local rice", "Ofada rice", "Basmati rice", "Brown rice"]
-                },
-                "wheat": {
-                    "name": "Wheat", 
-                    "examples": ["Wheat grains", "Wheat flour", "Whole wheat"]
-                },
-                "corn_maize": {
-                    "name": "Corn/Maize", 
-                    "examples": ["Yellow corn", "White corn", "Dried corn", "Sweet corn"]
-                },
-                "beans": {
-                    "name": "Beans", 
-                    "examples": ["Black beans", "Brown beans", "White beans", "Kidney beans"]
-                },
-                "cowpeas": {
-                    "name": "Cowpeas", 
-                    "examples": ["Black-eyed peas", "Drum beans", "String beans"]
-                },
-                "groundnuts": {
-                    "name": "Groundnuts", 
-                    "examples": ["Peanuts", "Groundnut paste", "Roasted groundnuts"]
-                },
-                "soybeans": {
-                    "name": "Soybeans", 
-                    "examples": ["Dried soybeans", "Soy flour", "Soy milk"]
-                },
-                "millet": {
-                    "name": "Millet", 
-                    "examples": ["Pearl millet", "Finger millet", "Fonio"]
-                }
-            }
-        }
-        
-        # Fish & Meat
-        categories["fish_meat"] = {
-            "name": "Fish & Meat",
-            "description": "Fish, meat and protein products",
-            "subcategories": {
-                "fresh_fish": {
-                    "name": "Fresh Fish", 
-                    "examples": ["Tilapia", "Catfish", "Mackerel", "Salmon"]
-                },
-                "dried_fish": {
-                    "name": "Dried Fish", 
-                    "examples": ["Stockfish", "Dried catfish", "Smoked fish", "Sardines"]
-                },
-                "poultry": {
-                    "name": "Poultry", 
-                    "examples": ["Chicken", "Turkey", "Duck", "Guinea fowl"]
-                },
-                "beef": {
-                    "name": "Beef", 
-                    "examples": ["Fresh beef", "Processed beef", "Beef cuts"]
-                },
-                "goat_mutton": {
-                    "name": "Goat/Mutton", 
-                    "examples": ["Goat meat", "Mutton", "Lamb"]
-                },
-                "pork": {
-                    "name": "Pork", 
-                    "examples": ["Fresh pork", "Processed pork", "Bacon"]
-                },
-                "snails": {
-                    "name": "Snails", 
-                    "examples": ["Giant African snails", "Garden snails"]
-                }
-            }
-        }
-        
-        # Spices & Vegetables
-        categories["spices_vegetables"] = {
-            "name": "Spices & Vegetables",
-            "description": "Vegetables, herbs, spices and fresh produce",
-            "subcategories": {
-                "leafy_vegetables": {
-                    "name": "Leafy Vegetables", 
-                    "examples": ["Spinach", "Lettuce", "Cabbage", "Kale", "Ugu leaves"]
-                },
-                "peppers": {
-                    "name": "Peppers", 
-                    "examples": ["Scotch bonnet", "Bell peppers", "Cayenne pepper", "Habanero"]
-                },
-                "tomatoes": {
-                    "name": "Tomatoes", 
-                    "examples": ["Fresh tomatoes", "Cherry tomatoes", "Roma tomatoes"]
-                },
-                "onions": {
-                    "name": "Onions", 
-                    "examples": ["Red onions", "White onions", "Spring onions", "Shallots"]
-                },
-                "ginger_garlic": {
-                    "name": "Ginger & Garlic", 
-                    "examples": ["Fresh ginger", "Garlic", "Ginger powder", "Garlic powder"]
-                },
-                "herbs_spices": {
-                    "name": "Herbs & Spices", 
-                    "examples": ["Basil", "Thyme", "Curry leaves", "Locust beans", "Turmeric"]
-                },
-                "okra": {
-                    "name": "Okra", 
-                    "examples": ["Fresh okra", "Dried okra"]
-                },
-                "cucumber": {
-                    "name": "Cucumber", 
-                    "examples": ["Field cucumber", "Greenhouse cucumber", "Mini cucumber"]
-                }
-            }
-        }
-        
-        # Tubers & Roots
-        categories["tubers_roots"] = {
-            "name": "Tubers & Roots",
-            "description": "Root vegetables, tubers and starchy crops",
-            "subcategories": {
-                "yams": {
-                    "name": "Yams", 
-                    "examples": ["White yam", "Water yam", "Aerial yam", "Pounded yam flour"]
-                },
-                "cassava": {
-                    "name": "Cassava", 
-                    "examples": ["Fresh cassava", "Cassava flour", "Garri", "Fufu flour"]
-                },
-                "sweet_potatoes": {
-                    "name": "Sweet Potatoes", 
-                    "examples": ["Orange flesh sweet potatoes", "White flesh sweet potatoes"]
-                },
-                "irish_potatoes": {
-                    "name": "Irish Potatoes", 
-                    "examples": ["Red potatoes", "White potatoes", "Fingerling potatoes"]
-                },
-                "cocoyams": {
-                    "name": "Cocoyams", 
-                    "examples": ["Taro", "Tannia", "Ede cocoyam"]
-                },
-                "plantains": {
-                    "name": "Plantains", 
-                    "examples": ["Unripe plantains", "Ripe plantains", "Plantain flour"]
-                }
-            }
-        }
-        
-        # Processing levels
-        processing_levels = {
-            "not_processed": "Raw, natural state - no processing",
-            "semi_processed": "Partially processed - cleaned, cut, or minimally processed",
-            "processed": "Fully processed - packaged, preserved, or manufactured"
-        }
-        
-        return {
-            "categories": categories,
-            "processing_levels": processing_levels
-        }
-        
-    except Exception as e:
-        print(f"Error getting product categories: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get product categories")
-
-@app.get("/api/categories/dynamic")
-async def get_dynamic_categories():
-    """Get categories that have products and available locations/seller types"""
-    try:
-        # Get all products to determine which categories have products
-        products = list(db.products.find({}, {"category": 1, "location": 1, "seller_username": 1, "seller_type": 1}))
-        preorders = list(db.preorders.find({}, {"product_category": 1, "location": 1, "seller_username": 1, "seller_type": 1}))
-        
-        # Collect categories with products
-        active_categories = set()
-        seller_types = set()
-        
-        for product in products:
-            if product.get("category"):
-                active_categories.add(product["category"])
-            if product.get("seller_type"):
-                seller_types.add(product["seller_type"])
-        
-        for preorder in preorders:
-            if preorder.get("product_category"):
-                active_categories.add(preorder["product_category"])
-            if preorder.get("seller_type"):
-                seller_types.add(preorder["seller_type"])
-        
-        # Get full category information for active categories
-        all_categories_response = await get_product_categories()
-        all_categories = all_categories_response["categories"]
-        
-        dynamic_categories = {}
-        for category_key in active_categories:
-            if category_key in all_categories:
-                dynamic_categories[category_key] = all_categories[category_key]
-        
-        return {
-            "categories": dynamic_categories,
-            "locations": NIGERIAN_STATES,  # Return all Nigerian states
-            "seller_types": ["farmer", "agent", "business"],  # Standard seller types
-            "processing_levels": all_categories_response["processing_levels"]
-        }
-        
-    except Exception as e:
-        print(f"Error getting dynamic categories: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get dynamic categories")
-
-@app.get("/api/locations/nigerian-states")
-async def get_nigerian_states():
-    """Get all Nigerian states including FCT Abuja"""
-    return {
-        "states": NIGERIAN_STATES,
-        "total": len(NIGERIAN_STATES)
-    }
-
-@app.put("/api/users/business-profile")
-async def update_business_profile(
-    business_data: dict,
-    current_user: dict = Depends(get_current_user)
-):
-    """Update business profile information"""
-    try:
-        user_id = current_user["id"]
-        
-        # Validate business category
-        if business_data.get("business_category") not in [e.value for e in BusinessCategory]:
-            raise HTTPException(status_code=400, detail="Invalid business category")
-        
-        # Validate registration status
-        if business_data.get("business_registration_status") not in [e.value for e in BusinessRegistrationStatus]:
-            raise HTTPException(status_code=400, detail="Invalid business registration status")
-        
-        # Build update data
-        update_data = {
-            "business_category": business_data.get("business_category"),
-            "business_registration_status": business_data.get("business_registration_status"),
-            "business_name": business_data.get("business_name", "").strip() or None,
-            "business_description": business_data.get("business_description", "").strip() or None,
-            "other_business_category": business_data.get("other_business_category", "").strip() or None,
-            "updated_at": datetime.utcnow()
-        }
-        
-        # Validate "others" category
-        if business_data.get("business_category") == "others" and not business_data.get("other_business_category"):
-            raise HTTPException(status_code=400, detail="Please specify your business type when selecting 'Others'")
-        
-        # Update user record
-        users_collection.update_one(
-            {"id": user_id},
-            {"$set": update_data}
-        )
-        
-        return {
-            "message": "Business profile updated successfully",
-            "business_category": business_data.get("business_category"),
-            "business_name": business_data.get("business_name")
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error updating business profile: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to update business profile")
-
-@app.post("/api/users/profile-picture")
-async def upload_profile_picture(
-    picture_data: dict,
-    current_user: dict = Depends(get_current_user)
-):
-    """Upload or update user profile picture (base64 encoded)"""
-    try:
-        user_id = current_user["id"]
-        
-        # Validate picture_data contains base64 string
-        if not picture_data.get("profile_picture"):
-            raise HTTPException(status_code=400, detail="Profile picture data is required")
-        
-        profile_picture = picture_data["profile_picture"]
-        
-        # Basic validation for base64 image (should start with data:image/)
-        if not profile_picture.startswith("data:image/"):
-            raise HTTPException(status_code=400, detail="Invalid image format. Must be base64 encoded image")
-        
-        # Update user profile picture
-        result = users_collection.update_one(
-            {"id": user_id},
-            {"$set": {"profile_picture": profile_picture, "updated_at": datetime.utcnow()}}
-        )
-        
-        if result.modified_count == 0:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        return {
-            "message": "Profile picture updated successfully",
-            "profile_picture": profile_picture
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error uploading profile picture: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to upload profile picture")
-
-@app.delete("/api/users/profile-picture")
-async def delete_profile_picture(current_user: dict = Depends(get_current_user)):
-    """Remove user profile picture"""
-    try:
-        user_id = current_user["id"]
-        
-        result = users_collection.update_one(
-            {"id": user_id},
-            {"$set": {"profile_picture": None, "updated_at": datetime.utcnow()}}
-        )
-        
-        if result.modified_count == 0:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        return {"message": "Profile picture removed successfully"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error deleting profile picture: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to delete profile picture")
-
-@app.post("/api/users/account-details")
-async def save_account_details(
-    account_data: dict,
-    current_user: dict = Depends(get_current_user)
-):
-    """Save encrypted account details (bank account, mobile money)"""
-    try:
-        user_id = current_user["id"]
-        
-        # Check if account details already exist
-        existing = secure_account_details_collection.find_one({"user_id": user_id})
-        
-        # Prepare encrypted data
-        encrypted_details = {
-            "user_id": user_id,
-            "bank_name": account_data.get("bank_name"),
-            "account_name": account_data.get("account_name"),
-            "mobile_money_provider": account_data.get("mobile_money_provider"),
-            "is_verified": False,
-            "updated_at": datetime.utcnow()
-        }
-        
-        # Encrypt sensitive fields
-        if account_data.get("account_number"):
-            encrypted_details["account_number"] = encrypt_data(account_data["account_number"])
-        
-        if account_data.get("mobile_money_number"):
-            encrypted_details["mobile_money_number"] = encrypt_data(account_data["mobile_money_number"])
-        
-        if existing:
-            # Update existing
-            secure_account_details_collection.update_one(
-                {"user_id": user_id},
-                {"$set": encrypted_details}
-            )
-            message = "Account details updated successfully"
-        else:
-            # Create new
-            encrypted_details["id"] = str(uuid.uuid4())
-            encrypted_details["created_at"] = datetime.utcnow()
-            secure_account_details_collection.insert_one(encrypted_details)
-            message = "Account details saved successfully"
-        
-        return {"message": message, "success": True}
-        
-    except Exception as e:
-        print(f"Error saving account details: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to save account details")
-
-@app.get("/api/users/account-details")
-async def get_account_details(current_user: dict = Depends(get_current_user)):
-    """Get decrypted account details for current user"""
-    try:
-        user_id = current_user["id"]
-        
-        details = secure_account_details_collection.find_one({"user_id": user_id})
-        
-        if not details:
-            return {"has_details": False}
-        
-        # Decrypt sensitive fields
-        decrypted = {
-            "has_details": True,
-            "bank_name": details.get("bank_name"),
-            "account_name": details.get("account_name"),
-            "mobile_money_provider": details.get("mobile_money_provider"),
-            "is_verified": details.get("is_verified", False)
-        }
-        
-        # Only decrypt if needed (show masked version for display)
-        if details.get("account_number"):
-            full_account = decrypt_data(details["account_number"])
-            # Mask account number (show last 4 digits only)
-            if full_account and len(full_account) > 4:
-                decrypted["account_number_masked"] = "****" + full_account[-4:]
-            else:
-                decrypted["account_number_masked"] = "****"
-        
-        if details.get("mobile_money_number"):
-            full_mobile = decrypt_data(details["mobile_money_number"])
-            # Mask mobile number
-            if full_mobile and len(full_mobile) > 4:
-                decrypted["mobile_money_masked"] = "****" + full_mobile[-4:]
-            else:
-                decrypted["mobile_money_masked"] = "****"
-        
-        return decrypted
-        
-    except Exception as e:
-        print(f"Error getting account details: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get account details")
-
-@app.delete("/api/users/account-details")
-async def delete_account_details(current_user: dict = Depends(get_current_user)):
-    """Delete saved account details"""
-    try:
-        user_id = current_user["id"]
-        
-        result = secure_account_details_collection.delete_one({"user_id": user_id})
-        
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="No account details found")
-        
-        return {"message": "Account details deleted successfully"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error deleting account details: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to delete account details")
-
-# ============================================
-# PAYSTACK PAYMENT INTEGRATION  
-# ============================================
-
-@app.post("/api/paystack/subaccount/create")
-async def create_paystack_subaccount(
-    account_data: dict,
-    current_user: dict = Depends(get_current_user)
-):
-    """Create Paystack subaccount for vendor/farmer/community"""
-    try:
-        user_id = current_user["id"]
-        
-        # Check if subaccount already exists
-        existing = paystack_subaccounts_collection.find_one({"user_id": user_id})
-        if existing and existing.get("is_active"):
-            return {
-                "message": "Subaccount already exists",
-                "subaccount_code": existing["subaccount_code"]
-            }
-        
-        # Validate required fields
-        required = ["business_name", "account_number", "bank_code", "bank_name"]
-        if not all(k in account_data for k in required):
-            raise HTTPException(status_code=400, detail="Missing required fields")
-        
-        # Create subaccount in Paystack
-        paystack_data = {
-            "business_name": account_data["business_name"],
-            "account_number": account_data["account_number"],
-            "bank_code": account_data["bank_code"],
-            "percentage_charge": 0.0,  # Always 0.0 for fixed split
-            "description": f"Pyramyd vendor: {account_data['business_name']}"
-        }
-        
-        response = paystack_request("POST", "/subaccount", paystack_data)
-        
-        if not response.get("status"):
-            raise HTTPException(status_code=400, detail=response.get("message", "Failed to create subaccount"))
-        
-        subaccount_code = response["data"]["subaccount_code"]
-        
-        # Save to database
-        subaccount = {
-            "id": str(uuid.uuid4()),
-            "user_id": user_id,
-            "subaccount_code": subaccount_code,
-            "business_name": account_data["business_name"],
-            "account_number": account_data["account_number"],
-            "bank_code": account_data["bank_code"],
-            "bank_name": account_data["bank_name"],
-            "percentage_charge": 0.0,
-            "is_active": True,
-            "created_at": datetime.utcnow()
-        }
-        
-        paystack_subaccounts_collection.insert_one(subaccount)
         
         return {
             "message": "Subaccount created successfully",
@@ -8004,1394 +9816,142 @@ async def create_paystack_subaccount(
         raise
     except Exception as e:
         print(f"Error creating subaccount: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create subaccount")
+        raise HTTPException(status_code=500, detail=f"Failed to create subaccount: {str(e)}")
 
-@app.get("/api/paystack/banks")
-async def get_banks():
-    """Get list of Nigerian banks"""
+@app.get("/api/payment/subaccount/{user_id}")
+async def get_details_subaccount(user_id: str):
+    """Get subaccount code for a user (Public/Protected)"""
+    # This is called by App.js to split payments
     try:
-        response = paystack_request("GET", "/bank")
+        user = db.users.find_one({"id": user_id})
+        if not user or "paystack_subaccount_code" not in user:
+            # Fallback or 404
+            # return {"subaccount_code": None}
+            raise HTTPException(status_code=404, detail="Subaccount not found")
+            
+        return {
+            "subaccount_code": user["paystack_subaccount_code"],
+            "bank_details": user.get("bank_details")
+        }
         
-        if response.get("status"):
-            return {
-                "status": True,
-                "banks": response["data"]
-            }
-        else:
-            raise HTTPException(status_code=400, detail="Failed to get banks")
-        
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error getting banks: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get banks")
+        print(f"Error getting subaccount: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get subaccount")
 
-# Note: /api/delivery/calculate-fee endpoint is defined above in KWIK DELIVERY section
 
-@app.post("/api/paystack/transaction/initialize")
-async def initialize_payment(
-    payment_data: dict,
-    current_user: dict = Depends(get_current_user)
+@app.get("/api/admin/documents/{doc_id}")
+async def get_admin_document(
+    doc_id: str,
+    token: str
 ):
+    """View KYC document (Admin Only)"""
+    try:
+        # Manually verify token since it's a query param for direct link access
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+             raise HTTPException(status_code=401, detail="Invalid token")
+             
+        user = db.users.find_one({"username": username})
+        if not user or user["role"] != "admin":
+             raise HTTPException(status_code=403, detail="Admin access required")
+             
+        doc = kyc_documents_collection.find_one({"id": doc_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+            
+        # Return file content
+        # Assuming file_data is stored as Base64 string in Mongo (from upload logic)
+        import base64
+        from fastapi.responses import Response
+        
+        # If it's already bytes, fine. If string, decode.
+        file_content = doc["file_data"]
+        if isinstance(file_content, str):
+            try:
+                # Handle possible dataURI prefix
+                if "base64," in file_content:
+                    file_content = file_content.split("base64,")[1]
+                file_content = base64.b64decode(file_content)
+            except:
+                pass # Return as is if fail?
+                
+        return Response(content=file_content, media_type=doc["mime_type"])
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception as e:
+        print(f"Error serving document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to serve document")
+
+@app.post("/api/paystack/webhook")
+async def paystack_webhook(request: Request):
     """
-    Initialize payment with proper split logic:
-    - FarmHub: Uses split group SPL_dCqIOTFNRu  
-    - Home/Community: Uses dynamic subaccount code
+    Handle Paystack Webhooks for payment confirmation.
     """
     try:
-        user_id = current_user["id"]
-        buyer_email = current_user.get("email")
-        buyer_role = current_user.get("role")
+        # Verify Signature
+        payload = await request.body()
+        signature = request.headers.get("x-paystack-signature")
         
-        # Extract payment details
-        product_total = payment_data.get("product_total", 0)  # In Naira
-        customer_state = payment_data.get("customer_state")  # For delivery fee calculation
-        product_weight = payment_data.get("product_weight", 1)  # In kg
-        subaccount_code = payment_data.get("subaccount_code")  # For Home/Community
-        product_id = payment_data.get("product_id")
-        order_id = payment_data.get("order_id")
-        platform_type = payment_data.get("platform_type", "home")  # farmhub, home, or community
-        
-        if not customer_state:
-            raise HTTPException(status_code=400, detail="Customer state is required for delivery calculation")
-        
-        # Get product data for smart delivery calculation
-        product_data = None
-        if product_id:
-            product = db.products.find_one({"id": product_id})
-            if product:
-                product_data = {
-                    'logistics_managed_by': product.get('logistics_managed_by', 'pyramyd'),
-                    'seller_delivery_fee': product.get('seller_delivery_fee', 0.0)
-                }
-        
-        # Use smart delivery fee calculation
-        delivery_info = calculate_delivery_fee(product_total, customer_state, product_data)
-        delivery_fee = delivery_info['delivery_fee']
-        delivery_method = delivery_info['delivery_method']
-        
-        # Convert to kobo
-        product_total_kobo = naira_to_kobo(product_total)
-        delivery_fee_kobo = naira_to_kobo(delivery_fee)
-        
-        # Calculate platform cut based on type
-        if platform_type == "farmhub":
-            # FarmHub: 10% service + delivery
-            platform_cut_kobo = int(product_total_kobo * FARMHUB_SERVICE_CHARGE) + delivery_fee_kobo
-        else:
-            # Community/Home: 2.5% commission + 10% service + delivery
-            commission_kobo = int(product_total_kobo * COMMUNITY_COMMISSION)
-            service_kobo = int(product_total_kobo * COMMUNITY_SERVICE)
-            platform_cut_kobo = commission_kobo + service_kobo + delivery_fee_kobo
-        
-        # Check if buyer is an agent and calculate commission with tier bonus
-        buyer_is_agent = buyer_role in ["agent", "purchasing_agent"]
-        agent_commission_kobo = 0
-        agent_tier_info = None
-        
-        if buyer_is_agent:
-            # Calculate commission with tier bonus
-            commission_result = calculate_agent_commission(kobo_to_naira(product_total_kobo), user_id, db)
-            agent_commission_kobo = naira_to_kobo(commission_result['total_commission'])
-            agent_tier_info = commission_result['tier_info']
-        
-        # Total amount customer pays
-        total_amount_kobo = product_total_kobo + platform_cut_kobo
-        
-        # Generate unique reference
-        reference = f"PYR_{uuid.uuid4().hex[:12].upper()}"
-        
-        # Prepare Paystack payload based on platform type
-        if platform_type == "farmhub":
-            # Farm Deals: Use split group (NO subaccount parameter)
-            paystack_data = {
-                "email": buyer_email,
-                "amount": total_amount_kobo,
-                "split_code": FARMHUB_SPLIT_GROUP,  # Use split group SPL_dCqIOTFNRu
-                "reference": reference,
-                "callback_url": payment_data.get("callback_url", ""),
-                "metadata": {
-                    "product_id": product_id,
-                    "order_id": order_id,
-                    "platform_type": platform_type,
-                    "buyer_id": user_id,
-                    "customer_state": customer_state,
-                    "delivery_fee": delivery_fee,
-                    "delivery_method": delivery_method
-                }
-            }
-        else:
-            # Home/Community: Use dynamic subaccount
-            if not subaccount_code:
-                raise HTTPException(status_code=400, detail="Subaccount code is required for Home/Community transactions")
+        if not signature or not verify_paystack_signature(payload, signature):
+            raise HTTPException(status_code=400, detail="Invalid signature")
             
-            paystack_data = {
-                "email": buyer_email,
-                "amount": total_amount_kobo,
-                "subaccount": subaccount_code,  # Dynamic vendor subaccount
-                "transaction_charge": platform_cut_kobo,  # Platform's fixed cut
-                "bearer": "account",  # Platform pays Paystack fees
-                "reference": reference,
-                "callback_url": payment_data.get("callback_url", ""),
-                "metadata": {
-                    "product_id": product_id,
-                    "order_id": order_id,
-                    "platform_type": platform_type,
-                    "buyer_id": user_id,
-                    "customer_state": customer_state,
-                    "delivery_fee": delivery_fee,
-                    "delivery_method": delivery_method
-                }
-            }
+        event_data = await request.json()
+        event = event_data.get("event")
+        data = event_data.get("data", {})
         
-        response = paystack_request("POST", "/transaction/initialize", paystack_data)
-        
-        if not response.get("status"):
-            raise HTTPException(status_code=400, detail=response.get("message", "Failed to initialize payment"))
-        
-        # Save transaction record
-        transaction = {
-            "id": str(uuid.uuid4()),
-            "reference": reference,
-            "buyer_id": user_id,
-            "buyer_email": buyer_email,
-            "product_id": product_id,
-            "order_id": order_id,
-            "product_total": product_total_kobo,
-            "delivery_fee": delivery_fee_kobo,
-            "platform_cut": platform_cut_kobo,
-            "total_amount": total_amount_kobo,
-            "subaccount_code": subaccount_code if platform_type != "farmhub" else FARMHUB_SUBACCOUNT,
-            "split_code": FARMHUB_SPLIT_GROUP if platform_type == "farmhub" else None,
-            "vendor_share": product_total_kobo,
-            "buyer_is_agent": buyer_is_agent,
-            "agent_commission": agent_commission_kobo,
-            "agent_tier": agent_tier_info['tier_name'] if agent_tier_info else None,
-            "agent_tier_bonus": naira_to_kobo(agent_tier_info['bonus_commission'] * kobo_to_naira(product_total_kobo)) if agent_tier_info else 0,
-            "customer_state": customer_state,
-            "platform_type": platform_type,
-            "payment_status": "pending",
-            "authorization_url": response["data"]["authorization_url"],
-            "access_code": response["data"]["access_code"],
-            "created_at": datetime.utcnow()
-        }
-        
-        paystack_transactions_collection.insert_one(transaction)
-        
-        return {
-            "status": True,
-            "message": "Payment initialized",
-            "authorization_url": response["data"]["authorization_url"],
-            "access_code": response["data"]["access_code"],
-            "reference": reference,
-            "amount": kobo_to_naira(total_amount_kobo),
-            "breakdown": {
-                "product_total": kobo_to_naira(product_total_kobo),
-                "delivery_fee": kobo_to_naira(delivery_fee_kobo),
-                "delivery_state": customer_state,
-                "platform_cut": kobo_to_naira(platform_cut_kobo),
-                "agent_commission": kobo_to_naira(agent_commission_kobo) if buyer_is_agent else 0,
-                "agent_tier": agent_tier_info['tier_name'] if agent_tier_info else None,
-                "tier_bonus": f"{agent_tier_info['bonus_commission'] * 100}%" if agent_tier_info else None
-            }
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error initializing payment: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to initialize payment: {str(e)}")
-
-@app.post("/api/users/kyc/submit")
-async def submit_kyc(
-    kyc_data: dict,
-    current_user: dict = Depends(get_current_user)
-):
-    """Submit KYC information for verification"""
-    try:
-        user_id = current_user["id"]
-        user_role = current_user.get("role")
-        
-        # Only non-personal accounts need KYC
-        if user_role == "personal":
-            raise HTTPException(status_code=400, detail="Personal accounts do not require KYC")
-        
-        # Validate required KYC fields based on role
-        required_fields = ["government_id", "proof_of_address", "phone_verification"]
-        
-        if user_role == "business":
-            required_fields.extend(["business_registration", "tax_identification"])
-        
-        missing_fields = [field for field in required_fields if not kyc_data.get(field)]
-        if missing_fields:
-            raise HTTPException(status_code=400, detail=f"Missing required KYC fields: {', '.join(missing_fields)}")
-        
-        # Update KYC status
-        update_data = {
-            "kyc_status": KYCStatus.PENDING,
-            "kyc_submitted_at": datetime.utcnow(),
-            "kyc_data": kyc_data,  # Store KYC documents/info
-            "updated_at": datetime.utcnow()
-        }
-        
-        users_collection.update_one(
-            {"id": user_id},
-            {"$set": update_data}
-        )
-        
-        return {
-            "message": "KYC submitted successfully",
-            "status": "pending",
-            "estimated_review_time": "2-5 business days"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error submitting KYC: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to submit KYC")
-
-@app.get("/api/users/kyc/status")
-async def get_kyc_status(current_user: dict = Depends(get_current_user)):
-    """Get current KYC status"""
-    try:
-        user_id = current_user["id"]
-        
-        user = users_collection.find_one({"id": user_id})
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        kyc_info = {
-            "status": user.get("kyc_status", "not_started"),
-            "submitted_at": user.get("kyc_submitted_at").isoformat() if user.get("kyc_submitted_at") else None,
-            "approved_at": user.get("kyc_approved_at").isoformat() if user.get("kyc_approved_at") else None,
-            "requires_kyc": user.get("role") != "personal",
-            "can_trade": user.get("role") == "personal" or user.get("kyc_status") == "approved"
-        }
-        
-        return kyc_info
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error getting KYC status: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get KYC status")
-
-# ==================== ENHANCED SELLER DASHBOARD ENDPOINTS ====================
-
-@app.get("/api/seller/dashboard/analytics")
-async def get_seller_analytics(
-    days: int = 30,
-    current_user: dict = Depends(get_current_user)
-):
-    """Get comprehensive seller analytics and metrics"""
-    try:
-        seller_id = current_user["id"]
-        seller_username = current_user["username"]
-        
-        # Calculate date range
-        end_date = datetime.utcnow()
-        start_date = end_date - timedelta(days=days)
-        
-        # Get seller's products (both regular and pre-orders)
-        products = list(db.products.find({"seller_id": seller_id}))
-        preorders = list(db.preorders.find({"seller_id": seller_id}))
-        all_products = products + preorders
-        product_ids = [p["id"] for p in all_products]
-        
-        # Get orders for this seller's products
-        orders_query = {
-            "product_details.product_id": {"$in": product_ids},
-            "created_at": {"$gte": start_date, "$lte": end_date}
-        }
-        orders = list(db.orders.find(orders_query))
-        
-        # Revenue calculations
-        total_revenue = sum(order.get("total_amount", 0) for order in orders if order.get("status") in ["completed", "delivered"])
-        pending_revenue = sum(order.get("total_amount", 0) for order in orders if order.get("status") in ["pending", "confirmed", "in_transit"])
-        
-        # Order statistics
-        total_orders = len(orders)
-        completed_orders = len([o for o in orders if o.get("status") in ["completed", "delivered"]])
-        pending_orders = len([o for o in orders if o.get("status") in ["pending", "confirmed"]])
-        cancelled_orders = len([o for o in orders if o.get("status") == "cancelled"])
-        
-        # Product performance
-        product_performance = {}
-        for product in all_products:
-            product_orders = [o for o in orders if o.get("product_details", {}).get("product_id") == product["id"]]
-            product_performance[product["id"]] = {
-                "product_name": product.get("product_name") or product.get("crop_type", "Unknown"),
-                "total_orders": len(product_orders),
-                "total_revenue": sum(o.get("total_amount", 0) for o in product_orders if o.get("status") in ["completed", "delivered"]),
-                "average_rating": product.get("average_rating", 5.0),
-                "total_ratings": product.get("total_ratings", 0),
-                "stock_level": product.get("quantity_available", 0),
-                "low_stock": product.get("quantity_available", 0) < product.get("minimum_order_quantity", 1) * 5
-            }
-        
-        # Customer insights
-        unique_customers = len(set(order.get("buyer_username") for order in orders))
-        repeat_customers = {}
-        for order in orders:
-            buyer = order.get("buyer_username")
-            if buyer:
-                repeat_customers[buyer] = repeat_customers.get(buyer, 0) + 1
-        
-        repeat_customer_count = len([count for count in repeat_customers.values() if count > 1])
-        
-        # Daily sales trend (last 7 days)
-        daily_sales = {}
-        for i in range(7):
-            date = (datetime.utcnow() - timedelta(days=i)).strftime("%Y-%m-%d")
-            daily_sales[date] = 0
-        
-        for order in orders:
-            if order.get("status") in ["completed", "delivered"]:
-                order_date = order.get("created_at")
-                if isinstance(order_date, datetime):
-                    date_str = order_date.strftime("%Y-%m-%d")
-                    if date_str in daily_sales:
-                        daily_sales[date_str] += order.get("total_amount", 0)
-        
-        # Top customers
-        top_customers = sorted(
-            [{"username": k, "total_spent": sum(o.get("total_amount", 0) for o in orders if o.get("buyer_username") == k and o.get("status") in ["completed", "delivered"]), "order_count": v} 
-             for k, v in repeat_customers.items()],
-            key=lambda x: x["total_spent"],
-            reverse=True
-        )[:5]
-        
-        # Inventory alerts
-        low_stock_products = [p for p in all_products if p.get("quantity_available", 0) < p.get("minimum_order_quantity", 1) * 5]
-        out_of_stock_products = [p for p in all_products if p.get("quantity_available", 0) == 0]
-        
-        return {
-            "period": {
-                "days": days,
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat()
-            },
-            "revenue": {
-                "total_revenue": total_revenue,
-                "pending_revenue": pending_revenue,
-                "daily_average": total_revenue / days if days > 0 else 0,
-                "daily_sales": daily_sales
-            },
-            "orders": {
-                "total_orders": total_orders,
-                "completed_orders": completed_orders,
-                "pending_orders": pending_orders,
-                "cancelled_orders": cancelled_orders,
-                "completion_rate": (completed_orders / total_orders * 100) if total_orders > 0 else 0
-            },
-            "customers": {
-                "unique_customers": unique_customers,
-                "repeat_customers": repeat_customer_count,
-                "repeat_rate": (repeat_customer_count / unique_customers * 100) if unique_customers > 0 else 0,
-                "top_customers": top_customers
-            },
-            "products": {
-                "total_products": len(all_products),
-                "active_products": len([p for p in all_products if p.get("quantity_available", 0) > 0]),
-                "low_stock_alerts": len(low_stock_products),
-                "out_of_stock": len(out_of_stock_products),
-                "performance": product_performance
-            },
-            "inventory_alerts": {
-                "low_stock_products": [{"id": p["id"], "name": p.get("product_name") or p.get("crop_type"), "stock": p.get("quantity_available", 0)} for p in low_stock_products[:5]],
-                "out_of_stock_products": [{"id": p["id"], "name": p.get("product_name") or p.get("crop_type")} for p in out_of_stock_products[:5]]
-            }
-        }
-        
-    except Exception as e:
-        print(f"Error getting seller analytics: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get seller analytics")
-
-@app.get("/api/seller/dashboard/orders")
-async def get_seller_orders(
-    status: Optional[str] = None,
-    days: Optional[int] = None,
-    page: int = 1,
-    limit: int = 20,
-    current_user: dict = Depends(get_current_user)
-):
-    """Get seller's orders with advanced filtering"""
-    try:
-        seller_id = current_user["id"]
-        
-        # Get seller's products
-        products = list(db.products.find({"seller_id": seller_id}))
-        preorders = list(db.preorders.find({"seller_id": seller_id}))
-        product_ids = [p["id"] for p in products + preorders]
-        
-        # Build query
-        query = {"product_details.product_id": {"$in": product_ids}}
-        
-        if status:
-            query["status"] = status
-        
-        if days:
-            start_date = datetime.utcnow() - timedelta(days=days)
-            query["created_at"] = {"$gte": start_date}
-        
-        # Get total count
-        total_count = db.orders.count_documents(query)
-        
-        # Get orders with pagination
-        skip = (page - 1) * limit
-        orders = list(db.orders.find(query)
-                     .sort("created_at", -1)
-                     .skip(skip)
-                     .limit(limit))
-        
-        # Clean up response
-        for order in orders:
-            order.pop('_id', None)
-            if isinstance(order.get("created_at"), datetime):
-                order["created_at"] = order["created_at"].isoformat()
-            if isinstance(order.get("updated_at"), datetime):
-                order["updated_at"] = order["updated_at"].isoformat()
-        
-        # Order statistics
-        status_counts = {}
-        for status_type in ["pending", "confirmed", "in_transit", "delivered", "completed", "cancelled"]:
-            count = db.orders.count_documents({
-                "product_details.product_id": {"$in": product_ids},
-                "status": status_type
-            })
-            status_counts[status_type] = count
-        
-        return {
-            "orders": orders,
-            "pagination": {
-                "total_count": total_count,
-                "page": page,
-                "limit": limit,
-                "total_pages": (total_count + limit - 1) // limit if total_count > 0 else 0
-            },
-            "status_summary": status_counts,
-            "filters_applied": {
-                "status": status,
-                "days": days
-            }
-        }
-        
-    except Exception as e:
-        print(f"Error getting seller orders: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get seller orders")
-
-@app.put("/api/seller/orders/{order_id}/status")
-async def update_order_status(
-    order_id: str,
-    status_data: dict,
-    current_user: dict = Depends(get_current_user)
-):
-    """Update order status (for sellers only)"""
-    try:
-        new_status = status_data.get("status")
-        notes = status_data.get("notes", "")
-        
-        if not new_status:
-            raise HTTPException(status_code=400, detail="Status is required")
-        
-        # Validate status
-        valid_statuses = ["pending", "confirmed", "preparing", "ready", "in_transit", "delivered", "completed", "cancelled"]
-        if new_status not in valid_statuses:
-            raise HTTPException(status_code=400, detail="Invalid status")
-        
-        # Find order
-        order = db.orders.find_one({"order_id": order_id})
-        if not order:
-            raise HTTPException(status_code=404, detail="Order not found")
-        
-        # Verify seller ownership
-        product_id = order.get("product_details", {}).get("product_id")
-        if not product_id:
-            raise HTTPException(status_code=400, detail="Invalid order structure")
-        
-        # Check if seller owns this product
-        product = db.products.find_one({"id": product_id, "seller_id": current_user["id"]})
-        if not product:
-            product = db.preorders.find_one({"id": product_id, "seller_id": current_user["id"]})
-        
-        if not product:
-            raise HTTPException(status_code=403, detail="You can only update orders for your own products")
-        
-        # Update order status
-        update_data = {
-            "status": new_status,
-            "updated_at": datetime.utcnow()
-        }
-        
-        if notes:
-            update_data["seller_notes"] = notes
-        
-        db.orders.update_one(
-            {"order_id": order_id},
-            {"$set": update_data}
-        )
-        
-        return {
-            "message": "Order status updated successfully",
-            "order_id": order_id,
-            "new_status": new_status
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error updating order status: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to update order status")
-
-@app.get("/api/seller/products/performance")
-async def get_product_performance(
-    days: int = 30,
-    current_user: dict = Depends(get_current_user)
-):
-    """Get detailed product performance metrics"""
-    try:
-        seller_id = current_user["id"]
-        
-        # Get seller's products
-        products = list(db.products.find({"seller_id": seller_id}))
-        preorders = list(db.preorders.find({"seller_id": seller_id}))
-        all_products = products + preorders
-        
-        # Calculate date range
-        start_date = datetime.utcnow() - timedelta(days=days)
-        
-        product_metrics = []
-        
-        for product in all_products:
-            product_id = product["id"]
+        if event == "charge.success":
+            reference = data.get("reference")
             
-            # Get orders for this product
-            orders = list(db.orders.find({
-                "product_details.product_id": product_id,
-                "created_at": {"$gte": start_date}
-            }))
-            
-            # Calculate metrics
-            total_orders = len(orders)
-            completed_orders = len([o for o in orders if o.get("status") in ["completed", "delivered"]])
-            revenue = sum(o.get("total_amount", 0) for o in orders if o.get("status") in ["completed", "delivered"])
-            
-            # Get product ratings
-            product_ratings = list(ratings_collection.find({
-                "rated_entity_id": product_id,
-                "rating_type": RatingType.PRODUCT_RATING
-            }))
-            
-            # View count (simulated - would be real in production)
-            view_count = total_orders * 5  # Approximation
-            
-            product_metrics.append({
-                "product_id": product_id,
-                "product_name": product.get("product_name") or product.get("crop_type", "Unknown"),
-                "category": product.get("category", ""),
-                "price_per_unit": product.get("price_per_unit", 0),
-                "stock_level": product.get("quantity_available", 0),
-                "metrics": {
-                    "total_orders": total_orders,
-                    "completed_orders": completed_orders,
-                    "conversion_rate": (completed_orders / total_orders * 100) if total_orders > 0 else 0,
-                    "revenue": revenue,
-                    "view_count": view_count,
-                    "average_rating": product.get("average_rating", 5.0),
-                    "total_ratings": len(product_ratings),
-                    "rating_distribution": {
-                        "5_star": len([r for r in product_ratings if r["rating_value"] == 5]),
-                        "4_star": len([r for r in product_ratings if r["rating_value"] == 4]),
-                        "3_star": len([r for r in product_ratings if r["rating_value"] == 3]),
-                        "2_star": len([r for r in product_ratings if r["rating_value"] == 2]),
-                        "1_star": len([r for r in product_ratings if r["rating_value"] == 1])
-                    }
-                },
-                "alerts": {
-                    "low_stock": product.get("quantity_available", 0) < product.get("minimum_order_quantity", 1) * 5,
-                    "out_of_stock": product.get("quantity_available", 0) == 0,
-                    "low_rating": product.get("average_rating", 5.0) < 3.5,
-                    "no_recent_orders": total_orders == 0
-                }
-            })
-        
-        # Sort by revenue
-        product_metrics.sort(key=lambda x: x["metrics"]["revenue"], reverse=True)
-        
-        return {
-            "products": product_metrics,
-            "summary": {
-                "total_products": len(product_metrics),
-                "low_stock_count": len([p for p in product_metrics if p["alerts"]["low_stock"]]),
-                "out_of_stock_count": len([p for p in product_metrics if p["alerts"]["out_of_stock"]]),
-                "low_rating_count": len([p for p in product_metrics if p["alerts"]["low_rating"]]),
-                "top_performer": product_metrics[0] if product_metrics else None
-            }
-        }
-        
-    except Exception as e:
-        print(f"Error getting product performance: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get product performance")
-
-@app.get("/api/seller/customers/insights")
-async def get_customer_insights(
-    days: int = 30,
-    current_user: dict = Depends(get_current_user)
-):
-    """Get customer insights and analytics"""
-    try:
-        seller_id = current_user["id"]
-        
-        # Get seller's products
-        products = list(db.products.find({"seller_id": seller_id}))
-        preorders = list(db.preorders.find({"seller_id": seller_id}))
-        product_ids = [p["id"] for p in products + preorders]
-        
-        # Calculate date range
-        start_date = datetime.utcnow() - timedelta(days=days)
-        
-        # Get orders
-        orders = list(db.orders.find({
-            "product_details.product_id": {"$in": product_ids},
-            "created_at": {"$gte": start_date}
-        }))
-        
-        # Customer analysis
-        customer_data = {}
-        for order in orders:
-            buyer = order.get("buyer_username")
-            if not buyer:
-                continue
-            
-            if buyer not in customer_data:
-                customer_data[buyer] = {
-                    "username": buyer,
-                    "total_orders": 0,
-                    "total_spent": 0,
-                    "completed_orders": 0,
-                    "first_order": order.get("created_at"),
-                    "last_order": order.get("created_at"),
-                    "favorite_products": {},
-                    "average_order_value": 0
-                }
-            
-            customer = customer_data[buyer]
-            customer["total_orders"] += 1
-            customer["total_spent"] += order.get("total_amount", 0)
-            
-            if order.get("status") in ["completed", "delivered"]:
-                customer["completed_orders"] += 1
-            
-            # Track order dates
-            order_date = order.get("created_at")
-            if order_date:
-                if customer["first_order"] is None or order_date < customer["first_order"]:
-                    customer["first_order"] = order_date
-                if customer["last_order"] is None or order_date > customer["last_order"]:
-                    customer["last_order"] = order_date
-            
-            # Track favorite products
-            product_name = order.get("product_details", {}).get("name", "Unknown")
-            customer["favorite_products"][product_name] = customer["favorite_products"].get(product_name, 0) + 1
-        
-        # Calculate averages and insights
-        for customer in customer_data.values():
-            customer["average_order_value"] = customer["total_spent"] / customer["total_orders"] if customer["total_orders"] > 0 else 0
-            customer["completion_rate"] = customer["completed_orders"] / customer["total_orders"] * 100 if customer["total_orders"] > 0 else 0
-            
-            # Get favorite product
-            if customer["favorite_products"]:
-                customer["top_product"] = max(customer["favorite_products"].items(), key=lambda x: x[1])[0]
-            else:
-                customer["top_product"] = "None"
-            
-            # Clean up dates for JSON serialization
-            if isinstance(customer["first_order"], datetime):
-                customer["first_order"] = customer["first_order"].isoformat()
-            if isinstance(customer["last_order"], datetime):
-                customer["last_order"] = customer["last_order"].isoformat()
-        
-        # Sort customers by total spent
-        top_customers = sorted(customer_data.values(), key=lambda x: x["total_spent"], reverse=True)
-        
-        # Customer segments
-        high_value_customers = [c for c in customer_data.values() if c["total_spent"] > 10000]  # Above ₦10,000
-        repeat_customers = [c for c in customer_data.values() if c["total_orders"] > 1]
-        new_customers = [c for c in customer_data.values() if c["total_orders"] == 1]
-        
-        return {
-            "summary": {
-                "total_customers": len(customer_data),
-                "high_value_customers": len(high_value_customers),
-                "repeat_customers": len(repeat_customers),
-                "new_customers": len(new_customers),
-                "average_customer_value": sum(c["total_spent"] for c in customer_data.values()) / len(customer_data) if customer_data else 0,
-                "customer_retention_rate": len(repeat_customers) / len(customer_data) * 100 if customer_data else 0
-            },
-            "top_customers": top_customers[:10],
-            "segments": {
-                "high_value": len(high_value_customers),
-                "repeat": len(repeat_customers),
-                "new": len(new_customers),
-                "at_risk": len([c for c in customer_data.values() if c["total_orders"] > 1 and c["completion_rate"] < 50])
-            }
-        }
-        
-    except Exception as e:
-        print(f"Error getting customer insights: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get customer insights")
-
-@app.put("/api/seller/products/{product_id}/inventory")
-async def update_product_inventory(
-    product_id: str,
-    inventory_data: dict,
-    current_user: dict = Depends(get_current_user)
-):
-    """Update product inventory (stock levels)"""
-    try:
-        new_quantity = inventory_data.get("quantity_available")
-        min_quantity = inventory_data.get("minimum_order_quantity")
-        
-        if new_quantity is None:
-            raise HTTPException(status_code=400, detail="quantity_available is required")
-        
-        if new_quantity < 0:
-            raise HTTPException(status_code=400, detail="Quantity cannot be negative")
-        
-        # Find product and verify ownership
-        product = db.products.find_one({"id": product_id, "seller_id": current_user["id"]})
-        if not product:
-            product = db.preorders.find_one({"id": product_id, "seller_id": current_user["id"]})
-        
-        if not product:
-            raise HTTPException(status_code=404, detail="Product not found or you don't have permission to update it")
-        
-        # Update inventory
-        update_data = {
-            "quantity_available": new_quantity,
-            "updated_at": datetime.utcnow()
-        }
-        
-        if min_quantity is not None:
-            update_data["minimum_order_quantity"] = max(1, min_quantity)
-        
-        # Update in appropriate collection
-        if product.get("type") == "preorder":
-            db.preorders.update_one({"id": product_id}, {"$set": update_data})
-        else:
-            db.products.update_one({"id": product_id}, {"$set": update_data})
-        
-        return {
-            "message": "Inventory updated successfully",
-            "product_id": product_id,
-            "new_quantity": new_quantity,
-            "minimum_order_quantity": update_data.get("minimum_order_quantity", product.get("minimum_order_quantity", 1))
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error updating product inventory: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to update product inventory")
-
-# ==================== RATING SYSTEM ENDPOINTS ====================
-
-@app.post("/api/ratings")
-async def create_rating(
-    rating_data: RatingCreate,
-    current_user: dict = Depends(get_current_user)
-):
-    """Create a new rating (1-5 stars) for users, products, or drivers"""
-    try:
-        # Validate rating value
-        if rating_data.rating_value < 1 or rating_data.rating_value > 5:
-            raise HTTPException(status_code=400, detail="Rating must be between 1 and 5 stars")
-        
-        # Check if rating already exists for this entity by this user
-        existing_rating = ratings_collection.find_one({
-            "rater_id": current_user["id"],
-            "rated_entity_id": rating_data.rated_entity_id,
-            "rating_type": rating_data.rating_type,
-            "order_id": rating_data.order_id  # Allow multiple ratings for different orders
-        })
-        
-        # If updating existing rating
-        if existing_rating:
-            # Update existing rating
-            update_data = {
-                "rating_value": rating_data.rating_value,
-                "comment": rating_data.comment,
-                "updated_at": datetime.utcnow()
-            }
-            
-            ratings_collection.update_one(
-                {"id": existing_rating["id"]},
-                {"$set": update_data}
-            )
-            
-            rating_id = existing_rating["id"]
-        else:
-            # Create new rating
-            rating = {
-                "id": str(uuid.uuid4()),
-                "rating_type": rating_data.rating_type,
-                "rating_value": rating_data.rating_value,
-                "rater_username": current_user["username"],
-                "rater_id": current_user["id"],
-                "rated_entity_id": rating_data.rated_entity_id,
-                "rated_entity_username": rating_data.rated_entity_username,
-                "order_id": rating_data.order_id,
-                "comment": rating_data.comment,
-                "created_at": datetime.utcnow(),
-                "updated_at": None
-            }
-            
-            ratings_collection.insert_one(rating)
-            rating_id = rating["id"]
-        
-        # Update average rating for the rated entity
-        await update_entity_average_rating(rating_data.rated_entity_id, rating_data.rating_type)
-        
-        return {
-            "message": "Rating submitted successfully",
-            "rating_id": rating_id,
-            "rating_value": rating_data.rating_value
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error creating rating: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create rating")
-
-async def update_entity_average_rating(entity_id: str, rating_type: RatingType):
-    """Helper function to update average rating for users, products, or drivers"""
-    try:
-        # Get all ratings for this entity
-        all_ratings = list(ratings_collection.find({
-            "rated_entity_id": entity_id,
-            "rating_type": rating_type
-        }))
-        
-        if not all_ratings:
-            return
-        
-        # Calculate new average
-        total_rating = sum(rating["rating_value"] for rating in all_ratings)
-        average_rating = round(total_rating / len(all_ratings), 1)
-        total_ratings = len(all_ratings)
-        
-        # Update appropriate collection based on rating type
-        if rating_type == RatingType.USER_RATING:
-            users_collection.update_one(
-                {"id": entity_id},
+            # Find all orders with this reference
+            result = db.orders.update_many(
+                {"payment_reference": reference},
                 {"$set": {
-                    "average_rating": average_rating,
-                    "total_ratings": total_ratings
+                    "status": "confirmed",  
+                    "payment_status": "paid",
+                    "paid_at": datetime.utcnow()
                 }}
             )
-        elif rating_type == RatingType.PRODUCT_RATING:
-            db.products.update_one(
-                {"id": entity_id},
-                {"$set": {
-                    "average_rating": average_rating,
-                    "total_ratings": total_ratings
-                }}
-            )
-            db.preorders.update_one(
-                {"id": entity_id},
-                {"$set": {
-                    "average_rating": average_rating,
-                    "total_ratings": total_ratings
-                }}
-            )
-        elif rating_type == RatingType.DRIVER_RATING:
-            # Update driver slot rating
-            driver_slots_collection.update_one(
-                {"driver_id": entity_id},
-                {"$set": {
-                    "average_rating": average_rating,
-                    "total_ratings": total_ratings
-                }}
-            )
-            # Also update user rating if driver is also a user
-            users_collection.update_one(
-                {"id": entity_id},
-                {"$set": {
-                    "average_rating": average_rating,
-                    "total_ratings": total_ratings
-                }}
-            )
-    except Exception as e:
-        print(f"Error updating average rating: {str(e)}")
-
-@app.get("/api/ratings/{entity_id}")
-async def get_entity_ratings(
-    entity_id: str,
-    rating_type: RatingType,
-    page: int = 1,
-    limit: int = 20
-):
-    """Get ratings for a specific entity (user, product, or driver)"""
-    try:
-        skip = (page - 1) * limit
-        
-        # Get ratings for the entity
-        ratings = list(ratings_collection.find({
-            "rated_entity_id": entity_id,
-            "rating_type": rating_type
-        }).sort("created_at", -1).skip(skip).limit(limit))
-        
-        # Get total count
-        total_count = ratings_collection.count_documents({
-            "rated_entity_id": entity_id,
-            "rating_type": rating_type
-        })
-        
-        # Clean up response
-        for rating in ratings:
-            rating.pop('_id', None)
-            if isinstance(rating.get("created_at"), datetime):
-                rating["created_at"] = rating["created_at"].isoformat()
-        
-        # Calculate rating summary
-        rating_distribution = {}
-        for i in range(1, 6):
-            count = ratings_collection.count_documents({
-                "rated_entity_id": entity_id,
-                "rating_type": rating_type,
-                "rating_value": i
-            })
-            rating_distribution[f"{i}_star"] = count
-        
-        return {
-            "ratings": ratings,
-            "total_count": total_count,
-            "rating_distribution": rating_distribution,
-            "page": page,
-            "limit": limit,
-            "total_pages": (total_count + limit - 1) // limit if total_count > 0 else 0
-        }
-        
-    except Exception as e:
-        print(f"Error getting entity ratings: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get ratings")
-
-@app.get("/api/ratings/my-ratings")
-async def get_my_ratings(
-    rating_type: Optional[RatingType] = None,
-    current_user: dict = Depends(get_current_user)
-):
-    """Get ratings given by the current user"""
-    try:
-        query = {"rater_id": current_user["id"]}
-        if rating_type:
-            query["rating_type"] = rating_type
-        
-        ratings = list(ratings_collection.find(query).sort("created_at", -1))
-        
-        # Clean up response
-        for rating in ratings:
-            rating.pop('_id', None)
-            if isinstance(rating.get("created_at"), datetime):
-                rating["created_at"] = rating["created_at"].isoformat()
-        
-        return {
-            "ratings": ratings,
-            "total_count": len(ratings)
-        }
-        
-    except Exception as e:
-        print(f"Error getting user ratings: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get user ratings")
-
-# ==================== DRIVER MANAGEMENT SYSTEM ====================
-
-@app.post("/api/driver-slots/purchase")
-async def purchase_driver_slots(
-    slots_count: int,
-    current_user: dict = Depends(get_current_user)
-):
-    """Purchase driver slots for logistics business (₦500 per slot, 14-day free trial)"""
-    try:
-        # Validate user is logistics business
-        if current_user.get('role') != 'logistics':
-            raise HTTPException(status_code=403, detail="Only logistics businesses can purchase driver slots")
-        
-        if slots_count < 1 or slots_count > 50:
-            raise HTTPException(status_code=400, detail="Slot count must be between 1 and 50")
-        
-        # Get existing slots count for this business
-        existing_slots = driver_slots_collection.count_documents({
-            "logistics_business_id": current_user["id"],
-            "is_active": True
-        })
-        
-        # Create new slots
-        slots_created = []
-        for i in range(slots_count):
-            slot_number = existing_slots + i + 1
+            print(f"Webhook: Updated {result.modified_count} orders for ref {reference}")
             
-            slot = {
-                "id": str(uuid.uuid4()),
-                "logistics_business_id": current_user["id"],
-                "logistics_username": current_user["username"],
-                "slot_number": slot_number,
-                "driver_id": None,
-                "driver_username": None,
-                "driver_name": None,
-                "vehicle_type": None,
-                "plate_number": None,
-                "vehicle_make_model": None,
-                "vehicle_color": None,
-                "vehicle_year": None,
-                "vehicle_photo": None,
-                "date_of_birth": None,
-                "address": None,
-                "driver_license": None,
-                "registration_link": None,
-                "subscription_status": DriverSubscriptionStatus.TRIAL,
-                "trial_start_date": datetime.utcnow(),
-                "subscription_start_date": None,
-                "subscription_end_date": None,
-                "monthly_fee": 500.0,
-                "is_active": True,
-                "total_trips": 0,
-                "average_rating": 5.0,
-                "created_at": datetime.utcnow(),
-                "updated_at": None
-            }
-            
-            driver_slots_collection.insert_one(slot)
-            slots_created.append(slot["id"])
-        
-        total_cost = slots_count * 500.0
-        trial_end_date = datetime.utcnow() + timedelta(days=14)
-        
-        return {
-            "message": f"Successfully purchased {slots_count} driver slots",
-            "slots_created": len(slots_created),
-            "total_slots": existing_slots + slots_count,
-            "trial_period": "14 days",
-            "trial_end_date": trial_end_date.isoformat(),
-            "monthly_cost_per_slot": "₦500",
-            "total_monthly_cost": f"₦{total_cost:,.0f}",
-            "slot_ids": slots_created
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error purchasing driver slots: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to purchase driver slots")
+        elif event == "transfer.success":
+             # Handle payout success
+             transfer_code = data.get("transfer_code")
+             
+             # Find commission payout
+             payout = db.commission_payouts.find_one({"transfer_code": transfer_code})
+             if payout:
+                 db.commission_payouts.update_one(
+                     {"_id": payout["_id"]},
+                     {"$set": {"status": "success", "paid_at": datetime.utcnow()}}
+                 )
+                 print(f"Webhook: Payout success for {transfer_code}")
 
-@app.get("/api/driver-slots/my-slots")
-async def get_my_driver_slots(
-    include_inactive: bool = False,
-    current_user: dict = Depends(get_current_user)
-):
-    """Get driver slots owned by logistics business"""
-    try:
-        # Validate user is logistics business
-        if current_user.get('role') != 'logistics':
-            raise HTTPException(status_code=403, detail="Only logistics businesses can view driver slots")
-        
-        query = {"logistics_business_id": current_user["id"]}
-        if not include_inactive:
-            query["is_active"] = True
-        
-        slots = list(driver_slots_collection.find(query).sort("slot_number", 1))
-        
-        # Clean up response
-        for slot in slots:
-            slot.pop('_id', None)
-            if isinstance(slot.get("created_at"), datetime):
-                slot["created_at"] = slot["created_at"].isoformat()
-            if isinstance(slot.get("trial_start_date"), datetime):
-                slot["trial_start_date"] = slot["trial_start_date"].isoformat()
-        
-        # Calculate summary statistics
-        active_slots = len([s for s in slots if s.get("is_active")])
-        occupied_slots = len([s for s in slots if s.get("driver_id")])
-        trial_slots = len([s for s in slots if s.get("subscription_status") == "trial"])
-        
-        return {
-            "slots": slots,
-            "summary": {
-                "total_slots": len(slots),
-                "active_slots": active_slots,
-                "occupied_slots": occupied_slots,
-                "available_slots": active_slots - occupied_slots,
-                "trial_slots": trial_slots,
-                "monthly_cost": f"₦{active_slots * 500:,.0f}"
-            }
-        }
-        
-    except HTTPException:
-        raise
+        elif event == "transfer.failed":
+             transfer_code = data.get("transfer_code")
+             db.commission_payouts.update_one(
+                 {"transfer_code": transfer_code},
+                 {"$set": {"status": "failed", "reason": data.get("reason", "Unknown")}}
+             )
+             print(f"Webhook: Payout failed for {transfer_code}")
+             
     except Exception as e:
-        print(f"Error getting driver slots: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get driver slots")
+        print(f"Webhook Error: {str(e)}")
+        # Don't fail the webhook response to Paystack
+        return {"status": "error", "message": str(e)}
+        
+    return {"status": "success"}
 
-@app.post("/api/driver-slots/{slot_id}/assign-driver")
-async def assign_driver_to_slot(
-    slot_id: str,
-    driver_data: DriverSlotCreate,
-    current_user: dict = Depends(get_current_user)
-):
-    """Assign driver information to a purchased slot and generate registration link"""
-    try:
-        # Find the slot
-        slot = driver_slots_collection.find_one({"id": slot_id})
-        if not slot:
-            raise HTTPException(status_code=404, detail="Driver slot not found")
-        
-        # Validate ownership
-        if slot["logistics_business_id"] != current_user["id"]:
-            raise HTTPException(status_code=403, detail="You can only assign drivers to your own slots")
-        
-        # Check if slot is already occupied
-        if slot.get("driver_id"):
-            raise HTTPException(status_code=400, detail="This slot is already assigned to a driver")
-        
-        # Generate unique registration link
-        registration_token = str(uuid.uuid4())
-        registration_link = f"/api/drivers/register/{registration_token}"
-        
-        # Update slot with driver information
-        update_data = {
-            "driver_name": driver_data.driver_name,
-            "vehicle_type": driver_data.vehicle_type,
-            "plate_number": driver_data.plate_number.upper(),
-            "vehicle_make_model": driver_data.vehicle_make_model,
-            "vehicle_color": driver_data.vehicle_color,
-            "vehicle_year": driver_data.vehicle_year,
-            "vehicle_photo": driver_data.vehicle_photo,
-            "date_of_birth": driver_data.date_of_birth,
-            "address": driver_data.address,
-            "driver_license": driver_data.driver_license,
-            "registration_link": registration_link,
-            "registration_token": registration_token,
-            "updated_at": datetime.utcnow()
-        }
-        
-        driver_slots_collection.update_one(
-            {"id": slot_id},
-            {"$set": update_data}
-        )
-        
-        return {
-            "message": "Driver assigned to slot successfully",
-            "slot_id": slot_id,
-            "driver_name": driver_data.driver_name,
-            "vehicle_info": f"{driver_data.vehicle_make_model} ({driver_data.plate_number})",
-            "registration_link": registration_link,
-            "instructions": "Share this registration link with the driver to complete their account setup"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error assigning driver to slot: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to assign driver to slot")
-
-@app.post("/api/drivers/register/{registration_token}")
-async def complete_driver_registration(
-    registration_token: str,
-    registration_data: DriverRegistrationComplete
-):
-    """Complete driver registration using the provided registration link"""
-    try:
-        # Find slot with this registration token
-        slot = driver_slots_collection.find_one({"registration_token": registration_token})
-        if not slot:
-            raise HTTPException(status_code=404, detail="Invalid registration link")
-        
-        # Check if slot is already activated
-        if slot.get("driver_id"):
-            raise HTTPException(status_code=400, detail="This registration link has already been used")
-        
-        # Check if username is available
-        existing_user = users_collection.find_one({"username": registration_data.username})
-        if existing_user:
-            raise HTTPException(status_code=400, detail="Username already exists")
-        
-        # Create driver user account
-        driver_user = {
-            "id": str(uuid.uuid4()),
-            "first_name": slot["driver_name"].split()[0] if slot.get("driver_name") else "Driver",
-            "last_name": " ".join(slot["driver_name"].split()[1:]) if slot.get("driver_name") and len(slot["driver_name"].split()) > 1 else "",
-            "username": registration_data.username,
-            "email": f"{registration_data.username}@pyramyddriver.com",  # Generated email
-            "password": hash_password(registration_data.password),
-            "phone": None,  # Will be updated when driver provides it
-            "role": UserRole.DRIVER,
-            "is_verified": True,  # Auto-verify logistics business managed drivers
-            "wallet_balance": 0.0,
-            "average_rating": 5.0,
-            "total_ratings": 0,
-            "created_at": datetime.utcnow()
-        }
-        
-        users_collection.insert_one(driver_user)
-        
-        # Update slot with driver account information
-        driver_slots_collection.update_one(
-            {"id": slot["id"]},
-            {"$set": {
-                "driver_id": driver_user["id"],
-                "driver_username": registration_data.username,
-                "registration_token": None,  # Clear token after use
-                "updated_at": datetime.utcnow()
-            }}
-        )
-        
-        return {
-            "message": "Driver registration completed successfully",
-            "driver_username": registration_data.username,
-            "vehicle_info": {
-                "type": slot.get("vehicle_type"),
-                "make_model": slot.get("vehicle_make_model"),
-                "plate_number": slot.get("plate_number"),
-                "color": slot.get("vehicle_color")
-            },
-            "logistics_business": slot["logistics_username"],
-            "instructions": "You can now access the driver platform using your username and password"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error completing driver registration: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to complete driver registration")
-
-@app.get("/api/drivers/profile/{driver_username}")
-async def get_driver_profile(driver_username: str):
-    """Get enhanced driver profile for uber-like interface"""
-    try:
-        # Get driver user information
-        driver_user = users_collection.find_one({"username": driver_username, "role": "driver"})
-        if not driver_user:
-            raise HTTPException(status_code=404, detail="Driver not found")
-        
-        # Get driver slot information
-        driver_slot = driver_slots_collection.find_one({"driver_username": driver_username})
-        
-        # Get driver ratings
-        driver_ratings = list(ratings_collection.find({
-            "rated_entity_id": driver_user["id"],
-            "rating_type": RatingType.DRIVER_RATING
-        }).sort("created_at", -1).limit(10))
-        
-        # Clean up ratings
-        for rating in driver_ratings:
-            rating.pop('_id', None)
-            if isinstance(rating.get("created_at"), datetime):
-                rating["created_at"] = rating["created_at"].isoformat()
-        
-        # Build enhanced profile
-        profile = {
-            "id": driver_user["id"],
-            "driver_username": driver_username,
-            "driver_name": f"{driver_user['first_name']} {driver_user['last_name']}".strip(),
-            "phone_number": driver_user.get("phone"),
-            "average_rating": driver_user.get("average_rating", 5.0),
-            "total_ratings": driver_user.get("total_ratings", 0),
-            "total_trips": driver_slot.get("total_trips", 0) if driver_slot else 0,
-            "is_independent": driver_slot is None,  # Independent if no slot found
-            "status": "offline",  # Default status, would be updated with real-time data
-            "vehicle_info": {},
-            "logistics_business_info": None,
-            "recent_ratings": driver_ratings,
-            "created_at": driver_user["created_at"].isoformat() if isinstance(driver_user.get("created_at"), datetime) else None
-        }
-        
-        # Add vehicle and logistics information if slot exists
-        if driver_slot:
-            profile["vehicle_info"] = {
-                "type": driver_slot.get("vehicle_type"),
-                "make_model": driver_slot.get("vehicle_make_model"),
-                "plate_number": driver_slot.get("plate_number"),
-                "color": driver_slot.get("vehicle_color"),
-                "year": driver_slot.get("vehicle_year"),
-                "photo": driver_slot.get("vehicle_photo")
-            }
-            profile["logistics_business_info"] = {
-                "business_username": driver_slot.get("logistics_username"),
-                "slot_number": driver_slot.get("slot_number")
-            }
-        
-        return profile
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error getting driver profile: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get driver profile")
-
-@app.get("/api/drivers/find-drivers")
-async def find_available_drivers(
-    location: Optional[str] = None,
-    vehicle_type: Optional[VehicleType] = None,
-    min_rating: Optional[float] = None,
-    limit: int = 20
-):
-    """Find available drivers for uber-like interface"""
-    try:
-        # Build query for active driver slots
-        query = {"is_active": True, "driver_id": {"$ne": None}}
-        
-        if vehicle_type:
-            query["vehicle_type"] = vehicle_type
-        
-        if min_rating:
-            query["average_rating"] = {"$gte": min_rating}
-        
-        # Get driver slots
-        driver_slots = list(driver_slots_collection.find(query).limit(limit))
-        
-        # Build driver profiles
-        drivers = []
-        for slot in driver_slots:
-            # Get user information
-            driver_user = users_collection.find_one({"id": slot["driver_id"]})
-            if not driver_user:
-                continue
-            
-            driver_profile = {
-                "id": slot["driver_id"],
-                "username": slot["driver_username"],
-                "name": slot["driver_name"],
-                "average_rating": slot.get("average_rating", 5.0),
-                "total_trips": slot.get("total_trips", 0),
-                "vehicle_info": {
-                    "type": slot.get("vehicle_type"),
-                    "make_model": slot.get("vehicle_make_model"),
-                    "plate_number": slot.get("plate_number"),
-                    "color": slot.get("vehicle_color"),
-                    "photo": slot.get("vehicle_photo")
-                },
-                "logistics_business": slot.get("logistics_username"),
-                "status": "available"  # Would be dynamic in real implementation
-            }
-            
-            drivers.append(driver_profile)
-        
-        return {
-            "drivers": drivers,
-            "total_found": len(drivers),
-            "filters_applied": {
-                "location": location,
-                "vehicle_type": vehicle_type,
-                "min_rating": min_rating
-            }
-        }
-        
-    except Exception as e:
-        print(f"Error finding drivers: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to find drivers")
 
 if __name__ == "__main__":
+    # Start Server
     import uvicorn
+<<<<<<< HEAD
     uvicorn.run(app, host="0.0.0.0", port=8001)
 
 # --- Bank Account Management ---
@@ -10796,3 +11356,11 @@ async def update_tracking_log(
     )
     
     return {"status": "success", "message": "Tracking updated"}
+=======
+    # Use PORT from environment or default to 5000 as requested
+    port = int(os.environ.get("PORT", 5000))
+    print(f"Starting server on port {port}...")
+    # Using string import allows reloading
+    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=True)
+
+>>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49

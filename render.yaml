@@ -5,13 +5,11 @@ services:
   # Backend API Service
   - type: web
     name: pyramyd-backend
-    runtime: python
-    region: oregon  # Choose: oregon, frankfurt, singapore
+    runtime: docker
+    rootDir: .
+    region: frankfurt  # Choose: oregon, frankfurt, singapore
     plan: starter  # free, starter, standard, pro
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT --workers 4
-    healthCheckPath: /health
+    healthCheckPath: /api/health
     envVars:
       - key: MONGO_URL
         sync: false  # Set in Render dashboard
@@ -23,9 +21,25 @@ services:
         value: production
       - key: PAYSTACK_SECRET_KEY
         sync: false
+      - key: PAYSTACK_PUBLIC_KEY
+        sync: false
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: GEOAPIFY_API_KEY
+        sync: false
+      - key: SMTP_SERVER
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SUPPORT_MAIL
+        sync: false
+      - key: KWIK_ACCESS_TOKEN
         sync: false
     autoDeploy: true
 
@@ -33,7 +47,7 @@ services:
   - type: web
     name: pyramyd-frontend
     runtime: node
-    region: oregon
+    region: frankfurt
     plan: starter
     rootDir: frontend
     buildCommand: yarn install --frozen-lockfile && yarn build
@@ -65,7 +79,7 @@ services:
 databases:
   - name: pyramyd-mongodb
     plan: starter  # free (limited), starter, standard
-    region: oregon
+    region: frankfurt
     ipAllowList: []  # Empty = accessible from all Render services
 
 # Notes for deployment:
