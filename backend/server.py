@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional, List, Union
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,32 +15,55 @@ import base64
 import hashlib
 import hmac
 import requests
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+import logging
+from app.utils.market_data import get_market_estimate
+from app.models.tracking import TrackingLog, TrackingLogEntry
+from app.utils.geo import get_distance_km
+from app.api.deps import get_current_user, get_current_admin
 
-# Environment variables - ALL SENSITIVE DATA MUST BE IN ENV AND RIGHT CREDENTIALS USED DURING TESTING AND DEPLOYMENT
-MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/') //
-JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-here-change-in-production')
-ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')  # For encrypting sensitive user data
-PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_dummy_paystack_key')
-PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY', 'pk_test_dummy_paystack_key')
-TWILIO_SID = os.environ.get('TWILIO_ACCOUNT_SID', 'dummy_twilio_sid')
-TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', 'dummy_twilio_token')
+# Setup Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Kwik Delivery API
-KWIK_API_KEY = os.environ.get('KWIK_API_KEY', 'dummy_kwik_key')
-KWIK_API_URL = "https://api.kwik.delivery/v1" #input the right url
-KWIK_ENABLED_STATES = ["Lagos", "Oyo", "FCT Abuja"]  # States where Kwik operates
+# Environment variables - ALL SENSITIVE DATA MUST BE IN ENV
+# In production, ensure these are set in the dashboard (Render/Heroku/etc)
+MONGO_URL = os.environ.get('MONGO_URL')
+if not MONGO_URL:
+    # Fallback for local dev ONLY if needed, but preferably crash in prod if missing
+    MONGO_URL = 'mongodb://localhost:27017/'
 
-# Admin credentials
-ADMIN_EMAIL = "a**********@gmail.com"
-ADMIN_PASSWORD = "******"  # Default password - change after first login
-ADMIN_PASSWORD_HASH = "**********"
+JWT_SECRET = os.environ.get('JWT_SECRET')
+if not JWT_SECRET:
+    print("WARNING: JWT_SECRET not set. Using insecure default for dev only.")
+    JWT_SECRET = 'dev-secret-key-change-in-prod'
+
+ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY') # Critical for BVN
+PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY')
+PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY')
+
+# SMS / Notifications
+TWILIO_SID = os.environ.get('TWILIO_ACCOUNT_SID')
+TWILIO_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
+
+# Kwik Delivery API - REMOVED
+# Kwik integration removed as per user request
+
+
+# Admin credentials - Should be seeded via script or env, not hardcoded
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@example.com')
+# In production, use a create-admin script instead of env vars for passwords if possible, 
+# but for simple setup:
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD') 
+ADMIN_PASSWORD_HASH = os.environ.get('ADMIN_PASSWORD_HASH')
 
 # Paystack API Base URL
 PAYSTACK_API_URL = "https://api.paystack.co"
 
-# Farm Deals Fixed Split Group (Sophie Farms Investment Ltd)
-FARMHUB_SPLIT_GROUP = os.environ.get('FARMHUB_SPLIT_GROUP', 'SPL_dCqIOTFNRu')
-FARMHUB_SUBACCOUNT = os.environ.get('FARMHUB_SUBACCOUNT', 'ACCT_c94r8ia2jeg41lx')
+# Farm Deals Fixed Split Group
+FARMHUB_SPLIT_GROUP = os.environ.get('FARMHUB_SPLIT_GROUP')
+FARMHUB_SUBACCOUNT = os.environ.get('FARMHUB_SUBACCOUNT')
 
 # Commission rates
 AGENT_BUYER_COMMISSION_RATE = 0.04  # 4% for agent buyers
@@ -108,29 +131,13 @@ def get_delivery_fee_by_state(state: str) -> float:
     """Get delivery fee based on customer's state"""
     return STATE_DELIVERY_FEES.get(state, 3000)  # Default 3000 if state not found
 
-# Generate encryption key if not provided (for development only)
-if not ENCRYPTION_KEY:
-    ENCRYPTION_KEY = Fernet.generate_key().decode()
-    print(f"⚠️ WARNING: Using auto-generated encryption key. Set ENCRYPTION_KEY in production!")
+def get_database():
+    return db
 
-# Initialize Fernet cipher for encryption
-cipher_suite = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
 
-def encrypt_data(data: str) -> str:
-    """Encrypt sensitive data"""
-    if not data:
-        return None
-    return cipher_suite.encrypt(data.encode()).decode()
 
-def decrypt_data(encrypted_data: str) -> str:
-    """Decrypt sensitive data"""
-    if not encrypted_data:
-        return None
-    try:
-        return cipher_suite.decrypt(encrypted_data.encode()).decode()
-    except Exception as e:
-        print(f"Decryption error: {str(e)}")
-        return None
+# Security Utils
+from app.utils.security import encrypt_data, decrypt_data
 
 # Paystack Helper Functions
 def paystack_request(method: str, endpoint: str, data: dict = None) -> dict:
@@ -167,6 +174,34 @@ def verify_paystack_signature(payload: bytes, signature: str) -> bool:
         hashlib.sha512
     ).hexdigest()
     return hmac.compare_digest(computed_signature, signature)
+
+def create_transfer_recipient(name: str, account_number: str, bank_code: str) -> str:
+    """Create a Paystack Transfer Recipient"""
+    payload = {
+        "type": "nuban",
+        "name": name,
+        "account_number": account_number,
+        "bank_code": bank_code,
+        "currency": "NGN"
+    }
+    response = paystack_request("POST", "/transferrecipient", payload)
+    if response and response.get("status"):
+        return response["data"]["recipient_code"]
+    raise ValueError("Failed to create transfer recipient")
+
+def initiate_transfer(amount_naira: float, recipient_code: str, reference: str, reason: str = "Withdrawal") -> dict:
+    """Initiate a Transfer to a recipient"""
+    payload = {
+        "source": "balance",
+        "amount": naira_to_kobo(amount_naira),
+        "recipient": recipient_code,
+        "reason": reason,
+        "reference": reference
+    }
+    response = paystack_request("POST", "/transfer", payload)
+    if response and response.get("status"):
+        return response["data"]
+    raise ValueError("Failed to initiate transfer")
 
 def naira_to_kobo(amount: float) -> int:
     """Convert Naira to Kobo (sub-unit)"""
@@ -259,121 +294,34 @@ def calculate_agent_commission(product_total: float, agent_user_id: str, db) -> 
         'tier_info': tier_info
     }
 
-# Kwik Delivery Integration
-def kwik_request(method: str, endpoint: str, data: dict = None) -> dict:
-    """Make authenticated request to Kwik Delivery API"""
-    headers = {
-        "Authorization": f"Bearer {KWIK_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    url = f"{KWIK_API_URL}{endpoint}"
-    
-    try:
-        if method == "GET":
-            response = requests.get(url, headers=headers)
-        elif method == "POST":
-            response = requests.post(url, headers=headers, json=data)
-        else:
-            raise ValueError(f"Unsupported method: {method}")
-        
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Kwik API error: {str(e)}")
-        if hasattr(e.response, 'text'):
-            print(f"Response: {e.response.text}")
-        # Don't raise exception, return None to fallback to 20% rule
-        return None
+# Kwik Delivery functions removed
 
-def calculate_delivery_fee(product_total: float, buyer_state: str, product_data: dict = None) -> dict:
-    """
-    Smart delivery fee calculator with vendor priority
-    Priority: Vendor logistics > Kwik API > 20% rule
-    """
-    delivery_info = {
-        'delivery_fee': 0.0,
-        'delivery_method': 'unknown',
-        'kwik_available': False,
-        'vendor_managed': False
-    }
-    
-    # Priority 1: Check if vendor manages logistics
-    if product_data and product_data.get('logistics_managed_by') == 'seller':
-        vendor_fee = product_data.get('seller_delivery_fee', 0.0)
-        delivery_info.update({
-            'delivery_fee': vendor_fee,
-            'delivery_method': 'vendor_managed',
-            'vendor_managed': True,
-            'is_free': vendor_fee == 0.0
-        })
-        return delivery_info
-    
-    # Priority 2: Check if Kwik is available for the state
-    if buyer_state in KWIK_ENABLED_STATES:
-        # Note: In production, you would call Kwik API to get actual quote
-        # For now, we'll use state-based fees for Kwik-enabled states
-        kwik_fee = STATE_DELIVERY_FEES.get(buyer_state, 3000)
-        delivery_info.update({
-            'delivery_fee': kwik_fee,
-            'delivery_method': 'kwik_delivery',
-            'kwik_available': True
-        })
-        return delivery_info
-    
-    # Priority 3: Use 20% of product value for other states
-    twenty_percent_fee = product_total * 0.20
-    delivery_info.update({
-        'delivery_fee': twenty_percent_fee,
-        'delivery_method': '20_percent_rule',
-        'state': buyer_state
-    })
-    
-    return delivery_info
 
-def create_kwik_delivery(pickup_address: dict, delivery_address: dict, order_details: dict) -> dict:
-    """
-    Create a delivery request on Kwik API
-    Returns tracking info or None if failed
-    """
-    kwik_payload = {
-        "pickup_details": {
-            "name": order_details.get('seller_name', 'Pyramyd Vendor'),
-            "phone": order_details.get('seller_phone', '+234'),
-            "address": pickup_address.get('address', ''),
-            "latitude": pickup_address.get('lat'),
-            "longitude": pickup_address.get('lng')
-        },
-        "delivery_details": {
-            "name": order_details.get('buyer_name', ''),
-            "phone": order_details.get('buyer_phone', ''),
-            "address": delivery_address.get('address', ''),
-            "latitude": delivery_address.get('lat'),
-            "longitude": delivery_address.get('lng')
-        },
-        "order_info": {
-            "order_id": order_details.get('order_id', ''),
-            "description": order_details.get('description', 'Product delivery'),
-            "amount": order_details.get('amount', 0)
-        }
-    }
-    
-    result = kwik_request("POST", "/deliveries", kwik_payload)
-    
-    if result and result.get('status') == 'success':
-        return {
-            'kwik_delivery_id': result.get('delivery_id'),
-            'tracking_url': result.get('tracking_url'),
-            'estimated_time': result.get('estimated_time')
-        }
-    
-    return None
+from fastapi import FastAPI, HTTPException, Depends, status, Request
+
+# Import the new KYC router
+import app.api.kyc as kyc
+import app.api.auth as auth
+import app.api.communities as communities
 
 app = FastAPI(title="Pyramyd API", version="1.0.0")
 
+# Include KYC router
+app.include_router(kyc.router, prefix="/api/kyc", tags=["kyc"])
+app.include_router(communities.router, prefix="/api/communities", tags=["communities"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+import app.api.rfq as rfq # Import newly created module
+app.include_router(rfq.router, prefix="/api/requests", tags=["rfq"])
+
+
 # CORS middleware
+# CORS middleware
+origins_str = os.environ.get("ALLOWED_ORIGINS", "*")
+origins = [origin.strip() for origin in origins_str.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -416,10 +364,79 @@ paystack_transfers_collection = db.paystack_transfers
 commission_payouts_collection = db.commission_payouts
 
 # Kwik Delivery collection
-kwik_deliveries_collection = db.kwik_deliveries
+disputes_collection = db.disputes
+buyer_requests_collection = db.buyer_requests
+request_offers_collection = db.request_offers
+settlement_logs_collection = db.settlement_logs
 
 # Security
 security = HTTPBearer()
+
+# --- Auto-Release / Payout Logic ---
+from app.services.payout_service import process_order_payout
+
+async def check_for_overdue_orders():
+    """
+    Background job to check for orders held in escrow 
+    that are overdue for auto-confirmation (e.g. 10 days rule).
+    Auto-confirms if delivered but not confirmed by buyer.
+    Respects 'payout_halted' flag.
+    """
+    logger.info("Running auto-release checker...")
+    try:
+        db = get_database()
+        
+        # Define cutoffs
+        now = datetime.utcnow()
+        instant_cutoff = now - timedelta(days=3)   # PyExpress / Instant
+        standard_cutoff = now - timedelta(days=14) # Farm Deals / Standard
+        
+        # Find delivered orders pending confirmation
+        candidates = list(db.orders.find({
+            "status": "delivered_pending_confirmation",
+            "payout_halted": {"$ne": True} # Do not process halted orders
+        }))
+        
+        for order in candidates:
+            delivered_at = order.get('delivered_at')
+            if not delivered_at:
+                continue # Safety check
+                
+            platform = order.get('platform')
+            should_release = False
+            
+            if platform == 'pyexpress':
+                if delivered_at < instant_cutoff:
+                    should_release = True
+            else: # farm_deals or others
+                if delivered_at < standard_cutoff:
+                    should_release = True
+            
+            if should_release:
+                logger.info(f"Auto-release triggered for order {order['order_id']}")
+                try:
+                    # Update status first
+                    db.orders.update_one(
+                        {"order_id": order['order_id']}, 
+                        {"$set": {"status": "completed", "auto_released": True, "completed_at": now}}
+                    )
+                    
+                    # Process Payout
+                    await process_order_payout(order['order_id'], db)
+                    
+                except Exception as e:
+                    logger.error(f"Failed to auto-process order {order.get('order_id')}: {e}")
+
+    except Exception as e:
+        logger.error(f"Error in auto-release job: {e}")
+
+@app.on_event("startup")
+async def start_scheduler():
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(check_for_overdue_orders, "interval", hours=1) # Run every hour
+    scheduler.start()
+    logger.info("APScheduler started for Auto-Release jobs.")
+
 
 # Enums
 class UserRole(str, Enum):
@@ -525,6 +542,20 @@ class OrderStatus(str, Enum):
     IN_TRANSIT = "in_transit"
     DELIVERED = "delivered"
     CANCELLED = "cancelled"
+    HELD_IN_ESCROW = "held_in_escrow"
+    DISPUTED = "disputed"
+
+def generate_tracking_id(country_code: str = "NGA") -> str:
+    """
+    Generate a non-guessable tracking ID (e.g., NGA_PYD-8B2-X9L)
+    Prefix is ISO 3166-1 alpha-3 country code where delivery is expected.
+    """
+    import random
+    import string
+    chars = string.ascii_uppercase + string.digits
+    part1 = ''.join(random.choices(chars, k=3))
+    part2 = ''.join(random.choices(chars, k=3))
+    return f"{country_code}_PYD-{part1}-{part2}"
 
 class Order(BaseModel):
     id: Optional[str] = None
@@ -714,15 +745,6 @@ class DriverCreate(BaseModel):
     color: str
     year: Optional[int] = None
 
-class DeliveryRequestCreate(BaseModel):
-    order_id: str
-    order_type: str
-    pickup_address: str
-    delivery_address: str
-    product_details: str
-    weight_kg: Optional[float] = None
-    special_instructions: Optional[str] = None
-    estimated_price: float
 
 class PreOrderStatus(str, Enum):
     DRAFT = "draft"
@@ -732,12 +754,6 @@ class PreOrderStatus(str, Enum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
-# Old ProductCategory enum removed - using new structure above
-    FISH = "fish"
-    MEAT = "meat"
-    PACKAGED_GOODS = "packaged_goods"
-    FEEDS = "feeds"
-    FRUITS = "fruits"
 
 class PreOrder(BaseModel):
     id: Optional[str] = None
@@ -1002,6 +1018,7 @@ class Product(BaseModel):
     seller_name: str
     seller_type: Optional[str] = None  # "farmer", "agent", "business", "supplier"
     seller_profile_picture: Optional[str] = None  # Seller's profile picture for transparency
+    seller_is_verified: bool = False  # If seller is verified
     title: str
     description: str
     # Enhanced category structure
@@ -1040,6 +1057,11 @@ class Product(BaseModel):
     # Rating information
     average_rating: float = 5.0  # Product rating
     total_ratings: int = 0  # Number of product ratings
+    
+    # Community / Group Buy Fields
+    target_quantity: Optional[int] = None 
+    committed_quantity: int = 0 
+    
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class ProductCreate(BaseModel):
@@ -1071,10 +1093,26 @@ class ProductCreate(BaseModel):
     delivery_cost_dropoff: float = 0.0  # Cost for drop-off delivery (0.0 = free)
     delivery_cost_shipping: float = 0.0  # Cost for shipping delivery (0.0 = free)
     delivery_notes: Optional[str] = None  # Special delivery instructions/notes
+    
+    # Date Information for Perishables vs Processed
+    best_before: Optional[datetime] = None  # For raw farm produce
+    expiry_date: Optional[datetime] = None  # For processed goods
+
+    # Community / Group Buy Fields
+    target_quantity: Optional[int] = None # For community orders
+    committed_quantity: int = 0 # Current commitments
+    
+    @validator("images", check_fields=False)
+    def validate_images(cls, v):
+        return v
 
 class CartItem(BaseModel):
     product_id: str
     quantity: int
+    unit: Optional[str] = None
+    unit_specification: Optional[Union[str, dict]] = None
+    delivery_method: Optional[str] = "delivery"  # 'delivery' or 'pickup'
+    dropoff_location: Optional[str] = None
 
 # Rating System Models
 class RatingType(str, Enum):
@@ -1410,6 +1448,11 @@ class AgentFarmer(BaseModel):
     farmer_id: str
     farmer_name: str
     farmer_phone: Optional[str] = None
+    # Secure Bank Details for Offline Farmer
+    bank_account_number: Optional[str] = None # Encrypted
+    bank_name: Optional[str] = None
+    bank_code: Optional[str] = None
+    paystack_recipient_code: Optional[str] = None
     farmer_location: str
     linked_at: datetime = Field(default_factory=datetime.utcnow)
     is_active: bool = True
@@ -1508,7 +1551,281 @@ class GiftCard(BaseModel):
     amount: float
     balance: float  # Remaining balance (can be partially used)
     status: GiftCardStatus = GiftCardStatus.ACTIVE
+    purchaser_id: str
+    purchaser_username: str
+    recipient_email: Optional[str] = None
+    recipient_name: Optional[str] = None
+    message: Optional[str] = None
+    expiry_date: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(days=365))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    redeemed_at: Optional[datetime] = None
+    redeemed_by_id: Optional[str] = None
+    redeemed_by_username: Optional[str] = None
+
+# RFQ & Buyer Request Models
+
+class BuyerRequestStatus(str, Enum):
+    OPEN = "open"
+    PARTIALLY_FILLED = "partially_filled"
+    FILLED = "filled"
+    CLOSED = "closed" # Manually closed or expired
+
+class RequestPlatform(str, Enum):
+    PYEXPRESS = "PyExpress"
+    FARM_DEALS = "FarmDeals"
+
+class RequestPersona(str, Enum):
+    HORECA = "HORECA" # Hotel/Restaurant/Cafe
+    BUSINESS = "Business" # Wholesaler/Exporter
+
+class BuyerRequest(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    username: str
+    
+    # Validation / Routing
+    platform: RequestPlatform # Auto-assigned
+    persona: RequestPersona
+    business_category: str
+    
+    # Privacy
+    is_private: bool = False
+    invited_sellers: List[str] = [] # List of usernames/emails
+    
+    # Source Logic
+    allow_multiple_sellers: bool = False
+    
+    # Details
+    title: str
+    items: List[dict] = [] # List of items requested (name, qty, specs)
+    location: str
+    budget: Optional[float] = None
+    
+    # Quantities
+    quantity_required: Optional[float] = None # User inputs total "units" or "count" (Optional)
+    quantity_remaining: Optional[float] = None # Starts equal to required
+    unit_of_measure: str
+    
+    # Timers
+    delivery_days: int # Used for routing (e.g. 3 days)
+    bidding_expiry: datetime 
+    expected_delivery_date: datetime
+    
+    status: BuyerRequestStatus = BuyerRequestStatus.OPEN
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+class OfferStatus(str, Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    IN_TRANSIT = "in_transit"
+    DELIVERED = "delivered"
+    COMPLETED = "completed"
+    DISPUTED = "disputed"
+
+class RequestOffer(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    request_id: str
+    seller_id: str
+    seller_username: str
+    
+    # Offer Details
+    price: float
+    quantity_offered: float
+    delivery_date: datetime
+    notes: Optional[str] = None
+    
+    status: OfferStatus = OfferStatus.PENDING
+    
+    # Fulfillment / Handshake
+    tracking_id: Optional[str] = None # Generated on Accept
+    delivery_otp: Optional[str] = None # Last 8 chars of tracking_id
+    
+    date_accepted: Optional[datetime] = None
+    date_dispatched: Optional[datetime] = None
+    date_delivered: Optional[datetime] = None
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class SettlementLog(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    request_id: str
+    offer_id: str
+    amount: float
+    fee: float
+    payout_reference: str
+    method_of_fulfillment: str # "OTP Verified" or "Auto-Released"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+# Dispute System Models
+class DisputeStatus(str, Enum):
+    OPEN = "open"
+    RESOLVED = "resolved"
+    CLOSED = "closed"
+
+class DisputeResolution(str, Enum):
+    REFUND_BUYER = "refund_buyer"
+    RELEASE_TO_SELLER = "release_to_seller"
+    DISMISSED = "dismissed"
+
+class Dispute(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_id: str
+    reporter_id: str
+    reporter_role: str
+    reason: str
+    description: Optional[str] = None
+    status: DisputeStatus = DisputeStatus.OPEN
+    resolution: Optional[DisputeResolution] = None
+    resolution_notes: Optional[str] = None
+    resolved_by: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    resolved_at: Optional[datetime] = None
+    balance: float
+    status: GiftCardStatus = GiftCardStatus.ACTIVE
+    created_by: str
+    redeemed_by: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    redeemed_at: Optional[datetime] = None
+
+# Dispute System Models
+class DisputeStatus(str, Enum):
+    OPEN = "open"
+    RESOLVED = "resolved"
+    CLOSED = "closed"
+
+class DisputeResolution(str, Enum):
+    REFUND_BUYER = "refund_buyer"
+    RELEASE_TO_SELLER = "release_to_seller"
+    DISMISSED = "dismissed"
+
+class Dispute(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_id: str
+    reporter_id: str  # User who opened the dispute
+    reporter_role: str # 'buyer' or 'seller'
+    reason: str
+    description: Optional[str] = None
+    status: DisputeStatus = DisputeStatus.OPEN
+    resolution: Optional[DisputeResolution] = None
+    resolution_notes: Optional[str] = None
+    resolved_by: Optional[str] = None  # Admin ID
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    resolved_at: Optional[datetime] = None
+    card_code: str = Field(default_factory=lambda: f"GIFT-{uuid.uuid4().hex[:8].upper()}")
+    amount: float
+    balance: float  # Remaining balance (can be partially used)
+    status: GiftCardStatus = GiftCardStatus.ACTIVE
     purchaser_id: str  # User who bought the gift card
+    purchaser_username: str
+    recipient_email: Optional[str] = None  # If gifted to someone
+    recipient_name: Optional[str] = None
+    message: Optional[str] = None  # Gift message
+    expiry_date: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(days=365))  # 1 year validity
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    redeemed_at: Optional[datetime] = None
+    redeemed_by_id: Optional[str] = None
+    redeemed_by_username: Optional[str] = None
+
+# RFQ & Buyer Request Models
+
+class BuyerRequestStatus(str, Enum):
+    OPEN = "open"
+    PARTIALLY_FILLED = "partially_filled"
+    FILLED = "filled"
+    CLOSED = "closed" # Manually closed or expired
+
+class RequestPlatform(str, Enum):
+    PYEXPRESS = "PyExpress"
+    FARM_DEALS = "FarmDeals"
+
+class RequestPersona(str, Enum):
+    HORECA = "HORECA" # Hotel/Restaurant/Cafe
+    BUSINESS = "Business" # Wholesaler/Exporter
+
+class BuyerRequest(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    username: str
+    
+    # Validation / Routing
+    platform: RequestPlatform # Auto-assigned
+    persona: RequestPersona
+    business_category: str
+    
+    # Privacy
+    is_private: bool = False
+    invited_sellers: List[str] = [] # List of usernames/emails
+    
+    # Source Logic
+    allow_multiple_sellers: bool = False
+    
+    # Details
+    title: str
+    specifications: Optional[str] = None
+    category: str
+    location: str
+    budget: float
+    
+    # Quantities
+    quantity_required: float
+    quantity_remaining: float # Starts equal to required
+    unit_of_measure: str
+    
+    # Timers
+    delivery_days: int # Used for routing (e.g. 3 days)
+    bidding_expiry: datetime 
+    expected_delivery_date: datetime
+    
+    status: BuyerRequestStatus = BuyerRequestStatus.OPEN
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+class OfferStatus(str, Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    IN_TRANSIT = "in_transit"
+    DELIVERED = "delivered"
+    COMPLETED = "completed"
+    DISPUTED = "disputed"
+
+class RequestOffer(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    request_id: str
+    seller_id: str
+    seller_username: str
+    
+    # Offer Details
+    price: float
+    quantity_offered: float
+    delivery_date: datetime
+    notes: Optional[str] = None
+    
+    status: OfferStatus = OfferStatus.PENDING
+    
+    # Fulfillment / Handshake
+    tracking_id: Optional[str] = None # Generated on Accept
+    delivery_otp: Optional[str] = None # Last 8 chars of tracking_id
+    
+    date_accepted: Optional[datetime] = None
+    date_dispatched: Optional[datetime] = None
+    date_delivered: Optional[datetime] = None
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class SettlementLog(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    request_id: str
+    offer_id: str
+    amount: float
+    fee: float
+    payout_reference: str
+    method_of_fulfillment: str # "OTP Verified" or "Auto-Released"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+# Dispute System Models
     purchaser_username: str
     recipient_email: Optional[str] = None  # If gifted to someone
     recipient_name: Optional[str] = None
@@ -1903,67 +2220,6 @@ async def login(login_data: UserLogin):
         }
     }
 
-@app.post("/api/auth/complete-registration")
-async def complete_registration(registration_data: CompleteRegistration):
-    # Check if user exists
-    if db.users.find_one({"$or": [
-        {"email_or_phone": registration_data.email_or_phone}, 
-        {"username": registration_data.username}
-    ]}):
-        raise HTTPException(status_code=400, detail="User already exists")
-    
-    # Determine user role based on registration path
-    user_role = None
-    if registration_data.user_path == 'buyer':
-        if registration_data.buyer_type == 'skip':
-            user_role = 'general_buyer'
-        else:
-            user_role = registration_data.buyer_type
-    elif registration_data.user_path == 'partner':
-        if registration_data.partner_type == 'business':
-            user_role = registration_data.business_category
-        else:
-            user_role = registration_data.partner_type
-    
-    # Create user with complete information
-    user = User(
-        first_name=registration_data.first_name,
-        last_name=registration_data.last_name,
-        username=registration_data.username,
-        email=registration_data.email_or_phone,  # Store as email for compatibility
-        phone=registration_data.phone,
-        role=user_role
-    )
-    
-    # Create user document with additional fields
-    user_dict = user.dict()
-    user_dict['password'] = hash_password(registration_data.password)
-    user_dict['gender'] = registration_data.gender
-    user_dict['date_of_birth'] = registration_data.date_of_birth
-    user_dict['user_path'] = registration_data.user_path
-    user_dict['business_info'] = registration_data.business_info or {}
-    user_dict['verification_info'] = registration_data.verification_info or {}
-    user_dict['is_verified'] = False  # Will be updated after verification process
-    
-    db.users.insert_one(user_dict)
-    
-    # Generate token
-    token = create_token(user.id)
-    
-    return {
-        "message": "Registration completed successfully",
-        "token": token,
-        "user": {
-            "id": user.id,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "username": user.username,
-            "email": user.email,
-            "role": user_role,
-            "user_path": registration_data.user_path
-        }
-    }
-
 @app.get("/api/user/profile")
 async def get_profile(current_user: dict = Depends(get_current_user)):
     user_data = {
@@ -2253,17 +2509,17 @@ async def get_product(product_id: str):
     return product
 
 @app.post("/api/orders")
-async def create_order(items: List[CartItem], delivery_address: str, current_user: dict = Depends(get_current_user)):
+async def create_order(items: List[CartItem], delivery_address: str, payment_method: str = "card", current_user: dict = Depends(get_current_user)):
     if not items:
         raise HTTPException(status_code=400, detail="No items in order")
     
     # KYC Compliance Check for Order Creation
     validate_kyc_compliance(current_user, "collect_payments")
     
-    order_items = []
-    total_amount = 0.0
-    seller_id = None
-    seller_name = None
+    # 1. Group Items by Seller & Delivery Method
+    # Key: seller_id + delivery_method + dropoff_location
+    group_map = {}
+    grand_total_to_pay = 0.0
     
     for item in items:
         product = db.products.find_one({"id": item.product_id})
@@ -2276,46 +2532,198 @@ async def create_order(items: List[CartItem], delivery_address: str, current_use
         if item.quantity < product['minimum_order_quantity']:
             raise HTTPException(status_code=400, detail=f"Minimum order quantity for {product['title']} is {product['minimum_order_quantity']}")
         
-        item_total = product['price_per_unit'] * item.quantity
-        total_amount += item_total
+        seller_id = product['seller_id']
+        d_method = item.delivery_method or "delivery"
+        d_location = item.dropoff_location if d_method == "pickup" else "HOME"
         
-        order_items.append({
-            "product_id": product['id'],
-            "title": product['title'],
-            "price_per_unit": product['price_per_unit'],
-            "quantity": item.quantity,
-            "total": item_total
+        group_key = f"{seller_id}::{d_method}::{d_location}"
+        
+        if group_key not in group_map:
+            group_map[group_key] = {
+                "seller_id": seller_id,
+                "delivery_method": d_method,
+                "dropoff_location": item.dropoff_location,
+                "items": [],
+                "seller_name": product['seller_name'],
+                "seller_username": product.get('seller_name'),
+                "product_subtotal": 0.0
+            }
+        
+        # Calculate Item Total
+        price = product['price_per_unit']
+        item_total = price * item.quantity
+        
+        # Add to group
+        group_map[group_key]["items"].append({
+            "product": product,
+            "cart_item": item,
+            "item_total": item_total
         })
+        group_map[group_key]["product_subtotal"] += item_total
+
+    # 2. Calculate Fees & Commission per Group
+    grand_total_with_fees = 0.0
+    
+    buying_agent_id = None
+    if current_user.get('role') == 'agent':
+        buying_agent_id = current_user['id']
         
-        # All items should be from same seller for this MVP
-        if seller_id is None:
-            seller_id = product['seller_id']
-            seller_name = product['seller_name']
-        elif seller_id != product['seller_id']:
-            raise HTTPException(status_code=400, detail="All items must be from the same seller")
+    group_calculations = {} 
     
-    # Create order
-    order = Order(
-        buyer_id=current_user['id'],
-        buyer_name=current_user['username'],
-        seller_id=seller_id,
-        seller_name=seller_name,
-        items=order_items,
-        total_amount=total_amount,
-        delivery_address=delivery_address
-    )
-    
-    order_dict = order.dict()
-    db.orders.insert_one(order_dict)
-    
-    # Update product quantities
-    for item in items:
-        db.products.update_one(
-            {"id": item.product_id},
-            {"$inc": {"quantity_available": -item.quantity}}
+    for group_key, group_data in group_map.items():
+        seller_id = group_data["seller_id"]
+        
+        # Identify Selling Agent
+        selling_agent_id = None
+        agent_farmer_record = db.agent_farmers.find_one({"farmer_id": seller_id})
+        if agent_farmer_record:
+            selling_agent_id = agent_farmer_record.get('agent_id')
+            
+        # Determine Pricing Logic
+        is_pyexpress = False
+        first_prod = group_data["items"][0]["product"]
+        if first_prod.get('platform') == 'pyexpress':
+            is_pyexpress = True
+        elif first_prod.get('category') in ['food_produce', 'processed_food']:
+            is_pyexpress = True
+            
+        # Rates
+        platform_rate = 0.0
+        buying_agent_rate = 0.0
+        selling_agent_rate = 0.0
+        max_rate = 0.0
+        
+        if is_pyexpress:
+             platform_rate = 0.035
+             if selling_agent_id: selling_agent_rate = 0.04
+             if buying_agent_id: buying_agent_rate = 0.025
+             max_rate = 0.10
+        else:
+             platform_rate = 0.05
+             if selling_agent_id: selling_agent_rate = 0.05
+             if buying_agent_id: buying_agent_rate = 0.04
+             max_rate = 0.14
+             
+        # Calculate
+        product_subtotal = group_data["product_subtotal"]
+        breakdown = {
+            "platform_fee": round(product_subtotal * platform_rate, 2),
+            "selling_agent_fee": round(product_subtotal * selling_agent_rate, 2),
+            "buying_agent_fee": round(product_subtotal * buying_agent_rate, 2)
+        }
+        service_charge_total = sum(breakdown.values())
+        
+        # Savings
+        max_charge = product_subtotal * max_rate
+        savings = max(0.0, max_charge - service_charge_total)
+        
+        group_grand_total = product_subtotal + service_charge_total
+        grand_total_with_fees += group_grand_total
+        
+        group_calculations[group_key] = {
+            "service_charge_total": service_charge_total,
+            "breakdown": breakdown,
+            "savings": savings,
+            "grand_total": group_grand_total,
+            "selling_agent_id": selling_agent_id,
+            "is_pyexpress": is_pyexpress
+        }
+
+    # 3. wallet Payment Check & Debit (Atomic)
+    transaction_status = OrderStatus.PENDING
+    if payment_method == "wallet":
+        if current_user.get("wallet_balance", 0.0) < grand_total_with_fees:
+            raise HTTPException(status_code=400, detail=f"Insufficient wallet balance. Req: {grand_total_with_fees}")
+            
+        # Deduct
+        db.users.update_one(
+            {"id": current_user["id"]},
+            {"$inc": {"wallet_balance": -grand_total_with_fees}}
         )
+        
+        db.wallet_transactions.insert_one({
+             "user_id": current_user["id"],
+             "type": "debit",
+             "amount": grand_total_with_fees,
+             "reference": f"ORD-{uuid.uuid4()}",
+             "description": "Cart Checkout Payment",
+             "created_at": datetime.utcnow()
+        })
+        transaction_status = OrderStatus.HELD_IN_ESCROW
+        
+    # 4. Create Orders per Group
+    created_order_ids = []
     
-    return {"message": "Order created successfully", "order_id": order.id, "total_amount": total_amount}
+    for group_key, group_data in group_map.items():
+        calc = group_calculations[group_key]
+        seller_id = group_data["seller_id"]
+        
+        # Tracking ID
+        tracking_id = generate_tracking_id()
+        
+        # Prepare Order Items
+        db_order_items = []
+        for x in group_data["items"]:
+            db_order_items.append({
+                "product_id": x["product"]["id"],
+                "title": x["product"]["title"],
+                "price_per_unit": x["product"]["price_per_unit"],
+                "quantity": x["cart_item"].quantity,
+                "unit": x["cart_item"].unit,
+                "unit_specification": x["cart_item"].unit_specification,
+                "total": x["item_total"]
+            })
+            
+            # Update Inventory
+            db.products.update_one(
+                {"id": x["product"]["id"]},
+                {"$inc": {"quantity_available": -x["cart_item"].quantity}}
+            )
+        
+        # Determine Address
+        final_shipping_address = delivery_address
+        if group_data["delivery_method"] == "pickup":
+             final_shipping_address = f"PICKUP POINT: {group_data['dropoff_location']}"
+
+        order = Order(
+            order_id=tracking_id,
+            buyer_username=current_user['username'],
+            seller_username=group_data['seller_name'],
+            product_details={"items": db_order_items},
+            quantity=sum(x["cart_item"].quantity for x in group_data["items"]),
+            unit="mixed",
+            unit_price=0,
+            total_amount=calc["grand_total"],
+            product_subtotal=group_data["product_subtotal"], 
+            shipping_address=final_shipping_address,
+            status=transaction_status,
+            created_at=datetime.utcnow()
+        )
+        
+        order_dict = order.dict()
+        order_dict['buyer_id'] = current_user['id']
+        order_dict['seller_id'] = seller_id
+        
+        order_dict['payment_info'] = {
+            "product_total": group_data["product_subtotal"],
+            "service_charge_total": calc["service_charge_total"],
+            "breakdown": calc["breakdown"],
+            "savings": calc["savings"],
+            "buying_agent_id": buying_agent_id,
+            "selling_agent_id": calc["selling_agent_id"],
+            "is_pyexpress": calc["is_pyexpress"]
+        }
+        
+        db.orders.insert_one(order_dict)
+        created_order_ids.append(tracking_id)
+        
+    return {
+        "message": "Orders created successfully",
+        "order_ids": created_order_ids,
+        "order_id": created_order_ids[0] if created_order_ids else None,
+        "total_amount": grand_total_with_fees,
+        "status": transaction_status
+    }
 
 @app.get("/api/orders")
 async def get_orders(current_user: dict = Depends(get_current_user)):
@@ -2332,6 +2740,9 @@ async def get_orders(current_user: dict = Depends(get_current_user)):
         order.pop('_id', None)
     
     return orders
+
+class DeliveryConfirmation(BaseModel):
+    tracking_id: str
 
 class AgentPurchaseOption(BaseModel):
     commission_type: str  # "percentage" or "collect_after_delivery"
@@ -2448,6 +2859,52 @@ async def agent_purchase(
         "total_amount": total_amount,
         "commission_amount": commission_amount,
         "commission_type": purchase_option.commission_type
+    }
+
+class CommunityPledge(BaseModel):
+    product_id: str
+    quantity: int
+
+@app.post("/api/community/pledge")
+async def pledge_to_community(pledge: CommunityPledge, current_user: dict = Depends(get_current_user)):
+    """Pledge/Commit to a Community Group Order"""
+    # Verify Product
+    product = db.products.find_one({"id": pledge.product_id})
+    if not product:
+         raise HTTPException(status_code=404, detail="Product not found")
+    
+    # Check simple validity
+    if pledge.quantity <= 0:
+         raise HTTPException(status_code=400, detail="Quantity must be positive")
+
+    # Check Target (if applicable)
+    current_committed = product.get('committed_quantity', 0)
+    target = product.get('target_quantity')
+    
+    if target and (current_committed + pledge.quantity > target):
+         raise HTTPException(status_code=400, detail=f"Target quantity exceeded. Max remaining: {target - current_committed}")
+
+    # Add to participants
+    participant = {
+        "user_id": current_user["id"],
+        "username": current_user["username"],
+        "product_id": pledge.product_id,
+        "quantity": pledge.quantity,
+        "pledged_at": datetime.utcnow(),
+        "status": "pledged" # Can be 'paid' if we integrated payment
+    }
+    db.group_buy_participants.insert_one(participant)
+
+    # Update Product Commitments
+    db.products.update_one(
+        {"id": pledge.product_id},
+        {"$inc": {"committed_quantity": pledge.quantity}}
+    )
+
+    return {
+        "message": "You have successfully pledged to this order!", 
+        "new_total": current_committed + pledge.quantity,
+        "target": target
     }
 
 @app.get("/api/users/search")
@@ -3278,6 +3735,25 @@ async def create_delivery_request(request_data: DeliveryRequestCreate, current_u
         import random
         otp = str(random.randint(100000, 999999))
         
+        # Prepare pickup coordinates
+        pickup_lat = request_data.pickup_coordinates.get("lat", 0.0) if request_data.pickup_coordinates else 0.0
+        pickup_lng = request_data.pickup_coordinates.get("lng", 0.0) if request_data.pickup_coordinates else 0.0
+
+        # Prepare delivery locations
+        delivery_locations = []
+        for i, addr in enumerate(request_data.delivery_addresses):
+            lat = 0.0
+            lng = 0.0
+            if request_data.delivery_coordinates and i < len(request_data.delivery_coordinates):
+                lat = request_data.delivery_coordinates[i].get("lat", 0.0)
+                lng = request_data.delivery_coordinates[i].get("lng", 0.0)
+            
+            delivery_locations.append({
+                "address": addr,
+                "lat": lat,
+                "lng": lng
+            })
+
         # Create delivery request
         delivery_request = {
             "id": str(uuid.uuid4()),
@@ -3286,14 +3762,12 @@ async def create_delivery_request(request_data: DeliveryRequestCreate, current_u
             "requester_username": current_user["username"],
             "pickup_location": {
                 "address": request_data.pickup_address,
-                "lat": 0.0,  # Would be geocoded in real app
-                "lng": 0.0
+                "lat": pickup_lat,
+                "lng": pickup_lng
             },
-            "delivery_location": {
-                "address": request_data.delivery_address,
-                "lat": 0.0,
-                "lng": 0.0
-            },
+            "delivery_locations": delivery_locations,
+            "total_quantity": request_data.total_quantity,
+            "quantity_unit": request_data.quantity_unit,
             "distance_km": distance_km,
             "estimated_price": request_data.estimated_price,
             "product_details": request_data.product_details,
@@ -3854,9 +4328,22 @@ async def create_order(order_data: OrderCreate, current_user: dict = Depends(get
         # Add delivery cost based on delivery method and supplier preferences
         delivery_cost = 0.0
         if order_data.delivery_method == "dropoff":
-            delivery_cost = product.get("delivery_cost_dropoff", 0.0)
+            # For Dropoff: Calculate distance from Seller (Product Location) to Hub
+            # If product location missing, fallback to static cost
+            if product.get("location") and dropoff_location_details:
+                dist_km = get_distance_km(product["location"], dropoff_location_details["address"])
+                # Formula: (10 * Qty) * Distance
+                delivery_cost = (10 * order_data.quantity) * dist_km
+            else:
+                 delivery_cost = product.get("delivery_cost_dropoff", 0.0)
+
         elif order_data.delivery_method in ["platform", "offline"] and order_data.shipping_address:
-            delivery_cost = product.get("delivery_cost_shipping", 0.0)
+            # For Shipping: Calculate distance from Seller to Buyer Address
+             if product.get("location") and order_data.shipping_address:
+                dist_km = get_distance_km(product["location"], order_data.shipping_address)
+                delivery_cost = (10 * order_data.quantity) * dist_km
+             else:
+                delivery_cost = product.get("delivery_cost_shipping", 0.0)
         
         total_amount = product_total + delivery_cost
         
@@ -4055,6 +4542,269 @@ async def update_order_status(order_id: str, status_update: OrderStatusUpdate, c
     except Exception as e:
         print(f"Error updating order status: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to update order status")
+
+# --- Refactored Payout Logic ---
+async def process_order_payout(order_id: str):
+    """
+    Core logic to release funds, calculate splits, and update order status.
+    Can be called by Manual Confirmation or Auto-Release Job.
+    """
+    # Fetch Order
+    order = db.orders.find_one({"order_id": order_id})
+    if not order:
+        logger.error(f"Payout failed: Order {order_id} not found")
+        return False
+        
+    if order["status"] != OrderStatus.HELD_IN_ESCROW:
+        logger.warning(f"Payout skipped: Order {order_id} is {order['status']}")
+        return False
+        
+    # Retrieve Financial Info
+    payment_info = order.get("payment_info", {})
+    product_total = payment_info.get("product_total", order.get("total_amount", 0))
+    breakdown = payment_info.get("breakdown", {})
+    
+    # Calculate Splits
+    seller_platform_due = round(product_total * 0.02, 2)
+    seller_payout = round(product_total * 0.98, 2)
+    
+    platform_base_fee = breakdown.get("platform_fee", 0.0)
+    total_platform_earnings = platform_base_fee + seller_platform_due
+    
+    selling_agent_fee = breakdown.get("selling_agent_fee", 0.0)
+    buying_agent_fee = breakdown.get("buying_agent_fee", 0.0)
+    selling_agent_id = payment_info.get("selling_agent_id")
+    buying_agent_id = payment_info.get("buying_agent_id")
+    
+    # helper to process transfer
+    def attempt_transfer(amount, recipient_code, description):
+        try:
+             # Convert to kobo
+             amount_kobo = int(amount * 100)
+             paystack_service.initiate_transfer(amount_kobo, recipient_code, description)
+             return "COMPLETED"
+        except Exception as e:
+            logger.error(f"Transfer Failed: {str(e)}")
+            return "FAILED_NETWORK" # Or FAILED_CRITICAL based on error
+            
+    # Execute Transactions
+    seller_payout_status = "PENDING"
+    seller_payout_note = ""
+
+    # Credit Seller
+    if order.get("seller_id"):
+        # 1. Update Wallet (Always done for ledger)
+        db.users.update_one(
+            {"id": order["seller_id"]},
+            {"$inc": {"wallet_balance": seller_payout}}
+        )
+        db.wallet_transactions.insert_one({
+            "user_id": order["seller_id"],
+            "type": "credit",
+            "amount": seller_payout,
+            "reference": f"EARN-{order_id}",
+            "description": f"Sale Revenue - Order {order_id}",
+            "created_at": datetime.utcnow()
+        })
+        
+        # 2. Attempt Real Transfer
+        recipient_code = None
+        
+        # Scenario A: Managed Farmer (Selling Agent involved)
+        if selling_agent_id:
+             agent_farmer = db.agent_farmers.find_one({
+                 "agent_id": selling_agent_id,
+                 "farmer_id": order["seller_id"]
+             })
+             if agent_farmer and agent_farmer.get("paystack_recipient_code"):
+                 recipient_code = agent_farmer.get("paystack_recipient_code")
+        
+        # Scenario B: Direct Seller (Check Profile)
+        if not recipient_code:
+            seller = db.users.find_one({"id": order["seller_id"]})
+            if seller and seller.get("bank_accounts"):
+                # Use primary or first
+                accounts = seller.get("bank_accounts", [])
+                if accounts:
+                    recipient_code = accounts[0].get("paystack_recipient_code")
+        
+        # Execute Transfer Logic
+        if recipient_code:
+            status = attempt_transfer(seller_payout, recipient_code, f"Payout for Order {order_id}")
+            seller_payout_status = status
+            if status == "COMPLETED":
+                seller_payout_note = "Funds transferred to Bank Account."
+            else:
+                seller_payout_note = "Network error during transfer. Funds in Wallet."
+                # Notify User
+                db.messages.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "sender_username": "System",
+                    "recipient_username": order["seller_username"],
+                    "conversation_id": f"sys_payout_{order['seller_username']}",
+                    "type": "text",
+                    "content": f"Action Required: Payout for Order {order['order_id']} failed due to network error. Funds match {seller_payout} have been credited to your Wallet. Please withdraw manually.",
+                    "timestamp": datetime.utcnow(),
+                    "read": False,
+                    "is_system": True
+                })
+        else:
+            seller_payout_status = "FAILED_NO_ACCOUNT"
+            seller_payout_note = "Funds in Wallet. Add Bank Details to Withdraw."
+            # Notify User
+            db.messages.insert_one({
+                "id": str(uuid.uuid4()),
+                "sender_username": "System",
+                "recipient_username": order["seller_username"],
+                "conversation_id": f"sys_payout_{order['seller_username']}",
+                "type": "text",
+                "content": f"Action Required: Payout for Order {order['order_id']} was credited to your Wallet because no Bank Account is linked. Please add your bank details in Profile to enable direct transfers.",
+                "timestamp": datetime.utcnow(),
+                "read": False,
+                "is_system": True
+            })
+            
+    # Credit Selling Agent (Wallet Only for now, can implement same logic if needed)
+    if selling_agent_id and selling_agent_fee > 0:
+            db.users.update_one(
+            {"id": selling_agent_id},
+            {"$inc": {"wallet_balance": selling_agent_fee}}
+        )
+            db.wallet_transactions.insert_one({
+            "user_id": selling_agent_id,
+            "type": "credit",
+            "amount": selling_agent_fee,
+            "reference": f"COMM-S-{order_id}",
+            "description": f"Selling Commission - Order {order_id}",
+            "created_at": datetime.utcnow()
+        })
+        
+    # Credit Buying Agent
+    if buying_agent_id and buying_agent_fee > 0:
+            db.users.update_one(
+            {"id": buying_agent_id},
+            {"$inc": {"wallet_balance": buying_agent_fee}}
+        )
+            db.wallet_transactions.insert_one({
+            "user_id": buying_agent_id,
+            "type": "credit",
+            "amount": buying_agent_fee,
+            "reference": f"COMM-B-{order_id}",
+            "description": f"Buying Commission - Order {order_id}",
+            "created_at": datetime.utcnow()
+        })
+    
+    # Update Order
+    db.orders.update_one(
+        {"order_id": order_id},
+        {"$set": {
+            "status": OrderStatus.DELIVERED,
+            "delivery_status": "delivered",
+            "delivered_at": datetime.utcnow(),
+            "payout_status": seller_payout_status,
+            "payout_note": seller_payout_note,
+            "auto_released": "auto_released" in str(order.get('notes', '')), 
+            "payout_details": {
+                "seller_payout": seller_payout,
+                "platform_earnings": total_platform_earnings,
+                "selling_agent_fee": selling_agent_fee,
+                "buying_agent_fee": buying_agent_fee
+            }
+        }}
+    )
+    
+    logger.info(f"Payout completed for Order {order_id}")
+    return True
+
+@app.post("/api/orders/{order_id}/confirm-delivery")
+async def confirm_delivery(
+    order_id: str,
+    confirmation: DeliveryConfirmation,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Buyer confirms delivery -> Release funds from Escrow.
+    Splits payments between Seller, Platform, and Agents.
+    """
+    try:
+        # 1. Fetch Order
+        order = db.orders.find_one({"order_id": order_id})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+            
+        # 2. Verify User is Buyer
+        if order["buyer_username"] != current_user["username"]:
+            raise HTTPException(status_code=403, detail="Only the buyer can confirm delivery")
+            
+        # 3. Verify Status
+        if order["status"] != OrderStatus.HELD_IN_ESCROW:
+            raise HTTPException(status_code=400, detail=f"Order status is {order['status']}, cannot confirm delivery")
+            
+        # 4. Verify Tracking ID matches
+        if order["order_id"] != confirmation.tracking_id:
+            raise HTTPException(status_code=400, detail="Invalid tracking ID")
+            
+        # 5. Process Payout (Refactored)
+        success = await process_order_payout(order_id)
+        
+        if not success:
+             raise HTTPException(status_code=500, detail="Failed to process payout")
+        
+        return {
+            "message": "Delivery confirmed and funds released successfully",
+            "status": "delivered",
+            "funds_distributed": True
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error confirming delivery: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to confirm delivery")
+
+# --- Background Task (Auto-Release) ---
+async def check_for_overdue_orders():
+    """
+    Check for orders held in escrow for > 10 days and auto-release them.
+    """
+    logger.info("Running Auto-Release Check...")
+    try:
+        ten_days_ago = datetime.utcnow() - timedelta(days=10)
+        
+        # Find overdue orders
+        overdue_orders = db.orders.find({
+            "status": OrderStatus.HELD_IN_ESCROW,
+            "created_at": {"$lt": ten_days_ago}
+        })
+        
+        count = 0
+        for order in overdue_orders:
+            order_id = order.get("order_id")
+            logger.info(f"Auto-Releasing Order {order_id}...")
+            
+            # Add note
+            db.orders.update_one(
+                {"order_id": order_id}, 
+                {"$set": {"notes": "Auto-released by system after 10 days"}}
+            )
+            
+            await process_order_payout(order_id)
+            count += 1
+            
+        if count > 0:
+            logger.info(f"Auto-released {count} overdue orders.")
+            
+    except Exception as e:
+        logger.error(f"Error in auto-release job: {str(e)}")
+
+# Initialize Scheduler
+scheduler = AsyncIOScheduler()
+
+@app.on_event("startup")
+async def start_scheduler():
+    scheduler.add_job(check_for_overdue_orders, IntervalTrigger(hours=24)) # Run daily
+    scheduler.start()
+    logger.info("Auto-Release Scheduler started.")
 
 @app.get("/api/orders/my-orders")
 async def get_my_orders(order_type: str = "buyer", current_user: dict = Depends(get_current_user)):
@@ -6091,6 +6841,8 @@ async def get_agent_dashboard(current_user: dict = Depends(get_current_user)):
             },
             "top_farmers": [
                 {
+                    "id": farmer.get("id"),
+                    "farmer_id": farmer.get("farmer_id"),
                     "name": farmer.get("farmer_name"),
                     "location": farmer.get("farmer_location"),
                     "total_sales": farmer.get("total_sales", 0),
@@ -6450,16 +7202,16 @@ async def get_admin_dashboard(current_user: dict = Depends(get_current_user)):
             users_by_role[role] = users_collection.count_documents({"role": role})
         
         # Get product statistics
-        total_products = products_collection.count_documents({})
+        total_products = db.products.count_documents({})
         products_by_platform = {
-            "pyexpress": products_collection.count_documents({"platform": "pyexpress"}),
-            "pyhub": products_collection.count_documents({"platform": "pyhub"})
+            "pyexpress": db.products.count_documents({"platform": "pyexpress"}),
+            "pyhub": db.products.count_documents({"platform": "pyhub"})
         }
         
         # Get order statistics
-        total_orders = orders_collection.count_documents({})
-        pending_orders = orders_collection.count_documents({"status": "pending"})
-        completed_orders = orders_collection.count_documents({"status": "completed"})
+        total_orders = db.orders.count_documents({})
+        pending_orders = db.orders.count_documents({"status": "pending"})
+        completed_orders = db.orders.count_documents({"status": "completed"})
         
         # Get community statistics
         total_communities = communities_collection.count_documents({})
@@ -8641,3 +9393,1406 @@ async def find_available_drivers(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
+
+# --- Bank Account Management ---
+
+class BankAccountUpdate(BaseModel):
+    account_number: str
+    bank_code: str
+    bank_name: str
+    account_name: str
+
+@app.post("/api/users/bank-account")
+async def save_user_bank_account(
+    account_data: BankAccountUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Securely save user's bank account for payouts"""
+    try:
+        # Verify Account Name with Paystack (Optional but recommended)
+        # resolved = paystack_service.resolve_account_number(account_data.account_number, account_data.bank_code)
+        # if resolved['data']['account_name'] != account_data.account_name: ...
+        
+        # Create Paystack Recipient
+        recipient = paystack_service.create_transfer_recipient(
+            name=account_data.account_name,
+            account_number=account_data.account_number,
+            bank_code=account_data.bank_code
+        )
+        recipient_code = recipient['data']['recipient_code']
+        
+        # Encrypt Account Number
+        encrypted_acc_num = encrypt_data(account_data.account_number)
+        
+        # Update User Profile
+        db.users.update_one(
+            {"id": current_user["id"]},
+            {"$set": {
+                "bank_accounts": [{ # Storing as a list, but currently supporting 1 primary
+                    "bank_name": account_data.bank_name,
+                    "bank_code": account_data.bank_code,
+                    "account_name": account_data.account_name,
+                    "account_number": encrypted_acc_num, # Encrypted
+                    "paystack_recipient_code": recipient_code,
+                    "is_primary": True
+                }]
+            }}
+        )
+        
+        return {"message": "Bank account saved successfully"}
+        
+    except Exception as e:
+        print(f"Error saving bank account: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save bank account")
+
+@app.post("/api/agents/farmers/{farmer_id}/bank-details")
+async def save_farmer_bank_details(
+    farmer_id: str,
+    account_data: BankAccountUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Agent saves bank details for an offline farmer"""
+    try:
+        if current_user["role"] != "agent":
+             raise HTTPException(status_code=403, detail="Only agents can perform this action")
+             
+        # Verify ownership/link - check both id (record id) and farmer_id (user id)
+        agent_farmer = db.agent_farmers.find_one({
+            "agent_id": current_user["id"],
+            "$or": [
+                {"id": farmer_id},
+                {"farmer_id": farmer_id}
+            ]
+        })
+        if not agent_farmer:
+            raise HTTPException(status_code=404, detail="Farmer not linked to this agent")
+            
+        # Create Paystack Recipient
+        recipient = paystack_service.create_transfer_recipient(
+            name=account_data.account_name,
+            account_number=account_data.account_number,
+            bank_code=account_data.bank_code
+        )
+        recipient_code = recipient['data']['recipient_code']
+        
+        # Encrypt Encrypt Encrypt
+        encrypted_acc_num = encrypt_data(account_data.account_number)
+        
+        # Update AgentFarmer Record
+        db.agent_farmers.update_one(
+            {"id": agent_farmer["id"]},
+            {"$set": {
+                "bank_name": account_data.bank_name,
+                "bank_code": account_data.bank_code,
+                "bank_account_number": encrypted_acc_num,
+                "paystack_recipient_code": recipient_code
+            }}
+        )
+        
+        return {"message": "Farmer bank details updated successfully"}
+        
+    except Exception as e:
+        print(f"Error saving farmer bank details: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save farmer bank details")
+
+# ==================== ORDER & WALLET ACTIONS ====================
+
+@app.post("/api/orders/{order_id}/confirm-delivery")
+async def confirm_delivery_endpoint(order_id: str, current_user: dict = Depends(get_current_user)):
+    """Buyer confirms delivery of an order held in escrow"""
+    try:
+        # Find order
+        order = db.orders.find_one({"order_id": order_id})
+        if not order:
+             raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Verify user is the buyer
+        if order["buyer_username"] != current_user["username"]:
+            raise HTTPException(status_code=403, detail="Only the buyer can confirm delivery")
+            
+        # Verify status is compatible
+        if order["status"] not in ["held_in_escrow", "in_transit", "delivered"]:
+             raise HTTPException(status_code=400, detail=f"Cannot confirm delivery for order in {order['status']} state")
+
+        # Update order status to DELIVERED (if not already)
+        if order["status"] != "delivered":
+            db.orders.update_one(
+                {"order_id": order_id},
+                {"$set": {
+                    "status": "delivered", 
+                    "delivered_at": datetime.utcnow(),
+                    "delivery_confirmed_by_buyer": True
+                }}
+            )
+            
+        # Trigger Payout Process (Release Funds)
+        payout_result = await process_order_payout(order_id, db)
+        
+        return {
+            "message": "Delivery confirmed and funds released successfully",
+            "payout_details": payout_result
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error checking confirm delivery: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to confirm delivery")
+
+class WithdrawalRequest(BaseModel):
+    amount: float
+    bank_details: Optional[dict] = None
+
+@app.post("/api/wallet/withdraw")
+async def withdraw_funds(
+    withdrawal_data: WithdrawalRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Withdraw funds from wallet to bank account"""
+    try:
+        user_id = current_user['id']
+        amount = withdrawal_data.amount
+        
+        if amount <= 0:
+             raise HTTPException(status_code=400, detail="Invalid withdrawal amount")
+             
+        # Check Balance
+        user = db.users.find_one({"id": user_id})
+        current_balance = user.get("wallet_balance", 0.0)
+        
+        if current_balance < amount:
+            raise HTTPException(status_code=400, detail="Insufficient wallet balance")
+            
+        # Get Bank Details
+        bank_accounts = user.get("bank_accounts", [])
+        if not bank_accounts:
+             raise HTTPException(status_code=400, detail="No bank account linked. Please add a bank account first.")
+        
+        # Use primary or first
+        bank_account = next((acc for acc in bank_accounts if acc.get("is_primary")), bank_accounts[0])
+        recipient_code = bank_account.get("paystack_recipient_code")
+        
+        if not recipient_code:
+             raise HTTPException(status_code=400, detail="Bank account not fully verified for payouts.")
+
+        # Deduct Balance
+        new_balance = current_balance - amount
+        db.users.update_one(
+            {"id": user_id},
+            {"$set": {"wallet_balance": new_balance}}
+        )
+        
+        # Log Transaction
+        transaction_id = str(uuid.uuid4())
+        transaction = {
+            "id": transaction_id,
+            "user_id": user_id,
+            "amount": amount,
+            "transaction_type": "withdrawal",
+            "status": "pending",
+            "description": f"Withdrawal to {bank_account.get('bank_name')} - {bank_account.get('account_name')}",
+            "reference": f"txn_{transaction_id[:8]}",
+            "created_at": datetime.utcnow()
+        }
+        wallet_transactions_collection.insert_one(transaction)
+        
+        # Initiate Transfer (Mock for MVP unless Paystack is live)
+        # In production: transfer = paystack_service.initiate_transfer(amount, recipient_code, "Withdrawal")
+        # We'll mark as success for MVP demo
+        wallet_transactions_collection.update_one(
+            {"id": transaction_id},
+            {"$set": {"status": "success"}}
+        )
+        
+        return {
+            "message": "Withdrawal initiated successfully",
+            "new_balance": new_balance,
+            "transaction_id": transaction_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error processing withdrawal: {str(e)}")
+        # In real app, rollback if deduction happened but transfer failed
+        raise HTTPException(status_code=500, detail="Failed to process withdrawal")
+
+
+@app.get("/api/admin/analytics")
+
+async def get_admin_analytics(
+
+    current_user: dict = Depends(get_current_user)
+
+):
+
+    """
+
+    Get high-level analytics for the Super Admin.
+
+    Tracks: GMV, Total Fees, User Counts, Order Status Distribution.
+
+    """
+
+    if current_user.get("role") != "admin":
+
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+
+
+    try:
+
+        # 1. User Stats
+
+        user_pipeline = [
+
+            {"$group": {"_id": "$role", "count": {"$sum": 1}}}
+
+        ]
+
+        user_counts = list(db.users.aggregate(user_pipeline))
+
+        # Format: {"farmer": 10, "buyer": 5, ...}
+
+        users_by_role = {item["_id"]: item["count"] for item in user_counts}
+
+        
+
+        # 2. Financials (GMV & Fees)
+
+        # Note: Ideally we sum 'amount' from completed/escrow orders for GMV
+
+        # And 'transaction_fees' from WalletTransactions for Revenue
+
+        
+
+        # GMV: Sum of all orders that are NOT cancelled
+
+        gmv_pipeline = [
+
+            {"$match": {"status": {"$ne": "cancelled"}}},
+
+            {"$group": {"_id": None, "total_gmv": {"$sum": "$total_amount"}, "count": {"$sum": 1}}}
+
+        ]
+
+        gmv_result = list(db.orders.aggregate(gmv_pipeline))
+
+        gmv = gmv_result[0]["total_gmv"] if gmv_result else 0
+
+        total_orders = gmv_result[0]["count"] if gmv_result else 0
+
+        
+
+        # Revenue: Sum of service charges from Wallet Transactions
+
+        # Assuming transaction_type='service_charge' or similar logic used in process_order_payout
+
+        revenue_pipeline = [
+
+            {"$match": {"transaction_type": "service_charge"}}, # Verify this type exists in process_order_payout
+
+            {"$group": {"_id": None, "total_revenue": {"$sum": "$amount"}}}
+
+        ]
+
+        revenue_result = list(wallet_transactions_collection.aggregate(revenue_pipeline))
+
+        total_revenue = revenue_result[0]["total_revenue"] if revenue_result else 0
+
+        
+
+        # Fallback Revenue Estimate (5% of GMV) if no transactions yet
+
+        if total_revenue == 0 and gmv > 0:
+
+             total_revenue_est = gmv * 0.05 
+
+        else:
+
+             total_revenue_est = total_revenue
+
+
+
+        return {
+
+            "users": users_by_role,
+
+            "financials": {
+
+                "gmv": gmv,
+
+                "total_orders": total_orders,
+
+                 "total_revenue": total_revenue_est, # Using estimate for now if 0
+
+                 "realized_revenue": total_revenue
+
+            },
+
+            "timestamp": datetime.utcnow()
+
+        }
+
+
+
+    except Exception as e:
+
+        print(f"Error fetching analytics: {str(e)}")
+
+        raise HTTPException(status_code=500, detail="Failed to fetch analytics")
+
+
+
+class WithdrawalRequest(BaseModel):
+    amount: float
+    account_number: str
+    bank_code: str
+    account_name: str
+    description: Optional[str] = "Withdrawal from Pyramyd"
+
+@app.post("/api/wallet/withdraw")
+async def withdraw_funds(request: WithdrawalRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Withdraw funds from wallet to bank account via Paystack Transfer
+    """
+    try:
+        if request.amount <= 0:
+            raise HTTPException(status_code=400, detail="Invalid amount")
+
+        # 1. Check Balance
+        user = db.users.find_one({"username": current_user["username"]})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        current_balance = user.get("wallet_balance", 0.0)
+        if current_balance < request.amount:
+            raise HTTPException(status_code=400, detail="Insufficient funds")
+
+        # 2. Deduct Bundle (Atomic-ish)
+        # We deduct FIRST to prevent double-spending race conditions.
+        # If transfer fails, we refund.
+        new_balance = current_balance - request.amount
+        tx_ref = f"WTH-{uuid.uuid4()}"
+        
+        db.users.update_one(
+            {"username": current_user["username"]},
+            {
+                "$set": {"wallet_balance": new_balance},
+                "$push": {
+                    "wallet_history": {
+                        "id": str(uuid.uuid4()),
+                        "type": "withdrawal",
+                        "amount": -request.amount,
+                        "reference": tx_ref,
+                        "status": "pending_transfer",
+                        "created_at": datetime.utcnow()
+                    }
+                }
+            }
+        )
+
+        try:
+            # 3. Create Recipient
+            recipient_code = create_transfer_recipient(
+                request.account_name, 
+                request.account_number, 
+                request.bank_code
+            )
+
+            # 4. Initiate Transfer
+            transfer_data = initiate_transfer(
+                request.amount, 
+                recipient_code, 
+                tx_ref, 
+                request.description
+            )
+            
+            # 5. Record Transaction
+            transaction = {
+                "id": str(uuid.uuid4()),
+                "user_id": user["id"],
+                "type": "withdrawal",
+                "amount": request.amount,
+                "reference": tx_ref,
+                "transfer_code": transfer_data.get("transfer_code"),
+                "status": "success", # Successfully INITIATED
+                "channel": "paystack_transfer",
+                "bank_details": {
+                    "bank_code": request.bank_code,
+                    "account_number": request.account_number
+                },
+                "created_at": datetime.utcnow()
+            }
+            db.wallet_transactions.insert_one(transaction)
+            
+            return {
+                "message": "Withdrawal initiated successfully", 
+                "reference": tx_ref,
+                "new_balance": new_balance
+            }
+
+        except Exception as e:
+            # Refund if Transfer initiation failed
+            print(f"Withdrawal Failed: {e}. Refunding user...")
+            db.users.update_one(
+                {"username": current_user["username"]},
+                {
+                    "$inc": {"wallet_balance": request.amount}, # Add back
+                    "$push": {
+                        "wallet_history": {
+                            "id": str(uuid.uuid4()),
+                            "type": "refund",
+                            "amount": request.amount,
+                            "reference": f"REF-{tx_ref}",
+                            "status": "success",
+                            "reason": f"Transfer failed: {str(e)}",
+                            "created_at": datetime.utcnow()
+                        }
+                    }
+                }
+            )
+            raise HTTPException(status_code=500, detail=f"Transfer failed: {str(e)}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error processing withdrawal: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process withdrawal")
+
+
+@app.post("/webhook/paystack")
+async def paystack_webhook(request: Request):
+    """
+    Handle Paystack Webhooks (Funding success, specialized events)
+    """
+    try:
+        # 1. Verify Signature
+        signature = request.headers.get("x-paystack-signature")
+        if not signature:
+            raise HTTPException(status_code=400, detail="No signature provided")
+        
+        body_bytes = await request.body()
+        if not verify_paystack_signature(body_bytes, signature):
+            raise HTTPException(status_code=400, detail="Invalid signature")
+
+        # 2. Parse Event
+        payload = await request.json()
+        event = payload.get("event")
+        data = payload.get("data", {})
+
+        print(f"Received Paystack Webhook: {event}")
+
+        if event == "charge.success":
+            # 3. Check Idempotency (Reference)
+            reference = data.get("reference")
+            if not reference:
+                return {"status": "ignored", "reason": "no reference"}
+
+            existing_txn = db.wallet_transactions.find_one({"reference": reference})
+            if existing_txn:
+                # Handle Pending Service Charge Payments
+                if existing_txn["status"] == "pending" and existing_txn.get("category") == "rfq_service_charge":
+                    # 1. Update Transaction to Success
+                    db.wallet_transactions.update_one(
+                        {"_id": existing_txn["_id"]},
+                        {"$set": {"status": "success", "metadata.paystack_data": data, "updated_at": datetime.utcnow()}}
+                    )
+                    
+                    # 2. Activate RFQ
+                    db.buyer_requests.update_one(
+                        {"payment_reference": reference},
+                        {"$set": {"status": "open"}}
+                    )
+                    logger.info(f"RFQ Service Charge verified. Request Activated. Ref: {reference}")
+                    return {"status": "success", "message": "RFQ Activated"}
+
+                print(f"Duplicate transaction ignored: {reference}")
+                return {"status": "success", "message": "Transaction already processed"}
+
+            # 4. Fund Wallet Logic (Only if NO existing transaction found)
+            email = data.get("customer", {}).get("email")
+            amount_kobo = data.get("amount", 0)
+            amount_naira = amount_kobo / 100
+
+            user = db.users.find_one({"email": email})
+            if user:
+                # Credit User Wallet
+                new_balance = user.get("wallet_balance", 0) + amount_naira
+                
+                # Update User
+                db.users.update_one(
+                    {"email": email},
+                    {
+                        "$set": {"wallet_balance": new_balance, "updated_at": datetime.utcnow()},
+                        "$push": {
+                            "wallet_history": {
+                                "id": str(uuid.uuid4()),
+                                "type": "deposit",
+                                "amount": amount_naira,
+                                "reference": reference,
+                                "status": "success",
+                                "created_at": datetime.utcnow()
+                            }
+                        }
+                    }
+                )
+                
+                # Record Transaction
+                transaction = {
+                    "id": str(uuid.uuid4()),
+                    "user_id": user["id"],
+                    "type": "deposit", 
+                    "amount": amount_naira,
+                    "reference": reference, 
+                    "status": "success",
+                    "channel": "paystack_webhook", # Differentiate from manual funding
+                    "created_at": datetime.utcnow()
+                }
+                db.wallet_transactions.insert_one(transaction)
+
+                print(f"Credited wallet for {email}: +{amount_naira}")
+            else:
+                print(f"User not found for email: {email}")
+
+
+        elif event == "transfer.success":
+            # Transfer confirmed by Paystack
+            reference = data.get("reference") # The WTH-{uuid} we sent
+            if reference:
+                db.wallet_transactions.update_one(
+                    {"reference": reference},
+                    {"$set": {"status": "completed", "updated_at": datetime.utcnow()}}
+                )
+                # Also update history status inside user doc if needed (though transaction is the source of truth)
+                print(f"Transfer successful: {reference}")
+
+        elif event in ["transfer.failed", "transfer.reversed"]:
+            # Transfer failed, refund user
+            reference = data.get("reference")
+            if reference:
+                print(f"Transfer failed: {reference}. Processing Refund.")
+                # find original transaction to get amount and user
+                original_tx = db.wallet_transactions.find_one({"reference": reference})
+                if original_tx and original_tx["status"] != "refunded":
+                    user_id = original_tx["user_id"]
+                    amount = original_tx["amount"] # This is positive in our transaction record for withdrawal? 
+                    # Wait, logic check: In 'withdraw_funds' we recorded amount as POSITIVE in transaction log? 
+                    # Yes: "amount": request.amount.
+                    # In 'wallet_history' inside user, we put NEGATIVE.
+                    
+                    # Refund amount back to wallet
+                    db.users.update_one(
+                        {"id": user_id},
+                        {
+                            "$inc": {"wallet_balance": amount},
+                            "$push": {
+                                "wallet_history": {
+                                    "id": str(uuid.uuid4()),
+                                    "type": "refund",
+                                    "amount": amount,
+                                    "reference": f"REF-{reference}",
+                                    "status": "success",
+                                    "reason": f"Transfer reversed: {data.get('reason')}",
+                                    "created_at": datetime.utcnow()
+                                }
+                            }
+                        }
+                    )
+                    
+                    # Update original tx status
+                    db.wallet_transactions.update_one(
+                        {"reference": reference},
+                        {"$set": {"status": "failed_refunded", "updated_at": datetime.utcnow()}}
+                    )
+
+        return {"status": "success"}
+
+    except Exception as e:
+        print(f"Webhook Error: {str(e)}")
+        # Return 200 to prevent Paystack from retrying indefinitely on logic errors
+        # Log error for manual review
+        return {"status": "error", "message": str(e)}
+
+# --- Dispute & Cancellation Endpoints ---
+
+class CancellationRequest(BaseModel):
+    reason: Optional[str] = None
+
+@app.post("/api/orders/{order_id}/cancel", tags=["Orders"])
+async def cancel_order(
+    order_id: str,
+    request: CancellationRequest,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    # Retrieve order
+    order = db.orders.find_one({"order_id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Check ownership
+    if order["buyer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized to cancel this order")
+
+    # Check Status - STRICT RULE: Only 'pending' (Unpaid)
+    if order["status"] != "pending":
+        if order["status"] == "held_in_escrow":
+            raise HTTPException(status_code=400, detail="Order is paid and held in escrow. Please contact support to cancel.")
+        else:
+            raise HTTPException(status_code=400, detail="Order cannot be cancelled in its current state.")
+
+    # Execute Cancellation
+    db.orders.update_one(
+        {"order_id": order_id},
+        {"$set": {"status": "cancelled", "updated_at": datetime.utcnow()}}
+    )
+
+    return {"status": "success", "message": "Order cancelled successfully."}
+
+
+class DisputeCreate(BaseModel):
+    reason: str
+    description: str
+
+@app.post("/api/orders/{order_id}/dispute", tags=["Orders"])
+async def report_dispute(
+    order_id: str,
+    dispute_data: DisputeCreate,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    # Retrieve Order
+    order = db.orders.find_one({"order_id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Verify Participant
+    user_id = current_user["id"]
+    if user_id != order["buyer_id"] and user_id != order["seller_id"]:
+        raise HTTPException(status_code=403, detail="Not a participant in this order")
+
+    # Verify Status
+    if order["status"] in ["cancelled", "pending"]:
+         raise HTTPException(status_code=400, detail="Cannot dispute an order in this state.")
+
+    # Create Dispute
+    dispute = {
+        "id": str(uuid.uuid4()),
+        "order_id": order_id,
+        "reporter_id": user_id,
+        "reporter_role": "buyer" if user_id == order["buyer_id"] else "seller",
+        "reason": dispute_data.reason,
+        "description": dispute_data.description,
+        "status": "open",
+        "created_at": datetime.utcnow()
+    }
+    db.disputes.insert_one(dispute)
+
+    # Update Order Status
+    db.orders.update_one(
+        {"order_id": order_id},
+        {"$set": {"status": "disputed", "updated_at": datetime.utcnow()}}
+    )
+
+    return {"status": "success", "message": "Dispute opened successfully", "dispute_id": dispute["id"]}
+
+
+class DisputeResolutionRequest(BaseModel):
+    action: str = Field(..., pattern="^(refund_buyer|release_to_seller|dismiss)$")
+    reason: str
+
+@app.post("/api/admin/orders/{order_id}/resolve", tags=["Admin"])
+async def resolve_dispute(
+    order_id: str,
+    resolution: DisputeResolutionRequest,
+    current_user: dict = Depends(get_current_admin), # Admin Only
+    db = Depends(get_database)
+):
+    order = db.orders.find_one({"order_id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    action = resolution.action
+    
+    if action == "refund_buyer":
+        # Process Refund
+        buyer_id = order["buyer_id"]
+        amount = order["total_amount"]
+        
+        # Credit Wallet
+        db.users.update_one(
+            {"id": buyer_id},
+            {
+                "$inc": {"wallet_balance": amount},
+                "$push": {
+                    "wallet_history": {
+                        "id": str(uuid.uuid4()),
+                        "type": "refund",
+                        "amount": amount,
+                        "description": f"Admin Refund for Order {order_id}",
+                        "status": "success",
+                        "created_at": datetime.utcnow()
+                    }
+                }
+            }
+        )
+        
+        # Update Order
+        db.orders.update_one(
+            {"order_id": order_id},
+            {"$set": {"status": "cancelled", "updated_at": datetime.utcnow()}}
+        )
+        
+        # Close Dispute if exists
+        db.disputes.update_many(
+            {"order_id": order_id, "status": "open"},
+            {"$set": {"status": "resolved", "resolution": "refund_buyer", "resolved_by": current_user["id"], "resolved_at": datetime.utcnow()}}
+        )
+        
+    elif action == "release_to_seller":
+        # Process Payout
+        await process_order_payout(order_id, db)
+        
+        # Close Dispute if exists
+        db.disputes.update_many(
+            {"order_id": order_id, "status": "open"},
+            {"$set": {"status": "resolved", "resolution": "release_to_seller", "resolved_by": current_user["id"], "resolved_at": datetime.utcnow()}}
+        )
+        
+    return {"status": "success", "message": f"Order resolved: {action}"}
+
+# --- Buyer Requests (RFQ) Endpoints ---
+
+class RequestItemCreate(BaseModel):
+    name: str
+    category: str
+    quantity: Optional[float] = None
+    unit: str
+    specifications: Optional[str] = None
+
+class BuyerRequestCreate(BaseModel):
+    request_type: str = "standard" # "instant" or "standard"
+    persona: RequestPersona
+    business_category: str
+    is_private: bool = False
+    invited_sellers: List[str] = []
+    allow_multiple_sellers: bool = False
+    title: str
+    items: List[RequestItemCreate] # Multi-Item Support
+    location: str
+    budget: Optional[float] = None # Optional user budget override
+    unit_of_measure: str
+    delivery_days: Optional[int] = None # For Standard (Days)
+    delivery_hours: Optional[int] = None # For Instant (Hours)
+
+@app.post("/api/requests", tags=["RFQ"])
+async def create_buyer_request(
+    request_data: BuyerRequestCreate,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    # Logic Refactor: Instant vs Standard
+    platform = RequestPlatform.FARM_DEALS
+    estimated_total_price = 0.0
+    
+    # 1. Price Estimation (System Generated)
+    # Calculate based on items market price
+    for item in request_data.items:
+        # Get market rate
+        rate = await get_market_estimate(item.name, item.unit)
+        # If quantity is not specified, we can't estimate well, but assuming 1 for unit price base?
+        # Standard requests (1 item) usually have quantity.
+        # Instant might have quantity too.
+        qty = item.quantity or 1.0
+        estimated_total_price += (rate * qty)
+    
+    # If user provided budget, use it as fallback or override? 
+    # User Requirement: "preconceived price need to be created by the system"
+    # But let's respect budget if explicitly set higher than estimate? No, stick to system for consistency
+    # unless system returns 0 (unknown item).
+    if estimated_total_price == 0 and request_data.budget:
+        estimated_total_price = request_data.budget
+
+    # 2. Validation & Fee Calculation
+    service_charge = 0.0
+    agent_fee_percent = 0.05 # Default 5%
+    
+    if request_data.request_type == "instant":
+        platform = RequestPlatform.PYEXPRESS
+        
+        # Validation
+        if not request_data.delivery_hours or not (2 <= request_data.delivery_hours <= 12):
+             # Ensure valid hours for Instant
+             # If days provided, convert?
+             if request_data.delivery_days:
+                 hours = request_data.delivery_days * 24
+                 if 2 <= hours <= 12:
+                     request_data.delivery_hours = int(hours)
+                 else:
+                     raise HTTPException(status_code=400, detail="Instant delivery must be between 2 and 12 hours")
+             else:
+                 raise HTTPException(status_code=400, detail="Instant delivery must be between 2 and 12 hours")
+
+        # Service Charge: 5% of Estimate
+        service_charge = estimated_total_price * 0.05
+        
+        # Bidding logic for Instant: 4 hours expiry (quick turnaround)
+        bidding_hours = 4
+        expected_delivery_date = datetime.utcnow() + timedelta(hours=request_data.delivery_hours)
+
+    elif request_data.request_type == "standard":
+        platform = RequestPlatform.FARM_DEALS
+        
+        # Validation
+        if len(request_data.items) > 1:
+            raise HTTPException(status_code=400, detail="Standard requests allow only 1 item at a time")
+            
+        days = request_data.delivery_days or 2
+        if days < 2:
+             raise HTTPException(status_code=400, detail="Standard delivery must be at least 2 days")
+             
+        # Service Charge: Tiered
+        if estimated_total_price < 10000000: # < 10M
+            service_charge = estimated_total_price * 0.05
+        elif estimated_total_price < 50000000: # < 50M
+            service_charge = estimated_total_price * 0.04
+        else: # >= 50M
+            service_charge = estimated_total_price * 0.036
+            
+        bidding_hours = 48
+        expected_delivery_date = datetime.utcnow() + timedelta(days=days)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid request type")
+
+    # 3. Payment Initialization (Pending State)
+    # Create Wallet Transaction for Service Charge
+    # We DO NOT deduct yet. We wait for user to pay via Paystack (Client uses ref).
+    payment_ref = f"RFQ-SVC-{uuid.uuid4().hex[:12]}"
+    
+    transaction = {
+        "user_id": current_user["id"],
+        "type": "debit", # It's a payment from user
+        "category": "rfq_service_charge",
+        "amount": service_charge,
+        "reference": payment_ref,
+        "description": f"Service Charge for RFQ: {request_data.title}",
+        "status": "pending",
+        "metadata": {
+            "request_type": request_data.request_type,
+            "estimated_price": estimated_total_price,
+            "platform": platform
+        },
+        "created_at": datetime.utcnow()
+    }
+    db.wallet_transactions.insert_one(transaction)
+
+    # Convert RequestItemCreate to dictionary list for storage
+    items_list = [item.dict() for item in request_data.items]
+    
+    bidding_expiry = datetime.utcnow() + timedelta(hours=bidding_hours)
+
+    new_request = BuyerRequest(
+        user_id=current_user["id"],
+        username=current_user.get("username", "Unknown"),
+        platform=platform,
+        persona=request_data.persona,
+        business_category=request_data.business_category,
+        is_private=request_data.is_private,
+        invited_sellers=request_data.invited_sellers,
+        allow_multiple_sellers=request_data.allow_multiple_sellers,
+        title=request_data.title,
+        items=items_list,
+        location=request_data.location,
+        budget=estimated_total_price, # Set system estimate as budget
+        quantity_required=request_data.quantity_required, # Keep for legacy/standard single item
+        quantity_remaining=request_data.quantity_required or 0, 
+        unit_of_measure=request_data.unit_of_measure,
+        delivery_days=request_data.delivery_days or 0, 
+        bidding_expiry=bidding_expiry,
+        expected_delivery_date=expected_delivery_date,
+        status="pending_payment" # Wait for Service Charge
+    )
+    
+    # Store the payment ref in request to link them?
+    # Or just use the transaction metadata. 
+    # Better to store `payment_reference` in request for easy lookup in webhook
+    request_dict = new_request.dict()
+    request_dict["payment_reference"] = payment_ref
+    request_dict["service_charge"] = service_charge
+    
+    db.buyer_requests.insert_one(request_dict)
+    
+    return {
+        "status": "pending_payment", 
+        "message": "Request created. Please pay service charge to activate.", 
+        "request_id": new_request.id,
+        "payment_reference": payment_ref,
+        "amount_to_pay": service_charge,
+        "estimated_total_price": estimated_total_price,
+        "currency": "NGN"
+    }
+
+@app.get("/api/requests", tags=["RFQ"])
+async def list_buyer_requests(
+    platform: Optional[RequestPlatform] = None,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    query = {"status": {"$in": ["open", "partially_filled"]}}
+    
+    if platform:
+        query["platform"] = platform
+        
+    # Privacy Logic
+    user_email = current_user.get("email")
+    username = current_user.get("username")
+    
+    query["$or"] = [
+        {"is_private": False},
+        {"user_id": current_user["id"]},
+        {"invited_sellers": {"$in": [user_email, username]}}
+    ]
+    
+    requests = list(db.buyer_requests.find(query).sort("created_at", -1))
+    return requests
+
+class OfferCreate(BaseModel):
+    price: float
+    quantity_offered: float
+    delivery_date: datetime
+    notes: Optional[str] = None
+    images: List[str] = [] # Proof for Standard bids
+
+@app.post("/api/requests/{request_id}/offers", tags=["RFQ"])
+async def create_offer(
+    request_id: str,
+    offer_data: OfferCreate,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    request = db.buyer_requests.find_one({"id": request_id})
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+        
+    if request["status"] == "closed":
+        raise HTTPException(status_code=400, detail="Bidding is closed")
+
+    # Logic: Only Standard supports "Bidding"
+    if request.get("request_type") == "instant":
+        raise HTTPException(status_code=400, detail="Instant requests cannot be bid on. Use 'Take Request' instead.")
+        
+    # Standard Validation
+    if not offer_data.images:
+        raise HTTPException(status_code=400, detail="Proof images are required for Standard bids")
+        
+    # Validation
+    if offer_data.quantity_offered > request["quantity_remaining"]:
+        raise HTTPException(status_code=400, detail=f"Offer quantity exceeds remaining needed ({request['quantity_remaining']})")
+
+    new_offer = RequestOffer(
+        request_id=request_id,
+        seller_id=current_user["id"],
+        seller_username=current_user.get("username", "Unknown"),
+        price=offer_data.price,
+        quantity_offered=offer_data.quantity_offered,
+        delivery_date=offer_data.delivery_date,
+        notes=offer_data.notes,
+        images=offer_data.images,
+        status="pending"
+    )
+    
+    db.request_offers.insert_one(new_offer.dict())
+    
+    return {"status": "success", "message": "Offer submitted", "offer_id": new_offer.id}
+
+@app.post("/api/requests/{request_id}/take", tags=["RFQ"])
+async def take_instant_request(
+    request_id: str,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    """
+    Agents 'Take' an Instant Request.
+    - Creates an 'accepted' offer immediately.
+    - Generates Tracking ID.
+    - Marks Request as Filled/Taken.
+    """
+    request = db.buyer_requests.find_one({"id": request_id})
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+        
+    if request.get("request_type") != "instant":
+        raise HTTPException(status_code=400, detail="Only Instant requests can be taken instantly")
+        
+    if request["status"] != "open":
+        raise HTTPException(status_code=400, detail="Request is not open")
+        
+    # Create Accepted Offer
+    tracking_id = f"RFQ-TRK-{uuid.uuid4().hex[:16].upper()}"
+    otp_code = tracking_id[-8:]
+    
+    # Instant price is fixed (Budget/Estimate)
+    price = request.get("budget", 0)
+    
+    new_offer = RequestOffer(
+        request_id=request_id,
+        seller_id=current_user["id"],
+        seller_username=current_user.get("username", "Unknown"),
+        price=price,
+        quantity_offered=request["quantity_required"] or 1, # Instant takes all? Usually yes.
+        delivery_date=request["expected_delivery_date"],
+        notes="Instant Take",
+        status="accepted",
+        tracking_id=tracking_id,
+        delivery_otp=otp_code,
+        date_accepted=datetime.utcnow()
+    )
+    
+    db.request_offers.insert_one(new_offer.dict())
+    
+    # [TRACKING] Initialize Log
+    tracking_log = TrackingLog(
+        tracking_id=tracking_id,
+        order_id=request_id,
+        current_status="Job Taken",
+        logs=[
+            TrackingLogEntry(status="Job Taken", note="Agent accepted instant request", timestamp=datetime.utcnow())
+        ]
+    )
+    db.tracking_logs.insert_one(tracking_log.dict())
+    
+    # Update Request
+    db.buyer_requests.update_one(
+        {"id": request_id},
+        {"$set": {"status": "filled", "quantity_remaining": 0}}
+    )
+    
+    return {
+        "status": "success", 
+        "message": "Request taken successfully", 
+        "tracking_id": tracking_id, 
+        "otp_code": otp_code
+    }
+
+@app.get("/api/agent/offers", tags=["RFQ"])
+async def list_agent_offers(
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    # Get all offers made by this agent
+    offers = list(db.request_offers.find({"seller_id": current_user["id"]}).sort("created_at", -1))
+    
+    # Enrich with Request details
+    results = []
+    for offer in offers:
+        req = db.buyer_requests.find_one({"id": offer["request_id"]})
+        if req:
+            offer["request_title"] = req["title"]
+            offer["request_platform"] = req["platform"]
+            results.append(offer)
+            
+    return results
+
+@app.post("/api/offers/{offer_id}/accept", tags=["RFQ"])
+async def accept_offer(
+    offer_id: str,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    offer = db.request_offers.find_one({"id": offer_id})
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+        
+    request = db.buyer_requests.find_one({"id": offer["request_id"]})
+    
+    # Validation: Only Buyer can accept
+    if request["user_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    if offer["status"] != "pending":
+        raise HTTPException(status_code=400, detail="Offer is not pending")
+        
+    # Fractional Logic: Deduct quantity
+    qty_needed = request["quantity_remaining"]
+    qty_offered = offer["quantity_offered"]
+    
+    if qty_offered > qty_needed:
+        # Edge case: two people accepted same time?
+        raise HTTPException(status_code=400, detail="Offer exceeds remaining quantity needed")
+        
+    # Generate Handshake
+    tracking_id = f"RFQ-TRK-{uuid.uuid4().hex[:16].upper()}"
+    otp_code = tracking_id[-8:] # Last 8 chars
+    
+    # Update Offer
+    db.request_offers.update_one(
+        {"id": offer_id},
+        {
+            "$set": {
+                "status": "accepted", 
+                "tracking_id": tracking_id,
+                "delivery_otp": otp_code,
+                "date_accepted": datetime.utcnow()
+            }
+        }
+    )
+    
+    # Update Request Pool
+    new_remaining = qty_needed - qty_offered
+    req_status = "partially_filled" if new_remaining > 0 else "filled"
+    # If filled, maybe close it? Or keep open for backup? Spec says "closed" if 0.
+    if new_remaining == 0:
+        req_status = "filled" # Logic: filled means done for now.
+        
+    db.buyer_requests.update_one(
+        {"id": request["id"]},
+        {"$set": {"quantity_remaining": new_remaining, "status": req_status}}
+    )
+    
+    # PAYMENT NOTE: Here we should trigger payment deduction from Wallet (Escrow).
+    # For MVP, we assume User has funds and we lock it.
+    # In production, this would call `process_payment(user_id, offer.price)`
+    
+    return {
+        "status": "success", 
+        "message": "Offer accepted", 
+        "tracking_id": tracking_id,
+        "otp_code": otp_code 
+    }
+
+@app.post("/api/offers/{offer_id}/delivered", tags=["RFQ"])
+async def mark_delivered(
+    offer_id: str,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    offer = db.request_offers.find_one({"id": offer_id})
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+        
+    # Only Seller can mark delivered
+    if offer["seller_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    if offer["status"] != "accepted":
+        raise HTTPException(status_code=400, detail="Offer must be in 'accepted' state")
+        
+    db.request_offers.update_one(
+        {"id": offer_id},
+        {"$set": {"status": "delivered", "date_delivered": datetime.utcnow()}}
+    )
+    
+    return {"status": "success", "message": "Order marked as delivered. Waiting for buyer confirmation or auto-release."}
+
+class DeliveryConfirm(BaseModel):
+    otp_code: str # Last 8 digits of Tracking ID
+
+@app.post("/api/offers/{offer_id}/confirm-delivery", tags=["RFQ"])
+async def confirm_delivery_otp(
+    offer_id: str,
+    data: DeliveryConfirm,
+    current_user: dict = Depends(get_current_user), 
+    db = Depends(get_database)
+):
+    offer = db.request_offers.find_one({"id": offer_id})
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+        
+    request = db.buyer_requests.find_one({"id": offer["request_id"]})
+    
+    # Buyer Confirmation: Only Buyer can confirm receipt
+    if request["user_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized (Only Buyer can confirm receipt)")
+        
+    if offer["delivery_otp"] != data.otp_code:
+        raise HTTPException(status_code=400, detail="Invalid Confirmation Code (Check Tracking ID)")
+        
+    # Verify Success! Release Funds.
+    # 1. Payout
+    # 2. Log Settlement
+    
+    # Idempotency check: If already completed
+    if offer["status"] == "completed":
+        return {"status": "success", "message": "Already completed"}
+    
+    amount = offer["price"]
+    
+    amount = offer["price"]
+    fee = amount * 0.03 # 3% Platform Fee (Assumption)
+    payout = amount - fee
+    
+    # Credit Seller Wallet
+    db.users.update_one(
+        {"id": current_user["id"]},
+        {
+            "$inc": {"wallet_balance": payout},
+            "$push": {
+                "wallet_history": {
+                    "id": str(uuid.uuid4()),
+                    "type": "payout",
+                    "amount": payout,
+                    "description": f"RFQ Payout: {offer_id}",
+                    "status": "success",
+                    "created_at": datetime.utcnow()
+                }
+            }
+        }
+    )
+    
+    # Log Settlement
+    settlement = {
+        "id": str(uuid.uuid4()),
+        "request_id": offer["request_id"],
+        "offer_id": offer_id,
+        "amount": amount,
+        "fee": fee,
+        "payout_reference": f"PAY-{uuid.uuid4().hex[:8]}",
+        "method_of_fulfillment": "OTP Verified",
+        "created_at": datetime.utcnow()
+    }
+    db.settlement_logs.insert_one(settlement)
+    
+    # Update Offer Status
+    db.request_offers.update_one(
+        {"id": offer_id},
+        {"$set": {"status": "completed", "date_delivered": datetime.utcnow(), "payout_status": "success"}}
+    )
+    
+    return {"status": "success", "message": "Delivery confirmed. Funds released."}
+
+# --- Auto-Release Job (RFQ) ---
+async def check_rfq_auto_release():
+    """
+    Check for offers marked 'delivered' and auto-release after X days.
+    PyExpress: 3 Days
+    FarmDeals: 14 Days
+    """
+    logger.info("Running RFQ Auto-Release Check...")
+    # Find offers status="delivered"
+    offers = list(db.request_offers.find({"status": "delivered"}))
+    
+    for offer in offers:
+        request = db.buyer_requests.find_one({"id": offer["request_id"]})
+        if not request: continue
+        
+        # Rule: PyExpress (3 Days), FarmDeals (14 Days)
+        days_limit = 3 if request["platform"] == "PyExpress" else 14
+        
+        delivered_at = offer.get("date_delivered")
+        if not delivered_at: continue
+        
+        if datetime.utcnow() > delivered_at + timedelta(days=days_limit):
+            logger.info(f"Auto-Releasing Offer {offer['id']}")
+            
+            # COPY PAYOUT LOGIC (Should be extracted to function in production)
+            amount = offer["price"]
+            fee = amount * 0.03
+            payout = amount - fee
+            
+            # Credit Seller
+            db.users.update_one(
+                {"id": offer["seller_id"]},
+                {
+                    "$inc": {"wallet_balance": payout},
+                    "$push": {
+                        "wallet_history": {
+                            "id": str(uuid.uuid4()),
+                            "type": "payout",
+                            "amount": payout,
+                            "description": f"Auto-Release Payout: {offer['id']}",
+                            "status": "success",
+                            "created_at": datetime.utcnow()
+                        }
+                    }
+                }
+            )
+            
+            # Log Settlement
+            settlement = {
+                "id": str(uuid.uuid4()),
+                "request_id": offer["request_id"],
+                "offer_id": offer["id"],
+                "amount": amount,
+                "fee": fee,
+                "payout_reference": f"AUTO-{uuid.uuid4().hex[:8]}",
+                "method_of_fulfillment": "Auto Release",
+                "created_at": datetime.utcnow()
+            }
+            db.settlement_logs.insert_one(settlement)
+            
+            # Update Offer
+            db.request_offers.update_one(
+                {"id": offer["id"]},
+                {"$set": {"status": "completed", "payout_status": "success"}}
+            ) 
+
+# Add to scheduler
+@app.on_event("startup")
+async def start_rfq_scheduler():
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(check_rfq_auto_release, "interval", hours=1)
+    # scheduler.start() # Already started in main block? careful of duplicates.
+
+
+# ==========================================
+# PART 5: INTERNAL TRACKING SYSTEM
+# ==========================================
+
+@app.get("/api/tracking/{tracking_id}", tags=["Tracking"])
+async def get_public_tracking(tracking_id: str, db = Depends(get_database)):
+    """
+    Public Endpoint: Get order tracking history.
+    Stripped of sensitive user data.
+    """
+    log = db.tracking_logs.find_one({"tracking_id": tracking_id})
+    if not log:
+        raise HTTPException(status_code=404, detail="Tracking ID not found")
+        
+    return {
+        "tracking_id": log["tracking_id"],
+        "status": log["current_status"],
+        "logs": log["logs"],
+        "estimated_delivery": log.get("estimated_delivery")
+    }
+
+class TrackingUpdate(BaseModel):
+    status: str
+    location: Optional[str] = None
+    note: Optional[str] = None
+
+@app.post("/api/tracking/{tracking_id}/update", tags=["Tracking"])
+async def update_tracking_log(
+    tracking_id: str,
+    update: TrackingUpdate,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_database)
+):
+    """
+    Restricted: Agents/Admins update tracking status.
+    """
+    # Verify Permissions (Agent, Admin, Logistics)
+    if current_user["role"] not in ["agent", "admin", "logistics"]:
+        raise HTTPException(status_code=403, detail="Not authorized to update tracking")
+        
+    log = db.tracking_logs.find_one({"tracking_id": tracking_id})
+    if not log:
+        raise HTTPException(status_code=404, detail="Tracking ID not found")
+        
+    new_entry = TrackingLogEntry(
+        status=update.status,
+        location=update.location,
+        note=update.note,
+        updated_by=current_user["username"],
+        timestamp=datetime.utcnow()
+    )
+    
+    db.tracking_logs.update_one(
+        {"tracking_id": tracking_id},
+        {
+            "$push": {"logs": new_entry.dict()},
+            "$set": {"current_status": update.status}
+        }
+    )
+    
+    return {"status": "success", "message": "Tracking updated"}

@@ -60,22 +60,29 @@ self.addEventListener('fetch', (event) => {
 });
 
 // Handle static asset requests (cache-first)
+// Handle static asset requests (Network-First with Cache Fallback)
 async function handleStaticRequest(request) {
   const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(request);
-  
-  if (cached) {
-    return cached;
-  }
 
   try {
+    // Try network first (Always get latest version)
     const response = await fetch(request);
+
+    // If successful, update the cache
     if (response.status === 200) {
       cache.put(request, response.clone());
     }
     return response;
   } catch (error) {
-    // Return offline page for navigation requests
+    // Note: 'Only-if-cached' mode error handling?
+    // Network failed, try cache
+    console.log('[SW] Network failed for static asset, trying cache:', request.url);
+    const cached = await cache.match(request);
+    if (cached) {
+      return cached;
+    }
+
+    // Return offline page for navigation requests if both fail
     if (request.destination === 'document') {
       return cache.match('/index.html');
     }
@@ -86,20 +93,20 @@ async function handleStaticRequest(request) {
 // Handle API requests (network-first with cache fallback)
 async function handleApiRequest(request) {
   const cache = await caches.open(CACHE_NAME);
-  
+
   try {
     // Try network first
     const response = await fetch(request);
-    
+
     // Cache successful GET requests
     if (request.method === 'GET' && response.status === 200) {
       cache.put(request, response.clone());
     }
-    
+
     return response;
   } catch (error) {
     console.log('[SW] Network failed, trying cache:', request.url);
-    
+
     // If GET request, try cache
     if (request.method === 'GET') {
       const cached = await cache.match(request);
@@ -107,7 +114,7 @@ async function handleApiRequest(request) {
         return cached;
       }
     }
-    
+
     // If POST/PUT request (like product creation), queue it for later
     if (request.method === 'POST' || request.method === 'PUT') {
       await queueOfflineRequest(request);
@@ -122,7 +129,7 @@ async function handleApiRequest(request) {
         }
       );
     }
-    
+
     // Return error for other cases
     return new Response(
       JSON.stringify({ error: 'No network connection', offline: true }),
@@ -138,7 +145,7 @@ async function handleApiRequest(request) {
 async function queueOfflineRequest(request) {
   const queue = await caches.open(OFFLINE_QUEUE);
   const body = await request.clone().text();
-  
+
   const queuedRequest = {
     url: request.url,
     method: request.method,
@@ -146,21 +153,21 @@ async function queueOfflineRequest(request) {
     body: body,
     timestamp: Date.now()
   };
-  
+
   // Store as a unique entry
   const queueKey = `offline-${Date.now()}-${Math.random()}`;
   await queue.put(
     new Request(queueKey),
     new Response(JSON.stringify(queuedRequest))
   );
-  
+
   console.log('[SW] Queued offline request:', queueKey);
 }
 
 // Background Sync event - sync queued requests when online
 self.addEventListener('sync', (event) => {
   console.log('[SW] Background sync triggered:', event.tag);
-  
+
   if (event.tag === 'sync-offline-requests') {
     event.waitUntil(syncOfflineRequests());
   }
@@ -171,12 +178,12 @@ async function syncOfflineRequests() {
   console.log('[SW] Starting offline requests sync...');
   const queue = await caches.open(OFFLINE_QUEUE);
   const requests = await queue.keys();
-  
+
   for (const request of requests) {
     try {
       const response = await queue.match(request);
       const queuedRequest = await response.json();
-      
+
       // Recreate and send the request
       const headers = new Headers(queuedRequest.headers);
       const fetchRequest = new Request(queuedRequest.url, {
@@ -184,13 +191,13 @@ async function syncOfflineRequests() {
         headers: headers,
         body: queuedRequest.body
       });
-      
+
       const fetchResponse = await fetch(fetchRequest);
-      
+
       if (fetchResponse.ok) {
         console.log('[SW] Synced request:', queuedRequest.url);
         await queue.delete(request);
-        
+
         // Notify clients about successful sync
         const clients = await self.clients.matchAll();
         clients.forEach(client => {
@@ -205,22 +212,22 @@ async function syncOfflineRequests() {
       console.error('[SW] Failed to sync request:', error);
     }
   }
-  
+
   console.log('[SW] Offline requests sync completed');
 }
 
 // Message event - handle commands from clients
 self.addEventListener('message', (event) => {
   console.log('[SW] Received message:', event.data);
-  
+
   if (event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-  
+
   if (event.data.type === 'SYNC_NOW') {
     syncOfflineRequests();
   }
-  
+
   if (event.data.type === 'CLEAR_CACHE') {
     event.waitUntil(
       caches.keys().then((cacheNames) => {
