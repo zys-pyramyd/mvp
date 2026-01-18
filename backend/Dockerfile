@@ -69,10 +69,5 @@ ENV PYTHONUNBUFFERED=1 \
 # Expose the application port
 EXPOSE ${PORT}
 
-<<<<<<< HEAD
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "4"]
-=======
 # Start the application using Uvicorn
 CMD sh -c "uvicorn server:app --host 0.0.0.0 --port ${PORT} --workers 4"
->>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
