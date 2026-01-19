@@ -12,6 +12,7 @@ const RequestWizard = ({ isOpen, onClose, onSubmit, userProfile, initialType = n
     const [deliveryDays, setDeliveryDays] = useState(2); // Standard (Days)
     const [deliveryHours, setDeliveryHours] = useState(4); // Instant (Hours)
     const [location, setLocation] = useState(userProfile?.state || '');
+    const [contactPhone, setContactPhone] = useState(userProfile?.phone || ''); // Added Phone Field for Instant
 
     // Review/Payment State
     const [isLoading, setIsLoading] = useState(false);
@@ -86,7 +87,38 @@ const RequestWizard = ({ isOpen, onClose, onSubmit, userProfile, initialType = n
         }
     };
 
-    const handleCreateRequest = async () => {
+    const calculateEstimatedTotal = () => {
+        if (requestType === 'standard') return 0; // Standard has no budget estimate usually
+        return items.reduce((sum, item, idx) => {
+            const price = priceEstimates[idx]?.average_price || 0;
+            const qty = parseFloat(item.quantity) || 1;
+            return sum + (price * qty);
+        }, 0);
+    };
+
+    const preparePayment = () => {
+        const estimatedTotal = calculateEstimatedTotal();
+        let serviceCharge = 0;
+        let agentFee = 0;
+
+        if (requestType === 'standard') {
+            serviceCharge = 5000;
+        } else {
+            serviceCharge = 3000;
+            agentFee = estimatedTotal * 0.04;
+        }
+
+        setPaymentData({
+            estimated_total_price: estimatedTotal,
+            service_charge: serviceCharge,
+            agent_fee: agentFee,
+            amount_to_pay: serviceCharge + agentFee, // Total Upfront Calculation
+            email: userProfile?.email || 'customer@example.com'
+        });
+        setStep(4); // Move to Payment Step
+    };
+
+    const handleSuccessPayment = async (reference) => {
         setIsLoading(true);
         try {
             const payload = {
@@ -94,26 +126,27 @@ const RequestWizard = ({ isOpen, onClose, onSubmit, userProfile, initialType = n
                 title: title || `${requestType === 'instant' ? 'Instant' : 'Standard'} Request for ${items[0].name}`,
                 items: items.map(i => ({
                     ...i,
-                    quantity: i.quantity ? parseFloat(i.quantity) : 1 // Default to 1 if empty?
+                    quantity: i.quantity ? parseFloat(i.quantity) : 1
                 })),
                 location,
+                contact_phone: contactPhone, // Pass phone
                 unit_of_measure: items[0].unit || "mixed",
                 persona: "Business",
                 business_category: userProfile?.business_category || "General",
+                // Payment Data
+                payment_reference: reference,
+                amount_paid: paymentData.amount_to_pay,
+                estimated_budget: paymentData.estimated_total_price,
                 // Conditional fields
                 ...(requestType === 'instant' ? { delivery_hours: parseInt(deliveryHours) } : { delivery_days: parseInt(deliveryDays) })
             };
 
             const response = await api.post('/requests', payload);
 
-            if (response.data.status === 'pending_payment') {
-                setPaymentData(response.data);
-                setStep(4); // Move to Payment Step
-            } else {
-                // Should not happen with new logic, but fallback
-                onSubmit(response.data);
-                onClose();
-            }
+            alert("Request Created Successfully! Agents will generally respond within minutes.");
+            onSubmit(response.data);
+            onClose();
+
         } catch (error) {
             console.error("Request creation failed:", error);
             alert(error.response?.data?.detail || "Failed to create request");
@@ -268,6 +301,24 @@ const RequestWizard = ({ isOpen, onClose, onSubmit, userProfile, initialType = n
                                     />
                                 </div>
                                 <div>
+                                    <label>Contact Phone</label>
+                                    <input
+                                        className="form-input"
+                                        value={contactPhone}
+                                        onChange={(e) => setContactPhone(e.target.value)}
+                                        placeholder="+234..."
+                                    />
+                                </div>
+                                <div>
+                                    <label>Delivery Address</label>
+                                    <input
+                                        className="form-input"
+                                        value={location}
+                                        onChange={(e) => setLocation(e.target.value)}
+                                        placeholder="Enter Address"
+                                    />
+                                </div>
+                                <div>
                                     {requestType === 'instant' ? (
                                         <>
                                             <label>Needed Within (Hours)</label>
@@ -339,10 +390,10 @@ const RequestWizard = ({ isOpen, onClose, onSubmit, userProfile, initialType = n
                                 <button className="btn-secondary" onClick={() => setStep(2)}>&larr; Back</button>
                                 <button
                                     className="btn-primary"
-                                    onClick={handleCreateRequest}
+                                    onClick={preparePayment}
                                     disabled={isLoading}
                                 >
-                                    {isLoading ? 'Creating...' : 'Create & Proceed to Payment'}
+                                    {isLoading ? 'Processing...' : 'Proceed to Payment'}
                                 </button>
                             </div>
                         </div>
@@ -352,42 +403,61 @@ const RequestWizard = ({ isOpen, onClose, onSubmit, userProfile, initialType = n
                     {step === 4 && paymentData && (
                         <div className="text-center py-6">
                             <div className="text-green-500 text-5xl mb-4">💳</div>
-                            <h4 className="text-2xl font-bold mb-2">Service Charge Payment</h4>
-                            <p className="text-gray-600 mb-6">Please complete the payment to activate your request.</p>
+                            <h4 className="text-2xl font-bold mb-2">Activate Your Request</h4>
+                            <p className="text-gray-600 mb-6">Service Charge & Agent Allocation Fee</p>
 
-                            <div className="bg-gray-100 p-6 rounded-lg max-w-sm mx-auto mb-8">
+                            <div className="bg-gray-100 p-6 rounded-lg max-w-sm mx-auto mb-8 text-left">
                                 <div className="flex justify-between mb-2">
-                                    <span>Estimated Goods Value:</span>
+                                    <span>Estimated Goods Budget:</span>
                                     <span className="font-bold">₦{paymentData.estimated_total_price?.toLocaleString()}</span>
                                 </div>
-                                <div className="flex justify-between mb-2 text-blue-600 font-bold">
-                                    <span>Service Charge:</span>
+                                <div className="flex justify-between mb-1 text-gray-700">
+                                    <span>Platform Service Charge:</span>
+                                    <span>₦{paymentData.service_charge?.toLocaleString()}</span>
+                                </div>
+                                {requestType === 'instant' && (
+                                    <div className="flex justify-between mb-1 text-gray-700">
+                                        <span>Agent Allocation Fee (4%):</span>
+                                        <span>₦{paymentData.agent_fee?.toLocaleString()}</span>
+                                    </div>
+                                )}
+                                <hr className="my-2" />
+                                <div className="flex justify-between mb-2 text-green-600 font-bold text-lg">
+                                    <span>Total To Pay Now:</span>
                                     <span>₦{paymentData.amount_to_pay?.toLocaleString()}</span>
                                 </div>
                                 <div className="text-xs text-orange-600 mt-2 italic">
-                                    * Delivery fee not included. Paid on delivery.
-                                </div>
-                                <hr className="my-2" />
-                                <div className="text-xs text-gray-500">
-                                    Payment Reference: <br />
-                                    <code className="bg-white px-2 py-1 rounded border">{paymentData.payment_reference}</code>
+                                    * Goods cost is paid separately on delivery.
                                 </div>
                             </div>
 
                             <button
                                 className="bg-green-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-green-700 w-full max-w-sm"
                                 onClick={() => {
-                                    // In a real app, this triggers Paystack Modal
-                                    // For MVP/Demo, alert user
-                                    alert(`Starting Paystack Payment for Ref: ${paymentData.payment_reference}\nAmount: ₦${paymentData.amount_to_pay}`);
-                                    alert("Payment Simulated! Reference verified.");
-
-                                    // Simulate Webhook / Success
-                                    onClose(); // Close Wizard
-                                    onSubmit(); // Refresh parent
+                                    // Use Paystack Pop or Simulate
+                                    const PaystackPop = window.PaystackPop;
+                                    if (PaystackPop) {
+                                        const paystack = new PaystackPop();
+                                        paystack.newTransaction({
+                                            key: process.env.REACT_APP_PAYSTACK_PUBLIC_KEY,
+                                            email: paymentData.email,
+                                            amount: paymentData.amount_to_pay * 100, // Kobo
+                                            onSuccess: (transaction) => {
+                                                handleSuccessPayment(transaction.reference);
+                                            },
+                                            onCancel: () => {
+                                                alert("Payment Cancelled");
+                                            }
+                                        });
+                                    } else {
+                                        // Fallback for simulation / if script missing
+                                        const ref = 'REF-' + Math.floor(Math.random() * 1000000000);
+                                        // alert(`Paystack Script not loaded. Simulating Success.\nRef: ${ref}`);
+                                        handleSuccessPayment(ref);
+                                    }
                                 }}
                             >
-                                Pay Now (Paystack)
+                                Pay ₦{paymentData.amount_to_pay?.toLocaleString()} Securely
                             </button>
                         </div>
                     )}

@@ -1125,23 +1125,17 @@ class OrderStatus(str, Enum):
     DELIVERED = "delivered"
     CANCELLED = "cancelled"
     HELD_IN_ESCROW = "held_in_escrow"
+    HELD_IN_ESCROW = "held_in_escrow"
     DISPUTED = "disputed"
+    PREORDER_PENDING = "preorder_pending" # Money paid, waiting for release date
 
-def generate_tracking_id(country_code: str = "NGA") -> str:
-    """
-    Generate a non-guessable tracking ID (e.g., NGA_PYD-8B2-X9L)
-    Prefix is ISO 3166-1 alpha-3 country code where delivery is expected.
-    """
-    import random
-    import string
-    chars = string.ascii_uppercase + string.digits
-    part1 = ''.join(random.choices(chars, k=3))
-    part2 = ''.join(random.choices(chars, k=3))
-    return f"{country_code}_PYD-{part1}-{part2}"
+# Legacy generate_tracking_id removed. Imported from app.utils.id_generator
+from app.utils.id_generator import generate_tracking_id
 
 class Order(BaseModel):
     id: Optional[str] = None
-    order_id: str = Field(default_factory=lambda: f"PY_ORD-{uuid.uuid4().hex[:12].upper()}")
+    order_type: str = "standard" # standard, preorder, custom_request
+    order_id: str = Field(default_factory=generate_tracking_id)
     buyer_username: str
     seller_username: str
     product_details: dict
@@ -3213,7 +3207,11 @@ async def create_order(items: List[CartItem], delivery_address: str, payment_met
         d_method = item.delivery_method or "delivery"
         d_location = item.dropoff_location if d_method == "pickup" else "HOME"
         
-        group_key = f"{seller_id}::{d_method}::{d_location}"
+        # Determine Order Type (Standard vs Preorder)
+        item_type = "preorder" if product.get('type') == 'preorder' or product.get('is_preorder') else "standard"
+        
+        # Group by Seller + Delivery + Location + Type
+        group_key = f"{seller_id}::{d_method}::{d_location}::{item_type}"
         
         if group_key not in group_map:
             group_map[group_key] = {
@@ -3221,6 +3219,7 @@ async def create_order(items: List[CartItem], delivery_address: str, payment_met
                 "delivery_method": d_method,
                 "dropoff_location": item.dropoff_location,
                 "items": [],
+                "order_type": item_type,
                 "seller_name": product['seller_name'],
                 "seller_username": product.get('seller_name'),
                 "product_subtotal": 0.0
@@ -3376,6 +3375,23 @@ async def create_order(items: List[CartItem], delivery_address: str, payment_met
             status=transaction_status,
             created_at=datetime.utcnow()
         )
+        
+        # Set Specific Status for Preorders
+        if group_data["order_type"] == "preorder":
+            order.status = OrderStatus.PREORDER_PENDING
+            order.order_type = "preorder"
+        
+        # Override status if Wallet Payment (Held in Escrow takes precedence for transaction, but we need to know it's a preorder)
+        # Actually, for Wallet, we debit and hold. 
+        # For standard: Status = PENDING -> (Paid) -> PROCESSING
+        # For preorder: Status = PENDING -> (Paid) -> PREORDER_PENDING
+        
+        if payment_method == "wallet":
+             # If paid by wallet, we move straight to 'PAID' state logic
+             if group_data["order_type"] == "preorder":
+                 order.status = OrderStatus.PREORDER_PENDING
+             else:
+                 order.status = OrderStatus.HELD_IN_ESCROW # Ready for processing
         
         order_dict = order.dict()
         order_dict['buyer_id'] = current_user['id']
@@ -10101,12 +10117,48 @@ async def check_rfq_auto_release():
                 {"$set": {"status": "completed", "payout_status": "success"}}
             ) 
 
-# Add to scheduler
 @app.on_event("startup")
-async def start_rfq_scheduler():
+async def startup_event():
+    # 1. Start Scheduler
     scheduler = AsyncIOScheduler()
     scheduler.add_job(check_rfq_auto_release, "interval", hours=1)
-    # scheduler.start() # Already started in main block? careful of duplicates.
+    scheduler.start()
+    
+    # 2. Seed Admin User
+    admin_email = os.environ.get('ADMIN_EMAIL')
+    admin_password = os.environ.get('ADMIN_PASSWORD')
+    
+    if admin_email and admin_password:
+        try:
+            logger.info(f"Seeding Admin User: {admin_email}")
+            existing_admin = db.users.find_one({"email": admin_email})
+            
+            hashed_pw = get_password_hash(admin_password)
+            
+            if existing_admin:
+                # Update password and ensure role is admin
+                db.users.update_one(
+                    {"email": admin_email},
+                    {"$set": {"password": hashed_pw, "role": "admin"}}
+                )
+                logger.info("Admin password updated from environment variable.")
+            else:
+                # Create new admin
+                new_admin = {
+                    "id": str(uuid.uuid4()),
+                    "email": admin_email,
+                    "username": "admin", # Default username
+                    "first_name": "System",
+                    "last_name": "Admin",
+                    "password": hashed_pw,
+                    "role": "admin",
+                    "is_verified": True,
+                    "created_at": datetime.utcnow()
+                }
+                db.users.insert_one(new_admin)
+                logger.info("New Admin user created from environment variable.")
+        except Exception as e:
+            logger.error(f"Failed to seed admin user: {e}")
 
 
 # ==========================================

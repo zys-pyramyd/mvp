@@ -53,6 +53,9 @@ try:
 except Exception:
     db = None
 
+def get_collection(name):
+    """Safely get a collection from the database"""
+    database = get_db()
     if database is not None:
         return database[name]
     return None

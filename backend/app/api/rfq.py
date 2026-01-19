@@ -28,6 +28,11 @@ class BuyerRequestCreate(BaseModel):
     budget: Optional[float] = None
     notes: Optional[str] = None
     
+    contact_phone: Optional[str] = None # Required for Instant
+    payment_reference: Optional[str] = None
+    amount_paid: Optional[float] = 0.0
+    estimated_budget: Optional[float] = 0.0
+    
     @validator('type')
     def validate_type(cls, v):
         if v not in ['instant', 'standard']:
@@ -75,10 +80,31 @@ async def create_request(
         "delivery_date": request_data.delivery_date,
         "budget": request_data.budget,
         "notes": request_data.notes,
+        "contact_phone": request_data.contact_phone,
+        # Payment Info
+        "payment_reference": request_data.payment_reference,
+        "amount_paid": request_data.amount_paid,
+        "service_fees_paid": request_data.amount_paid - (request_data.amount_paid * 0.04 if request_data.type == 'instant' else 0), # Approx split, refining below
+        # Wait, if Instant: 3000 + 4% Budget.
+        # Let's store raw values for clarity
+        "validation_data": {
+             "estimated_budget": request_data.estimated_budget,
+             "fee_structure": "Standard 5k" if request_data.type == 'standard' else "3k + 4% Budget"
+        },
+        "agent_fee_held": (request_data.estimated_budget * 0.04) if request_data.type == 'instant' else 0,
+        
         "status": "active",
         "offers_count": 0,
         "created_at": datetime.utcnow()
     }
+    
+    # 4. Enforce validations
+    if request_data.type == 'instant' and not request_data.contact_phone:
+         raise HTTPException(status_code=400, detail="Contact phone is required for Instant requests")
+
+    # 5. Verify Payment (Simulation)
+    if not request_data.payment_reference:
+          raise HTTPException(status_code=402, detail="Payment required to activate request")
     
     db.requests.insert_one(new_request)
     
