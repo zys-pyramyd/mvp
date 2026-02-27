@@ -1,11 +1,91 @@
-from fastapi import APIRouter, Request, Header, HTTPException, status
+from fastapi import APIRouter, Request, Header, HTTPException, status, Depends
 from app.services.paystack import verify_signature
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user
 from datetime import datetime
 import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+@router.post("/webhook")
+async def paystack_webhook(request: Request, x_paystack_signature: str = Header(None)):
+    """
+    Comprehensive Paystack Webhook Handler
+    ... (existing docstring)
+    """
+
+from pydantic import BaseModel
+from typing import Optional
+from app.services.paystack import initialize_transaction
+
+class InitializeTransactionRequest(BaseModel):
+    email: str
+    amount: float
+    callback_url: str
+    metadata: Optional[dict] = {}
+
+@router.post("/transaction/initialize")
+async def initialize_payment(
+    request: InitializeTransactionRequest,
+    current_user: dict = Depends(get_current_user) # Optional auth? Better for security.
+):
+    """
+    Initialize a Paystack transaction.
+    """
+    db = get_db()
+    
+    # 1. Create Pending Transaction Record
+    # We generate a temporary ref or rely on Paystack's ref?
+    # Paystack returns ref. But we want to track it BEFORE redirecting.
+    # But we don't know the ref until we call Paystack.
+    # So we call Paystack FIRST.
+    
+    try:
+        amount_kobo = int(request.amount * 100)
+        
+        # Add metadata
+        metadata = request.metadata or {}
+        metadata["user_id"] = current_user.get("id")
+        
+        result = initialize_transaction(
+            email=request.email,
+            amount=amount_kobo,
+            callback_url=request.callback_url,
+            metadata=metadata
+        )
+        
+        reference = result["data"]["reference"]
+        authorization_url = result["data"]["authorization_url"]
+        access_code = result["data"]["access_code"]
+        
+        # 2. Log Pending Transaction
+        transaction = {
+            "user_id": current_user.get("id"),
+            "email": request.email,
+            "type": "debit", # It's a payment FROM user
+            "category": "order_payment" if "order_id" in metadata else "wallet_funding",
+            "amount": request.amount,
+            "reference": reference,
+            "description": "Payment Initialization",
+            "status": "pending",
+            "metadata": metadata,
+            "created_at": datetime.utcnow()
+        }
+        db.wallet_transactions.insert_one(transaction)
+        
+        return {
+            "status": True,
+            "message": "Authorization URL created",
+            "data": {
+                "authorization_url": authorization_url,
+                "access_code": access_code,
+                "reference": reference
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Payment Initialization Error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/webhook")
 async def paystack_webhook(request: Request, x_paystack_signature: str = Header(None)):
@@ -81,7 +161,7 @@ async def paystack_webhook(request: Request, x_paystack_signature: str = Header(
                 
                 if category == "rfq_service_charge":
                     # Activate RFQ/Buyer Request
-                    db.buyer_requests.update_one(
+                    db.requests.update_one(  # Fixed: correct collection name
                         {"payment_reference": reference},
                         {"$set": {"status": "open", "payment_status": "paid"}}
                     )
@@ -89,11 +169,30 @@ async def paystack_webhook(request: Request, x_paystack_signature: str = Header(
                     
                 elif category == "order_payment":
                     # Mark order as paid
-                    db.orders.update_one(
-                        {"payment_reference": reference},
-                        {"$set": {"payment_status": "paid", "status": "processing"}}
-                    )
-                    logger.info(f"✅ Order payment verified. Ref: {reference}")
+                    # Use order_id from metadata because order doesn't have reference yet
+                    order_id = existing_txn.get("metadata", {}).get("order_id")
+                    if order_id:
+                        db.orders.update_one(
+                            {"order_id": order_id},
+                            {"$set": {
+                                "payment_status": "paid", 
+                                "status": "held_in_escrow",  # Funds held in escrow
+                                "payment_reference": reference,
+                                "paid_at": datetime.utcnow()
+                            }}
+                        )
+                        logger.info(f"✅ Order payment verified and held in escrow. Ref: {reference}, Order: {order_id}")
+                    else:
+                        # Fallback for legacy support
+                        db.orders.update_one(
+                            {"payment_reference": reference},
+                            {"$set": {
+                                "payment_status": "paid", 
+                                "status": "held_in_escrow",
+                                "paid_at": datetime.utcnow()
+                            }}
+                        )
+                        logger.info(f"✅ Order payment verified and held in escrow (by Ref). Ref: {reference}")
                     
                 elif category == "wallet_funding":
                     # Credit user wallet

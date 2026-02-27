@@ -13,6 +13,8 @@ def signup_user(username, email, role, password="password123"):
         "username": username,
         "email": email,
         "password": password,
+        "first_name": "Sim",
+        "last_name": "User",
         "role": role,
         "phone": "08012345678",
         "bvn": "12345678901" # Mock BVN
@@ -27,26 +29,26 @@ def signup_user(username, email, role, password="password123"):
         # If user already exists, try login
         if res.status_code == 400 and "exists" in res.text:
             print("User exists, logging in...")
-            return login_user(username, password)
+            return login_user(email, password)
             
         if res.status_code != 200:
             print(f"Register failed: {res.text}")
             return None
             
         data = res.json()
-        return data["access_token"]
+        return data["token"]
     except Exception as e:
         print(f"Error: {e}")
         return None
 
-def login_user(username, password="password123"):
+def login_user(email, password="password123"):
     payload = {
-        "username": username,
+        "email_or_phone": email,
         "password": password
     }
-    res = requests.post(f"{BASE_URL}/auth/login", data=payload) # OAuth2 form data
+    res = requests.post(f"{BASE_URL}/auth/login", json=payload) # OAuth2 form data
     if res.status_code == 200:
-        return res.json()["access_token"]
+        return res.json()["token"]
     print(f"Login failed: {res.text}")
     return None
 
@@ -57,12 +59,13 @@ def main():
     if not buyer_token: return
     
     # Agent
-    agent_token = signup_user("simulator_agent", "agent@sim.com", "partner")
+    agent_token = signup_user("simulator_agent_new", "agent_new@sim.com", "agent")
     if not agent_token: return
     
     print_step("2. CREATE RFQ (BUYER)")
     rfq_payload = {
         "title": "Simulation Rice Supply",
+        "type": "instant",
         "items": [
             {"name": "Rice", "quantity": 10, "unit": "bags", "specifications": "Long grain"},
             {"name": "Oil", "quantity": 5, "unit": "liters", "specifications": "Vegetable"}
@@ -70,6 +73,8 @@ def main():
         "delivery_days": 2, # PyExpress
         "location": "Lagos, Ikeja (Simulated)",
         "budget": 50000,
+        "contact_phone": "08012345678",
+        "payment_reference": "SIM_PAY_REF_123",
         "quantity_required": 15,
         "unit_of_measure": "mixed",
         "persona": "personal",
@@ -81,13 +86,13 @@ def main():
     print(f"Create RFQ: {res.status_code} - {res.text}")
     if res.status_code != 200: return
     request_id = res.json()["request_id"]
-    print(f"Request ID: {request_id} | Platform: {res.json()['platform_assigned']}")
+    print(f"Request ID: {request_id} | Type: {res.json()['type']}")
 
     print_step("3. LIST REQUESTS & MAKE OFFER (AGENT)")
     headers_agent = {"Authorization": f"Bearer {agent_token}"}
     
     # Agent checks Market
-    res = requests.get(f"{BASE_URL}/requests?platform=PyExpress", headers=headers_agent)
+    res = requests.get(f"{BASE_URL}/requests?platform=pyexpress", headers=headers_agent)
     requests_list = res.json()
     print(f"Found {len(requests_list)} PyExpress requests.")
     

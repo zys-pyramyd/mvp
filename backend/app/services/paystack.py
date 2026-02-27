@@ -111,3 +111,23 @@ def initiate_transfer(amount: int, recipient_code: str, reason: str = None) -> d
         "reason": reason
     }
     return paystack_request("POST", "/transfer", data)
+
+def initialize_transaction(email: str, amount: int, callback_url: str, metadata: dict = None) -> dict:
+    """
+    Initialize a transaction.
+    Amount in kobo.
+    """
+    data = {
+        "email": email,
+        "amount": amount,
+        "callback_url": callback_url,
+        "metadata": metadata or {}
+    }
+    return paystack_request("POST", "/transaction/initialize", data)
+
+def verify_transaction(reference: str) -> dict:
+    """
+    Verify a Paystack transaction by reference.
+    Returns the full Paystack response; check data['status'] == 'success'.
+    """
+    return paystack_request("GET", f"/transaction/verify/{reference}")

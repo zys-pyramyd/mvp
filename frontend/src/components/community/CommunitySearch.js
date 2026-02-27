@@ -34,47 +34,45 @@ const CommunitySearch = ({ onJoin }) => {
     }, []);
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-            <h3 className="text-lg font-semibold mb-4">Find Communities</h3>
-            <form onSubmit={handleSearch} className="mb-6">
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <h3 className="font-bold text-gray-900 mb-3 text-sm">Find Communities</h3>
+            <form onSubmit={handleSearch} className="mb-4">
                 <div className="flex gap-2">
                     <input
                         type="text"
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                        placeholder="Search by name, location, or crop..."
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-emerald-500"
+                        placeholder="Search..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                     <button
                         type="submit"
-                        className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                        className="px-3 py-2 bg-emerald-600 text-white rounded text-sm hover:bg-emerald-700 disabled:opacity-50"
                         disabled={loading}
                     >
-                        {loading ? 'Searching...' : 'Search'}
+                        🔍
                     </button>
                 </div>
             </form>
 
-            <div className="space-y-4">
+            <div className="space-y-3 max-h-60 overflow-y-auto">
                 {results.length === 0 && !loading && searchTerm && (
-                    <p className="text-gray-500 text-center">No communities found. Try a different term.</p>
+                    <p className="text-gray-500 text-center text-xs">No result.</p>
                 )}
                 {results.map(community => (
-                    <div key={community.id} className="flex justify-between items-center p-4 border border-gray-100 rounded-lg hover:bg-gray-50">
-                        <div>
-                            <h4 className="font-medium text-gray-900">{community.name}</h4>
-                            <p className="text-sm text-gray-500">{community.description}</p>
-                            <div className="flex gap-2 mt-1">
-                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{community.category}</span>
-                                <span className="text-xs text-gray-400">{community.members_count || 0} members</span>
+                    <div key={community.id} className="flex flex-col gap-2 p-2 border border-gray-100 rounded hover:bg-gray-50">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h4 className="font-semibold text-sm text-gray-900 line-clamp-1">{community.name}</h4>
+                                <p className="text-xs text-gray-500 line-clamp-1">{community.category}</p>
                             </div>
+                            <button
+                                onClick={() => onJoin(community.id)}
+                                className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded hover:bg-emerald-200"
+                            >
+                                Join
+                            </button>
                         </div>
-                        <button
-                            onClick={() => onJoin(community.id)}
-                            className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-md hover:bg-emerald-200 text-sm font-medium"
-                        >
-                            Join
-                        </button>
                     </div>
                 ))}
             </div>

@@ -1,0 +1,323 @@
+.order-details-modal {
+    max-width: 700px;
+    width: 95%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.order-info-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.info-row:last-child {
+    margin-bottom: 0;
+}
+
+.info-row .label {
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.info-row .value {
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.info-row .total-amount {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.status-badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-pending {
+    background: #ffeaa7;
+    color: #d63031;
+}
+
+.status-held_in_escrow {
+    background: #74b9ff;
+    color: #0984e3;
+}
+
+.status-delivered {
+    background: #55efc4;
+    color: #00b894;
+}
+
+.status-completed {
+    background: #81ecec;
+    color: #00cec9;
+}
+
+.status-cancelled {
+    background: #fab1a0;
+    color: #d63031;
+}
+
+/* Order Actions */
+.order-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.btn-select-all {
+    background: #6c5ce7;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-select-all:hover {
+    background: #5f3dc4;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
+}
+
+.btn-remove-items {
+    background: #ff7675;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    flex: 1;
+}
+
+.btn-remove-items:hover {
+    background: #d63031;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 118, 117, 0.3);
+}
+
+.btn-cancel-order {
+    background: #fd79a8;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    flex: 1;
+}
+
+.btn-cancel-order:hover {
+    background: #e84393;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(253, 121, 168, 0.3);
+}
+
+.btn-select-all:disabled,
+.btn-remove-items:disabled,
+.btn-cancel-order:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Order Items */
+.order-items-section {
+    margin-bottom: 20px;
+}
+
+.order-items-section h4 {
+    margin-bottom: 15px;
+    color: #2d3436;
+    font-size: 18px;
+}
+
+.order-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    border: 2px solid #dfe6e9;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+}
+
+.order-item:hover {
+    border-color: #6c5ce7;
+    box-shadow: 0 4px 12px rgba(108, 92, 231, 0.1);
+}
+
+.item-checkbox {
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    accent-color: #6c5ce7;
+}
+
+.item-details {
+    flex: 1;
+}
+
+.item-details h5 {
+    margin: 0 0 5px 0;
+    color: #2d3436;
+    font-size: 16px;
+}
+
+.item-meta {
+    margin: 0;
+    color: #636e72;
+    font-size: 14px;
+}
+
+.item-total {
+    font-size: 18px;
+    font-weight: bold;
+    color: #6c5ce7;
+}
+
+/* Refund Preview */
+.refund-preview {
+    background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 20px rgba(108, 92, 231, 0.2);
+}
+
+.preview-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 15px;
+}
+
+.preview-row:last-child {
+    margin-bottom: 0;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.refund-amount {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.new-total {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+/* Delivery Section */
+.delivery-section {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.delivery-section h4 {
+    margin: 0 0 10px 0;
+    color: #2d3436;
+    font-size: 16px;
+}
+
+.delivery-section p {
+    margin: 0;
+    color: #636e72;
+}
+
+/* Status Message */
+.status-message {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 20px;
+}
+
+.status-message p {
+    margin: 5px 0;
+    color: #856404;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+    text-align: center;
+    padding: 40px;
+    color: #6c5ce7;
+    font-size: 18px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .order-details-modal {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        border-radius: 0;
+    }
+
+    .order-actions {
+        flex-direction: column;
+    }
+
+    .btn-select-all,
+    .btn-remove-items,
+    .btn-cancel-order {
+        width: 100%;
+    }
+
+    .order-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .item-checkbox {
+        align-self: flex-start;
+    }
+
+    .item-total {
+        align-self: flex-end;
+    }
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.order-item {
+    animation: slideIn 0.3s ease;
+}

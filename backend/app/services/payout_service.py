@@ -17,24 +17,47 @@ async def process_order_payout(order_id: str, db):
     """
     logger.info(f"Processing payout for order: {order_id}")
     
-    # 1. Fetch Order
-    order = db.orders.find_one({"order_id": order_id})
-    if not order:
-        logger.error(f"Order {order_id} not found")
-        return False, "Order not found"
+    # 1. Fetch Order and Check Payout Status Atomically
+    # This prevents duplicate payouts if confirm_delivery is called multiple times
+    order = db.orders.find_one_and_update(
+        {
+            "order_id": order_id,
+            "status": {"$in": ["held_in_escrow", "delivered"]},
+            "payout_status": {"$ne": "completed"}  # Ensure not already paid
+        },
+        {
+            "$set": {
+                "payout_status": "processing",
+                "payout_started_at": datetime.utcnow()
+            }
+        },
+        return_document=True
+    )
     
-    if order.get("status") not in ["held_in_escrow", "delivered"]:
-        # Allow 'delivered' if we are re-processing a failed payout
-        if order.get("payout_status") == "completed":
-             logger.warning(f"Order {order_id} already paid out")
-             return False, "Order already paid out"
+    if not order:
+        # Either order not found, wrong status, or already paid out
+        existing_order = db.orders.find_one({"order_id": order_id})
+        if not existing_order:
+            logger.error(f"Order {order_id} not found")
+            return False, "Order not found"
+        elif existing_order.get("payout_status") == "completed":
+            logger.warning(f"Order {order_id} already paid out")
+            return False, "Order already paid out"
+        else:
+            logger.error(f"Order {order_id} has invalid status: {existing_order.get('status')}")
+            return False, f"Order must be in escrow or delivered status. Current: {existing_order.get('status')}"
     
     # 2. Identify Parties
     seller_id = order.get("seller_id")
     seller = db.users.find_one({"id": seller_id})
     if not seller:
-         return False, "Seller not found"
-         
+        # Rollback payout status
+        db.orders.update_one(
+            {"order_id": order_id},
+            {"$set": {"payout_status": "failed", "payout_error": "Seller not found"}}
+        )
+        return False, "Seller not found"
+        
     # Check for Agent (if seller has an agent)
     # Logic: usually strictly based on 'selling_agent_id' in order, but MVP might not have it.
     # We'll assume direct sale unless 'agent_id' is in order.
@@ -62,6 +85,8 @@ async def process_order_payout(order_id: str, db):
     platform_fee = total_amount * platform_fee_rate
         
     seller_amount = total_amount - platform_fee - agent_commission
+    
+    logger.info(f"Processing payout for order {order_id}. Total: ₦{total_amount}, Seller: ₦{seller_amount}, Platform: ₦{platform_fee}, Agent: ₦{agent_commission}")
     
     # 4. Update Wallets (Ledger)
     # Credit Seller
@@ -143,7 +168,7 @@ async def process_order_payout(order_id: str, db):
                                 "wallet_history": {
                                     "type": "debit",
                                     "amount": seller_amount,
-                                    "description": f"Auto-Withdrawal to Bank ({bank_details['bank_name']})",
+                                    "description": f"Auto-Withdrawal to Bank ({bank_details.get('bank_name', 'Unknown Bank')})",
                                     "date": datetime.utcnow()
                                 }
                             }
@@ -163,10 +188,11 @@ async def process_order_payout(order_id: str, db):
         {"order_id": order_id},
         {
             "$set": {
-                "status": "delivered", 
+                "status": "completed",  # Order fully completed after payout
                 "payout_status": "completed",
                 "transfer_status": transfer_status,
                 "transfer_ref": transfer_ref,
+                "buyer_confirmed_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow() 
             }
         }

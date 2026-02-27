@@ -260,36 +260,41 @@ const Header = ({
                                                 )}
 
                                                 {/* Dashboards based on role */}
-                                                {user.role === 'farmer' && (
-                                                    <button
-                                                        onClick={() => { setShowProfileMenu(false); setShowFarmerDashboard(true); }}
-                                                        className="group flex items-center w-full px-4 py-2 text-sm text-green-700 hover:bg-green-50"
-                                                    >
-                                                        <span className="mr-3">🌾</span> Farmer Dashboard
-                                                    </button>
-                                                )}
-
-                                                {(user.role === 'agent' || user.role === 'purchasing_agent') && (
-                                                    <button
-                                                        onClick={() => { setShowProfileMenu(false); setShowAgentDashboard(true); }}
-                                                        className="group flex items-center w-full px-4 py-2 text-sm text-blue-700 hover:bg-blue-50"
-                                                    >
-                                                        <span className="mr-3">👥</span> Agent Dashboard
-                                                    </button>
-                                                )}
-
-                                                {/* Admin Dashboard */}
-                                                {user.role === 'admin' && (
-                                                    <button
-                                                        onClick={() => {
-                                                            setShowProfileMenu(false);
+                                                <button
+                                                    onClick={() => {
+                                                        setShowProfileMenu(false);
+                                                        if (user.role === 'admin') {
                                                             window.location.href = '/pyadmin';
-                                                        }}
-                                                        className="group flex items-center w-full px-4 py-2 text-sm text-purple-700 hover:bg-purple-50 font-medium"
-                                                    >
-                                                        <span className="mr-3">⚡</span> Admin Dashboard
-                                                    </button>
-                                                )}
+                                                        } else if (['farmer', 'business', 'supplier_food_produce'].includes(user.role)) {
+                                                            setShowFarmerDashboard(true);
+                                                        } else if (['agent', 'purchasing_agent'].includes(user.role)) {
+                                                            setShowAgentDashboard(true);
+                                                        } else {
+                                                            // Requires App.js to pass down setShowPersonalDashboard or handle it
+                                                            // Since Header does not receive setShowPersonalDashboard, we could
+                                                            // add it to props or rely on the App.js profile menu.
+                                                            // Wait, Header.js IS the profile menu currently. Let's fix props in App.js as well.
+                                                            if (typeof setShowPersonalDashboard === 'function') {
+                                                                setShowPersonalDashboard(true);
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="group flex items-center w-full px-4 py-2 text-sm text-green-700 hover:bg-green-50 font-medium"
+                                                >
+                                                    <span className="mr-3">⚙️</span> My Dashboard
+                                                </button>
+
+                                                {/* Create Request (Bulk Buy) */}
+                                                <button
+                                                    onClick={() => {
+                                                        setShowProfileMenu(false);
+                                                        // Ensure app has a handler to open the request wizard. Let's assume passed in or dispatched.
+                                                        if (typeof window.openRequestWizard === 'function') window.openRequestWizard();
+                                                    }}
+                                                    className="group flex items-center w-full px-4 py-2 text-sm text-purple-700 hover:bg-purple-50 font-medium border-b border-gray-100 pb-3 mb-1"
+                                                >
+                                                    <span className="mr-3">➕</span> Create Request (Bulk Buy)
+                                                </button>
 
                                                 <button
                                                     onClick={() => { setShowProfileMenu(false); setShowMarketChart(true); }}

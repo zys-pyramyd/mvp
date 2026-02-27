@@ -1,8 +1,10 @@
 
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, status
 from app.models.user import User, CreateAdminRequest, UserRole
-from app.core.security import hash_password
+from app.core.security import hash_password, decrypt_data
 from app.api.deps import get_db, get_current_user
+from app.services.paystack import assign_dedicated_account
 from app.core.config import settings
 
 router = APIRouter()
@@ -83,7 +85,46 @@ async def verify_user(user_id: str, current_user: dict = Depends(get_current_use
     
     db = get_db()
     
-    # Update user verification status
+    # Fetch user first to get details for DVA
+    user = db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    dva_message = ""
+    dva_created = False
+    
+    # Try creating DVA if Partner (has BVN) and doesn't have one
+    if user.get("bvn") and not user.get("dva_account_number"):
+        try:
+            bvn = decrypt_data(user["bvn"])
+            dva_data_req = {
+                "email": user["email"],
+                "first_name": user["first_name"],
+                "last_name": user["last_name"],
+                "phone": user.get("phone")
+            }
+            dva_result = assign_dedicated_account(dva_data_req, bvn)
+            
+            if dva_result and dva_result.get("status") and dva_result.get("data"):
+                data = dva_result["data"]
+                # Update with DVA details
+                db.users.update_one(
+                    {"id": user_id},
+                    {"$set": {
+                        "dva_account_number": data.get("account_number"),
+                        "dva_bank_name": data.get("bank", {}).get("name") if isinstance(data.get("bank"), dict) else data.get("bank", "Unknown"),
+                        "paystack_customer_code": data.get("customer", {}).get("customer_code")
+                    }}
+                )
+                dva_created = True
+                dva_message = ". DVA created successfully."
+            else:
+                 dva_message = f". DVA creation failed: {dva_result.get('message')}. User can retry in profile."
+        except Exception as e:
+            print(f"Verify User DVA Error: {e}")
+            dva_message = ". DVA creation error (check logs). User can retry."
+
+    # Update user verification status (Always verify if admin clicked it, regardless of DVA)
     result = db.users.update_one(
         {"id": user_id},
         {"$set": {
@@ -94,11 +135,8 @@ async def verify_user(user_id: str, current_user: dict = Depends(get_current_use
             "verification_info.verified_at": datetime.utcnow()
         }}
     )
-    
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
         
-    return {"message": f"User {user_id} has been manually verified"}
+    return {"message": f"User {user_id} has been manually verified{dva_message}"}
 
 # --- Global Order Tracking ---
 @router.get("/orders")

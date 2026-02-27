@@ -18,17 +18,28 @@ class RequestItem(BaseModel):
     unit: str
     specifications: Optional[str] = None
     target_price: Optional[float] = None
+    moisture_content_percent: Optional[float] = None # Optional moisture content
 
 class BuyerRequestCreate(BaseModel):
     type: str = Field(..., description="'instant' (PyExpress) or 'standard' (FarmDeals)")
     items: List[RequestItem]
-    location: str
+    # Location split
+    region_country: str = "Nigeria"
+    region_state: str 
+    location: str # Specific address/city for delivery logic
+    
     delivery_days: Optional[int] = None # For Instant
     delivery_date: Optional[datetime] = None # For Standard
-    budget: Optional[float] = None
-    notes: Optional[str] = None
+    publish_date: Optional[datetime] = None # When the request goes live to bidders
+    expiry_date: datetime # Required: When the request closes
     
-    contact_phone: Optional[str] = None # Required for Instant
+    budget: Optional[float] = None
+    currency: str = "NGN"
+    price_range_min: Optional[float] = None
+    price_range_max: Optional[float] = None
+    
+    notes: Optional[str] = None # Description
+    contact_phone: Optional[str] = None 
     payment_reference: Optional[str] = None
     amount_paid: Optional[float] = 0.0
     estimated_budget: Optional[float] = 0.0
@@ -40,12 +51,141 @@ class BuyerRequestCreate(BaseModel):
         return v
 
 class OfferCreate(BaseModel):
-    price: float
+    price: float # Total Price
+    items: Optional[List[RequestItem]] = None # Detailed quotation
+    images: List[str] = [] # URLs
+    moisture_content_percent: Optional[float] = None
+    quotation_file: Optional[str] = None # PDF/Doc URL
     delivery_date: datetime
     notes: Optional[str] = None
-    quantity_offered: Optional[float] = None # Partial offers?
+    quantity_offered: Optional[float] = None
+
+class RFQPaymentRequest(BaseModel):
+    type: str = Field(..., description="'instant' or 'standard'")
+    items: List[RequestItem]
+    estimated_budget: Optional[float] = 0.0
+    
+    @validator('type')
+    def validate_type(cls, v):
+        if v not in ['instant', 'standard']:
+            raise ValueError("Type must be 'instant' or 'standard'")
+        return v
+
+class RequestUpdate(BaseModel):
+    items: Optional[List[RequestItem]] = None
+    region_state: Optional[str] = None
+    location: Optional[str] = None
+    publish_date: Optional[datetime] = None
+    expiry_date: Optional[datetime] = None
+    notes: Optional[str] = None
+    contact_phone: Optional[str] = None
+
+class AcceptOfferRequest(BaseModel):
+    acknowledgment_note: Optional[str] = None
+    acknowledgment_files: List[str] = []
+    confirmed_delivery_date: Optional[datetime] = None
+    payment_terms: Optional[dict] = None
+
+class RequestStatusUpdate(BaseModel):
+    status: str = Field(..., description="'active', 'on_hold', or 'closed'")
 
 # --- Endpoints ---
+
+@router.post("/initialize-payment", response_model=dict)
+async def initialize_rfq_payment(
+    payment_req: RFQPaymentRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Initialize payment for RFQ request.
+    Calculates fees and returns Paystack payment URL.
+    
+    Fee Structure:
+    - Instant: ₦3,000 + 4% of estimated budget
+    - Standard: ₦5,000 (fixed)
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Calculate fees
+    if payment_req.type == 'instant':
+        service_charge = 3000.0
+        agent_fee = payment_req.estimated_budget * 0.04
+        total_amount = service_charge + agent_fee
+    else:  # standard
+        service_charge = 5000.0
+        agent_fee = 0.0
+        total_amount = service_charge
+    
+    # Initialize Paystack transaction
+    from app.services.paystack import initialize_transaction
+    import os
+    
+    try:
+        amount_kobo = int(total_amount * 100)
+        
+        # Prepare metadata
+        metadata = {
+            "request_type": payment_req.type,
+            "user_id": current_user['id'],
+            "service_charge": service_charge,
+            "agent_fee": agent_fee,
+            "estimated_budget": payment_req.estimated_budget,
+            "item_count": len(payment_req.items)
+        }
+        
+        # Get callback URL
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        callback_url = f"{frontend_url}/rfq/payment-callback"
+        
+        result = initialize_transaction(
+            email=current_user.get('email'),
+            amount=amount_kobo,
+            callback_url=callback_url,
+            metadata=metadata
+        )
+        
+        payment_reference = result["data"]["reference"]
+        authorization_url = result["data"]["authorization_url"]
+        
+        # Create pending transaction record
+        db = get_db()
+        transaction = {
+            "user_id": current_user["id"],
+            "email": current_user.get("email"),
+            "type": "debit",
+            "category": "rfq_service_charge",
+            "amount": total_amount,
+            "reference": payment_reference,
+            "description": f"RFQ Service Charge - {payment_req.type.capitalize()} Request",
+            "status": "pending",
+            "metadata": metadata,
+            "created_at": datetime.utcnow()
+        }
+        db.wallet_transactions.insert_one(transaction)
+        
+        logger.info(f"RFQ payment initialized. Type: {payment_req.type}, Amount: ₦{total_amount}, Reference: {payment_reference}, User: {current_user['id']}")
+        
+        return {
+            "message": "Payment initialized successfully",
+            "payment_url": authorization_url,
+            "payment_reference": payment_reference,
+            "amount": total_amount,
+            "service_charge": service_charge,
+            "agent_fee": agent_fee,
+            "breakdown": {
+                "service_charge": service_charge,
+                "agent_fee": agent_fee,
+                "total": total_amount
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"RFQ payment initialization failed. Error: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Payment initialization failed: {str(e)}"
+        )
 
 @router.post("/", response_model=dict)
 async def create_request(
@@ -76,9 +216,18 @@ async def create_request(
         "platform": "pyexpress" if request_data.type == 'instant' else "farm_deals",
         "items": [item.dict() for item in request_data.items],
         "location": request_data.location,
+        "region_country": request_data.region_country,
+        "region_state": request_data.region_state,
         "delivery_days": request_data.delivery_days,
         "delivery_date": request_data.delivery_date,
+        "publish_date": request_data.publish_date or datetime.utcnow(),
+        "expiry_date": request_data.expiry_date,
         "budget": request_data.budget,
+        "currency": request_data.currency,
+        "price_range": {
+            "min": request_data.price_range_min,
+            "max": request_data.price_range_max
+        },
         "notes": request_data.notes,
         "contact_phone": request_data.contact_phone,
         # Payment Info
@@ -114,19 +263,129 @@ async def create_request(
         "type": request_data.type
     }
 
+@router.post("/verify-payment", response_model=dict)
+async def verify_and_create_request(
+    request_data: BuyerRequestCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Verify Paystack payment then create the request atomically.
+    Called by frontend immediately after Paystack popup succeeds.
+    Replaces the separate /requests endpoint for the payment flow.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    db = get_db()
+
+    if not request_data.payment_reference:
+        raise HTTPException(status_code=402, detail="Payment reference is required")
+
+    # 1. Check for duplicate — prevent double-submission if user clicks twice
+    existing = db.requests.find_one({"payment_reference": request_data.payment_reference})
+    if existing:
+        return {
+            "message": "Request already created",
+            "request_id": existing["id"],
+            "type": existing["type"]
+        }
+
+    # 2. Verify payment with Paystack
+    from app.services.paystack import verify_transaction
+    try:
+        result = verify_transaction(request_data.payment_reference)
+    except Exception as e:
+        logger.error(f"Paystack verification failed: {e}")
+        raise HTTPException(status_code=402, detail="Payment verification failed. Please contact support.")
+
+    pay_data = result.get("data", {})
+    if pay_data.get("status") != "success":
+        raise HTTPException(status_code=402, detail="Payment not confirmed. Please complete payment first.")
+
+    # 3. Confirm amount matches expected fee
+    amount_paid_kobo = pay_data.get("amount", 0)
+    amount_paid_naira = amount_paid_kobo / 100.0
+    expected = 5000.0 if request_data.type == "standard" else (3000.0 + (request_data.estimated_budget or 0) * 0.04)
+    if amount_paid_naira < expected - 1:  # 1 naira tolerance for rounding
+        raise HTTPException(
+            status_code=402,
+            detail=f"Insufficient payment. Expected ₦{expected:.0f}, received ₦{amount_paid_naira:.0f}."
+        )
+
+    # 4. Mark wallet transaction as success (idempotent)
+    db.wallet_transactions.update_one(
+        {"reference": request_data.payment_reference, "status": "pending"},
+        {"$set": {"status": "success", "verified_at": datetime.utcnow()}}
+    )
+
+    # 5. Create the request
+    if request_data.type == 'instant' and not request_data.contact_phone:
+        raise HTTPException(status_code=400, detail="Contact phone is required for Instant requests")
+
+    req_id = f"RFQ-{uuid.uuid4().hex[:8].upper()}"
+    new_request = {
+        "id": req_id,
+        "buyer_id": current_user['id'],
+        "buyer_username": current_user['username'],
+        "buyer_type": current_user.get('role'),
+        "type": request_data.type,
+        "platform": "pyexpress" if request_data.type == 'instant' else "farm_deals",
+        "items": [item.dict() for item in request_data.items],
+        "location": request_data.location,
+        "region_country": request_data.region_country,
+        "region_state": request_data.region_state,
+        "delivery_days": request_data.delivery_days,
+        "delivery_date": request_data.delivery_date,
+        "publish_date": request_data.publish_date or datetime.utcnow(),
+        "expiry_date": request_data.expiry_date,
+        "budget": request_data.budget,
+        "currency": request_data.currency,
+        "price_range": {
+            "min": request_data.price_range_min,
+            "max": request_data.price_range_max
+        },
+        "notes": request_data.notes,
+        "contact_phone": request_data.contact_phone,
+        "payment_reference": request_data.payment_reference,
+        "amount_paid": amount_paid_naira,
+        "payment_status": "paid",
+        "validation_data": {
+            "estimated_budget": request_data.estimated_budget,
+            "fee_structure": "Standard 5k" if request_data.type == 'standard' else "3k + 4% Budget"
+        },
+        "agent_fee_held": (request_data.estimated_budget * 0.04) if request_data.type == 'instant' else 0,
+        "status": "active",
+        "offers_count": 0,
+        "created_at": datetime.utcnow()
+    }
+
+    db.requests.insert_one(new_request)
+    logger.info(f"Request {req_id} created after payment verification. Ref: {request_data.payment_reference}")
+
+    return {
+        "message": "Payment verified. Request created successfully!",
+        "request_id": req_id,
+        "type": request_data.type
+    }
+
 @router.get("/")
 async def list_requests(
     type: Optional[str] = None,
     platform: Optional[str] = None,
     location: Optional[str] = None,
+    status: Optional[str] = "active",
     current_user: dict = Depends(get_current_user)
 ):
     """
-    List active requests.
-    Agents/Farmers/Businesses view these to make offers.
+    List requests with filtering.
     """
     db = get_db()
-    query = {"status": "active"}
+    query = {}
+    
+    if status and status != "all":
+        query["status"] = status
+    
+    # Only show published requests
+    query["publish_date"] = {"$lte": datetime.utcnow()}
     
     if type:
         query["type"] = type
@@ -139,6 +398,27 @@ async def list_requests(
     
     for r in requests:
         r['_id'] = str(r['_id'])
+        
+    return requests
+
+@router.get("/mine")
+async def get_my_requests(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get requests created by the current user along with their offers.
+    """
+    db = get_db()
+    
+    requests_cursor = db.requests.find({"buyer_id": current_user['id']}).sort("created_at", -1)
+    requests = list(requests_cursor)
+    
+    for req in requests:
+        req['_id'] = str(req['_id'])
+        offers = list(db.offers.find({"request_id": req['id']}).sort("created_at", -1))
+        for offer in offers:
+            offer['_id'] = str(offer['_id'])
+        req['offers'] = offers
         
     return requests
 
@@ -164,9 +444,16 @@ async def make_offer(
     request = db.requests.find_one({"id": request_id})
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
-        
-    if request['status'] != 'active':
+
+    # Prevent self-bidding
+    if request['buyer_id'] == current_user['id']:
+        raise HTTPException(status_code=400, detail="You cannot bid on your own request")
+
+    if request['status'] not in ['active', 'on_hold']:
         raise HTTPException(status_code=400, detail="Request is no longer active")
+        
+    if request.get('publish_date') and request['publish_date'] > datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Request is not yet published")
 
     offer_id = f"OFF-{uuid.uuid4().hex[:8].upper()}"
     
@@ -177,6 +464,10 @@ async def make_offer(
         "seller_username": current_user['username'],
         "seller_role": role,
         "price": offer_data.price,
+        "items": [i.dict() for i in offer_data.items] if offer_data.items else [],
+        "images": offer_data.images,
+        "moisture_content_percent": offer_data.moisture_content_percent,
+        "quotation_file": offer_data.quotation_file,
         "delivery_date": offer_data.delivery_date,
         "notes": offer_data.notes,
         "status": "pending",
@@ -191,10 +482,11 @@ async def make_offer(
 @router.post("/offers/{offer_id}/accept")
 async def accept_offer(
     offer_id: str,
+    accept_data: AcceptOfferRequest,
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Buyer accepts an offer -> Creates an Order.
+    Buyer accepts an offer -> Sets terms -> Waits for Seller Confirmation.
     """
     db = get_db()
     offer = db.offers.find_one({"id": offer_id})
@@ -209,43 +501,148 @@ async def accept_offer(
         raise HTTPException(status_code=403, detail="Only the request owner can accept offers")
         
     if request['status'] != 'active':
-        # raise HTTPException(status_code=400, detail="Request is already closed")
-        pass # Allow multiple accepts? Usually single accept closes it.
+        pass # Allow multiple accepts negotiation
         
-    # Create Order
-    tracking_id = generate_tracking_id()
-    
-    # Calculate Total
-    # Assuming full fulfillment for MVP
-    total_amount = offer['price'] 
-    
-    order_data = {
-        "order_id": tracking_id,
-        "buyer_id": current_user['id'],
-        "buyer_username": current_user['username'],
-        "seller_id": offer['seller_id'],
-        "seller_username": offer['seller_username'],
-        "seller_role": offer['seller_role'], # Important for commission logic
-        "items": request['items'], # List of items
-        "total_amount": total_amount,
-        "status": "pending", # Awaiting payment
-        "origin_request_id": request['id'],
-        "origin_offer_id": offer['id'],
-        "platform": request['platform'], 
-        "created_at": datetime.utcnow()
-    }
-    
-    db.orders.insert_one(order_data)
-    
-    # Update Request & Offer status
-    db.requests.update_one({"id": request['id']}, {"$set": {"status": "completed"}})
-    db.offers.update_one({"id": offer_id}, {"$set": {"status": "accepted"}})
+    # Update Offer with Terms
+    db.offers.update_one(
+        {"id": offer_id}, 
+        {"$set": {
+            "status": "accepted_by_buyer", # Waiting for seller to confirm
+            "buyer_terms": {
+                "acknowledgment_note": accept_data.acknowledgment_note,
+                "acknowledgment_files": accept_data.acknowledgment_files,
+                "confirmed_delivery_date": accept_data.confirmed_delivery_date,
+                "payment_terms": accept_data.payment_terms
+            },
+            "terms_sent_at": datetime.utcnow()
+        }}
+    )
     
     return {
-        "message": "Offer accepted. Order created.",
-        "order_id": tracking_id,
-        "tracking_id": tracking_id
+        "message": "Offer accepted and terms sent. Waiting for seller confirmation.",
+        "offer_id": offer_id,
+        "status": "accepted_by_buyer"
     }
+
+@router.post("/offers/{offer_id}/confirm-terms")
+async def confirm_offer_terms(
+    offer_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Seller/Agent confirms the buyer's terms → creates an Order.
+    Status: accepted_by_buyer → accepted (Order created).
+    """
+    db = get_db()
+    offer = db.offers.find_one({"id": offer_id})
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+
+    if offer["seller_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the offer owner can confirm terms")
+
+    if offer.get("status") != "accepted_by_buyer":
+        raise HTTPException(status_code=400, detail="Offer is not awaiting your confirmation")
+
+    # Create Order from offer
+    tracking_id = generate_tracking_id()
+    terms = offer.get("buyer_terms", {})
+
+    order_data = {
+        "order_id": tracking_id,
+        "buyer_id": db.requests.find_one({"id": offer["request_id"]}, {"buyer_id": 1}).get("buyer_id"),
+        "seller_id": current_user["id"],
+        "seller_username": current_user["username"],
+        "seller_role": offer.get("seller_role"),
+        "origin_request_id": offer["request_id"],
+        "origin_offer_id": offer_id,
+        "items": offer.get("items", []),
+        "total_amount": offer["price"],
+        "delivery_date": terms.get("confirmed_delivery_date"),
+        "payment_terms": terms.get("payment_terms"),
+        "acknowledgment_note": terms.get("acknowledgment_note"),
+        "acknowledgment_files": terms.get("acknowledgment_files", []),
+        "platform": "farm_deals",
+        "is_rfq_order": True, # Tag to indicate this is a non-escrow standard request order
+        "status": "confirmed",
+        "created_at": datetime.utcnow()
+    }
+
+    db.orders.insert_one(order_data)
+
+    # Update offer status
+    db.offers.update_one(
+        {"id": offer_id},
+        {"$set": {"status": "accepted", "order_id": tracking_id, "terms_confirmed_at": datetime.utcnow()}}
+    )
+
+    return {
+        "message": "Terms confirmed! Order created.",
+        "offer_id": offer_id,
+        "order_id": tracking_id,
+        "status": "accepted"
+    }
+
+@router.post("/offers/{offer_id}/reject-terms")
+async def reject_offer_terms(
+    offer_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Seller/Agent rejects the buyer's terms → offer goes back to pending.
+    Buyer can re-negotiate or choose another bid.
+    """
+    db = get_db()
+    offer = db.offers.find_one({"id": offer_id})
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+
+    if offer["seller_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the offer owner can reject terms")
+
+    if offer.get("status") != "accepted_by_buyer":
+        raise HTTPException(status_code=400, detail="Offer is not awaiting your confirmation")
+
+    db.offers.update_one(
+        {"id": offer_id},
+        {"$set": {"status": "terms_rejected", "terms_rejected_at": datetime.utcnow()}}
+    )
+
+    return {
+        "message": "Terms rejected. The buyer has been notified.",
+        "offer_id": offer_id,
+        "status": "terms_rejected"
+    }
+
+@router.post("/offers/{offer_id}/reject")
+async def reject_offer(
+    offer_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Buyer rejects an offer outright (before accepting terms).
+    """
+    db = get_db()
+    offer = db.offers.find_one({"id": offer_id})
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+
+    request = db.requests.find_one({"id": offer["request_id"]})
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    if request["buyer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the request owner can reject offers")
+
+    if offer.get("status") not in ["pending", "terms_rejected"]:
+        raise HTTPException(status_code=400, detail="Offer cannot be rejected at this stage")
+
+    db.offers.update_one(
+        {"id": offer_id},
+        {"$set": {"status": "rejected", "rejected_at": datetime.utcnow()}}
+    )
+
+    return {"message": "Offer rejected.", "offer_id": offer_id, "status": "rejected"}
 
 @router.post("/offers/{offer_id}/delivered")
 async def mark_offer_delivered(
@@ -305,6 +702,11 @@ async def list_my_offers(current_user: dict = Depends(get_current_user)):
             "status": offer['status'],
             "delivery_date": offer['delivery_date'],
             "quantity_offered": offer.get('quantity_offered'),
+            "notes": offer.get('notes'),
+            "images": offer.get('images', []),
+            "items": offer.get('items', []),
+            "moisture_content_percent": offer.get('moisture_content_percent'),
+            "buyer_terms": offer.get('buyer_terms'),  # Needed for agent terms modal
             "created_at": offer['created_at']
         }
         
@@ -318,26 +720,12 @@ async def list_my_offers(current_user: dict = Depends(get_current_user)):
             order = db.orders.find_one({"origin_offer_id": offer['id']})
             if order:
                 offer_data['tracking_id'] = order['order_id']
-                # Security: Only show delivery_otp (last 8 chars) or full tracking ID?
-                # Requirement: "Agent to indicate delivered, buyer inputs last 8 chars".
-                # So Agent needs full Tracking ID to give to buyer? Or Buyer has it?
-                # Usually: Agent delivers, Buyer checks item. 
-                # Buyer needs to input a code. If code is from Tracking ID, Agent shouldn't need to give it if Buyer already has Order info.
-                # BUT, if Buyer created Request, they might NOT have Tracking ID until Order is created.
-                # When Agent marks delivered, Agent tells Buyer "Here is your package".
-                # Buyer checks package.
-                # CONFUSION: "Buyer inputs last 8 characters of tracking ID".
-                # Does Buyer have Tracking ID? Yes, usually in "My Orders".
-                # Does Agent have it? Yes.
-                # If checking physicality, maybe Agent GIVES the code?
-                # "modify confirm_delivery_otp endpoint to allow the buyer (not the seller) to confirm receipt by inputting the last 8 characters of the tracking ID."
-                # This implies Buyer KNOWS the tracking ID or matches what is on the package label.
-                # Let's send tracking_id to Agent so they can write it on package or verify.
                 offer_data['delivery_otp'] = order['order_id'] 
 
         results.append(offer_data)
         
     return results
+
 
 @router.post("/offers/{offer_id}/confirm-delivery")
 async def confirm_delivery(
@@ -390,7 +778,11 @@ async def confirm_delivery(
         {"$set": {"status": "completed"}}
     )
     
-    # 5. Trigger Payout
+    # 5. Check if it's a non-escrow RFQ Order
+    if order.get("is_rfq_order"):
+        return {"message": "Delivery confirmed! As a standard RFQ order, please ensure direct payment is settled as per your negotiated terms."}
+    
+    # 6. Trigger Payout for Escrow Orders
     from app.services.payout_service import process_order_payout
     success, msg = await process_order_payout(tracking_id, db)
     
@@ -428,8 +820,12 @@ async def take_instant_request(
     if req['type'] != 'instant':
         raise HTTPException(status_code=400, detail="This endpoint is for Instant requests only")
         
-    if req['status'] != 'active':
+    if req['status'] not in ['active', 'on_hold']:
         raise HTTPException(status_code=400, detail="Request is no longer active")
+        
+    # Check if publish_date has passed
+    if req.get('publish_date') and req['publish_date'] > datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Request is not yet published")
         
     # 3. Create Order Directly
     tracking_id = generate_tracking_id()
@@ -477,7 +873,6 @@ async def take_instant_request(
     }
     db.offers.insert_one(offer)
     
-    # Link Order to this fake offer
     db.orders.update_one({"order_id": tracking_id}, {"$set": {"origin_offer_id": offer_id}})
 
     return {
@@ -485,3 +880,87 @@ async def take_instant_request(
         "tracking_id": tracking_id,
         "order_id": tracking_id
     }
+
+@router.put("/{request_id}/status")
+async def update_request_status(
+    request_id: str,
+    status_update: RequestStatusUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Update request status to allow pausing (on_hold) or closing (closed).
+    """
+    db = get_db()
+    req = db.requests.find_one({"id": request_id})
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+        
+    if req["buyer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the request creator can change its status")
+        
+    current_status = req.get("status", "active")
+    new_status = status_update.status
+    
+    if current_status == "closed":
+        raise HTTPException(status_code=400, detail="Cannot modify a closed request")
+        
+    if new_status not in ["active", "on_hold", "closed"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+        
+    if current_status == new_status:
+        return {"message": f"Request is already {new_status}"}
+
+    update_data = {"status": new_status, "updated_at": datetime.utcnow()}
+    
+    # Handle Timer Logic
+    now = datetime.utcnow()
+    expiry = req.get("expiry_date")
+
+    if new_status == "on_hold" and current_status == "active" and expiry:
+        # Calculate remaining seconds
+        remaining = (expiry - now).total_seconds()
+        update_data["hold_duration_seconds"] = max(0, remaining)
+        
+    elif new_status == "active" and current_status == "on_hold":
+        # Resume timer
+        hold_seconds = req.get("hold_duration_seconds", 0)
+        import datetime as dt
+        new_expiry = now + dt.timedelta(seconds=hold_seconds)
+        update_data["expiry_date"] = new_expiry
+        update_data["hold_duration_seconds"] = None
+
+    db.requests.update_one({"id": request_id}, {"$set": update_data})
+    
+    return {"message": f"Request status updated to {new_status}", "status": new_status}
+
+@router.put("/{request_id}")
+async def update_request(
+    request_id: str,
+    update_data: RequestUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Edit a request. Only allowed if status is active or on_hold.
+    """
+    db = get_db()
+    req = db.requests.find_one({"id": request_id})
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+        
+    if req["buyer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the creator can edit this request")
+        
+    if req["status"] not in ["active", "on_hold"]:
+        raise HTTPException(status_code=400, detail="Only active or on hold requests can be edited")
+        
+    updates = {k: v for k, v in update_data.dict(exclude_none=True).items()}
+    if not updates:
+        return {"message": "No changes provided"}
+        
+    if "items" in updates:
+        updates["items"] = [item.dict() for item in update_data.items]
+        
+    updates["updated_at"] = datetime.utcnow()
+    
+    db.requests.update_one({"id": request_id}, {"$set": updates})
+    return {"message": "Request updated successfully"}

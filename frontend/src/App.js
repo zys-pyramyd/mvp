@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import DealBoard from './components/rfq/DealBoard';
 import RequestWizard from './components/rfq/RequestWizard';
 import RequestFeed from './components/rfq/RequestFeed';
@@ -8,7 +9,17 @@ import WalletModal from './components/wallet/WalletModal';
 import CommunitySearch from './components/community/CommunitySearch';
 import MyCommunities from './components/community/MyCommunities';
 import CommunityFeed from './components/community/CommunityFeed';
+import RecommendedCommunities from './components/community/RecommendedCommunities';
+import GlobalFeed from './components/community/GlobalFeed';
+import TrendingProducts from './components/community/TrendingProducts';
 import AdminDashboard from './components/admin/AdminDashboard';
+import RegistrationModal from './components/Registration/RegistrationModal';
+import DVAPromptModal from './components/profile/DVAPromptModal';
+import MyOrdersModal from './components/profile/MyOrdersModal';
+import MyRequests from './components/rfq/MyRequests';
+import PersonalDashboard from './components/Dashboard/PersonalDashboard';
+import SellerDashboard from './SellerDashboard';
+import AgentDeliveryDashboard from './AgentDeliveryDashboard';
 import './App.css';
 
 // Helper function to map backend order statuses to user-friendly display labels
@@ -78,47 +89,12 @@ const RequestsIcon = () => (
   </svg>
 );
 
-const PreOrderTimer = ({ deadline }) => {
-  const [timeLeft, setTimeLeft] = useState(null);
-
-  useEffect(() => {
-    if (!deadline) return;
-    const calculateTimeLeft = () => {
-      const difference = +new Date(deadline) - +new Date();
-      let timeLeft = {};
-
-      if (difference > 0) {
-        timeLeft = {
-          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-          minutes: Math.floor((difference / 1000 / 60) % 60),
-          seconds: Math.floor((difference / 1000) % 60)
-        };
-      }
-      return timeLeft;
-    };
-
-    setTimeLeft(calculateTimeLeft());
-    const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft());
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [deadline]);
-
-  if (!timeLeft || Object.keys(timeLeft).length === 0) {
-    return <span className="text-red-500 font-bold">Ended</span>;
-  }
-
-  return (
-    <div className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-bold flex items-center space-x-2">
-      <span>⏱️ Ends in:</span>
-      <span>
-        {timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s
-      </span>
-    </div>
-  );
-};
+const OffersIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 function App() {
   const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
@@ -141,10 +117,26 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state && location.state.openProduct) {
+      // Use a timeout to ensure all state is initialized before opening the modal
+      setTimeout(() => openProductDetail(location.state.openProduct), 100);
+
+      // Clean up the route state so it doesn't re-trigger on refresh
+      window.history.replaceState({}, document.title)
+    }
+  }, [location.state]);
+
   // RFQ / Request Wizard State
   const [showRequestWizard, setShowRequestWizard] = useState(false);
-  const [wizardType, setWizardType] = useState('instant'); // 'instant' or 'standard'
+  const [wizardType, setWizardType] = useState('standard'); // 'instant' or 'standard'
   const [activeMobileTab, setActiveMobileTab] = useState('marketplace'); // 'marketplace' | 'requests'
+  const [myRequests, setMyRequests] = useState([]);
+  const [pendingOffersCount, setPendingOffersCount] = useState(0);
+  const [myOffers, setMyOffers] = useState([]);
+  const [showMyRequestsPage, setShowMyRequestsPage] = useState(false);
 
   // Handle /pyadmin route
   useEffect(() => {
@@ -175,8 +167,11 @@ function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
   const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [showMyOrders, setShowMyOrders] = useState(false);
   const [showOrderTracking, setShowOrderTracking] = useState(false);
   const [orders, setOrders] = useState([]);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [confirmOrderId, setConfirmOrderId] = useState(null);
   const [deliveryCodeInput, setDeliveryCodeInput] = useState('');
   const [confirmingDelivery, setConfirmingDelivery] = useState(false);
@@ -236,6 +231,7 @@ function App() {
   const [showBusinessProfile, setShowBusinessProfile] = useState(false);
   const [showKYCPrompt, setShowKYCPrompt] = useState(false);
   const [kycStatus, setKycStatus] = useState(null);
+  const [showDVAPrompt, setShowDVAPrompt] = useState(false);
 
   // Communities state
   const [communities, setCommunities] = useState([]);
@@ -300,6 +296,17 @@ function App() {
 
   // Location and filtering state
   const [locationFilter, setLocationFilter] = useState('');
+
+  // Global handler for Request Wizard
+  useEffect(() => {
+    window.openRequestWizard = () => {
+      setWizardType('standard');
+      setShowRequestWizard(true);
+    };
+    return () => {
+      delete window.openRequestWizard;
+    };
+  }, []);
 
   // Enhanced Farm Deals state
   const [bulkListings, setBulkListings] = useState([]);
@@ -615,6 +622,19 @@ function App() {
       fetchWalletSummary();
       fetchKYCStatus();
       fetchUserCommunities();
+      fetchOrders();
+      fetchUnreadMessagesCount();
+
+      const statusInterval = setInterval(() => {
+        fetchOrders();
+        fetchUnreadMessagesCount();
+      }, 30000);
+
+      // Check for missing DVA (Partner only)
+      if (['farmer', 'agent', 'business', 'aggregator', 'processor'].includes(user.role) && !user.dva_account_number) {
+        setShowDVAPrompt(true);
+      }
+      return () => clearInterval(statusInterval);
     }
   }, [user]);
 
@@ -625,6 +645,52 @@ function App() {
     fetchCommunities();
     fetchFeaturedCommunityProducts();
   }, []);
+
+  const fetchMyRequests = async () => {
+    try {
+      // 1. Fetch user's own requests (they act as a buyer)
+      const requestsResponse = await fetch(`${API_BASE_URL}/api/requests/mine`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+
+      // 2. Fetch user's own bids (they act as a seller)
+      const offersResponse = await fetch(`${API_BASE_URL}/api/requests/offers/mine`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+
+      let count = 0;
+      let reqs = [];
+      let offers = [];
+
+      if (requestsResponse.ok) {
+        reqs = await requestsResponse.json();
+        setMyRequests(reqs);
+        reqs.forEach(r => {
+          if (r.offers) count += r.offers.filter(o => o.status === 'pending').length;
+        });
+      }
+
+      if (offersResponse.ok) {
+        offers = await offersResponse.json();
+        setMyOffers(offers);
+        // Add accepted bids to the notification count
+        count += offers.filter(o => o.status === 'accepted_by_buyer').length;
+      }
+
+      setPendingOffersCount(count);
+
+    } catch (error) {
+      console.error("Failed to fetch my requests or offers", error);
+    }
+  };
+
+  useEffect(() => {
+    if (user && ['business', 'personal', 'farmer', 'agent'].includes(user.role)) {
+      fetchMyRequests();
+      const interval = setInterval(fetchMyRequests, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
   // PWA: Online/Offline detection and Service Worker communication
   useEffect(() => {
@@ -826,15 +892,59 @@ function App() {
           allProducts = data;
         }
 
+        if (allProducts.length === 0) {
+          allProducts = getMockProducts();
+        }
+
         setProducts(allProducts);
       } else {
         console.error('Failed to fetch products');
-        setProducts([]); // Set empty array on error
+        setProducts(getMockProducts()); // Fallback to mock on error
       }
     } catch (error) {
       console.error('Error fetching products:', error);
-      setProducts([]); // Set empty array on error
+      setProducts(getMockProducts()); // Fallback to mock on error
     }
+  };
+
+  const getMockProducts = () => {
+    return [
+      {
+        id: 'mock-1',
+        _id: 'mock-1',
+        product_name: 'Mock Testing Product 1',
+        crop_type: 'Mock Testing Product 1',
+        description: 'This is a mocked product to test the Buy Now cart flow.',
+        price_per_unit: 5000,
+        unit: 'kg',
+        unit_of_measure: 'kg',
+        unit_specification: 'Bag',
+        quantity: 200,
+        available_stock: 200,
+        location: 'Mock Location',
+        farm_name: 'Mock Farm',
+        seller_type: 'farmer',
+        type: 'product',
+        images: []
+      },
+      {
+        id: 'mock-2',
+        _id: 'mock-2',
+        product_name: 'Mock Preorder Product',
+        crop_type: 'Mock Preorder Product',
+        description: 'This is a mocked preorder product to test the checkout flow.',
+        price_per_unit: 10000,
+        unit: 'ton',
+        unit_of_measure: 'ton',
+        quantity: 50,
+        available_stock: 50,
+        location: 'Mock Location',
+        farm_name: 'Mock Farm',
+        seller_type: 'business',
+        type: 'preorder',
+        images: []
+      }
+    ];
   };
 
   const fetchCategories = async () => {
@@ -1411,7 +1521,7 @@ function App() {
         const data = await response.json();
         // Update user object with new profile picture
         setUser({ ...user, profile_picture: data.profile_picture });
-        alert('Profile picture updated successfully! ✅');
+        alert('Profile picture updated successfully! ?');
         setShowProfilePictureUpload(false);
         return true;
       } else {
@@ -1443,7 +1553,7 @@ function App() {
 
       if (response.ok) {
         setUser({ ...user, profile_picture: null });
-        alert('Profile picture removed successfully! ✅');
+        alert('Profile picture removed successfully! ?');
         return true;
       }
     } catch (error) {
@@ -2300,7 +2410,7 @@ function App() {
         Request ID: ${result.request_id}
         Total destinations: ${result.total_destinations}
         Quantity: ${result.total_quantity} ${result.quantity_unit}
-        Estimated price: ₦${result.estimated_price}
+        Estimated price: ?${result.estimated_price}
         OTP: ${result.delivery_otp}`);
 
         setShowCreateDeliveryRequest(false);
@@ -2606,8 +2716,8 @@ function App() {
       // Calculate delivery fees based on method
       if (item.delivery_method === 'platform') {
         // Platform delivery fee calculation
-        const baseDeliveryFee = 500; // Base fee of ₦500
-        const weightMultiplier = (item.product.weight_kg || 1) * 50; // ₦50 per kg
+        const baseDeliveryFee = 500; // Base fee of ?500
+        const weightMultiplier = (item.product.weight_kg || 1) * 50; // ?50 per kg
         deliveryTotal += baseDeliveryFee + weightMultiplier;
       } else if (item.delivery_method === 'offline') {
         // Offline delivery - minimal handling fee
@@ -2776,16 +2886,16 @@ function App() {
 
             // Enhanced error handling for agents
             if (kycError.error === 'AGENT_KYC_REQUIRED') {
-              alert(`🚨 Agent KYC Required\n\n${kycError.message}\n\nRequired Documents:\n${kycError.required_actions.documents.join('\n• ')}\n\n⏱️ ${kycError.verification_time}\n\n👀 Current Access: ${kycError.access_level.replace('_', ' ')}\n\nPlease complete your KYC verification in your profile settings.`);
+              alert(` Agent KYC Required\n\n${kycError.message}\n\nRequired Documents:\n${kycError.required_actions.documents.join('\n ')}\n\n ${kycError.verification_time}\n\n Current Access: ${kycError.access_level.replace('_', ' ')}\n\nPlease complete your KYC verification in your profile settings.`);
               return;
             } else if (kycError.error === 'AGENT_KYC_PENDING') {
-              alert(`⏳ Agent KYC Under Review\n\n${kycError.message}\n\n⏱️ ${kycError.verification_time}\n\n👀 Current Access: ${kycError.access_level.replace('_', ' ')}\n\nYou can view the platform but cannot perform transactions until verified.`);
+              alert(`? Agent KYC Under Review\n\n${kycError.message}\n\n ${kycError.verification_time}\n\n Current Access: ${kycError.access_level.replace('_', ' ')}\n\nYou can view the platform but cannot perform transactions until verified.`);
               return;
             } else if (kycError.error === 'AGENT_KYC_REJECTED') {
-              alert(`❌ Agent KYC Rejected\n\n${kycError.message}\n\nRequired Documents:\n${kycError.required_actions.documents.join('\n• ')}\n\n👀 Current Access: ${kycError.access_level.replace('_', ' ')}\n\nPlease resubmit with correct documents.`);
+              alert(`? Agent KYC Rejected\n\n${kycError.message}\n\nRequired Documents:\n${kycError.required_actions.documents.join('\n ')}\n\n Current Access: ${kycError.access_level.replace('_', ' ')}\n\nPlease resubmit with correct documents.`);
               return;
             } else if (kycError.error === 'KYC_REQUIRED') {
-              alert(`KYC Verification Required\n\n${kycError.message}\n\nRequired Documents:\n${kycError.required_actions.documents.join('\n• ')}\n\nStatus: ${kycError.kyc_status}\n\nPlease complete your KYC verification in your profile settings to continue.`);
+              alert(`KYC Verification Required\n\n${kycError.message}\n\nRequired Documents:\n${kycError.required_actions.documents.join('\n ')}\n\nStatus: ${kycError.kyc_status}\n\nPlease complete your KYC verification in your profile settings to continue.`);
               return;
             }
           }
@@ -2803,15 +2913,15 @@ function App() {
 
       let successMessage = `Orders created successfully! 
       Total orders: ${orders.length}
-      Total amount: ₦${totalAmount.toLocaleString()}
+      Total amount: ?${totalAmount.toLocaleString()}
       Order IDs: ${orders.map(o => o.order_id).join(', ')}`;
 
       // Add delivery cost breakdown if applicable
       const totalDeliveryCost = orders.reduce((sum, order) => sum + (order.cost_breakdown?.delivery_cost || 0), 0);
       if (totalDeliveryCost > 0) {
         successMessage += `\n\nCost Breakdown:
-        Product Total: ₦${(totalAmount - totalDeliveryCost).toLocaleString()}
-        Delivery Cost: ₦${totalDeliveryCost.toLocaleString()}`;
+        Product Total: ?${(totalAmount - totalDeliveryCost).toLocaleString()}
+        Delivery Cost: ?${totalDeliveryCost.toLocaleString()}`;
       }
       // Add drop-off location info if applicable
       const dropoffOrders = orders.filter(o => o.delivery_info?.method === 'dropoff');
@@ -2820,7 +2930,7 @@ function App() {
         dropoffOrders.forEach(order => {
           if (order.delivery_info?.dropoff_location) {
             const loc = order.delivery_info.dropoff_location;
-            successMessage += `\n• ${loc.name} - ${loc.city}, ${loc.state}`;
+            successMessage += `\n ${loc.name} - ${loc.city}, ${loc.state}`;
           }
         });
       }
@@ -2926,11 +3036,11 @@ function App() {
         const breakdown = result.breakdown;
         const confirmPayment = window.confirm(
           `Payment Breakdown:\n\n` +
-          `Product Total: ₦${breakdown.product_total.toLocaleString()}\n` +
-          `Delivery Fee (${breakdown.delivery_state}): ₦${breakdown.delivery_fee.toLocaleString()}\n` +
-          `Platform Charges: ₦${breakdown.platform_cut.toLocaleString()}\n` +
-          (breakdown.agent_commission > 0 ? `Your Commission (${breakdown.agent_tier || ''}): ₦${breakdown.agent_commission.toLocaleString()}\n` : '') +
-          `\nTotal Amount: ₦${result.amount.toLocaleString()}\n\n` +
+          `Product Total: ?${breakdown.product_total.toLocaleString()}\n` +
+          `Delivery Fee (${breakdown.delivery_state}): ?${breakdown.delivery_fee.toLocaleString()}\n` +
+          `Platform Charges: ?${breakdown.platform_cut.toLocaleString()}\n` +
+          (breakdown.agent_commission > 0 ? `Your Commission (${breakdown.agent_tier || ''}): ?${breakdown.agent_commission.toLocaleString()}\n` : '') +
+          `\nTotal Amount: ?${result.amount.toLocaleString()}\n\n` +
           `Proceed to payment gateway?`
         );
 
@@ -2978,10 +3088,10 @@ function App() {
           setCart([]);
           setShowCheckout(false);
 
-          alert(`Payment Successful! ✅\n\nReference: ${reference}\n\nYour order has been confirmed and will be processed shortly.`);
+          alert(`Payment Successful! ?\n\nReference: ${reference}\n\nYour order has been confirmed and will be processed shortly.`);
         } else {
           setPaymentStatus('failed');
-          alert(`Payment Failed ❌\n\n${result.message || 'Payment could not be completed'}`);
+          alert(`Payment Failed ?\n\n${result.message || 'Payment could not be completed'}`);
         }
       } else {
         throw new Error('Failed to verify payment');
@@ -3040,9 +3150,26 @@ function App() {
       if (response.ok) {
         const data = await response.json();
         setOrders(data);
+        const pending = data.filter(o => o.status && o.status !== 'delivered' && o.status !== 'cancelled').length;
+        setPendingOrdersCount(pending);
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
+    }
+  };
+
+  const fetchUnreadMessagesCount = async () => {
+    if (!user) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/messages/unread-count`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadMessagesCount(data.unread_count);
+      }
+    } catch (error) {
+      console.error('Error fetching unread messages:', error);
     }
   };
 
@@ -3250,23 +3377,8 @@ function App() {
 
   // CTA Handlers for slides
   const handleSlideAction = (action) => {
-    if (action === 'agent_register') {
-      setSelectedUserPath('partner');
-      setPartnerType('agent');
-      setRegistrationStep('basic');
-      setAuthMode('register');
-      setShowAuthModal(true);
-    } else if (action === 'supplier_register') {
-      setSelectedUserPath('partner');
-      setPartnerType('business');
-      setBusinessCategory('supplier');
-      setRegistrationStep('basic');
-      setAuthMode('register');
-      setShowAuthModal(true);
-    } else if (action === 'business_register') {
-      setSelectedUserPath('buyer');
-      setSelectedBuyerType('hotel'); // Default to hotel, user can change
-      setRegistrationStep('basic');
+    // Simply open the auth modal in register mode for all actions
+    if (['agent_register', 'supplier_register', 'business_register'].includes(action)) {
       setAuthMode('register');
       setShowAuthModal(true);
     }
@@ -3312,7 +3424,7 @@ function App() {
                 onClick={() => setShowCreateCommunity(false)}
                 className="text-gray-400 hover:text-gray-600"
               >
-                ✕
+                ?
               </button>
             </div>
 
@@ -3446,7 +3558,7 @@ function App() {
                 }}
                 className="text-gray-400 hover:text-gray-600 text-xl sm:text-2xl p-1"
               >
-                ✕
+                ?
               </button>
             </div>
 
@@ -3478,7 +3590,7 @@ function App() {
                     onClick={() => setCommunitySearchTerm('')}
                     className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                   >
-                    ✕
+                    ?
                   </button>
                 )}
               </div>
@@ -3598,7 +3710,7 @@ function App() {
                 onClick={() => setShowProfilePictureUpload(false)}
                 className="text-gray-400 hover:text-gray-600 text-2xl"
               >
-                ✕
+                ?
               </button>
             </div>
 
@@ -3670,7 +3782,7 @@ function App() {
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-xs text-blue-800">
-                  <strong>🔒 Transparency:</strong> Your profile picture will appear on all products you post, helping buyers know who they're purchasing from.
+                  <strong> Transparency:</strong> Your profile picture will appear on all products you post, helping buyers know who they're purchasing from.
                 </p>
               </div>
             </div>
@@ -3708,7 +3820,7 @@ function App() {
                   <p className="text-sm text-gray-600">{communityDetails.category}</p>
                   <div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
                     <span>{communityDetails.member_count || 0} members</span>
-                    {communityDetails.location && <span>📍 {communityDetails.location}</span>}
+                    {communityDetails.location && <span> {communityDetails.location}</span>}
                   </div>
                 </div>
               </div>
@@ -3717,7 +3829,7 @@ function App() {
                 onClick={() => setShowCommunityDetails(false)}
                 className="text-gray-400 hover:text-gray-600 text-2xl"
               >
-                ✕
+                ?
               </button>
             </div>
 
@@ -3755,10 +3867,10 @@ function App() {
                       <h4 className="font-semibold text-gray-900 mb-2">{product.title}</h4>
                       <p className="text-sm text-gray-600 mb-2 line-clamp-2">{product.description}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-lg font-bold text-emerald-600">₦{product.price}</span>
+                        <span className="text-lg font-bold text-emerald-600">?{product.price}</span>
                         <div className="flex items-center gap-2 text-sm text-gray-500">
-                          <span>❤️ {product.likes_count || 0}</span>
-                          <span>💬 {product.comments_count || 0}</span>
+                          <span> {product.likes_count || 0}</span>
+                          <span> {product.comments_count || 0}</span>
                         </div>
                       </div>
                     </div>
@@ -3806,7 +3918,7 @@ function App() {
                 onClick={() => setShowSellerDetails(false)}
                 className="text-gray-400 hover:text-gray-600 text-2xl"
               >
-                ✕
+                ?
               </button>
             </div>
 
@@ -3836,10 +3948,10 @@ function App() {
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <span className="text-sm text-gray-600">Type</span>
                 <span className="text-sm font-medium text-gray-900 capitalize">
-                  {sellerDetails.role === 'farmer' && '👨‍🌾 Farmer'}
-                  {sellerDetails.role === 'agent' && '🤝 Agent'}
-                  {sellerDetails.role === 'business' && '🏢 Business'}
-                  {sellerDetails.role === 'supplier' && '📦 Supplier'}
+                  {sellerDetails.role === 'farmer' && '? Farmer'}
+                  {sellerDetails.role === 'agent' && ' Agent'}
+                  {sellerDetails.role === 'business' && ' Business'}
+                  {sellerDetails.role === 'supplier' && ' Supplier'}
                   {!['farmer', 'agent', 'business', 'supplier'].includes(sellerDetails.role) && sellerDetails.role}
                 </span>
               </div>
@@ -3883,7 +3995,7 @@ function App() {
                           : 'text-gray-300'
                           }`}
                       >
-                        ⭐
+                        ?
                       </span>
                     ))}
                   </div>
@@ -3904,12 +4016,12 @@ function App() {
                 <div className="flex items-center gap-2">
                   {sellerDetails.is_verified && (
                     <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                      ✓ Verified
+                      ? Verified
                     </span>
                   )}
                   {sellerDetails.kyc_status === 'approved' && (
                     <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
-                      ✓ KYC Approved
+                      ? KYC Approved
                     </span>
                   )}
                 </div>
@@ -3919,7 +4031,7 @@ function App() {
             {/* Transparency Notice */}
             <div className="mt-6 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
               <p className="text-xs text-emerald-800">
-                <strong>🔒 Transparency:</strong> All seller information is verified through Pyramyd's KYC process to ensure safe transactions.
+                <strong> Transparency:</strong> All seller information is verified through Pyramyd's KYC process to ensure safe transactions.
               </p>
             </div>
           </div>
@@ -3940,9 +4052,9 @@ function App() {
           } text-white px-4 py-2 text-center text-sm`}>
           <div className="max-w-7xl mx-auto flex items-center justify-center space-x-4">
             <span>
-              {kycStatus.status === 'not_started' && '⚠️ Complete your KYC verification to start receiving payments'}
-              {kycStatus.status === 'pending' && '⏳ Your KYC is under review. You\'ll be able to receive payments once approved'}
-              {kycStatus.status === 'rejected' && '❌ Your KYC was rejected. Please resubmit with correct documents'}
+              {kycStatus.status === 'not_started' && ' Complete your KYC verification to start receiving payments'}
+              {kycStatus.status === 'pending' && '? Your KYC is under review. You\'ll be able to receive payments once approved'}
+              {kycStatus.status === 'rejected' && '? Your KYC was rejected. Please resubmit with correct documents'}
             </span>
             {kycStatus.status !== 'pending' && (
               <button
@@ -3968,7 +4080,7 @@ function App() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414" />
             </svg>
-            <span>📡 You're offline. Browsing cached content. Posts will sync when online.</span>
+            <span> You're offline. Browsing cached content. Posts will sync when online.</span>
           </div>
         </div>
       )}
@@ -3991,7 +4103,7 @@ function App() {
               onClick={() => setShowInstallPrompt(false)}
               className="text-white hover:text-gray-200 text-lg"
             >
-              ✕
+              ?
             </button>
           </div>
         </div>
@@ -4039,6 +4151,7 @@ function App() {
                       setShowAuthModal(true);
                     } else {
                       setShowMessaging(true);
+                      setUnreadMessagesCount(0); // Optimistic clear
                     }
                   }}
                   className="nav-button icon-button relative p-1.5 md:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 hidden md:flex flex-shrink-0"
@@ -4047,9 +4160,9 @@ function App() {
                   <div className="w-5 h-5">
                     <MessageIcon />
                   </div>
-                  {user && messages.length > 0 && (
+                  {user && unreadMessagesCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-semibold text-[10px] sm:text-xs">
-                      {messages.length}
+                      {unreadMessagesCount}
                     </span>
                   )}
                 </button>
@@ -4064,12 +4177,17 @@ function App() {
                       fetchOrders();
                     }
                   }}
-                  className="nav-button icon-button p-1.5 md:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 hidden md:flex flex-shrink-0"
+                  className="nav-button icon-button relative p-1.5 md:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500 hidden md:flex flex-shrink-0"
                   title="Track Orders / Find Drivers"
                 >
                   <div className="w-5 h-5">
                     <TruckIcon />
                   </div>
+                  {user && pendingOrdersCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-semibold text-[10px] sm:text-xs">
+                      {pendingOrdersCount}
+                    </span>
+                  )}
                 </button>
 
                 {/* Profile Icon with Dropdown - Always Visible (Priority 2) */}
@@ -4088,11 +4206,16 @@ function App() {
                   ) : (
                     <button
                       onClick={() => setShowProfileMenu(!showProfileMenu)}
-                      className="nav-button icon-button flex items-center gap-1 sm:gap-2 p-1 sm:p-1.5 md:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
+                      className="nav-button icon-button relative flex items-center gap-1 sm:gap-2 p-1 sm:p-1.5 md:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
                       title="Profile Menu"
                     >
-                      <div className="w-5 h-5 flex-shrink-0">
+                      <div className="w-5 h-5 flex-shrink-0 relative">
                         <ProfileIcon />
+                        {pendingOffersCount > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] sm:text-[10px] rounded-full h-3 w-3 sm:h-4 sm:w-4 flex items-center justify-center font-bold border-2 border-white">
+                            {pendingOffersCount}
+                          </span>
+                        )}
                       </div>
                       <span className="hidden md:inline text-xs md:text-sm font-medium whitespace-nowrap">
                         {user.first_name}
@@ -4146,6 +4269,21 @@ function App() {
               </button>
 
               <button
+                onClick={() => setShowMyRequestsPage(true)}
+                className={`relative flex flex-col sm:flex-row items-center justify-center px-2 sm:px-4 py-1 sm:py-2 rounded-lg transition-colors min-w-[60px] sm:min-w-0 text-gray-500 hover:text-gray-900 border border-transparent sm:border-b-2 sm:border-transparent hover:border-gray-300`}
+              >
+                <div className="text-gray-400 group-hover:text-gray-600">
+                  <OffersIcon />
+                </div>
+                <span className="text-[10px] sm:text-sm font-medium mt-1 sm:mt-0 sm:ml-2 whitespace-nowrap">Offers</span>
+                {pendingOffersCount > 0 && (
+                  <span className="absolute top-0 right-0 sm:static sm:ml-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center justify-center min-w-[18px]">
+                    {pendingOffersCount}
+                  </span>
+                )}
+              </button>
+
+              <button
                 onClick={() => setCurrentPlatform('communities')}
                 className={`flex flex-col sm:flex-row items-center justify-center px-2 sm:px-4 py-1 sm:py-2 rounded-lg transition-colors min-w-[60px] sm:min-w-0 ${currentPlatform === 'communities'
                   ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100 sm:border-0 sm:shadow-none sm:bg-transparent'
@@ -4186,17 +4324,17 @@ function App() {
                                 ? 'bg-red-100 text-red-800'
                                 : 'bg-gray-100 text-gray-800'
                             }`}>
-                            {kycStatus.status === 'approved' && '✅ KYC Verified'}
-                            {kycStatus.status === 'pending' && '⏳ KYC Pending'}
-                            {kycStatus.status === 'rejected' && '❌ KYC Rejected'}
-                            {kycStatus.status === 'not_started' && '⚠️ KYC Required'}
+                            {kycStatus.status === 'approved' && '? KYC Verified'}
+                            {kycStatus.status === 'pending' && '? KYC Pending'}
+                            {kycStatus.status === 'rejected' && '? KYC Rejected'}
+                            {kycStatus.status === 'not_started' && ' KYC Required'}
                           </div>
 
                           {/* Payment capability indicator */}
                           <div className="text-xs text-gray-500 mt-1">
                             {kycStatus.status === 'approved'
-                              ? '✅ Can receive payments'
-                              : '⚠️ Cannot receive payments'}
+                              ? '? Can receive payments'
+                              : ' Cannot receive payments'}
                           </div>
                         </div>
                       )}
@@ -4205,10 +4343,10 @@ function App() {
                       {user.role === 'personal' && (
                         <div className="mt-2">
                           <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            👤 Personal Account
+                            Personal Account
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
-                            ✅ Can purchase products
+                            ? Can purchase products
                           </div>
                         </div>
                       )}
@@ -4221,7 +4359,7 @@ function App() {
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                     >
-                      👤 My Profile
+                      My Profile
                     </button>
 
                     <button
@@ -4231,7 +4369,7 @@ function App() {
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-50 font-medium"
                     >
-                      🏠 My Dashboard
+                      My Dashboard
                     </button>
 
                     {/* Mobile-only options - show on tablets and smaller */}
@@ -4243,7 +4381,7 @@ function App() {
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                       >
-                        💬 Messages
+                        Messages
                       </button>
                       <button
                         onClick={() => {
@@ -4253,7 +4391,7 @@ function App() {
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                       >
-                        🚛 Order Tracking
+                        Order Tracking
                       </button>
                     </div>
 
@@ -4266,7 +4404,7 @@ function App() {
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-gray-50 font-medium"
                       >
-                        🤝 Become a Partner
+                        Become a Partner
                       </button>
                     )}
 
@@ -4279,7 +4417,7 @@ function App() {
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-50 font-medium"
                       >
-                        📍 Add Drop-off Location
+                        Add Drop-off Location
                       </button>
                     )}
 
@@ -4300,9 +4438,9 @@ function App() {
                             : 'text-blue-600 hover:bg-blue-50 border-blue-400 bg-blue-25'
                           }`}
                       >
-                        {kycStatus.status === 'not_started' && '🔐 Complete KYC (Required)'}
-                        {kycStatus.status === 'pending' && '⏳ KYC Under Review'}
-                        {kycStatus.status === 'rejected' && '❌ Resubmit KYC'}
+                        {kycStatus.status === 'not_started' && ' Complete KYC (Required)'}
+                        {kycStatus.status === 'pending' && '? KYC Under Review'}
+                        {kycStatus.status === 'rejected' && '? Resubmit KYC'}
                       </button>
                     )}
 
@@ -4317,7 +4455,7 @@ function App() {
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-50 font-medium"
                     >
-                      💰 My Wallet
+                      My Wallet
                     </button>
 
                     {/* Gift Cards */}
@@ -4329,7 +4467,7 @@ function App() {
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-pink-600 hover:bg-gray-50 font-medium"
                     >
-                      🎁 Gift Cards
+                      Gift Cards
                     </button>
 
                     {/* Rating & Reviews */}
@@ -4340,7 +4478,7 @@ function App() {
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                     >
-                      ⭐ My Ratings & Reviews
+                      ? My Ratings & Reviews
                     </button>
 
                     {/* Driver Management for logistics businesses */}
@@ -4353,7 +4491,7 @@ function App() {
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-50 font-medium"
                       >
-                        🚗 Manage Drivers
+                        Manage Drivers
                       </button>
                     )}
 
@@ -4366,36 +4504,41 @@ function App() {
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                     >
-                      🔍 Find Drivers
+                      Find Drivers
                     </button>
 
-                    {/* Farmer Dashboard */}
-                    {user.role === 'farmer' && (
-                      <button
-                        onClick={() => {
-                          setShowProfileMenu(false);
+                    {/* Unified Dashboard */}
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        if (user.role === 'admin') {
+                          window.location.href = '/pyadmin';
+                        } else if (['farmer', 'business', 'supplier_food_produce'].includes(user.role)) {
+                          // Let's use a state for seller dashboard. Wait, App.js might need the state var first.
+                          // ACTUALLY, we can reuse showFarmerDashboard to render SellerDashboard.
                           setShowFarmerDashboard(true);
-                          fetchFarmerDashboard();
-                        }}
-                        className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-50 font-medium"
-                      >
-                        🌾 Farmer Dashboard
-                      </button>
-                    )}
-
-                    {/* Agent Dashboard */}
-                    {user.role === 'agent' && (
-                      <button
-                        onClick={() => {
-                          setShowProfileMenu(false);
+                        } else if (['agent', 'purchasing_agent'].includes(user.role)) {
                           setShowAgentDashboard(true);
-                          fetchAgentDashboard();
-                        }}
-                        className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-50 font-medium"
-                      >
-                        🤝 Agent Dashboard
-                      </button>
-                    )}
+                        } else {
+                          setShowPersonalDashboard(true);
+                        }
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-50 font-medium"
+                    >
+                      My Dashboard
+                    </button>
+
+                    {/* Quick Create Request link for everyone */}
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setWizardType('standard');
+                        setShowRequestWizard(true);
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-50 font-medium"
+                    >
+                      Create Request (Bulk Buy)
+                    </button>
 
                     {/* View Requests - For Agents, Farmers, Businesses */}
                     {(user.role === 'agent' || user.role === 'farmer' || user.role === 'business') && (
@@ -4406,9 +4549,25 @@ function App() {
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-gray-50 font-medium"
                       >
-                        🎯 View Buyer Requests
+                        View Buyer Requests
                       </button>
                     )}
+
+                    {/* My Requests & Offers - For users who created requests */}
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setShowMyRequestsPage(true);
+                      }}
+                      className="flex items-center justify-between w-full px-4 py-2 text-sm text-emerald-600 hover:bg-gray-50 font-medium"
+                    >
+                      <span>📦 My Offers / Requests</span>
+                      {pendingOffersCount > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          {pendingOffersCount}
+                        </span>
+                      )}
+                    </button>
 
                     {/* Wallet - For Partners (Farmers, Agents, Businesses) */}
                     {(user.role === 'farmer' || user.role === 'agent' || user.role === 'business') && (
@@ -4419,7 +4578,7 @@ function App() {
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-50 font-medium"
                       >
-                        💰 My Wallet
+                        My Wallet
                       </button>
                     )}
 
@@ -4433,7 +4592,7 @@ function App() {
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-50 font-medium"
                     >
-                      📈 Market Prices
+                      Market Prices
                     </button>
 
                     {/* Driver Portal Access (for drivers) */}
@@ -4445,7 +4604,7 @@ function App() {
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-50 font-medium"
                       >
-                        🚛 Driver Portal
+                        Driver Portal
                       </button>
                     )}
 
@@ -4495,7 +4654,7 @@ function App() {
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-50 font-medium"
                       >
-                        🚛 Driver Portal
+                        Driver Portal
                       </button>
                     )}
 
@@ -4509,7 +4668,7 @@ function App() {
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-50 font-medium"
                       >
-                        📋 Logistics Dashboard
+                        Logistics Dashboard
                       </button>
                     )}
 
@@ -4523,7 +4682,7 @@ function App() {
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-50 font-medium"
                       >
-                        📊 Seller Dashboard
+                        Seller Dashboard
                       </button>
                     )}
 
@@ -4536,7 +4695,7 @@ function App() {
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-gray-50 font-medium"
                       >
-                        🚚 Request Delivery
+                        Request Delivery
                       </button>
                     )}
 
@@ -4583,44 +4742,73 @@ function App() {
           {/* --- COMMUNITIES PLATFORM --- */}
           {
             currentPlatform === 'communities' && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 h-[calc(100vh-140px)]">
-                {/* Left Sidebar: My Communities & Search */}
-                <div className="md:col-span-1 flex flex-col gap-6 overflow-y-auto">
-                  <MyCommunities
-                    onSelect={setSelectedCommunity}
-                    refreshTrigger={refreshCommunities}
-                    onCreate={() => setShowCreateCommunity(true)}
-                  />
+              <div className="flex flex-col gap-6">
+                {/* Community Header Actions - Top Right */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setShowCreateCommunity(true)}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium shadow-sm flex items-center gap-2 transform transition-all hover:scale-105"
+                  >
+                    <span>+ Create Community</span>
+                  </button>
+                </div>
+
+                {/* 70% Width Top Search Bar */}
+                <div className="w-full lg:w-[70%] mx-auto">
                   <CommunitySearch onJoin={handleJoinCommunity} />
                 </div>
 
-                {/* Main Content: Feed or Welcome */}
-                <div className="md:col-span-3 h-full">
-                  {selectedCommunity ? (
-                    <CommunityFeed
-                      community={selectedCommunity}
-                      onBack={() => setSelectedCommunity(null)}
+                {/* 3-Column Layout */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-auto min-h-[calc(100vh-280px)]">
+
+                  {/* Left Column (3/12): Popular Communities & My Groups */}
+                  <div className="md:col-span-3 flex flex-col gap-6">
+                    <RecommendedCommunities
+                      onJoin={handleJoinCommunity}
+                      API_BASE_URL={process.env.REACT_APP_BACKEND_URL}
                     />
-                  ) : (
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full flex flex-col items-center justify-center text-center p-8">
-                      <div className="text-6xl mb-4">👥</div>
-                      <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Pyramyd Communities</h2>
-                      <p className="text-gray-500 max-w-md mb-6">
-                        Connect with farmers, agents, and buyers. Join a community from the sidebar to see updates, share knowledge, and trade.
-                      </p>
-                      <button
-                        onClick={() => setShowCreateCommunity(true)}
-                        className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium shadow-sm transition-colors flex items-center gap-2"
-                      >
-                        <span className="text-xl">+</span>
-                        Create Your Community
-                      </button>
-                    </div>
-                  )}
+                    <MyCommunities
+                      onSelect={setSelectedCommunity}
+                      refreshTrigger={refreshCommunities}
+                    />
+                  </div>
+
+                  {/* Middle Column (6/12): Unified Global Feed or Specific Feed */}
+                  <div className="md:col-span-6 h-full">
+                    {selectedCommunity ? (
+                      <CommunityFeed
+                        community={selectedCommunity}
+                        onBack={() => setSelectedCommunity(null)}
+                        onOpenProduct={openProductDetail}
+                      />
+                    ) : (
+                      <div className="flex flex-col gap-4">
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                          <h2 className="text-xl font-bold text-gray-900 mb-1 flex items-center gap-2">
+                            <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                            General Public Feed
+                          </h2>
+                          <p className="text-gray-500 text-sm">Discover recent activity across all open groups.</p>
+                        </div>
+                        <GlobalFeed
+                          API_BASE_URL={process.env.REACT_APP_BACKEND_URL}
+                          onOpenProduct={openProductDetail}
+                          onJoinCommunity={handleJoinCommunity}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Column (3/12): High Commits (Trending) */}
+                  <div className="md:col-span-3">
+                    <TrendingProducts
+                      API_BASE_URL={process.env.REACT_APP_BACKEND_URL}
+                      onOpenProduct={openProductDetail}
+                    />
+                  </div>
                 </div>
               </div>
-            )
-          }
+            )}
 
           {/* --- HOME / MARKETPLACE PLATFORMS (Existing) --- */}
           {
@@ -4680,7 +4868,7 @@ function App() {
 
                         {/* Price Range */}
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Min Price (₦)</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Min Price (?)</label>
                           <input
                             type="number"
                             placeholder="Min price"
@@ -4691,7 +4879,7 @@ function App() {
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Max Price (₦)</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Max Price (?)</label>
                           <input
                             type="number"
                             placeholder="Max price"
@@ -4761,7 +4949,8 @@ function App() {
                   )}
                 </div>
 
-                {/* Instant Request CTA (PyExpress / Home) */}
+                {/* Instant Request CTA (PyExpress / Home) - DISABLED/COMING SOON */}
+                {/* 
                 {currentPlatform === 'home' && (
                   <>
                     <div className="mt-4 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -4791,19 +4980,19 @@ function App() {
                       </button>
                     </div>
 
-                    {/* Instant Requests Feed */}
                     <div className="mt-8">
                       <RequestFeed type="instant" userRole={user?.role} />
                     </div>
                   </>
-                )}
+                )} 
+                */}
 
                 {/* Standard Request CTA (Farm Deals) */}
                 {currentPlatform === 'buy_from_farm' && (
                   <>
                     <div className="mt-4 bg-gradient-to-r from-green-50 to-amber-50 border border-green-100 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
                       <div className="flex items-start gap-3">
-                        <div className="bg-green-100 p-2 rounded-lg text-2xl">🌾</div>
+                        <div className="bg-green-100 p-2 rounded-lg text-2xl"></div>
                         <div>
                           <h3 className="font-bold text-gray-900">Bulk Farm Request</h3>
                           <p className="text-sm text-gray-600">
@@ -4899,7 +5088,7 @@ function App() {
                 <div className="mb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium text-gray-700">📍 Location:</span>
+                      <span className="text-sm font-medium text-gray-700"> Location:</span>
                       <select
                         value={locationFilter}
                         onChange={(e) => setLocationFilter(e.target.value)}
@@ -4960,7 +5149,7 @@ function App() {
                   <div className="mb-8">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h3 className="text-xl font-bold text-gray-900">🔥 Pre-Order Sales</h3>
+                        <h3 className="text-xl font-bold text-gray-900"> Pre-Order Sales</h3>
                         <p className="text-sm text-gray-600">Secure your products in advance with special pre-order pricing!</p>
                       </div>
                       <button
@@ -4972,7 +5161,7 @@ function App() {
                         }}
                         className="px-3 sm:px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-medium text-xs sm:text-sm"
                       >
-                        See More in Farm Deals →
+                        See More in Farm Deals ?
                       </button>
                     </div>
 
@@ -4995,12 +5184,12 @@ function App() {
                                 />
                               ) : (
                                 <div className="w-full h-32 sm:h-40 bg-gradient-to-r from-orange-200 to-orange-300 flex items-center justify-center rounded-t-lg">
-                                  <span className="text-orange-600 font-medium text-sm sm:text-base">🌾 Pre-Order Product</span>
+                                  <span className="text-orange-600 font-medium text-sm sm:text-base"> Pre-Order Product</span>
                                 </div>
                               )}
 
                               <div className="absolute top-2 left-2 bg-orange-500 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-bold flex items-center">
-                                ⚡ PRE-ORDER
+                                ? PRE-ORDER
                               </div>
 
                               {/* Pre-order percentage badge */}
@@ -5020,7 +5209,7 @@ function App() {
                               {/* Enhanced Pricing for Pre-orders */}
                               <div className="flex items-center space-x-2 mb-2">
                                 <span className="text-base sm:text-lg font-bold text-orange-600">
-                                  ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
+                                  ?{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
                                   {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) &&
                                     <span className="text-xs sm:text-sm font-medium text-gray-600 ml-1">
                                       ({product.unit_specification || product.unit_of_measure || 'standard'})
@@ -5033,7 +5222,7 @@ function App() {
                               <div className="mb-3 p-2 sm:p-3 bg-orange-50 rounded-lg border border-orange-200">
                                 <div className="text-xs text-orange-800 space-y-1">
                                   <div className="flex justify-between">
-                                    <span>💰 Payment Required:</span>
+                                    <span> Payment Required:</span>
                                     <span className="font-bold">
                                       {product.partial_payment_percentage ?
                                         `${Math.round(product.partial_payment_percentage * 100)}%` :
@@ -5042,16 +5231,16 @@ function App() {
                                     </span>
                                   </div>
                                   <div className="flex justify-between">
-                                    <span>📦 Available:</span>
+                                    <span> Available:</span>
                                     <span className="font-bold">{product.available_stock || product.total_stock} {product.unit}</span>
                                   </div>
                                   <div className="flex justify-between">
-                                    <span>🚚 Delivery:</span>
+                                    <span> Delivery:</span>
                                     <span className="font-bold text-xs">{new Date(product.delivery_date).toLocaleDateString()}</span>
                                   </div>
                                   {product.orders_count > 0 && (
                                     <div className="flex justify-between">
-                                      <span>👥 Pre-orders:</span>
+                                      <span> Pre-orders:</span>
                                       <span className="font-bold text-green-600">{product.orders_count}</span>
                                     </div>
                                   )}
@@ -5060,7 +5249,7 @@ function App() {
 
                               {/* Location */}
                               <div className="text-xs text-gray-600 mb-3 flex items-center line-clamp-1">
-                                📍 {product.location}
+                                {product.location}
                               </div>
 
                               {/* Action button */}
@@ -5075,7 +5264,7 @@ function App() {
                                 }}
                                 className="w-full py-2 px-3 sm:px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors text-xs sm:text-sm"
                               >
-                                🛒 Add Pre-order to Cart
+                                Add Pre-order to Cart
                               </button>
                             </div>
                           </div>
@@ -5085,7 +5274,7 @@ function App() {
                         {products.filter(product => product.type === 'preorder').length === 0 && (
                           <div className="w-full text-center py-6 sm:py-8 bg-orange-50 rounded-lg border-2 border-dashed border-orange-200">
                             <div className="text-orange-600">
-                              <div className="text-xl sm:text-2xl mb-2">📦</div>
+                              <div className="text-xl sm:text-2xl mb-2"></div>
                               <h4 className="font-medium text-gray-700 text-sm sm:text-base">No Pre-Orders Available</h4>
                               <p className="text-xs sm:text-sm text-gray-500">Check back soon for exciting pre-order deals!</p>
                             </div>
@@ -5103,7 +5292,7 @@ function App() {
                     <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                          <span className="text-orange-600">🕐</span>
+                          <span className="text-orange-600"></span>
                           <span className="text-sm font-medium text-orange-800">Filter by Pre-Orders:</span>
                         </div>
                         <label className="flex items-center space-x-2">
@@ -5136,7 +5325,7 @@ function App() {
                         onClick={() => scrollCategories('left')}
                         className="hidden md:flex items-center justify-center w-10 h-10 bg-white shadow-md rounded-full border hover:bg-gray-50 transition-colors mr-2 z-10"
                       >
-                        <span className="text-gray-600">←</span>
+                        <span className="text-gray-600">?</span>
                       </button>
 
                       {/* Categories Container */}
@@ -5173,10 +5362,10 @@ function App() {
                             >
                               <div className="text-center">
                                 <div className="text-2xl mb-1">
-                                  {key === 'grains_legumes' ? '🌾' :
-                                    key === 'fish_meat' ? '🐟' :
-                                      key === 'spices_vegetables' ? '🌶️' :
-                                        key === 'tubers_roots' ? '🥔' : '📦'}
+                                  {key === 'grains_legumes' ? '' :
+                                    key === 'fish_meat' ? '' :
+                                      key === 'spices_vegetables' ? '?' :
+                                        key === 'tubers_roots' ? '' : ''}
                                 </div>
                                 <div className="text-xs font-medium text-gray-700 mb-1">{category.name}</div>
                                 {/* Show example products */}
@@ -5197,7 +5386,7 @@ function App() {
                         onClick={() => scrollCategories('right')}
                         className="hidden md:flex items-center justify-center w-10 h-10 bg-white shadow-md rounded-full border hover:bg-gray-50 transition-colors ml-2 z-10"
                       >
-                        <span className="text-gray-600">→</span>
+                        <span className="text-gray-600">?</span>
                       </button>
                     </div>
 
@@ -5211,7 +5400,7 @@ function App() {
 
           {/* Mobile Swipe Hint */}
           <div className="md:hidden text-center text-xs text-gray-500 mt-2">
-            👆 Swipe to see more categories
+            Swipe to see more categories
           </div>
 
 
@@ -5255,7 +5444,7 @@ function App() {
                             {/* View Details Overlay */}
                             <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all flex items-center justify-center rounded-t-lg">
                               <div className="bg-white bg-opacity-0 hover:bg-opacity-90 text-transparent hover:text-gray-800 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm font-medium transition-all">
-                                👁️ View Details
+                                ? View Details
                               </div>
                             </div>
 
@@ -5277,14 +5466,14 @@ function App() {
                             {product.has_discount && product.discount_value && (
                               <div className="absolute top-12 right-2 bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-lg animate-pulse">
                                 {product.discount_type === 'percentage' && `${product.discount_value}% OFF`}
-                                {product.discount_type === 'fixed' && `₦${product.discount_value} OFF`}
+                                {product.discount_type === 'fixed' && `?${product.discount_value} OFF`}
                               </div>
                             )}
 
                             {/* Free Delivery Badge */}
                             {product.logistics_managed_by === 'seller' && product.seller_delivery_fee === 0 && (
                               <div className="absolute bottom-2 left-2 bg-red-600 text-white px-2 py-1 rounded-lg text-xs font-bold">
-                                🚚 FREE DELIVERY
+                                FREE DELIVERY
                               </div>
                             )}
                           </div>
@@ -5304,10 +5493,10 @@ function App() {
                               {product.has_discount && product.original_price ? (
                                 <div>
                                   <div className="text-xs sm:text-sm text-gray-500 line-through">
-                                    ₦{product.original_price}/{product.unit || product.unit_of_measure || 'kg'}
+                                    ?{product.original_price}/{product.unit || product.unit_of_measure || 'kg'}
                                   </div>
                                   <div className="text-lg sm:text-xl font-bold text-red-600">
-                                    ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
+                                    ?{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
                                     {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) &&
                                       <span className="text-xs sm:text-sm font-medium text-gray-600 ml-1">
                                         ({product.unit_specification || product.unit_of_measure || 'standard'})
@@ -5315,12 +5504,12 @@ function App() {
                                     }
                                   </div>
                                   <div className="text-xs text-green-600 font-medium">
-                                    You save ₦{product.discount_amount}!
+                                    You save ?{product.discount_amount}!
                                   </div>
                                 </div>
                               ) : (
                                 <div className="text-lg sm:text-xl font-bold text-emerald-600">
-                                  ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
+                                  ?{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
                                   {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) &&
                                     <span className="text-xs sm:text-sm font-medium text-gray-600 ml-1">
                                       ({product.unit_specification || product.unit_of_measure || 'standard'})
@@ -5354,7 +5543,7 @@ function App() {
                                   onClick={() => fetchSellerDetails(product.seller_name)}
                                   title="Click to view business owner details"
                                 >
-                                  🏢 {product.business_name}
+                                  {product.business_name}
                                 </div>
                               )}
                               {product.farm_name && (
@@ -5363,7 +5552,7 @@ function App() {
                                   onClick={() => fetchSellerDetails(product.seller_name)}
                                   title="Click to view farmer details"
                                 >
-                                  🌾 {product.farm_name}
+                                  {product.farm_name}
                                 </div>
                               )}
                               {product.agent_username && product.agent_name && (
@@ -5391,7 +5580,7 @@ function App() {
 
                             {/* Location - Responsive */}
                             <div className="text-xs sm:text-sm text-gray-500 mb-2 line-clamp-1">
-                              📍 {product.location}
+                              {product.location}
                             </div>
 
                             {/* Delivery Information */}
@@ -5401,8 +5590,8 @@ function App() {
                                 : 'bg-blue-50 text-blue-700'
                                 }`}>
                                 {product.seller_delivery_fee === 0
-                                  ? '🚚 FREE DELIVERY by Seller'
-                                  : `🚚 Delivery: ₦${product.seller_delivery_fee} (Seller Managed)`
+                                  ? ' FREE DELIVERY by Seller'
+                                  : ` Delivery: ?${product.seller_delivery_fee} (Seller Managed)`
                                 }
                               </div>
                             )}
@@ -5418,7 +5607,7 @@ function App() {
                                       : 'text-gray-300'
                                       }`}
                                   >
-                                    ⭐
+                                    ?
                                   </span>
                                 ))}
                               </div>
@@ -5466,10 +5655,10 @@ function App() {
                                 </div>
                                 {product.seller_type && (
                                   <div className="text-xs text-gray-600 capitalize">
-                                    {product.seller_type === 'farmer' && '👨‍🌾 Farmer'}
-                                    {product.seller_type === 'agent' && '🤝 Agent'}
-                                    {product.seller_type === 'business' && '🏢 Business'}
-                                    {product.seller_type === 'supplier' && '📦 Supplier'}
+                                    {product.seller_type === 'farmer' && '? Farmer'}
+                                    {product.seller_type === 'agent' && ' Agent'}
+                                    {product.seller_type === 'business' && ' Business'}
+                                    {product.seller_type === 'supplier' && ' Supplier'}
                                     {!['farmer', 'agent', 'business', 'supplier'].includes(product.seller_type) && product.seller_type}
                                   </div>
                                 )}
@@ -5525,7 +5714,7 @@ function App() {
                                     ))}
                                   </select>
                                   <div className="text-xs text-gray-500 mt-1">
-                                    📍 Pick up your order at a convenient location
+                                    Pick up your order at a convenient location
                                   </div>
                                 </div>
                               </div>
@@ -5577,791 +5766,22 @@ function App() {
         </main>
       </div >
 
-      {/* Enhanced Registration Modal */}
-      {
-        showAuthModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-md w-full p-6">
-              {/* Login Form */}
-              {authMode === 'login' && (
-                <>
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">Sign In</h2>
-                    <button
-                      onClick={() => setShowAuthModal(false)}
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      ×
-                    </button>
-                  </div>
-
-                  <form onSubmit={handleAuth} className="space-y-4">
-                    <input
-                      type="text"
-                      placeholder="Email or Phone"
-                      value={authForm.email_or_phone}
-                      onChange={(e) => setAuthForm(prev => ({ ...prev, email_or_phone: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      required
-                    />
-
-                    <input
-                      type="password"
-                      placeholder="Password"
-                      value={authForm.password}
-                      onChange={(e) => setAuthForm(prev => ({ ...prev, password: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      required
-                    />
-
-                    <button
-                      type="submit"
-                      className="w-full bg-emerald-600 text-white py-2 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-                    >
-                      Sign In
-                    </button>
-                  </form>
-
-                  <p className="mt-4 text-center text-sm text-gray-600">
-                    Don't have an account?
-                    <button
-                      onClick={() => setAuthMode('register')}
-                      className="text-emerald-600 hover:text-emerald-700 font-medium ml-1"
-                    >
-                      Sign Up
-                    </button>
-                  </p>
-                </>
-              )}
-
-              {/* Registration Flow */}
-              {authMode === 'register' && (
-                <>
-                  {registrationStep === 'basic' && (
-                    <>
-                      <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-bold">Create Account</h2>
-                        <button
-                          onClick={() => setShowAuthModal(false)}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          ×
-                        </button>
-                      </div>
-
-                      <form onSubmit={handleBasicRegistration} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-3">
-                          <input
-                            type="text"
-                            placeholder="First Name"
-                            value={authForm.first_name}
-                            onChange={(e) => setAuthForm(prev => ({ ...prev, first_name: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            required
-                          />
-                          <input
-                            type="text"
-                            placeholder="Last Name"
-                            value={authForm.last_name}
-                            onChange={(e) => setAuthForm(prev => ({ ...prev, last_name: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            required
-                          />
-                        </div>
-
-                        <input
-                          type="text"
-                          placeholder="Username (unique)"
-                          value={authForm.username}
-                          onChange={(e) => setAuthForm(prev => ({ ...prev, username: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          required
-                        />
-
-                        <input
-                          type="text"
-                          placeholder="Email or Phone Number"
-                          value={authForm.email_or_phone}
-                          onChange={(e) => setAuthForm(prev => ({ ...prev, email_or_phone: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          required
-                        />
-
-                        <input
-                          type="tel"
-                          placeholder="Phone Number (optional)"
-                          value={authForm.phone}
-                          onChange={(e) => setAuthForm(prev => ({ ...prev, phone: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        />
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <select
-                            value={authForm.gender}
-                            onChange={(e) => setAuthForm(prev => ({ ...prev, gender: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            required
-                          >
-                            <option value="">Select Gender</option>
-                            <option value="male">Male</option>
-                            <option value="female">Female</option>
-                            <option value="other">Other</option>
-                          </select>
-
-                          <input
-                            type="date"
-                            placeholder="Date of Birth"
-                            value={authForm.date_of_birth}
-                            onChange={(e) => setAuthForm(prev => ({ ...prev, date_of_birth: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            required
-                          />
-                        </div>
-
-                        <input
-                          type="password"
-                          placeholder="Password"
-                          value={authForm.password}
-                          onChange={(e) => setAuthForm(prev => ({ ...prev, password: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          required
-                        />
-
-                        <button
-                          type="submit"
-                          className="w-full bg-emerald-600 text-white py-2 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
-                        >
-                          Continue
-                        </button>
-                      </form>
-
-                      <p className="mt-4 text-center text-sm text-gray-600">
-                        Already have an account?
-                        <button
-                          onClick={() => setAuthMode('login')}
-                          className="text-emerald-600 hover:text-emerald-700 font-medium ml-1"
-                        >
-                          Sign In
-                        </button>
-                      </p>
-                    </>
-                  )}
-
-                  {/* Account Type Selection Step */}
-                  {registrationStep === 'role_path' && (
-                    <>
-                      <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-bold text-center w-full text-emerald-600">Choose Account Type</h2>
-                      </div>
-
-                      <div className="bg-gradient-to-br from-emerald-50 to-blue-50 p-6 rounded-2xl">
-                        <p className="text-gray-600 mb-6 text-center">
-                          Select the account type that best describes you:
-                        </p>
-
-                        <div className="grid grid-cols-1 gap-4">
-                          {/* Personal Account */}
-                          <div className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:border-blue-300 transition-colors cursor-pointer">
-                            <div className="flex items-center">
-                              <div className="text-3xl mr-4">👤</div>
-                              <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-800">Personal</h3>
-                                <p className="text-sm text-gray-600">Individual buyer - shop for personal needs</p>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  setAuthForm({ ...authForm, role: 'personal' });
-                                  handleCompleteRegistration();
-                                }}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                              >
-                                Select
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Farmer Account */}
-                          <div className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:border-green-300 transition-colors cursor-pointer">
-                            <div className="flex items-center">
-                              <div className="text-3xl mr-4">🌾</div>
-                              <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-800">Farmer</h3>
-                                <p className="text-sm text-gray-600">Agricultural producer - sell your farm produce</p>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  setAuthForm({ ...authForm, role: 'farmer' });
-                                  setRegistrationStep('business_profile');
-                                }}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                              >
-                                Select
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Agent Account */}
-                          <div className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:border-purple-300 transition-colors cursor-pointer">
-                            <div className="flex items-center">
-                              <div className="text-3xl mr-4">🤝</div>
-                              <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-800">Agent</h3>
-                                <p className="text-sm text-gray-600">Market aggregator - connect buyers and sellers</p>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  setAuthForm({ ...authForm, role: 'agent' });
-                                  setRegistrationStep('business_profile');
-                                }}
-                                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                              >
-                                Select
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Business Account */}
-                          <div className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:border-emerald-300 transition-colors cursor-pointer">
-                            <div className="flex items-center">
-                              <div className="text-3xl mr-4">🏢</div>
-                              <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-800">Business</h3>
-                                <p className="text-sm text-gray-600">Enterprise buyer/seller - restaurants, suppliers, etc.</p>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  setAuthForm({ ...authForm, role: 'business' });
-                                  setRegistrationStep('business_profile');
-                                }}
-                                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                              >
-                                Select
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Buyer Type Selection Step */}
-                  {registrationStep === 'buyer_type' && (
-                    <>
-                      <div className="flex justify-between items-center mb-6">
-                        <button
-                          onClick={() => setRegistrationStep('role_path')}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          ← Back
-                        </button>
-                        <h2 className="text-xl font-bold text-emerald-600">Select Your Business Type</h2>
-                        <div></div>
-                      </div>
-
-                      <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-2xl">
-                        <div className="space-y-3">
-                          <button
-                            onClick={() => handleBuyerTypeSelection('retailer')}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
-                          >
-                            <div className="font-medium">Retailer</div>
-                            <div className="text-sm text-gray-600">Buy and sell to end consumers</div>
-                          </button>
-
-                          <button
-                            onClick={() => handleBuyerTypeSelection('hotel')}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
-                          >
-                            <div className="font-medium">Hotel</div>
-                            <div className="text-sm text-gray-600">Hospitality business</div>
-                          </button>
-
-                          <button
-                            onClick={() => handleBuyerTypeSelection('cafe')}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
-                          >
-                            <div className="font-medium">Cafe</div>
-                            <div className="text-sm text-gray-600">Coffee shop or cafe business</div>
-                          </button>
-
-                          <button
-                            onClick={() => handleBuyerTypeSelection('restaurant')}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
-                          >
-                            <div className="font-medium">Restaurant</div>
-                            <div className="text-sm text-gray-600">Food service business</div>
-                          </button>
-
-                          <button
-                            onClick={() => handleBuyerTypeSelection('others')}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
-                          >
-                            <div className="font-medium">Others</div>
-                            <div className="text-sm text-gray-600">Specify your business type</div>
-                          </button>
-                        </div>
-
-                        <div className="mt-6 flex justify-end">
-                          <button
-                            onClick={() => handleBuyerTypeSelection('skip')}
-                            className="text-gray-500 hover:text-gray-700 text-sm font-medium px-4 py-2 rounded-full border border-gray-300 hover:border-gray-400 transition-colors"
-                          >
-                            Skip (if you're not a business)
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Business Info Step */}
-                  {registrationStep === 'business_info' && (
-                    <>
-                      <div className="flex justify-between items-center mb-6">
-                        <button
-                          onClick={() => setRegistrationStep('buyer_type')}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          ← Back
-                        </button>
-                        <h2 className="text-xl font-bold text-emerald-600">Business Information</h2>
-                        <div></div>
-                      </div>
-
-                      <div className="bg-gradient-to-br from-emerald-50 to-green-50 p-6 rounded-2xl">
-                        <form onSubmit={(e) => { e.preventDefault(); completeRegistration(); }} className="space-y-4">
-                          {selectedBuyerType === 'others' && (
-                            <input
-                              type="text"
-                              placeholder="Specify your business type"
-                              value={businessInfo.business_type}
-                              onChange={(e) => setBusinessInfo(prev => ({ ...prev, business_type: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              required
-                            />
-                          )}
-
-                          <input
-                            type="text"
-                            placeholder="Business Name"
-                            value={businessInfo.business_name}
-                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, business_name: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            required
-                          />
-
-                          <input
-                            type="text"
-                            placeholder="Business Address"
-                            value={businessInfo.business_address}
-                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, business_address: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            required
-                          />
-
-                          <div className="grid grid-cols-3 gap-3">
-                            <input
-                              type="text"
-                              placeholder="City"
-                              value={businessInfo.city}
-                              onChange={(e) => setBusinessInfo(prev => ({ ...prev, city: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              required
-                            />
-                            <input
-                              type="text"
-                              placeholder="State"
-                              value={businessInfo.state}
-                              onChange={(e) => setBusinessInfo(prev => ({ ...prev, state: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              required
-                            />
-                            <input
-                              type="text"
-                              placeholder="Country"
-                              value={businessInfo.country}
-                              onChange={(e) => setBusinessInfo(prev => ({ ...prev, country: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              required
-                            />
-                          </div>
-
-                          <button
-                            type="submit"
-                            className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
-                          >
-                            Complete Registration
-                          </button>
-                        </form>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Home Address Step (for skip option) */}
-                  {registrationStep === 'home_address' && (
-                    <>
-                      <div className="flex justify-between items-center mb-6">
-                        <button
-                          onClick={() => setRegistrationStep('buyer_type')}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          ← Back
-                        </button>
-                        <h2 className="text-xl font-bold text-emerald-600">Your Address</h2>
-                        <div></div>
-                      </div>
-
-                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl">
-                        <form onSubmit={(e) => { e.preventDefault(); completeRegistration(); }} className="space-y-4">
-                          <input
-                            type="text"
-                            placeholder="Home Address"
-                            value={businessInfo.home_address}
-                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, home_address: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            required
-                          />
-
-                          <div className="grid grid-cols-3 gap-3">
-                            <input
-                              type="text"
-                              placeholder="City"
-                              value={businessInfo.city}
-                              onChange={(e) => setBusinessInfo(prev => ({ ...prev, city: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              required
-                            />
-                            <input
-                              type="text"
-                              placeholder="State"
-                              value={businessInfo.state}
-                              onChange={(e) => setBusinessInfo(prev => ({ ...prev, state: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              required
-                            />
-                            <input
-                              type="text"
-                              placeholder="Country"
-                              value={businessInfo.country}
-                              onChange={(e) => setBusinessInfo(prev => ({ ...prev, country: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              required
-                            />
-                          </div>
-
-                          <button
-                            type="submit"
-                            className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
-                          >
-                            Complete Registration
-                          </button>
-                        </form>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Partner Type Selection Step */}
-                  {registrationStep === 'partner_type' && (
-                    <>
-                      <div className="flex justify-between items-center mb-6">
-                        <button
-                          onClick={() => setRegistrationStep('role_path')}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          ← Back
-                        </button>
-                        <h2 className="text-xl font-bold text-emerald-600">Select Your Role</h2>
-                        <div></div>
-                      </div>
-
-                      <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-2xl">
-                        <div className="space-y-3">
-                          <button
-                            onClick={() => handlePartnerTypeSelection('agent')}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
-                          >
-                            <div className="font-medium">Agent</div>
-                            <div className="text-sm text-gray-600">Field agent facilitating transactions</div>
-                          </button>
-
-                          <button
-                            onClick={() => handlePartnerTypeSelection('farmer')}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
-                          >
-                            <div className="font-medium">Farmer</div>
-                            <div className="text-sm text-gray-600">Individual farmer growing produce</div>
-                          </button>
-
-                          <button
-                            onClick={() => handlePartnerTypeSelection('driver')}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
-                          >
-                            <div className="font-medium">Driver</div>
-                            <div className="text-sm text-gray-600">Delivery driver for transport services</div>
-                          </button>
-
-                          <button
-                            onClick={() => handlePartnerTypeSelection('storage_owner')}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
-                          >
-                            <div className="font-medium">Storage Owner</div>
-                            <div className="text-sm text-gray-600">Provide storage facilities</div>
-                          </button>
-
-                          <button
-                            onClick={() => handlePartnerTypeSelection('business')}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
-                          >
-                            <div className="font-medium">Business</div>
-                            <div className="text-sm text-gray-600">Supplier, Processor, or Logistics Business</div>
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Business Category Selection Step */}
-                  {registrationStep === 'business_category' && (
-                    <>
-                      <div className="flex justify-between items-center mb-6">
-                        <button
-                          onClick={() => setRegistrationStep('partner_type')}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          ← Back
-                        </button>
-                        <h2 className="text-xl font-bold text-emerald-600">Business Category</h2>
-                        <div></div>
-                      </div>
-
-                      <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-2xl">
-                        <div className="space-y-3">
-                          <button
-                            onClick={() => handleBusinessCategory('supplier')}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
-                          >
-                            <div className="font-medium">Supplier</div>
-                            <div className="text-sm text-gray-600">Supply agricultural products</div>
-                          </button>
-
-                          <button
-                            onClick={() => handleBusinessCategory('processor')}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
-                          >
-                            <div className="font-medium">Processor</div>
-                            <div className="text-sm text-gray-600">Process raw materials into finished goods</div>
-                          </button>
-
-                          <button
-                            onClick={() => handleBusinessCategory('logistics_business')}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
-                          >
-                            <div className="font-medium">Logistics Business</div>
-                            <div className="text-sm text-gray-600">Transport and logistics services</div>
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Verification Step */}
-                  {registrationStep === 'verification' && (
-                    <>
-                      <div className="flex justify-between items-center mb-6">
-                        <button
-                          onClick={() => setRegistrationStep(partnerType === 'business' ? 'business_category' : 'partner_type')}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          ← Back
-                        </button>
-                        <h2 className="text-xl font-bold text-emerald-600">Verification Requirements</h2>
-                        <div></div>
-                      </div>
-
-                      <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-2xl">
-                        <form onSubmit={(e) => { e.preventDefault(); completeRegistration(); }} className="space-y-4">
-                          {/* Different verification based on role */}
-                          {(partnerType === 'agent' || partnerType === 'driver') && (
-                            <>
-                              <div className="mb-4 p-3 bg-blue-100 rounded-lg">
-                                <p className="text-sm text-blue-800 font-medium">Required: NIN and Photo for verification</p>
-                              </div>
-                              <input
-                                type="text"
-                                placeholder="National Identification Number (NIN)"
-                                value={verificationInfo.nin}
-                                onChange={(e) => setVerificationInfo(prev => ({ ...prev, nin: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                required
-                              />
-                              <input
-                                type="file"
-                                accept="image/*"
-                                placeholder="Upload your photo"
-                                onChange={(e) => setVerificationInfo(prev => ({ ...prev, photo: e.target.files[0]?.name || '' }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                required
-                              />
-                            </>
-                          )}
-
-                          {partnerType === 'farmer' && (
-                            <>
-                              <div className="mb-4 p-3 bg-green-100 rounded-lg">
-                                <p className="text-sm text-green-800 font-medium">Required: Photo, NIN, Farm Photo, and Farm Information</p>
-                              </div>
-                              <input
-                                type="text"
-                                placeholder="National Identification Number (NIN)"
-                                value={verificationInfo.nin}
-                                onChange={(e) => setVerificationInfo(prev => ({ ...prev, nin: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                required
-                              />
-                              <input
-                                type="file"
-                                accept="image/*"
-                                placeholder="Upload your photo"
-                                onChange={(e) => setVerificationInfo(prev => ({ ...prev, photo: e.target.files[0]?.name || '' }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                required
-                              />
-                              <input
-                                type="file"
-                                accept="image/*"
-                                placeholder="Upload farm photo"
-                                onChange={(e) => setVerificationInfo(prev => ({ ...prev, farm_photo: e.target.files[0]?.name || '' }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                required
-                              />
-                              <textarea
-                                placeholder="Farm Information (location, size, crops grown, etc.)"
-                                value={verificationInfo.farm_info}
-                                onChange={(e) => setVerificationInfo(prev => ({ ...prev, farm_info: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                rows="3"
-                                required
-                              />
-                            </>
-                          )}
-
-                          {(businessCategory === 'processor' || businessCategory === 'logistics_business' || (partnerType === 'business' && businessCategory)) && (
-                            <>
-                              <div className="mb-4 p-3 bg-purple-100 rounded-lg">
-                                <p className="text-sm text-purple-800 font-medium">Required: CAC Number, Business Name, and Address</p>
-                              </div>
-                              <input
-                                type="text"
-                                placeholder="CAC Registration Number"
-                                value={verificationInfo.cac_number}
-                                onChange={(e) => setVerificationInfo(prev => ({ ...prev, cac_number: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                required
-                              />
-                              <input
-                                type="text"
-                                placeholder="Business Name"
-                                value={businessInfo.business_name}
-                                onChange={(e) => setBusinessInfo(prev => ({ ...prev, business_name: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                required
-                              />
-                              <input
-                                type="text"
-                                placeholder="Business Address"
-                                value={businessInfo.business_address}
-                                onChange={(e) => setBusinessInfo(prev => ({ ...prev, business_address: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                required
-                              />
-                            </>
-                          )}
-
-                          {businessCategory === 'supplier' && (
-                            <>
-                              <div className="mb-4 p-3 bg-orange-100 rounded-lg">
-                                <p className="text-sm text-orange-800 font-medium">Suppliers can submit either NIN or CAC Number</p>
-                              </div>
-                              <div className="space-y-3">
-                                <label className="flex items-center">
-                                  <input
-                                    type="radio"
-                                    name="supplier_verification"
-                                    value="nin"
-                                    onChange={(e) => setVerificationInfo(prev => ({ ...prev, verification_type: e.target.value }))}
-                                    className="mr-2"
-                                  />
-                                  Use NIN (Individual/Unregistered Business)
-                                </label>
-                                <label className="flex items-center">
-                                  <input
-                                    type="radio"
-                                    name="supplier_verification"
-                                    value="cac"
-                                    onChange={(e) => setVerificationInfo(prev => ({ ...prev, verification_type: e.target.value }))}
-                                    className="mr-2"
-                                  />
-                                  Use CAC (Registered Business)
-                                </label>
-                              </div>
-
-                              {verificationInfo.verification_type === 'nin' && (
-                                <input
-                                  type="text"
-                                  placeholder="National Identification Number (NIN)"
-                                  value={verificationInfo.nin}
-                                  onChange={(e) => setVerificationInfo(prev => ({ ...prev, nin: e.target.value }))}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                  required
-                                />
-                              )}
-
-                              {verificationInfo.verification_type === 'cac' && (
-                                <>
-                                  <input
-                                    type="text"
-                                    placeholder="CAC Registration Number"
-                                    value={verificationInfo.cac_number}
-                                    onChange={(e) => setVerificationInfo(prev => ({ ...prev, cac_number: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                    required
-                                  />
-                                  <input
-                                    type="text"
-                                    placeholder="Business Name"
-                                    value={businessInfo.business_name}
-                                    onChange={(e) => setBusinessInfo(prev => ({ ...prev, business_name: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                    required
-                                  />
-                                  <input
-                                    type="text"
-                                    placeholder="Business Address"
-                                    value={businessInfo.business_address}
-                                    onChange={(e) => setBusinessInfo(prev => ({ ...prev, business_address: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                    required
-                                  />
-                                </>
-                              )}
-                            </>
-                          )}
-
-                          <button
-                            type="submit"
-                            className="w-full bg-emerald-600 text-white py-3 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
-                          >
-                            Complete Registration
-                          </button>
-                        </form>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        )
-      }
+      {/* Registration Modal */}
+      {showAuthModal && (
+        <RegistrationModal
+          onClose={() => setShowAuthModal(false)}
+          onLogin={(data) => {
+            localStorage.setItem('token', data.token);
+            setUser(data.user);
+            setShowAuthModal(false);
+          }}
+          onRegister={(data) => {
+            localStorage.setItem('token', data.token);
+            setUser(data.user);
+            setShowAuthModal(false);
+          }}
+        />
+      )}
 
       {/* Comprehensive Checkout Page */}
       {
@@ -6372,7 +5792,7 @@ function App() {
                 <div className="flex justify-between items-center">
                   <div>
                     <h2 className="text-2xl font-semibold text-gray-900">
-                      {checkoutPlatform === 'pyexpress' ? '🛒 PyExpress Checkout' : '🌾 Farm Deals Checkout'}
+                      {checkoutPlatform === 'pyexpress' ? ' PyExpress Checkout' : ' Farm Deals Checkout'}
                     </h2>
                     <p className="text-sm text-gray-600 mt-1">
                       {checkoutPlatform === 'pyexpress'
@@ -6384,7 +5804,7 @@ function App() {
                     onClick={() => setShowCheckout(false)}
                     className="text-gray-500 hover:text-gray-700 text-2xl"
                   >
-                    ×
+
                   </button>
                 </div>
 
@@ -6423,7 +5843,7 @@ function App() {
                     {/* Step 1: Review Order */}
                     {checkoutStep === 'review' && (
                       <div className="space-y-6">
-                        <h3 className="text-lg font-semibold text-gray-900">📦 Review Your Order</h3>
+                        <h3 className="text-lg font-semibold text-gray-900"> Review Your Order</h3>
 
                         {getActiveCartItems().length === 0 ? (
                           <div className="text-center py-8">
@@ -6448,13 +5868,13 @@ function App() {
                                         {item.unit_specification && ` (${item.unit_specification})`}
                                       </span>
                                       <span className="text-gray-700">
-                                        <strong>Price:</strong> ₦{item.product.price_per_unit}/{item.unit}
+                                        <strong>Price:</strong> ?{item.product.price_per_unit}/{item.unit}
                                       </span>
                                       <span className={`px-2 py-1 rounded-full text-xs ${item.delivery_method === 'platform'
                                         ? 'bg-blue-100 text-blue-800'
                                         : 'bg-green-100 text-green-800'
                                         }`}>
-                                        {item.delivery_method === 'platform' ? '🚛 Platform Driver' : '🚚 Offline Delivery'}
+                                        {item.delivery_method === 'platform' ? ' Platform Driver' : ' Offline Delivery'}
                                       </span>
                                     </div>
 
@@ -6468,11 +5888,11 @@ function App() {
                                       <div className="mt-2">
                                         {item.product.seller_delivery_fee === 0 ? (
                                           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            🎉 FREE Delivery (Vendor Managed)
+                                            FREE Delivery (Vendor Managed)
                                           </span>
                                         ) : (
                                           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                            🚚 Vendor Delivery: ₦{item.product.seller_delivery_fee?.toLocaleString()}
+                                            Vendor Delivery: ?{item.product.seller_delivery_fee?.toLocaleString()}
                                           </span>
                                         )}
                                       </div>
@@ -6481,7 +5901,7 @@ function App() {
 
                                   <div className="text-right">
                                     <div className="text-lg font-semibold text-gray-900">
-                                      ₦{(item.product.price_per_unit * item.quantity).toLocaleString()}
+                                      ?{(item.product.price_per_unit * item.quantity).toLocaleString()}
                                     </div>
                                     <button
                                       onClick={() => removeCartItem(item.id)}
@@ -6513,7 +5933,7 @@ function App() {
                     {/* Step 2: Shipping Address */}
                     {checkoutStep === 'address' && (
                       <div className="space-y-6">
-                        <h3 className="text-lg font-semibold text-gray-900">📍 Shipping Address</h3>
+                        <h3 className="text-lg font-semibold text-gray-900"> Shipping Address</h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
@@ -6653,7 +6073,7 @@ function App() {
                     {/* Step 3: Payment */}
                     {checkoutStep === 'payment' && (
                       <div className="space-y-6">
-                        <h3 className="text-lg font-semibold text-gray-900">💳 Payment with Paystack</h3>
+                        <h3 className="text-lg font-semibold text-gray-900"> Payment with Paystack</h3>
 
                         <div className={`border rounded-lg p-4 ${checkoutPlatform === 'pyexpress'
                           ? 'bg-emerald-50 border-emerald-200'
@@ -6677,7 +6097,7 @@ function App() {
                               </div>
                               {user && (user.role === 'agent' || user.role === 'purchasing_agent') && (
                                 <div className="mt-2 text-sm font-medium text-blue-700">
-                                  ✨ As an agent, you'll earn commission on this purchase!
+                                  ? As an agent, you'll earn commission on this purchase!
                                 </div>
                               )}
                             </div>
@@ -6741,7 +6161,7 @@ function App() {
                                 Processing...
                               </>
                             ) : (
-                              `Pay ₦${orderSummary.total?.toLocaleString() || 0} Securely`
+                              `Pay ?${orderSummary.total?.toLocaleString() || 0} Securely`
                             )}
                           </button>
                         </div>
@@ -6752,38 +6172,38 @@ function App() {
                   {/* Order Summary Sidebar */}
                   <div className="lg:col-span-1">
                     <div className="bg-gray-50 rounded-lg p-6 sticky top-0">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Order Summary</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4"> Order Summary</h3>
 
                       <div className="space-y-3">
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Product Total ({orderSummary.item_count} items)</span>
-                          <span className="font-medium">₦{orderSummary.product_total?.toLocaleString() || 0}</span>
+                          <span className="font-medium">?{orderSummary.product_total?.toLocaleString() || 0}</span>
                         </div>
 
                         {orderSummary.platform_service_charge > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Service Charge (10%)</span>
-                            <span className="font-medium">₦{orderSummary.platform_service_charge?.toLocaleString() || 0}</span>
+                            <span className="font-medium">?{orderSummary.platform_service_charge?.toLocaleString() || 0}</span>
                           </div>
                         )}
 
                         {orderSummary.platform_commission > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Platform Commission (2.5%)</span>
-                            <span className="font-medium">₦{orderSummary.platform_commission?.toLocaleString() || 0}</span>
+                            <span className="font-medium">?{orderSummary.platform_commission?.toLocaleString() || 0}</span>
                           </div>
                         )}
 
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Delivery Fees</span>
-                          <span className="font-medium">₦{orderSummary.delivery_total?.toLocaleString() || 0}</span>
+                          <span className="font-medium">?{orderSummary.delivery_total?.toLocaleString() || 0}</span>
                         </div>
 
                         {orderSummary.is_agent && orderSummary.agent_commission > 0 && (
                           <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 -mx-1">
                             <div className="flex justify-between text-sm">
-                              <span className="text-emerald-700 font-medium">🎁 Your Agent Commission (4%)</span>
-                              <span className="font-semibold text-emerald-700">₦{orderSummary.agent_commission?.toLocaleString() || 0}</span>
+                              <span className="text-emerald-700 font-medium"> Your Agent Commission (4%)</span>
+                              <span className="font-semibold text-emerald-700">?{orderSummary.agent_commission?.toLocaleString() || 0}</span>
                             </div>
                             <p className="text-xs text-emerald-600 mt-1">
                               Paid separately to your account after order completion
@@ -6794,16 +6214,16 @@ function App() {
                         <div className="border-t border-gray-200 pt-3">
                           <div className="flex justify-between">
                             <span className="text-lg font-semibold text-gray-900">Total to Pay</span>
-                            <span className="text-lg font-semibold text-emerald-600">₦{orderSummary.total?.toLocaleString() || 0}</span>
+                            <span className="text-lg font-semibold text-emerald-600">?{orderSummary.total?.toLocaleString() || 0}</span>
                           </div>
                         </div>
 
                         {/* Breakdown Info */}
                         <div className="text-xs text-gray-500 mt-2 space-y-1">
-                          <div>• Vendor receives: ₦{orderSummary.product_total?.toLocaleString() || 0}</div>
-                          <div>• Platform fee: ₦{orderSummary.platform_cut?.toLocaleString() || 0}</div>
+                          <div> Vendor receives: ?{orderSummary.product_total?.toLocaleString() || 0}</div>
+                          <div> Platform fee: ?{orderSummary.platform_cut?.toLocaleString() || 0}</div>
                           {orderSummary.is_agent && (
-                            <div className="text-emerald-600 font-medium">• Your commission: ₦{orderSummary.agent_commission?.toLocaleString() || 0}</div>
+                            <div className="text-emerald-600 font-medium"> Your commission: ?{orderSummary.agent_commission?.toLocaleString() || 0}</div>
                           )}
                         </div>
                       </div>
@@ -6811,7 +6231,7 @@ function App() {
                       {/* Shipping Address Summary */}
                       {checkoutStep !== 'review' && shippingAddress.full_name && (
                         <div className="mt-6 pt-6 border-t border-gray-200">
-                          <h4 className="font-medium text-gray-900 mb-2">📍 Shipping To:</h4>
+                          <h4 className="font-medium text-gray-900 mb-2"> Shipping To:</h4>
                           <div className="text-sm text-gray-600">
                             <div>{shippingAddress.full_name}</div>
                             <div>{shippingAddress.address_line_1}</div>
@@ -6838,12 +6258,12 @@ function App() {
             <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold text-gray-900">🚚 Create Delivery Request</h2>
+                  <h2 className="text-xl font-semibold text-gray-900"> Create Delivery Request</h2>
                   <button
                     onClick={() => setShowCreateDeliveryRequest(false)}
                     className="text-gray-500 hover:text-gray-700"
                   >
-                    ×
+
                   </button>
                 </div>
               </div>
@@ -6852,7 +6272,7 @@ function App() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Left Column - Form */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Order Details</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4"> Order Details</h3>
 
                     {/* Order Information */}
                     <div className="grid grid-cols-2 gap-4">
@@ -6935,7 +6355,7 @@ function App() {
 
                     {/* Locations */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">📍 Pickup Address *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1"> Pickup Address *</label>
                       <input
                         type="text"
                         value={enhancedDeliveryForm.pickup_address}
@@ -6948,7 +6368,7 @@ function App() {
                     {/* Multiple Delivery Destinations */}
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="block text-sm font-medium text-gray-700">🎯 Delivery Destinations *</label>
+                        <label className="block text-sm font-medium text-gray-700"> Delivery Destinations *</label>
                         <button
                           type="button"
                           onClick={addDeliveryDestination}
@@ -6976,7 +6396,7 @@ function App() {
                                 onClick={() => removeDeliveryDestination(index)}
                                 className="text-red-600 hover:text-red-700 p-1"
                               >
-                                ✕
+                                ?
                               </button>
                             )}
                           </div>
@@ -6986,7 +6406,7 @@ function App() {
 
                     {/* Pricing */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">💰 Estimated Price (₦) *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1"> Estimated Price (?) *</label>
                       <input
                         type="number"
                         value={enhancedDeliveryForm.estimated_price}
@@ -6998,7 +6418,7 @@ function App() {
 
                     {/* Special Instructions */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">📝 Special Instructions</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1"> Special Instructions</label>
                       <textarea
                         value={enhancedDeliveryForm.special_instructions}
                         onChange={(e) => setEnhancedDeliveryForm(prev => ({ ...prev, special_instructions: e.target.value }))}
@@ -7011,7 +6431,7 @@ function App() {
 
                   {/* Right Column - Driver Search & Map */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">🔍 Find & Select Driver</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4"> Find & Select Driver</h3>
 
                     {/* Driver Search */}
                     <div>
@@ -7029,7 +6449,7 @@ function App() {
                           onClick={() => searchDrivers(pickupCoordinates)}
                           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                         >
-                          🔍
+
                         </button>
                       </div>
                     </div>
@@ -7055,10 +6475,10 @@ function App() {
                                 <div className="font-medium text-gray-900">{driver.driver_name}</div>
                                 <div className="text-sm text-gray-600">@{driver.driver_username}</div>
                                 <div className="text-sm text-gray-500">
-                                  ⭐ {driver.rating} • {driver.total_deliveries} deliveries
+                                  ? {driver.rating}  {driver.total_deliveries} deliveries
                                 </div>
                                 <div className="text-sm text-blue-600">
-                                  🚗 {driver.vehicle_info.make_model} ({driver.vehicle_info.plate_number})
+                                  {driver.vehicle_info.make_model} ({driver.vehicle_info.plate_number})
                                 </div>
                               </div>
                               <div className="text-right">
@@ -7068,7 +6488,7 @@ function App() {
                                 </div>
                                 {driver.distance_km && (
                                   <div className="text-sm text-gray-500 mt-1">
-                                    📍 {driver.distance_km} km away
+                                    {driver.distance_km} km away
                                   </div>
                                 )}
                               </div>
@@ -7081,11 +6501,11 @@ function App() {
                     {/* Selected Driver */}
                     {selectedDriver && (
                       <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
-                        <div className="text-sm font-medium text-emerald-800 mb-2">✅ Selected Driver</div>
+                        <div className="text-sm font-medium text-emerald-800 mb-2">? Selected Driver</div>
                         <div className="font-medium text-gray-900">{selectedDriver.driver_name}</div>
                         <div className="text-sm text-gray-600">@{selectedDriver.driver_username}</div>
                         <div className="text-sm text-gray-500">
-                          ⭐ {selectedDriver.rating} • {selectedDriver.total_deliveries} deliveries
+                          ? {selectedDriver.rating}  {selectedDriver.total_deliveries} deliveries
                         </div>
                       </div>
                     )}
@@ -7093,7 +6513,7 @@ function App() {
                     {/* Map Placeholder */}
                     <div className="h-48 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center">
                       <div className="text-center text-gray-500">
-                        <div className="text-2xl mb-2">🗺️</div>
+                        <div className="text-2xl mb-2">?</div>
                         <div className="text-sm">Interactive Map</div>
                         <div className="text-xs">Pickup & delivery locations will be shown here</div>
                       </div>
@@ -7132,12 +6552,12 @@ function App() {
               {/* Left Side - Delivery Info */}
               <div className="w-1/3 bg-gray-50 border-r border-gray-200 p-4">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">📦 Delivery Info</h3>
+                  <h3 className="text-lg font-semibold text-gray-900"> Delivery Info</h3>
                   <button
                     onClick={() => setShowDriverMessages(false)}
                     className="text-gray-500 hover:text-gray-700"
                   >
-                    ×
+
                   </button>
                 </div>
 
@@ -7175,7 +6595,7 @@ function App() {
                     <div>
                       <div className="text-sm font-medium text-gray-700">Price</div>
                       <div className="text-sm text-gray-900">
-                        ₦{trackingData.negotiated_price || trackingData.estimated_price}
+                        ?{trackingData.negotiated_price || trackingData.estimated_price}
                       </div>
                     </div>
                   </div>
@@ -7185,14 +6605,14 @@ function App() {
               {/* Right Side - Chat */}
               <div className="flex-1 flex flex-col">
                 <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">💬 Delivery Chat</h3>
+                  <h3 className="text-lg font-semibold text-gray-900"> Delivery Chat</h3>
                 </div>
 
                 {/* Messages */}
                 <div className="flex-1 p-4 overflow-y-auto">
                   {deliveryMessages.length === 0 ? (
                     <div className="text-center text-gray-500 mt-8">
-                      <div className="text-2xl mb-2">💬</div>
+                      <div className="text-2xl mb-2"></div>
                       <div>No messages yet</div>
                       <div className="text-sm">Start a conversation with your driver</div>
                     </div>
@@ -7210,7 +6630,7 @@ function App() {
                             <div className="text-sm">
                               {message.message_type === 'location' ? (
                                 <div>
-                                  <div className="font-medium">📍 Location shared</div>
+                                  <div className="font-medium"> Location shared</div>
                                   <div className="text-xs opacity-75">Tap to view on map</div>
                                 </div>
                               ) : (
@@ -7243,7 +6663,7 @@ function App() {
                       className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
                       title="Share location"
                     >
-                      📍
+
                     </button>
                     <button
                       onClick={() => newDeliveryMessage.trim() && sendDeliveryMessage(currentDeliveryChat, newDeliveryMessage)}
@@ -7274,7 +6694,7 @@ function App() {
                     }}
                     className="text-gray-500 hover:text-gray-700"
                   >
-                    ×
+
                   </button>
                 </div>
               </div>
@@ -7302,7 +6722,7 @@ function App() {
                   <div className="bg-emerald-50 p-3 rounded-lg">
                     <div className="text-sm text-gray-600">Price per unit</div>
                     <div className="text-xl font-bold text-emerald-600">
-                      ₦{selectedPreOrder.price_per_unit}/{selectedPreOrder.unit}
+                      ?{selectedPreOrder.price_per_unit}/{selectedPreOrder.unit}
                     </div>
                   </div>
                   <div className="bg-orange-50 p-3 rounded-lg">
@@ -7374,9 +6794,9 @@ function App() {
                           const partial = Math.round(total * selectedPreOrder.partial_payment_percentage);
 
                           document.getElementById('summary-quantity').textContent = `${quantity} ${selectedPreOrder.unit}`;
-                          document.getElementById('summary-total').textContent = `₦${total}`;
-                          document.getElementById('summary-partial').textContent = `₦${partial}`;
-                          document.getElementById('summary-remaining').textContent = `₦${total - partial}`;
+                          document.getElementById('summary-total').textContent = `?${total}`;
+                          document.getElementById('summary-partial').textContent = `?${partial}`;
+                          document.getElementById('summary-remaining').textContent = `?${total - partial}`;
                         }}
                       />
                     </div>
@@ -7386,7 +6806,7 @@ function App() {
                       <div className="space-y-1 text-sm">
                         <div className="flex justify-between">
                           <span>Unit price:</span>
-                          <span>₦{selectedPreOrder.price_per_unit}</span>
+                          <span>?{selectedPreOrder.price_per_unit}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Quantity:</span>
@@ -7394,15 +6814,15 @@ function App() {
                         </div>
                         <div className="flex justify-between font-medium">
                           <span>Total amount:</span>
-                          <span id="summary-total">₦{selectedPreOrder.price_per_unit}</span>
+                          <span id="summary-total">?{selectedPreOrder.price_per_unit}</span>
                         </div>
                         <div className="flex justify-between text-orange-600">
                           <span>Partial payment now:</span>
-                          <span id="summary-partial">₦{Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
+                          <span id="summary-partial">?{Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
                         </div>
                         <div className="flex justify-between text-gray-600">
                           <span>Remaining on delivery:</span>
-                          <span id="summary-remaining">₦{selectedPreOrder.price_per_unit - Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
+                          <span id="summary-remaining">?{selectedPreOrder.price_per_unit - Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
                         </div>
                       </div>
                     </div>
@@ -7428,7 +6848,7 @@ function App() {
 
                           if (response.ok) {
                             const result = await response.json();
-                            alert(`Pre-order placed successfully! Order ID: ${result.order_id}\nPartial payment: ₦${result.partial_amount}\nRemaining: ₦${result.remaining_amount}`);
+                            alert(`Pre-order placed successfully! Order ID: ${result.order_id}\nPartial payment: ?${result.partial_amount}\nRemaining: ?${result.remaining_amount}`);
                             setShowPreOrderDetails(false);
                             setSelectedPreOrder(null);
                             fetchProducts(); // Refresh products to update stock
@@ -7479,7 +6899,7 @@ function App() {
                     onClick={() => setShowCreatePreOrder(false)}
                     className="text-gray-500 hover:text-gray-700"
                   >
-                    ×
+
                   </button>
                 </div>
               </div>
@@ -7612,7 +7032,7 @@ function App() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Price per Unit (₦) *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Price per Unit (?) *</label>
                         <input
                           type="number"
                           required
@@ -7731,12 +7151,15 @@ function App() {
             <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-lg flex flex-col">
               <div className="p-4 border-b border-gray-200">
                 <div className="flex justify-between items-center mb-3">
-                  <h2 className="text-lg font-semibold">🛒 Shopping Cart ({cart.length})</h2>
+                  <h2 className="text-lg font-semibold"> Shopping Cart ({cart.length})</h2>
                   <button
                     onClick={() => setShowCart(false)}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="text-gray-500 hover:text-gray-900 transition-colors p-1"
+                    title="Close Cart"
                   >
-                    ×
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
                 </div>
 
@@ -7788,15 +7211,15 @@ function App() {
                               {item.product.product_name || item.product.crop_type}
                             </h3>
                             <p className="text-xs text-gray-600">
-                              ₦{item.product.price_per_unit}/{item.unit}
-                              {item.unit_specification && <span className="text-gray-500"> ({item.unit_specification})</span>} • {item.product.seller_username}
+                              ?{item.product.price_per_unit}/{item.unit}
+                              {item.unit_specification && <span className="text-gray-500"> ({item.unit_specification})</span>}  {item.product.seller_username}
                             </p>
                           </div>
                           <button
                             onClick={() => removeCartItem(item.id)}
                             className="text-red-500 hover:text-red-700 text-sm"
                           >
-                            ✕
+                            ?
                           </button>
                         </div>
 
@@ -7835,14 +7258,14 @@ function App() {
                               : 'bg-green-100 text-green-700'
                               }`}
                           >
-                            {item.delivery_method === 'platform' ? '🚛 Platform' : '🚚 Offline'}
+                            {item.delivery_method === 'platform' ? ' Platform' : ' Offline'}
                           </button>
                         </div>
 
                         {/* Item Total */}
                         <div className="text-right">
                           <span className="font-semibold text-emerald-600">
-                            ₦{(item.product.price_per_unit * item.quantity).toLocaleString()}
+                            ?{(item.product.price_per_unit * item.quantity).toLocaleString()}
                           </span>
                         </div>
                       </div>
@@ -7857,16 +7280,16 @@ function App() {
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Items ({getActiveCartItems().reduce((sum, item) => sum + item.quantity, 0)})</span>
-                      <span className="font-medium">₦{getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0).toLocaleString()}</span>
+                      <span className="font-medium">?{getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Est. Delivery</span>
-                      <span className="font-medium">₦{Math.round(getActiveCartItems().length * 350).toLocaleString()}</span>
+                      <span className="font-medium">?{Math.round(getActiveCartItems().length * 350).toLocaleString()}</span>
                     </div>
                     <div className={`flex justify-between font-semibold pt-2 border-t border-gray-200 ${activeCartTab === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600'
                       }`}>
                       <span>Total</span>
-                      <span>₦{(getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0) + Math.round(getActiveCartItems().length * 350)).toLocaleString()}</span>
+                      <span>?{(getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0) + Math.round(getActiveCartItems().length * 350)).toLocaleString()}</span>
                     </div>
                   </div>
 
@@ -7908,7 +7331,7 @@ function App() {
                     onClick={() => setShowMessaging(false)}
                     className="text-gray-500 hover:text-gray-700"
                   >
-                    ×
+
                   </button>
                 </div>
               </div>
@@ -7997,7 +7420,7 @@ function App() {
                         onClick={() => setSelectedConversation(null)}
                         className="text-gray-500 hover:text-gray-700"
                       >
-                        ←
+                        ?
                       </button>
                       <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
                         {selectedConversation.avatar}
@@ -8083,7 +7506,7 @@ function App() {
                           : 'bg-blue-500 text-white hover:bg-blue-600'
                           }`}
                       >
-                        {isRecording ? '⏹️' : '🎤'}
+                        {isRecording ? '' : ''}
                       </button>
                       <button
                         onClick={sendMessage}
@@ -8112,7 +7535,7 @@ function App() {
                     onClick={() => setShowOrderTracking(false)}
                     className="text-gray-500 hover:text-gray-700"
                   >
-                    ×
+
                   </button>
                 </div>
               </div>
@@ -8142,7 +7565,7 @@ function App() {
                         </div>
 
                         <div className="text-sm text-gray-600 mb-2">
-                          <p><strong>Total:</strong> ₦{order.total_amount.toLocaleString()}</p>
+                          <p><strong>Total:</strong> ?{order.total_amount.toLocaleString()}</p>
                           <p><strong>Items:</strong> {order.items.length} item(s)</p>
                           <p><strong>Delivery:</strong> {order.delivery_address}</p>
                         </div>
@@ -8150,8 +7573,8 @@ function App() {
                         <div className="space-y-1">
                           {order.items.map((item, index) => (
                             <div key={index} className="flex justify-between text-sm">
-                              <span>{item.title} × {item.quantity}</span>
-                              <span>₦{item.total.toLocaleString()}</span>
+                              <span>{item.title}  {item.quantity}</span>
+                              <span>?{item.total.toLocaleString()}</span>
                             </div>
                           ))}
                         </div>
@@ -8174,14 +7597,14 @@ function App() {
               <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">📍 Add Drop-off Location</h2>
+                    <h2 className="text-2xl font-bold text-gray-900"> Add Drop-off Location</h2>
                     <p className="text-gray-600 mt-1">Create a convenient pickup location for buyers</p>
                   </div>
                   <button
                     onClick={() => setShowAddDropOff(false)}
                     className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
                   >
-                    ×
+
                   </button>
                 </div>
               </div>
@@ -8413,7 +7836,7 @@ function App() {
                       type="submit"
                       className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
                     >
-                      📍 Add Location
+                      Add Location
                     </button>
                   </div>
                 </form>
@@ -8438,7 +7861,7 @@ function App() {
                     <div className="flex items-center space-x-4">
                       {/* Enhanced Pricing Display */}
                       <div className="text-3xl font-bold text-emerald-600">
-                        ₦{selectedProduct.price_per_unit}/{selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'}
+                        ?{selectedProduct.price_per_unit}/{selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'}
                         {(selectedProduct.unit_specification) &&
                           <span className="text-lg font-medium text-gray-600 ml-2">
                             ({selectedProduct.unit_specification})
@@ -8449,7 +7872,7 @@ function App() {
                       {/* Pre-order Badge */}
                       {selectedProduct.type === 'preorder' && (
                         <div className="bg-orange-500 text-white px-4 py-2 rounded-full text-sm font-bold">
-                          ⚡ PRE-ORDER
+                          ? PRE-ORDER
                         </div>
                       )}
                     </div>
@@ -8459,7 +7882,7 @@ function App() {
                     onClick={closeProductDetail}
                     className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
                   >
-                    ×
+
                   </button>
                 </div>
               </div>
@@ -8478,7 +7901,7 @@ function App() {
                       />
                     ) : (
                       <div className="w-full h-64 bg-gradient-to-r from-gray-200 to-gray-300 flex items-center justify-center rounded-lg shadow-lg mb-4">
-                        <span className="text-gray-500 text-lg">📦 Product Image</span>
+                        <span className="text-gray-500 text-lg"> Product Image</span>
                       </div>
                     )}
 
@@ -8506,7 +7929,7 @@ function App() {
                           <span className="text-sm text-gray-600">Agent:</span>
                           <div className="font-medium text-blue-600">@{selectedProduct.agent_username}</div>
                           <div className="flex items-center mt-1">
-                            <span className="text-yellow-400">★★★★☆</span>
+                            <span className="text-yellow-400">?</span>
                             <span className="text-sm text-gray-600 ml-2">4.2/5 (Agent Rating)</span>
                           </div>
                         </div>
@@ -8514,7 +7937,35 @@ function App() {
 
                       <div>
                         <span className="text-sm text-gray-600">Location:</span>
-                        <div className="font-medium text-gray-800">📍 {selectedProduct.location}</div>
+                        <div className="font-medium text-gray-800"> {selectedProduct.location}</div>
+                      </div>
+
+                      {/* About Product Section */}
+                      <div className="mt-8 border-t border-gray-100 pt-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-3">About this Product</h3>
+                        <p className="text-gray-700 whitespace-pre-line mb-4">
+                          {selectedProduct.about_product || selectedProduct.description || 'No detailed description available.'}
+                        </p>
+
+                        {selectedProduct.product_benefits && selectedProduct.product_benefits.length > 0 && (
+                          <div className="mb-4">
+                            <h4 className="font-medium text-gray-900 mb-2">Key Benefits</h4>
+                            <ul className="list-disc pl-5 space-y-1 text-gray-600">
+                              {selectedProduct.product_benefits.map((benefit, idx) => (
+                                <li key={idx}>{benefit}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {selectedProduct.usage_instructions && (
+                          <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Usage Instructions</h4>
+                            <p className="text-gray-600 whitespace-pre-line">
+                              {selectedProduct.usage_instructions}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -8629,11 +8080,11 @@ function App() {
                                           : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
                                           }`}
                                       >
-                                        <div className="text-sm font-medium">📍 Drop-off Location</div>
+                                        <div className="text-sm font-medium"> Drop-off Location</div>
                                         <div className="text-xs mt-1">
                                           {deliveryOptions.delivery_costs.dropoff.is_free
                                             ? 'Free'
-                                            : `₦${deliveryOptions.delivery_costs.dropoff.cost}`
+                                            : `?${deliveryOptions.delivery_costs.dropoff.cost}`
                                           }
                                         </div>
                                       </button>
@@ -8645,11 +8096,11 @@ function App() {
                                           : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
                                           }`}
                                       >
-                                        <div className="text-sm font-medium">🚚 Home Delivery</div>
+                                        <div className="text-sm font-medium"> Home Delivery</div>
                                         <div className="text-xs mt-1">
                                           {deliveryOptions.delivery_costs.shipping.is_free
                                             ? 'Free'
-                                            : `₦${deliveryOptions.delivery_costs.shipping.cost}`
+                                            : `?${deliveryOptions.delivery_costs.shipping.cost}`
                                           }
                                         </div>
                                       </button>
@@ -8671,10 +8122,10 @@ function App() {
                                         ))}
                                       </select>
                                       <div className="text-xs text-gray-500 mt-1">
-                                        📍 Pick up your order at a convenient market or location
+                                        Pick up your order at a convenient market or location
                                         {deliveryOptions.delivery_costs.dropoff.cost > 0 && (
                                           <span className="text-emerald-600 font-medium ml-2">
-                                            (₦{deliveryOptions.delivery_costs.dropoff.cost} fee)
+                                            (?{deliveryOptions.delivery_costs.dropoff.cost} fee)
                                           </span>
                                         )}
                                       </div>
@@ -8691,10 +8142,10 @@ function App() {
                                         rows="3"
                                       ></textarea>
                                       <div className="text-xs text-gray-500 mt-1">
-                                        🚚 We'll deliver directly to your address
+                                        We'll deliver directly to your address
                                         {deliveryOptions.delivery_costs.shipping.cost > 0 && (
                                           <span className="text-blue-600 font-medium ml-2">
-                                            (₦{deliveryOptions.delivery_costs.shipping.cost} fee)
+                                            (?{deliveryOptions.delivery_costs.shipping.cost} fee)
                                           </span>
                                         )}
                                       </div>
@@ -8796,12 +8247,105 @@ function App() {
 
                             closeProductDetail();
                           }}
-                          className={`w-full py-3 px-6 rounded-lg font-bold text-lg transition-colors ${selectedProduct.type === 'preorder'
+                          className={`w-full py-3 px-6 rounded-lg font-bold text-lg transition-colors mb-3 ${selectedProduct.type === 'preorder'
                             ? 'bg-orange-600 hover:bg-orange-700 text-white'
                             : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                             }`}
                         >
-                          {selectedProduct.type === 'preorder' ? '🛒 Add Pre-order to Cart' : '🛒 Add to Cart'}
+                          {selectedProduct.type === 'preorder' ? ' Add Pre-order to Cart' : ' Add to Cart'}
+                        </button>
+
+                        {/* Buy Now Button */}
+                        <button
+                          onClick={() => {
+                            const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
+                            const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg';
+                            const specification = selectedProduct.unit_specification || 'standard';
+
+                            const productId = selectedProduct.id || selectedProduct._id;
+                            const deliveryOptions = productDeliveryOptions[productId];
+
+                            if (!deliveryOptions) {
+                              alert('Unable to determine delivery options. Please try again.');
+                              return;
+                            }
+
+                            // Determine actual delivery method based on what's supported
+                            let deliveryMethod = selectedDeliveryMethod;
+                            if (!deliveryOptions.supports_dropoff_delivery && !deliveryOptions.supports_shipping_delivery) {
+                              alert('This product has no available delivery methods. Please contact the supplier.');
+                              return;
+                            }
+
+                            // Default to available method if current selection isn't supported
+                            if (deliveryMethod === 'dropoff' && !deliveryOptions.supports_dropoff_delivery) {
+                              deliveryMethod = 'shipping';
+                            } else if (deliveryMethod === 'shipping' && !deliveryOptions.supports_shipping_delivery) {
+                              deliveryMethod = 'dropoff';
+                            }
+
+                            let deliveryDetails = null;
+
+                            // Validate and get delivery details based on method
+                            if (deliveryMethod === 'dropoff') {
+                              const dropoffLocationId = document.getElementById('detail-dropoff')?.value;
+                              if (!dropoffLocationId) {
+                                alert('Please select a drop-off location');
+                                return;
+                              }
+
+                              const dropoffLocation = dropOffLocations.find(loc => loc.id.toString() === dropoffLocationId);
+                              if (!dropoffLocation) {
+                                alert('Invalid drop-off location selected');
+                                return;
+                              }
+
+                              deliveryDetails = {
+                                type: 'dropoff',
+                                dropoffLocation: dropoffLocation,
+                                cost: deliveryOptions.delivery_costs.dropoff.cost
+                              };
+                            } else if (deliveryMethod === 'shipping') {
+                              const shippingAddress = document.getElementById('detail-shipping-address')?.value?.trim();
+                              if (!shippingAddress) {
+                                alert('Please enter your delivery address');
+                                return;
+                              }
+
+                              deliveryDetails = {
+                                type: 'shipping',
+                                shippingAddress: shippingAddress,
+                                cost: deliveryOptions.delivery_costs.shipping.cost
+                              };
+                            }
+
+                            const cartItem = {
+                              ...selectedProduct,
+                              cartQuantity: quantity,
+                              cartUnit: unit,
+                              cartSpecification: specification,
+                              deliveryMethod: deliveryMethod,
+                              deliveryDetails: deliveryDetails
+                            };
+
+                            // Use the appropriate parameters for addEnhancedToCart based on delivery method
+                            if (deliveryMethod === 'dropoff') {
+                              addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff', deliveryDetails.dropoffLocation);
+                            } else {
+                              addEnhancedToCart(cartItem, quantity, unit, specification, 'platform', null, deliveryDetails.shippingAddress);
+                            }
+
+                            closeProductDetail();
+                            setTimeout(() => {
+                              proceedToCheckout();
+                            }, 300); // Allow cart state to update
+                          }}
+                          className={`w-full py-3 px-6 rounded-lg font-bold text-lg transition-colors border-2 ${selectedProduct.type === 'preorder'
+                            ? 'border-orange-600 text-orange-600 hover:bg-orange-50'
+                            : 'border-emerald-600 text-emerald-600 hover:bg-emerald-50'
+                            }`}
+                        >
+                          {selectedProduct.type === 'preorder' ? ' Buy Pre-order Now' : ' Buy Now'}
                         </button>
 
                         {/* Rate Product Button */}
@@ -8813,7 +8357,7 @@ function App() {
                             }}
                             className="w-full mt-3 py-2 px-6 border-2 border-yellow-400 text-yellow-600 rounded-lg font-medium text-sm hover:bg-yellow-50 transition-colors"
                           >
-                            ⭐ Rate this Product
+                            ? Rate this Product
                           </button>
                         )}
                       </div>
@@ -8823,7 +8367,7 @@ function App() {
 
                 {/* Simple Pre-Order and Recommended Sections */}
                 <div className="mt-8 pt-8 border-t border-gray-200">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">🔥 More Pre-Orders Available</h2>
+                  <h2 className="text-xl font-bold text-gray-900 mb-4"> More Pre-Orders Available</h2>
                   <div className="flex space-x-4 overflow-x-auto pb-4">
                     {products.filter(product =>
                       product.type === 'preorder' &&
@@ -8835,7 +8379,7 @@ function App() {
                           {product.product_name || product.crop_type}
                         </h4>
                         <div className="text-orange-600 font-bold">
-                          ₦{product.price_per_unit}/{product.unit || 'kg'}
+                          ?{product.price_per_unit}/{product.unit || 'kg'}
                         </div>
                       </div>
                     ))}
@@ -8858,7 +8402,7 @@ function App() {
                   onClick={closeRatingModal}
                   className="text-gray-500 hover:text-gray-700"
                 >
-                  ×
+
                 </button>
               </div>
 
@@ -8899,7 +8443,7 @@ function App() {
                           className="hidden"
                         />
                         <span className="text-2xl text-gray-300 hover:text-yellow-400 transition-colors">
-                          ⭐
+                          ?
                         </span>
                       </label>
                     ))}
@@ -8951,7 +8495,7 @@ function App() {
                     onClick={() => setShowDriverManagement(false)}
                     className="text-gray-500 hover:text-gray-700"
                   >
-                    ×
+
                   </button>
                 </div>
               </div>
@@ -8961,7 +8505,7 @@ function App() {
                 <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
                   <h3 className="text-lg font-semibold mb-4">Purchase Driver Slots</h3>
                   <p className="text-gray-600 mb-4">
-                    Each driver slot costs ₦500/month with a 14-day free trial. Purchase slots to add drivers to your fleet.
+                    Each driver slot costs ?500/month with a 14-day free trial. Purchase slots to add drivers to your fleet.
                   </p>
                   <div className="flex space-x-4">
                     <input
@@ -9034,7 +8578,7 @@ function App() {
                                 <strong>Vehicle:</strong> {slot.vehicle_make_model} ({slot.plate_number})
                               </div>
                               <div className="text-sm">
-                                <strong>Rating:</strong> ⭐ {slot.average_rating}/5.0
+                                <strong>Rating:</strong> ? {slot.average_rating}/5.0
                               </div>
                               <div className="text-sm">
                                 <strong>Trips:</strong> {slot.total_trips}
@@ -9093,12 +8637,12 @@ function App() {
             <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-semibold">🚗 Find Drivers</h2>
+                  <h2 className="text-2xl font-semibold"> Find Drivers</h2>
                   <button
                     onClick={() => setShowFindDrivers(false)}
                     className="text-gray-500 hover:text-gray-700"
                   >
-                    ×
+
                   </button>
                 </div>
               </div>
@@ -9163,7 +8707,7 @@ function App() {
                           <div>
                             <h4 className="font-semibold">{driver.name}</h4>
                             <div className="flex items-center">
-                              <span className="text-yellow-400">⭐</span>
+                              <span className="text-yellow-400">?</span>
                               <span className="ml-1 text-sm text-gray-600">
                                 {driver.average_rating.toFixed(1)} ({driver.total_trips} trips)
                               </span>
@@ -9224,12 +8768,12 @@ function App() {
             <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-semibold">💰 My Wallet</h2>
+                  <h2 className="text-2xl font-semibold"> My Wallet</h2>
                   <button
                     onClick={() => setShowWallet(false)}
                     className="text-gray-500 hover:text-gray-700"
                   >
-                    ×
+
                   </button>
                 </div>
               </div>
@@ -9239,20 +8783,20 @@ function App() {
                 <div className="mb-8 p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg">
                   <h3 className="text-lg font-semibold mb-2">Wallet Balance</h3>
                   <div className="text-3xl font-bold mb-4">
-                    ₦{walletSummary ? walletSummary.balance.toLocaleString() : '0'}
+                    ?{walletSummary ? walletSummary.balance.toLocaleString() : '0'}
                   </div>
                   <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
                       <div className="text-purple-200">Total Funded</div>
-                      <div className="font-medium">₦{walletSummary ? walletSummary.total_funded.toLocaleString() : '0'}</div>
+                      <div className="font-medium">?{walletSummary ? walletSummary.total_funded.toLocaleString() : '0'}</div>
                     </div>
                     <div>
                       <div className="text-purple-200">Total Spent</div>
-                      <div className="font-medium">₦{walletSummary ? walletSummary.total_spent.toLocaleString() : '0'}</div>
+                      <div className="font-medium">?{walletSummary ? walletSummary.total_spent.toLocaleString() : '0'}</div>
                     </div>
                     <div>
                       <div className="text-purple-200">Withdrawn</div>
-                      <div className="font-medium">₦{walletSummary ? walletSummary.total_withdrawn.toLocaleString() : '0'}</div>
+                      <div className="font-medium">?{walletSummary ? walletSummary.total_withdrawn.toLocaleString() : '0'}</div>
                     </div>
                   </div>
                 </div>
@@ -9263,28 +8807,28 @@ function App() {
                     onClick={() => setShowFundWallet(true)}
                     className="p-4 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
                   >
-                    <div className="text-2xl mb-2">💳</div>
+                    <div className="text-2xl mb-2"></div>
                     <div className="font-medium">Fund Wallet</div>
                   </button>
                   <button
                     onClick={() => setShowWithdrawFunds(true)}
                     className="p-4 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
                   >
-                    <div className="text-2xl mb-2">🏦</div>
+                    <div className="text-2xl mb-2"></div>
                     <div className="font-medium">Withdraw</div>
                   </button>
                   <button
                     onClick={() => setShowCreateGiftCard(true)}
                     className="p-4 bg-pink-100 text-pink-700 rounded-lg hover:bg-pink-200 transition-colors"
                   >
-                    <div className="text-2xl mb-2">🎁</div>
+                    <div className="text-2xl mb-2"></div>
                     <div className="font-medium">Buy Gift Card</div>
                   </button>
                   <button
                     onClick={() => setShowAddBankAccount(true)}
                     className="p-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                   >
-                    <div className="text-2xl mb-2">🏧</div>
+                    <div className="text-2xl mb-2"></div>
                     <div className="font-medium">Add Bank</div>
                   </button>
                 </div>
@@ -9305,14 +8849,14 @@ function App() {
                               ? 'text-green-600'
                               : 'text-red-600'
                               }`}>
-                              {transaction.transaction_type.includes('funding') ? '⬇️' :
-                                transaction.transaction_type.includes('withdrawal') ? '⬆️' :
-                                  transaction.transaction_type.includes('gift_card') ? '🎁' : '💰'}
+                              {transaction.transaction_type.includes('funding') ? '' :
+                                transaction.transaction_type.includes('withdrawal') ? '' :
+                                  transaction.transaction_type.includes('gift_card') ? '' : ''}
                             </div>
                             <div>
                               <div className="font-medium">{transaction.description}</div>
                               <div className="text-sm text-gray-500">
-                                {new Date(transaction.created_at).toLocaleDateString()} • {transaction.reference}
+                                {new Date(transaction.created_at).toLocaleDateString()}  {transaction.reference}
                               </div>
                             </div>
                           </div>
@@ -9322,7 +8866,7 @@ function App() {
                             }`}>
                             <div className="font-semibold">
                               {transaction.transaction_type.includes('funding') || transaction.transaction_type.includes('redemption') ? '+' : '-'}
-                              ₦{transaction.amount.toLocaleString()}
+                              ?{transaction.amount.toLocaleString()}
                             </div>
                             <div className="text-xs text-gray-500">
                               Status: {transaction.status}
@@ -9345,12 +8889,12 @@ function App() {
           <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold">💳 Fund Wallet</h3>
+                <h3 className="text-xl font-semibold"> Fund Wallet</h3>
                 <button
                   onClick={() => setShowFundWallet(false)}
                   className="text-gray-500 hover:text-gray-700"
                 >
-                  ×
+
                 </button>
               </div>
 
@@ -9363,7 +8907,7 @@ function App() {
 
                 try {
                   await fundWallet(amount, fundingMethod, description);
-                  alert(`Successfully funded wallet with ₦${parseFloat(amount).toLocaleString()}`);
+                  alert(`Successfully funded wallet with ?${parseFloat(amount).toLocaleString()}`);
                   setShowFundWallet(false);
                 } catch (error) {
                   alert('Failed to fund wallet: ' + error.message);
@@ -9372,7 +8916,7 @@ function App() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Amount (₦)
+                      Amount (?)
                     </label>
                     <input
                       type="number"
@@ -9443,12 +8987,12 @@ function App() {
             <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-semibold">🎁 Gift Cards</h2>
+                  <h2 className="text-2xl font-semibold"> Gift Cards</h2>
                   <button
                     onClick={() => setShowGiftCards(false)}
                     className="text-gray-500 hover:text-gray-700"
                   >
-                    ×
+
                   </button>
                 </div>
               </div>
@@ -9460,7 +9004,7 @@ function App() {
                     onClick={() => setShowCreateGiftCard(true)}
                     className="p-6 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:from-pink-600 hover:to-purple-700 transition-colors"
                   >
-                    <div className="text-3xl mb-2">🎁</div>
+                    <div className="text-3xl mb-2"></div>
                     <div className="text-lg font-semibold">Create Gift Card</div>
                     <div className="text-sm text-pink-100">Purchase gift cards for others</div>
                   </button>
@@ -9468,7 +9012,7 @@ function App() {
                     onClick={() => setShowRedeemGiftCard(true)}
                     className="p-6 bg-gradient-to-r from-green-500 to-blue-600 text-white rounded-lg hover:from-green-600 hover:to-blue-700 transition-colors"
                   >
-                    <div className="text-3xl mb-2">💰</div>
+                    <div className="text-3xl mb-2"></div>
                     <div className="text-lg font-semibold">Redeem Gift Card</div>
                     <div className="text-sm text-green-100">Add gift card value to wallet</div>
                   </button>
@@ -9495,7 +9039,7 @@ function App() {
                       {userGiftCards.map(giftCard => (
                         <div key={giftCard.id} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-br from-pink-50 to-purple-50">
                           <div className="flex justify-between items-start mb-3">
-                            <div className="text-2xl">🎁</div>
+                            <div className="text-2xl"></div>
                             <span className={`text-xs px-2 py-1 rounded ${giftCard.status === 'active'
                               ? 'bg-green-100 text-green-800'
                               : giftCard.status === 'redeemed'
@@ -9511,10 +9055,10 @@ function App() {
                               {giftCard.card_code}
                             </div>
                             <div className="text-lg font-bold">
-                              ₦{giftCard.amount.toLocaleString()}
+                              ?{giftCard.amount.toLocaleString()}
                             </div>
                             <div className="text-sm text-gray-600">
-                              Balance: ₦{giftCard.balance.toLocaleString()}
+                              Balance: ?{giftCard.balance.toLocaleString()}
                             </div>
                             {giftCard.recipient_name && (
                               <div className="text-sm text-gray-600">
@@ -9542,12 +9086,12 @@ function App() {
           <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold">🎁 Create Gift Card</h3>
+                <h3 className="text-xl font-semibold"> Create Gift Card</h3>
                 <button
                   onClick={() => setShowCreateGiftCard(false)}
                   className="text-gray-500 hover:text-gray-700"
                 >
-                  ×
+
                 </button>
               </div>
 
@@ -9561,7 +9105,7 @@ function App() {
 
                 try {
                   const result = await createGiftCard(amount, recipientEmail, recipientName, message);
-                  alert(`Gift card created successfully!\nCard Code: ${result.gift_card.card_code}\nAmount: ₦${parseFloat(amount).toLocaleString()}`);
+                  alert(`Gift card created successfully!\nCard Code: ${result.gift_card.card_code}\nAmount: ?${parseFloat(amount).toLocaleString()}`);
                   setShowCreateGiftCard(false);
                 } catch (error) {
                   alert('Failed to create gift card: ' + error.message);
@@ -9570,7 +9114,7 @@ function App() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Gift Card Amount (₦)
+                      Gift Card Amount (?)
                     </label>
                     <input
                       type="number"
@@ -9581,7 +9125,7 @@ function App() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                       placeholder="Enter gift card value"
                     />
-                    <div className="text-xs text-gray-500 mt-1">Min: ₦100, Max: ₦100,000</div>
+                    <div className="text-xs text-gray-500 mt-1">Min: ?100, Max: ?100,000</div>
                   </div>
 
                   <div>
@@ -9648,7 +9192,7 @@ function App() {
           <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold">💰 Redeem Gift Card</h3>
+                <h3 className="text-xl font-semibold"> Redeem Gift Card</h3>
                 <button
                   onClick={() => {
                     setShowRedeemGiftCard(false);
@@ -9656,7 +9200,7 @@ function App() {
                   }}
                   className="text-gray-500 hover:text-gray-700"
                 >
-                  ×
+
                 </button>
               </div>
 
@@ -9668,7 +9212,7 @@ function App() {
 
                 try {
                   const result = await redeemGiftCard(cardCode, amount);
-                  alert(`Gift card redeemed successfully!\nRedeemed: ₦${result.redeemed_amount.toLocaleString()}\nNew wallet balance: ₦${result.new_wallet_balance.toLocaleString()}`);
+                  alert(`Gift card redeemed successfully!\nRedeemed: ?${result.redeemed_amount.toLocaleString()}\nNew wallet balance: ?${result.new_wallet_balance.toLocaleString()}`);
                   setShowRedeemGiftCard(false);
                   setGiftCardDetails(null);
                 } catch (error) {
@@ -9714,10 +9258,10 @@ function App() {
                           Gift Card Found!
                         </div>
                         <div className="text-sm text-green-700">
-                          Available Balance: ₦{giftCardDetails.balance.toLocaleString()}
+                          Available Balance: ?{giftCardDetails.balance.toLocaleString()}
                         </div>
                         <div className="text-sm text-green-600">
-                          Status: {giftCardDetails.status} •
+                          Status: {giftCardDetails.status}
                           Expires: {new Date(giftCardDetails.expiry_date).toLocaleDateString()}
                         </div>
                         {giftCardDetails.message && (
@@ -9778,7 +9322,7 @@ function App() {
           <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg max-w-md w-full p-6 border-2 border-yellow-200">
               <div className="text-center">
-                <div className="text-4xl mb-4">🔐</div>
+                <div className="text-4xl mb-4"></div>
                 <h3 className="text-xl font-semibold mb-2 text-gray-800">Complete Your KYC</h3>
                 <p className="text-gray-600 mb-4">
                   Complete your KYC verification to start receiving payments on the platform.
@@ -9816,111 +9360,18 @@ function App() {
         )
       }
 
-      {/* Farmer Dashboard */}
+      {/* Farmer / Seller Dashboard */}
       {
-        showFarmerDashboard && user && user.role === 'farmer' && (
+        showFarmerDashboard && user && ['farmer', 'business', 'supplier_food_produce'].includes(user.role) && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-semibold">🌾 Farmer Dashboard</h2>
-                  <button
-                    onClick={() => setShowFarmerDashboard(false)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-
-              {farmerDashboardData ? (
-                <div className="p-6">
-                  {/* Profile Summary */}
-                  <div className="mb-8 p-6 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg">
-                    <h3 className="text-lg font-semibold mb-2">Welcome, {farmerDashboardData.farmer_profile.name}!</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <div className="text-green-200">KYC Status</div>
-                        <div className="font-medium capitalize">{farmerDashboardData.farmer_profile.kyc_status}</div>
-                      </div>
-                      <div>
-                        <div className="text-green-200">Rating</div>
-                        <div className="font-medium">⭐ {farmerDashboardData.farmer_profile.average_rating}/5</div>
-                      </div>
-                      <div>
-                        <div className="text-green-200">Products</div>
-                        <div className="font-medium">{farmerDashboardData.business_metrics.total_products}</div>
-                      </div>
-                      <div>
-                        <div className="text-green-200">Revenue</div>
-                        <div className="font-medium">₦{farmerDashboardData.business_metrics.total_revenue.toLocaleString()}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Business Metrics */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <div className="text-2xl text-blue-600 mb-2">📦</div>
-                      <div className="text-2xl font-bold text-blue-600">{farmerDashboardData.business_metrics.active_products}</div>
-                      <div className="text-sm text-blue-600">Active Products</div>
-                    </div>
-                    <div className="bg-green-50 p-4 rounded-lg">
-                      <div className="text-2xl text-green-600 mb-2">🌾</div>
-                      <div className="text-2xl font-bold text-green-600">{farmerDashboardData.business_metrics.total_farmlands}</div>
-                      <div className="text-sm text-green-600">Farmlands</div>
-                    </div>
-                    <div className="bg-yellow-50 p-4 rounded-lg">
-                      <div className="text-2xl text-yellow-600 mb-2">📋</div>
-                      <div className="text-2xl font-bold text-yellow-600">{farmerDashboardData.business_metrics.pending_orders}</div>
-                      <div className="text-sm text-yellow-600">Pending Orders</div>
-                    </div>
-                    <div className="bg-purple-50 p-4 rounded-lg">
-                      <div className="text-2xl text-purple-600 mb-2">📏</div>
-                      <div className="text-2xl font-bold text-purple-600">{farmerDashboardData.business_metrics.total_hectares}</div>
-                      <div className="text-sm text-purple-600">Total Hectares</div>
-                    </div>
-                  </div>
-
-                  {/* Recent Orders */}
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
-                    {farmerDashboardData.recent_orders.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <p>No recent orders. Start listing your products to get orders!</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {farmerDashboardData.recent_orders.map((order, index) => (
-                          <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                            <div>
-                              <div className="font-medium">{order.product}</div>
-                              <div className="text-sm text-gray-500">Buyer: {order.buyer}</div>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-semibold">₦{order.amount.toLocaleString()}</div>
-                              <div className={`text-xs px-2 py-1 rounded ${order.status === 'completed' || order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                                order.status === 'pending' || order.status === 'confirmed' ? 'bg-yellow-100 text-yellow-800' :
-                                  order.status === 'held_in_escrow' || order.status === 'in_transit' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-gray-100 text-gray-800'
-                                }`}>
-                                {getOrderStatusDisplay(order.status)}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="p-6">
-                  <div className="text-center py-8 text-gray-500">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-                    <p>Loading dashboard data...</p>
-                  </div>
-                </div>
-              )}
+            <div className="bg-white rounded-lg max-w-7xl w-full max-h-[90vh] overflow-y-auto relative">
+              <button
+                onClick={() => setShowFarmerDashboard(false)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-2 shadow"
+              >
+                ✕ Close
+              </button>
+              <SellerDashboard user={user} token={localStorage.getItem('token')} />
             </div>
           </div>
         )
@@ -9928,24 +9379,33 @@ function App() {
 
       {/* Agent Dashboard */}
       {
-        showAgentDashboard && user && user.role === 'agent' && (
+        showAgentDashboard && user && ['agent', 'purchasing_agent'].includes(user.role) && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-semibold">🤝 Agent Dashboard</h2>
-                  <button
-                    onClick={() => setShowAgentDashboard(false)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-              {/* Agent Dashboard Content Placeholder */}
-              {agentDashboardData ? (
-                <DealBoard requests={[]} onRefresh={() => { }} />
-              ) : <p className="p-6">Loading Agent Data...</p>}
+            <div className="bg-white rounded-lg max-w-7xl w-full max-h-[90vh] overflow-y-auto relative">
+              <button
+                onClick={() => setShowAgentDashboard(false)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-2 shadow"
+              >
+                ✕ Close
+              </button>
+              <SellerDashboard user={user} token={localStorage.getItem('token')} />
+            </div>
+          </div>
+        )
+      }
+
+      {/* Personal Dashboard */}
+      {
+        showPersonalDashboard && user && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-7xl w-full max-h-[90vh] overflow-y-auto relative">
+              <button
+                onClick={() => setShowPersonalDashboard(false)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-2 shadow"
+              >
+                ✕ Close
+              </button>
+              <PersonalDashboard user={user} />
             </div>
           </div>
         )
@@ -9958,8 +9418,8 @@ function App() {
             <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-semibold">🛡️ Admin Dashboard</h2>
-                  <button onClick={() => setShowAdminDashboard(false)} className="text-gray-500 hover:text-gray-700">×</button>
+                  <h2 className="text-2xl font-semibold">? Admin Dashboard</h2>
+                  <button onClick={() => setShowAdminDashboard(false)} className="text-gray-500 hover:text-gray-700"></button>
                 </div>
               </div>
               <div className="p-6">
@@ -9978,12 +9438,12 @@ function App() {
             <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-semibold">📈 Market Prices</h2>
+                  <h2 className="text-2xl font-semibold"> Market Prices</h2>
                   <button
                     onClick={() => setShowMarketChart(false)}
                     className="text-gray-500 hover:text-gray-700"
                   >
-                    ×
+
                   </button>
                 </div>
               </div>
@@ -10010,7 +9470,7 @@ function App() {
                             <div className="text-xs text-gray-500 capitalize">{item.category.replace('_', ' ')}</div>
                           </div>
                           <div className="text-right">
-                            <div className="text-xl font-bold text-gray-900">₦{item.price.toLocaleString()}</div>
+                            <div className="text-xl font-bold text-gray-900">?{item.price.toLocaleString()}</div>
                             <div className={`text-sm font-medium ${item.trend.startsWith('+') ? 'text-green-600' : 'text-red-600'
                               }`}>
                               {item.trend}
@@ -10040,8 +9500,8 @@ function App() {
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold">🌱 Create Community</h3>
-                <button onClick={() => setShowCreateCommunity(false)} className="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                <h3 className="text-xl font-semibold"> Create Community</h3>
+                <button onClick={() => setShowCreateCommunity(false)} className="text-gray-500 hover:text-gray-700 text-2xl"></button>
               </div>
               <form onSubmit={handleCreateCommunity}>
                 <div className="space-y-4">
@@ -10133,6 +9593,27 @@ function App() {
         )
       }
 
+      {/* My Requests (Offers) Page */}
+      {
+        showMyRequestsPage && (
+          <div className="fixed inset-0 bg-white z-50 overflow-y-auto pt-16">
+            <div className="max-w-7xl mx-auto px-4 relative">
+              <button
+                onClick={() => setShowMyRequestsPage(false)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-3xl z-50 bg-white rounded-full w-10 h-10 flex items-center justify-center shadow-sm"
+              >
+                &times;
+              </button>
+              <MyRequests
+                requests={myRequests}
+                myOffers={myOffers}
+                onRefresh={fetchMyRequests}
+              />
+            </div>
+          </div>
+        )
+      }
+
       {
         showWallet && (
           <WalletModal
@@ -10142,6 +9623,33 @@ function App() {
           />
         )
       }
+
+      {/* DVA Creation Prompt for Partners */}
+      <DVAPromptModal
+        isOpen={showDVAPrompt}
+        onClose={() => setShowDVAPrompt(false)}
+        user={user}
+        onUpdateUser={(updatedUser) => {
+          setUser(updatedUser);
+          localStorage.setItem('user', JSON.stringify(updatedUser)); // Persist update
+          setShowDVAPrompt(false);
+        }}
+      />
+
+      {showMyOrders && (
+        <MyOrdersModal onClose={() => setShowMyOrders(false)} />
+      )}
+
+      {/* Floating My Orders Button */}
+      {user && (
+        <button
+          onClick={() => setShowMyOrders(true)}
+          className="fixed bottom-24 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg z-50 hover:bg-blue-700 flex items-center justify-center transition-all transform hover:scale-105"
+          title="My Orders"
+        >
+          <span className="text-xl">📦</span>
+        </button>
+      )}
 
     </div >
 

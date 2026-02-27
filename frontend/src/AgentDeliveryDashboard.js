@@ -1,29 +1,58 @@
 import React, { useState, useEffect } from 'react';
+import MyRequests from './components/rfq/MyRequests';
 
 const AgentDeliveryDashboard = ({ user, token }) => {
     const [deliveries, setDeliveries] = useState([]);
+    const [requests, setRequests] = useState([]);
+    const [quotations, setQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('pending'); // pending, history
-
-    useEffect(() => {
-        fetchDeliveries();
-    }, []);
+    const [activeTab, setActiveTab] = useState('pending'); // pending, history, requests, quotations
 
     const fetchDeliveries = async () => {
         try {
-            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/agent/deliveries`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setDeliveries(data.orders || []);
+            // Fetch Deliveries
+            if (activeTab === 'pending' || activeTab === 'history') {
+                const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/agent/deliveries`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setDeliveries(data.orders || []);
+                }
             }
+
+            // Fetch My Requests
+            if (activeTab === 'requests') {
+                const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/requests/my-requests`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setRequests(Array.isArray(data) ? data : data.requests || []);
+                }
+            }
+
+            // Fetch Sent Quotations (Offers)
+            if (activeTab === 'quotations') {
+                const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/requests/my-offers`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setQuotations(Array.isArray(data) ? data : data.offers || []);
+                }
+            }
+
         } catch (error) {
-            console.error("Failed to fetch deliveries", error);
+            console.error("Failed to fetch dashboard data", error);
         } finally {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        fetchDeliveries();
+    }, [activeTab]);
 
     const updateStatus = async (orderId, newStatus, notes) => {
         try {
@@ -71,30 +100,91 @@ const AgentDeliveryDashboard = ({ user, token }) => {
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b mb-6">
+            <div className="flex border-b mb-6 overflow-x-auto">
                 <button
-                    className={`px-6 py-3 font-medium transition ${activeTab === 'pending' ? 'border-b-2 border-emerald-600 text-emerald-700' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`px-6 py-3 font-medium transition whitespace-nowrap ${activeTab === 'pending' ? 'border-b-2 border-emerald-600 text-emerald-700' : 'text-gray-500 hover:text-gray-700'}`}
                     onClick={() => setActiveTab('pending')}
                 >
                     Active Deliveries ({deliveries.filter(d => !['delivered', 'cancelled'].includes(d.delivery_status)).length})
                 </button>
                 <button
-                    className={`px-6 py-3 font-medium transition ${activeTab === 'history' ? 'border-b-2 border-emerald-600 text-emerald-700' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`px-6 py-3 font-medium transition whitespace-nowrap ${activeTab === 'history' ? 'border-b-2 border-emerald-600 text-emerald-700' : 'text-gray-500 hover:text-gray-700'}`}
                     onClick={() => setActiveTab('history')}
                 >
                     History
                 </button>
+                <button
+                    className={`px-6 py-3 font-medium transition whitespace-nowrap ${activeTab === 'requests' ? 'border-b-2 border-emerald-600 text-emerald-700' : 'text-gray-500 hover:text-gray-700'}`}
+                    onClick={() => setActiveTab('requests')}
+                >
+                    My Requests
+                </button>
+                <button
+                    className={`px-6 py-3 font-medium transition whitespace-nowrap ${activeTab === 'quotations' ? 'border-b-2 border-emerald-600 text-emerald-700' : 'text-gray-500 hover:text-gray-700'}`}
+                    onClick={() => setActiveTab('quotations')}
+                >
+                    Sent Quotations
+                </button>
             </div>
 
             <div className="grid gap-4">
-                {filteredDeliveries.length === 0 ? (
-                    <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                        <p className="text-gray-500">No deliveries found in this category.</p>
+                {(activeTab === 'pending' || activeTab === 'history') && (
+                    filteredDeliveries.length === 0 ? (
+                        <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                            <p className="text-gray-500">No deliveries found in this category.</p>
+                        </div>
+                    ) : (
+                        filteredDeliveries.map(order => (
+                            <DeliveryCard key={order.order_id} order={order} onUpdate={updateStatus} />
+                        ))
+                    )
+                )}
+
+                {activeTab === 'requests' && (
+                    <div className="bg-white p-4 rounded-lg shadow-sm border">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold">My Buyer Requests</h3>
+                            <button
+                                onClick={() => { if (window.openRequestWizard) window.openRequestWizard(); }}
+                                className="bg-purple-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-purple-700 transition"
+                            >
+                                + Create Request (Bulk Buy)
+                            </button>
+                        </div>
+                        <MyRequests requests={requests} onRefresh={fetchDeliveries} />
                     </div>
-                ) : (
-                    filteredDeliveries.map(order => (
-                        <DeliveryCard key={order.order_id} order={order} onUpdate={updateStatus} />
-                    ))
+                )}
+
+                {activeTab === 'quotations' && (
+                    <div className="bg-white p-4 rounded-lg shadow-sm border">
+                        <h3 className="text-xl font-bold mb-6">Sent Quotations</h3>
+                        {quotations.length === 0 ? (
+                            <p className="text-gray-500 text-center py-8">You haven't submitted any quotations yet.</p>
+                        ) : (
+                            <div className="space-y-4">
+                                {quotations.map(offer => (
+                                    <div key={offer.id} className="border p-4 rounded-lg">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <h4 className="font-bold">Request ID: {offer.request_id}</h4>
+                                                <p className="text-sm text-gray-500">Date: {new Date(offer.created_at).toLocaleDateString()}</p>
+                                            </div>
+                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${offer.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                                                    offer.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                                        'bg-yellow-100 text-yellow-800'
+                                                }`}>
+                                                {offer.status.toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <div className="mt-2">
+                                            <p className="font-bold text-lg text-emerald-600">₦{offer.price?.toLocaleString()}</p>
+                                            {offer.notes && <p className="text-sm text-gray-600 mt-1">"{offer.notes}"</p>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
         </div>

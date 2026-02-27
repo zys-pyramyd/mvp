@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const ProductModal = ({ product, variant, isOpen, onClose, onAddToCart, onCommit, onChatAgent, dropOffLocations = [] }) => {
+const ProductModal = ({ product, variant, isOpen, onClose, onAddToCart, onBuyNow, onCommit, onChatAgent, dropOffLocations = [] }) => {
     const [quantity, setQuantity] = useState(1);
     const [selectedDropOff, setSelectedDropOff] = useState('');
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -22,6 +22,12 @@ const ProductModal = ({ product, variant, isOpen, onClose, onAddToCart, onCommit
 
         if (actionType === 'commit') {
             onCommit(product, quantity);
+        } else if (actionType === 'buyNow') {
+            if (onBuyNow) {
+                onBuyNow(product, quantity, dropoffLoc);
+            } else {
+                onAddToCart(product, quantity, dropoffLoc);
+            }
         } else {
             onAddToCart(product, quantity, dropoffLoc);
         }
@@ -230,7 +236,7 @@ const ProductModal = ({ product, variant, isOpen, onClose, onAddToCart, onCommit
                                         Add to Cart
                                     </button>
                                     <button
-                                        onClick={() => handleAction('cart')}
+                                        onClick={() => handleAction('buyNow')}
                                         className="flex-1 bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 shadow-lg transform active:scale-95 transition-all"
                                     >
                                         Buy Now

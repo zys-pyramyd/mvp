@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from app.api.deps import get_db, get_current_user
 from typing import List, Optional
 
@@ -70,24 +70,38 @@ async def get_public_user_profile(username: str):
         raise HTTPException(status_code=500, detail="Failed to get user profile")
 
 @router.get("/search")
-async def search_users(username: str, current_user: dict = Depends(get_current_user)):
-    """Search users by username for group buying"""
-    if not username:
+async def search_users(q: str = Query(..., min_length=1), current_user: dict = Depends(get_current_user)):
+    """Search users by username or name"""
+    if not q:
         return []
     
     db = get_db()
     
-    users = list(db.users.find({
-        "username": {"$regex": username, "$options": "i"},
-        "role": {"$in": ["general_buyer", "retailer", "hotel", "restaurant", "cafe"]}
-    }).limit(10))
+    # Search by username, first_name, or last_name (case insensitive)
+    query = {
+        "$or": [
+            {"username": {"$regex": q, "$options": "i"}},
+            {"first_name": {"$regex": q, "$options": "i"}},
+            {"last_name": {"$regex": q, "$options": "i"}}
+        ]
+    }
     
+    # We want to find ANY user to add to community, so we remove strict role filtering 
+    # or keep it broad if needed. For now, let's allow finding any user.
+    users = list(db.users.find(query).limit(10))
+    
+    results = []
     for user in users:
-        user.pop('_id', None)
-        user.pop('password', None)
-        user['is_nin_verified'] = bool(user.get('verification_info', {}).get('nin'))
+        results.append({
+            "id": user.get("id"),
+            "username": user.get("username"),
+            "first_name": user.get("first_name"),
+            "last_name": user.get("last_name"),
+            "profile_picture": user.get("profile_picture"),
+            "role": user.get("role")
+        })
     
-    return users
+    return results
 
 # --- Bank Account Management ---
 from app.models.user import BankAccountCreate

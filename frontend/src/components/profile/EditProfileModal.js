@@ -12,6 +12,7 @@ const EditProfileModal = ({ isOpen, onClose }) => {
     const [loading, setLoading] = useState(false);
     const [dvaLoading, setDvaLoading] = useState(false);
     const [msg, setMsg] = useState({ type: '', text: '' });
+    const [bvn, setBvn] = useState(''); // State for BVN retry
 
     useEffect(() => {
         if (user) {
@@ -51,7 +52,9 @@ const EditProfileModal = ({ isOpen, onClose }) => {
         setDvaLoading(true);
         setMsg({ type: '', text: '' });
         try {
-            const response = await api.post('/auth/create-dva');
+            // Send BVN if provided
+            const payload = bvn ? { bvn } : {};
+            const response = await api.post('/auth/create-dva', payload);
             const { account_number, bank_name } = response.data;
 
             const updatedUser = {
@@ -61,10 +64,10 @@ const EditProfileModal = ({ isOpen, onClose }) => {
             };
 
             login(localStorage.getItem('token'), updatedUser); // Update context
-            setMsg({ type: 'success', text: `DVA Created: ${account_number} (${bank_name})` });
+            setMsg({ type: 'success', text: `Virtual Account Created: ${account_number} (${bank_name})` });
         } catch (error) {
             console.error(error);
-            setMsg({ type: 'error', text: error.response?.data?.detail || 'DVA Creation failed. Ensure names match BVN.' });
+            setMsg({ type: 'error', text: error.response?.data?.detail || 'Virtual Account creation failed. Ensure names match BVN.' });
         } finally {
             setDvaLoading(false);
         }
@@ -146,6 +149,21 @@ const EditProfileModal = ({ isOpen, onClose }) => {
                                     <p className="font-bold mb-1">No Virtual Account</p>
                                     <p>You cannot receive automated payouts. Ensure your profile name matches your BVN exactly.</p>
                                 </div>
+
+                                <div className="mb-4">
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Update BVN (Optional - if previous attempts failed)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={bvn}
+                                        onChange={(e) => setBvn(e.target.value)}
+                                        placeholder="Enter corrected BVN only if needed"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 text-sm"
+                                        maxLength={11}
+                                    />
+                                </div>
+
                                 <button
                                     onClick={handleCreateDVA}
                                     disabled={dvaLoading}

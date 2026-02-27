@@ -5,7 +5,7 @@ import sys
 import certifi
 
 # Environment variables
-MONGO_URL = os.environ.get('MONGO_URL', os.environ.get('MONGO_URI'))
+MONGO_URL = os.environ.get('MONGO_URL', os.environ.get('MONGO_URI', 'mongodb://localhost:27017/'))
 
 # Global client variable (Lazy Loading)
 _client = None
@@ -18,18 +18,23 @@ def get_db():
             return None
             
         try:
-            # Add tlsCAFile=certifi.where() to fix SSL errors on Render/Linux
+            # Only add tlsCAFile for remote connections (Render/Atlas)
+            kwargs = {}
+            if "localhost" not in MONGO_URL and "127.0.0.1" not in MONGO_URL:
+                kwargs['tlsCAFile'] = certifi.where()
+
             _client = MongoClient(
                 MONGO_URL, 
                 serverSelectionTimeoutMS=10000, 
-                tlsCAFile=certifi.where()
+                **kwargs
             )
             print("Client initialized (Lazy)")
         except Exception as e:
             print(f"X Error initializing MongoDB client: {e}")
             return None
             
-    return _client['pyramyd']
+    db_name = os.environ.get('DB_NAME', 'pyramyd')
+    return _client[db_name]
 
 # Proxy object to maintain backward compatibility with 'from database import db'
 # This allows db['collection'] to work by creating the client on demand if accessed.

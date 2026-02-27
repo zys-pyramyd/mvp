@@ -1,0 +1,174 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- C:\Python314\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Downloads\mvp\backend
+plugins: anyio-4.12.1
+collecting ... collected 1 item
+
+tests/test_integration.py::test_full_order_flow FAILED                   [100%]
+
+================================== FAILURES ===================================
+____________________________ test_full_order_flow _____________________________
+
+    def test_full_order_flow():
+        # 1. Register Buyer
+        buyer_email = f"buyer_{uuid.uuid4()}@example.com"
+        buyer_data = {
+            "email": buyer_email,
+            "password": "password123",
+            "role": "personal",
+            "first_name": "Integration",
+            "last_name": "Buyer"
+        }
+        res = client.post("/api/auth/register", json=buyer_data)
+>       assert res.status_code == 200, res.text
+E       AssertionError: {"detail":[{"type":"missing","loc":["body","username"],"msg":"Field required","input":{"email":"buyer_fc2a5609-725e-4858-b030-c74fd402ca05@example.com","password":"password123","role":"personal","first_name":"Integration","last_name":"Buyer"}}]}
+E       assert 422 == 200
+E        +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+
+tests\test_integration.py:42: AssertionError
+============================== warnings summary ===============================
+app\models\order.py:12
+  C:\Users\Downloads\mvp\backend\app\models\order.py:12: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('unit')
+
+app\models\order.py:51
+  C:\Users\Downloads\mvp\backend\app\models\order.py:51: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('dropoff_location_id')
+
+app\models\order.py:150
+  C:\Users\Downloads\mvp\backend\app\models\order.py:150: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('partial_payment_percentage')
+
+app\models\order.py:156
+  C:\Users\Downloads\mvp\backend\app\models\order.py:156: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('total_stock')
+
+app\models\order.py:162
+  C:\Users\Downloads\mvp\backend\app\models\order.py:162: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('price_per_unit')
+
+app\models\order.py:208
+  C:\Users\Downloads\mvp\backend\app\models\order.py:208: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('name')
+
+app\models\order.py:214
+  C:\Users\Downloads\mvp\backend\app\models\order.py:214: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('address')
+
+app\api\rfq.py:36
+  C:\Users\Downloads\mvp\backend\app\api\rfq.py:36: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('type')
+
+app\api\rfq.py:53
+  C:\Users\Downloads\mvp\backend\app\api\rfq.py:53: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('type')
+
+app\models\tracking.py:8
+  C:\Users\Downloads\mvp\backend\app\models\tracking.py:8: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    timestamp: datetime = datetime.utcnow()
+
+server.py:401
+  C:\Users\Downloads\mvp\backend\server.py:401: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+..\..\..\HP\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py:4576
+..\..\..\HP\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py:4576
+..\..\..\HP\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py:4576
+..\..\..\HP\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py:4576
+..\..\..\HP\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py:4576
+  C:\Users\HP\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py:4576: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+server.py:659
+  C:\Users\Downloads\mvp\backend\server.py:659: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+server.py:766
+  C:\Users\Downloads\mvp\backend\server.py:766: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+server.py:998
+  C:\Users\Downloads\mvp\backend\server.py:998: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('unit')
+
+server.py:1014
+  C:\Users\Downloads\mvp\backend\server.py:1014: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('dropoff_location_id')
+
+server.py:1207
+  C:\Users\Downloads\mvp\backend\server.py:1207: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('partial_payment_percentage')
+
+server.py:1213
+  C:\Users\Downloads\mvp\backend\server.py:1213: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('total_stock')
+
+server.py:1219
+  C:\Users\Downloads\mvp\backend\server.py:1219: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('price_per_unit')
+
+server.py:1266
+  C:\Users\Downloads\mvp\backend\server.py:1266: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('name')
+
+server.py:1272
+  C:\Users\Downloads\mvp\backend\server.py:1272: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('address')
+
+server.py:1300
+  C:\Users\Downloads\mvp\backend\server.py:1300: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('phone')
+
+server.py:1312
+  C:\Users\Downloads\mvp\backend\server.py:1312: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator('email', always=True)
+
+server.py:1535
+  C:\Users\Downloads\mvp\backend\server.py:1535: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    @validator("images", check_fields=False)
+
+server.py:5269
+  C:\Users\Downloads\mvp\backend\server.py:5269: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+server.py:9944
+  C:\Users\Downloads\mvp\backend\server.py:9944: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_integration.py::test_full_order_flow - AssertionError: {"detail":[{"type":"missing","loc":["body","username"],"msg":"Field required","input":{"email":"buyer_fc2a5609-725e-4858-b030-c74fd402ca05@example.com","password":"password123","role":"personal","first_name":"Integration","last_name":"Buyer"}}]}
+assert 422 == 200
+ +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+======================= 1 failed, 30 warnings in 3.08s ========================

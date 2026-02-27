@@ -41,6 +41,8 @@ def test_personal_registration():
 def test_partner_registration_with_bvn():
     print("\nTesting Partner Registration with BVN...")
     user_data = generate_random_user("partner")
+    user_data["first_name"] = "TestPartner" # Fixed name for mock matching
+    user_data["last_name"] = "User"
     user_data["partner_type"] = "farmer"
     user_data["bvn"] = "12345678901"
     
@@ -49,26 +51,47 @@ def test_partner_registration_with_bvn():
     if response.status_code == 200:
         print("[OK] Partner Registration Successful")
         user = response.json()['user']
-        # We need to verify DVA fields in DB, but API response might not return them all.
-        # Let's check login response or just assume 200 OK means logic ran.
-        # To be sure, we can fetch user profile if endpoint exists.
-        return response.json()['token']
+        return response.json()['token'], user['id']
     else:
         print(f"[FAILED] Partner Registration Failed: {response.text}")
+        return None, None
+
+def login_admin():
+    print("\nLogging in as Admin...")
+    payload = {"email_or_phone": "admin@pyramydhub.com", "password": "admin123"}
+    try:
+        res = requests.post(f"{BASE_URL}/api/auth/login", json=payload)
+        if res.status_code == 200:
+            print("[OK] Admin Login Successful")
+            return res.json()['token']
+        else:
+            print(f"[FAILED] Admin Login Failed: {res.text}")
+            # Try creating admin if missing/failed? for now just fail.
+            return None
+    except Exception as e:
+        print(f"[FAILED] Admin Login Error: {e}")
         return None
 
-def test_order_id_format(token):
-    print("\nTesting Order ID Format...")
-    return # Skip for now as we don't have products easily set up in this script
-    # To properly test this we need:
-    # 1. Product in DB
-    # 2. Add to cart / Create Order
-    # This might be complex to script purely with requests without setting up state.
-    # We will rely on manual verification or unit tests for this part.
+def test_admin_verification(admin_token, user_id):
+    print(f"\nTesting Admin Verification for User {user_id}...")
+    headers = {"Authorization": f"Bearer {admin_token}"}
     
+    # Verify User
+    res = requests.put(f"{BASE_URL}/api/admin/users/{user_id}/verify", headers=headers)
+    
+    if res.status_code == 200:
+        print(f"[OK] Verification Result: {res.json()['message']}")
+        
+        # Check if DVA was created (by checking user profile/admin get)
+        # We can't easily check DB directly here without pymongo, 
+        # but we can try login as user or check admin user list?
+        # Let's trust the message for now or add a 'get user' check if admin has endpoint.
+        pass
+    else:
+        print(f"[FAILED] Verification Failed: {res.text}")
+
 if __name__ == "__main__":
     print("Starting Verification...")
-    # These tests assume the server is running on localhost:8000
     try:
         requests.get(BASE_URL)
     except requests.exceptions.ConnectionError:
@@ -76,6 +99,11 @@ if __name__ == "__main__":
         sys.exit(1)
         
     token = test_personal_registration()
-    partner_token = test_partner_registration_with_bvn()
+    partner_token, partner_id = test_partner_registration_with_bvn()
     
-    # If we had a token, we could call an endpoint to see if ID generated correctly
+    if partner_id:
+        admin_token = login_admin()
+        if admin_token:
+            test_admin_verification(admin_token, partner_id)
+    
+    # End

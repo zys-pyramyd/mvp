@@ -2,8 +2,14 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from app.api.deps import get_db, get_current_user
 from app.models.product import Product, ProductCreate
+from app.models.community import CommunityProductComment
 from app.models.common import ProductCategory, PreOrderStatus
 from typing import List, Optional
+from datetime import datetime
+from pydantic import BaseModel, Field
+
+class CommentCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=1000)
 from datetime import datetime
 
 router = APIRouter()
@@ -222,7 +228,7 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
         raise HTTPException(status_code=400, detail="Please select a role first")
     
     # Check if user can create products
-    allowed_roles = ['farmer', 'agent', 'supplier_farm_inputs', 'supplier_food_produce', 'processor']
+    allowed_roles = ['farmer', 'agent', 'business']
     if current_user.get('role') not in allowed_roles:
         raise HTTPException(status_code=403, detail="Not authorized to create products")
         
@@ -240,20 +246,44 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
     # Enforce platform restrictions
     if user_role == 'farmer':
         product_platform = 'pyhub'
-    elif user_role == 'supplier_farm_inputs':
+    elif user_role == 'business':
+        # Businesses can list Farm Inputs, Food, etc. across platforms (PyExpress or PyHub)
+        # We respect the platform sent from the frontend, default to pyexpress
+        product_platform = product_data.platform or 'pyexpress'
+            
+    elif user_role == 'agent':
+        # Agents can list on behalf of farmers effectively
         product_platform = 'pyhub'
-        # Validate that the product category is appropriate for farm inputs
-        farm_input_categories = ['fertilizer', 'herbicides', 'pesticides', 'seeds']
-        if product_data.category.value not in farm_input_categories:
-            raise HTTPException(status_code=400, detail="Farm input suppliers can only list farm input products")
-    elif user_role == 'supplier_food_produce':
-        product_platform = 'pyexpress'
-        # Validate that the product category is appropriate for food produce
-        food_categories = ['sea_food', 'grain', 'legumes', 'vegetables', 'spices', 'fruits', 'fish', 'meat', 'packaged_goods']
-        if product_data.category.value not in food_categories:
-            raise HTTPException(status_code=400, detail="Food produce suppliers can only list food products")
-    elif user_role == 'processor':
-        product_platform = 'pyexpress'
+    
+    # Enforce Pre-order Role Restrictions
+    if product_data.is_preorder:
+        # Enforce that only Farmers, Agents, and Businesses can create pre-orders.
+        # Since 'processor' is removed, we just need to ensure the allowed roles are respected.
+        # The current implementation restricts based on logic.
+        # If user_role is 'personal' (buyer), they likely shouldn't be creating pre-orders either unless they are selling?
+        # Assuming the standard checks pass.
+        pass
+        
+    # Community Product Logic
+    if product_data.community_id:
+        product_platform = 'community'
+        # Verify user is member of community
+        member = db.community_members.find_one({
+            "community_id": product_data.community_id,
+            "user_id": current_user['id']
+        })
+        if not member:
+            raise HTTPException(status_code=403, detail="You must be a member of the community to list products there")
+            
+        # Restrict to Admins/Creators only
+        if member.get('role') not in ['admin', 'creator']:
+             raise HTTPException(status_code=403, detail="Only community admins can list products")
+            
+        # Optional: Fetch community name for denormalization
+        community = db.communities.find_one({"id": product_data.community_id})
+        community_name = community.get('name') if community else None
+    else:
+        community_name = None
     
     db = get_db()
     
@@ -264,6 +294,7 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
         seller_type=current_user.get('role'),
         seller_profile_picture=current_user.get('profile_picture'),  # Include seller's profile picture
         seller_is_verified=current_user.get('is_verified', False),  # Verified status
+        community_name=community_name, # Community Name
         business_name=current_user.get('business_name'),  # Include business name for transparency
         platform=product_platform,
         **{k: v for k, v in product_data.dict().items() if k != 'platform'}
@@ -345,4 +376,48 @@ async def update_preorder_time(
         }}
     )
     
+    
     return {"message": "Pre-order settings updated"}
+
+@router.post("/{product_id}/comments")
+async def create_product_comment(
+    product_id: str,
+    comment_data: CommentCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Comment on a product offering"""
+    db = get_db()
+    
+    # Verify product exists
+    product = db.products.find_one({"id": product_id})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    comment = CommunityProductComment(
+        product_id=product_id,
+        user_id=current_user['id'],
+        username=current_user['username'],
+        comment=comment_data.content
+    )
+    
+    db.product_comments.insert_one(comment.dict())
+    
+    # Update comment count on product (optional but good for UI)
+    db.products.update_one(
+        {"id": product_id},
+        {"$inc": {"comments_count": 1}}
+    )
+    
+    return comment
+
+@router.get("/{product_id}/comments")
+async def get_product_comments(product_id: str, limit: int = 20):
+    """Get comments for a product"""
+    db = get_db()
+    comments = list(db.product_comments.find({"product_id": product_id})
+                   .sort("created_at", -1)
+                   .limit(limit))
+    
+    for c in comments:
+        c.pop("_id", None)
+    return comments

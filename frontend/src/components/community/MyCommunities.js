@@ -36,12 +36,6 @@ const MyCommunities = ({ onSelect, refreshTrigger, onCreate }) => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex justify-between items-center">
                 <h3 className="font-semibold text-emerald-900">My Communities</h3>
-                <button
-                    onClick={onCreate}
-                    className="text-xs bg-emerald-600 text-white px-2 py-1 rounded hover:bg-emerald-700 transition-colors"
-                >
-                    + Create
-                </button>
             </div>
 
             {communities.length === 0 ? (

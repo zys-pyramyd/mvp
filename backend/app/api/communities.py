@@ -78,8 +78,8 @@ async def search_communities(
             # If not, we search generic products with 'community' platform or similar.
             # Safe bet: Search 'products' collection where platform='community' OR 'community_products' if it exists.
             
-            # Let's try searching the 'community_products' collection first
-            products_cursor = db.community_products.find({
+            # Let's try searching the 'products' collection
+            products_cursor = db.products.find({
                 "$or": [
                     {"title": {"$regex": q, "$options": "i"}},
                     {"description": {"$regex": q, "$options": "i"}},
@@ -96,6 +96,31 @@ async def search_communities(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/recommended")
+async def get_recommended_communities(limit: int = 5, current_user: dict = Depends(get_current_user)):
+    """Get recommended communities and posts"""
+    db = get_db()
+    
+    # 1. Random/Popular Communities the user hasn't joined
+    # Get user's communities
+    user_memberships = list(db.community_members.find({"user_id": current_user['id']}))
+    joined_ids = [m['community_id'] for m in user_memberships]
+    
+    # Find popular communities not in joined_ids
+    pipeline = [
+        {"$match": {"id": {"$nin": joined_ids}}},
+        {"$sample": {"size": limit}}  # Random selection
+    ]
+    
+    communities = list(db.communities.aggregate(pipeline))
+    for c in communities:
+        c.pop('_id', None)
+        
+    # 2. Random/High engagement posts from any public community
+    # (Optional, for now just communities)
+    
+    return communities
 
 @router.get("/my-communities")
 async def get_my_communities(current_user: dict = Depends(get_current_user)):
@@ -194,6 +219,10 @@ async def create_community_post(community_id: str, post: dict, current_user: dic
     
     if not member:
         raise HTTPException(status_code=403, detail="Must be a member to post")
+        
+    # Restrict to Admins/Moderators only (Creators are usually Admins)
+    if member.get('role') not in ['admin', 'moderator', 'creator']:
+         raise HTTPException(status_code=403, detail="Only community admins can create posts")
         
     new_post = {
         "id": f"post_{datetime.utcnow().timestamp()}",
@@ -401,3 +430,172 @@ async def update_member_role(
         raise HTTPException(status_code=404, detail="Member not found")
         
     return {"message": "Role updated successfully"}
+
+@router.get("/{community_id}/members")
+async def get_community_members(community_id: str, current_user: dict = Depends(get_current_user)):
+    """Get list of community members"""
+    db = get_db()
+    
+    # Verify membership (optional, but good for privacy if private community)
+    # For now, allow checking members if you are in it
+    
+    cursor = db.community_members.find({"community_id": community_id})
+    members = list(cursor)
+    
+    results = []
+    for m in members:
+        user = db.users.find_one({"id": m["user_id"]})
+        if user:
+            results.append({
+                "user_id": m["user_id"],
+                "username": user.get("username"),
+                "first_name": user.get("first_name"),
+                "last_name": user.get("last_name"),
+                "profile_picture": user.get("profile_picture"),
+                "role": m.get("role", "member"),
+                "joined_at": m.get("joined_at")
+            })
+            
+    return results
+
+@router.post("/{community_id}/members")
+async def add_community_member(
+    community_id: str, 
+    payload: dict, # {user_id: str}
+    current_user: dict = Depends(get_current_user)
+):
+    """Add a member manually (Admin only)"""
+    db = get_db()
+    target_user_id = payload.get("user_id")
+    
+    # Check admin
+    requester = db.community_members.find_one({
+        "community_id": community_id, 
+        "user_id": current_user['id'],
+        "role": {"$in": ["admin", "creator"]}
+    })
+    if not requester:
+        raise HTTPException(status_code=403, detail="Only admins can add members")
+        
+    # Check if target exists
+    target = db.users.find_one({"id": target_user_id})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Check if already member
+    exists = db.community_members.find_one({"community_id": community_id, "user_id": target_user_id})
+    if exists:
+        return {"message": "User is already a member"}
+        
+    db.community_members.insert_one({
+        "community_id": community_id,
+        "user_id": target_user_id,
+        "joined_at": datetime.utcnow(),
+        "role": "member",
+        "added_by": current_user['id']
+    })
+    
+    db.communities.update_one({"id": community_id}, {"$inc": {"members_count": 1}})
+    
+    return {"message": "Member added successfully"}
+
+@router.delete("/{community_id}")
+async def delete_community(community_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a community (Creator only)"""
+    db = get_db()
+    
+    community = db.communities.find_one({"id": community_id})
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+        
+    if community.get("creator_id") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the creator can delete the community")
+        
+    # Delete everything
+    db.communities.delete_one({"id": community_id})
+    db.community_members.delete_many({"community_id": community_id})
+    db.community_posts.delete_many({"community_id": community_id})
+    # Optional: Delete products or flag them? 
+    # For now, let's leave products but they won't show in community feed.
+    
+    return {"message": "Community deleted successfully"}
+
+@router.get("/trending-products")
+async def get_trending_community_products(limit: int = 10):
+    """Get trending community products across all communities"""
+    db = get_db()
+    
+    # Query products with a community platform or community_id
+    cursor = db.products.find({
+        "$or": [
+            {"community_id": {"$exists": True, "$ne": None}},
+            {"platform": "community"}
+        ]
+    }).sort("quantity_available", -1).limit(limit) # Sorting by available stock as proxy for now
+    
+    products = list(cursor)
+    for p in products:
+        p.pop('_id', None)
+        # Fetch community details to display
+        if p.get("community_id"):
+            comm = db.communities.find_one({"id": p["community_id"]})
+            if comm:
+                p["community_name"] = comm.get("name")
+                
+    return products
+
+@router.get("/global-feed")
+async def get_global_community_feed(limit: int = 20):
+    """Get aggregated posts and products from public communities"""
+    db = get_db()
+    
+    # Get public communities
+    public_comms = list(db.communities.find({"is_private": False}))
+    public_comm_ids = [c["id"] for c in public_comms]
+    
+    if not public_comm_ids:
+        return []
+        
+    # Get recent posts from these communities
+    posts_cursor = db.community_posts.find({"community_id": {"$in": public_comm_ids}}).sort("created_at", -1).limit(limit)
+    posts = list(posts_cursor)
+    
+    # Enrich posts
+    for p in posts:
+        p.pop('_id', None)
+        p["feed_type"] = "post"
+        user = db.users.find_one({"id": p.get("user_id")})
+        p["author"] = f"{user.get('first_name', '')} {user.get('last_name', '')}" if user else "Unknown"
+        if isinstance(p.get("created_at"), datetime):
+            p["date"] = p.get("created_at").strftime("%Y-%m-%d %H:%M")
+        else:
+            p["date"] = str(p.get("created_at", ""))
+            
+        comm = db.communities.find_one({"id": p.get("community_id")})
+        if comm:
+            p["community_name"] = comm.get("name")
+            
+    # Get recent products from these communities
+    products_cursor = db.products.find({
+        "community_id": {"$in": public_comm_ids}
+    }).sort("created_at", -1).limit(limit)
+    
+    products = list(products_cursor)
+    for p in products:
+        p.pop('_id', None)
+        p["feed_type"] = "product"
+        if isinstance(p.get("created_at"), datetime):
+            p["date"] = p.get("created_at").strftime("%Y-%m-%d %H:%M")
+        else:
+            p["date"] = str(p.get("created_at", ""))
+            
+        comm = db.communities.find_one({"id": p.get("community_id")})
+        if comm:
+            p["community_name"] = comm.get("name")
+            
+    # Combine and sort by date descending
+    combined_feed = posts + products
+    # Sort by raw created_at if possible, else rely on string date
+    combined_feed.sort(key=lambda x: x.get("created_at", x.get("date", "")), reverse=True)
+    
+    return combined_feed[:limit]

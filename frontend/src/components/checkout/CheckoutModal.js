@@ -108,82 +108,12 @@ const CheckoutModal = ({
         return true;
     };
 
-    const handleInitializePayment = async () => {
-        if (!validateAddress()) return;
-
-        setPaymentProcessing(true);
-
-        try {
-            // 1. Calculate totals
-            const productTotal = orderSummary.product_total;
-
-            // 2. Prepare Payload
-            // Note: In a real app, you might want to create the order *before* payment
-            // or use a transaction initialization endpoint that handles it.
-            // We'll mimic the existing App.js logic here.
-
-            const subaccountCode = cart[0]?.product?.seller_subaccount_code || null;
-            const platformType = checkoutPlatform === 'pyexpress' ? 'home' : 'farmhub';
-
-            const paymentData = {
-                product_total: productTotal,
-                customer_state: addressMode === 'pickup' ? selectedPickupLocation : shippingAddress.state,
-                product_weight: cart.reduce((sum, item) => sum + (item.quantity * 1), 0),
-                subaccount_code: subaccountCode,
-                product_id: cart.map(item => item.product.id || item.product._id).join(','),
-                platform_type: platformType,
-                callback_url: `${window.location.origin}/payment-callback`,
-                // Include address info in metadata for backend to use after webhook
-                metadata: {
-                    address_mode: addressMode,
-                    shipping_address: addressMode === 'pickup' ? null : shippingAddress,
-                    pickup_location: addressMode === 'pickup' ? selectedPickupLocation : null
-                }
-            };
-
-            // 3. Call API
-            const response = await api.post('/paystack/transaction/initialize', paymentData);
-            const result = response.data;
-
-            // 4. Confirm Amount
-            // (Using window.confirm as in original code, though a modal UI is better)
-            const breakdown = result.breakdown;
-            const confirmPayment = window.confirm(
-                `Payment Breakdown:\n\n` +
-                `Product Total: ₦${breakdown.product_total.toLocaleString()}\n` +
-                `Delivery Fee (${breakdown.delivery_state}): ₦${breakdown.delivery_fee.toLocaleString()}\n` +
-                `Platform Charges: ₦${breakdown.platform_cut.toLocaleString()}\n` +
-                `\nTotal Amount: ₦${result.amount.toLocaleString()}\n\n` +
-                `Proceed to payment gateway?`
-            );
-
-            if (confirmPayment) {
-                window.location.href = result.authorization_url;
-            } else {
-                setPaymentProcessing(false);
-            }
-
-        } catch (error) {
-            console.error('Payment initialization error:', error);
-            alert(`Payment initialization failed: ${error.message || 'Unknown error'}`);
-            setPaymentProcessing(false);
-        }
-    };
-
-    // Note: Actual verification happens on callback page or needs polling.
-    // For this refactor, we assume the user is redirected away. 
-    // If we want to simulate success for "offline" dev:
-    const simulateSuccess = async () => {
-        // Create orders logic
-        await createOrders();
-    };
-
-    const createOrders = async () => {
+    const processPayment = async () => {
         if (!validateAddress()) return;
         setPaymentProcessing(true);
 
         try {
-            // Map cart items to backend schema
+            // 1. Prepare Order Payload
             const orderItems = cart.map(item => ({
                 product_id: item.product.id || item.product._id,
                 quantity: item.quantity,
@@ -195,7 +125,6 @@ const CheckoutModal = ({
 
             let shippingAddressStr = '';
             if (addressMode === 'pickup') {
-                // For pickup, we might need a specific field in backend or just put generic info
                 shippingAddressStr = `PICKUP: ${selectedPickupLocation}`;
             } else {
                 shippingAddressStr = `${shippingAddress.full_name}, ${shippingAddress.address_line_1}, ${shippingAddress.address_line_2 ? shippingAddress.address_line_2 + ', ' : ''}${shippingAddress.city}, ${shippingAddress.state}, ${shippingAddress.country}`;
@@ -207,24 +136,50 @@ const CheckoutModal = ({
                 payment_method: paymentMethod
             };
 
+            // 2. Create Order (Pending Payment)
             const response = await api.post('/orders', payload);
-
-            // Backend will now return { order_ids: [...] } or { order_id: ... }
             const result = response.data;
-            const createdOrders = result.order_ids || (result.order_id ? [result.order_id] : []);
+            const orderId = result.order_id;
+            const createdOrders = result.order_ids || (orderId ? [orderId] : []);
 
-            setPaymentStatus('success');
-            setOrderConfirmation({ orders: createdOrders });
-            // onCheckoutComplete(createdOrders); // Wait for user to dismiss modal
+            // 3. Handle Payment Method
+            if (paymentMethod === 'wallet') {
+                // Wallet payment is processed by backend during order creation
+                // If we are here, it meant success (otherwise 400 would catch)
+                setPaymentStatus('success');
+                setOrderConfirmation({
+                    orders: createdOrders,
+                    buyer_notice: result.buyer_notice
+                });
+            } else if (paymentMethod === 'paystack') {
+                // Initialize Paystack with Order ID
+                const paymentData = {
+                    email: user.email,
+                    amount: orderSummary.total, // Backend expects Naira, converts to Kobo
+                    callback_url: `${window.location.origin}/payment-callback`,
+                    metadata: {
+                        order_id: orderId, // Critical for Webhook to link payment to order
+                        // address info is already in the order
+                    }
+                };
+
+                const initRes = await api.post('/paystack/transaction/initialize', paymentData);
+                const { authorization_url } = initRes.data.data;
+
+                // Redirect user
+                window.location.href = authorization_url;
+            }
 
         } catch (error) {
-            console.error("Order creation failed", error);
-            alert(`Order creation failed: ${error.response?.data?.detail || error.message}`);
-        } finally {
+            console.error("Payment/Order failed", error);
+            alert(`Failed: ${error.response?.data?.detail || error.message}`);
             setPaymentProcessing(false);
+        } finally {
+            if (paymentMethod === 'wallet') {
+                setPaymentProcessing(false);
+            }
         }
     };
-
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -259,6 +214,21 @@ const CheckoutModal = ({
                                     You can track your orders in the "Orders" section of your profile.
                                 </p>
                             </div>
+
+                            {/* Buyer Protection Notice for Pre-orders */}
+                            {orderConfirmation?.buyer_notice && (
+                                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 w-full max-w-md">
+                                    <div className="flex items-start">
+                                        <span className="text-2xl mr-3">🔒</span>
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-blue-900 mb-1">Payment Protection</h4>
+                                            <p className="text-sm text-blue-700">
+                                                {orderConfirmation.buyer_notice}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="flex flex-col sm:flex-row gap-4">
                                 <button
@@ -507,16 +477,26 @@ const CheckoutModal = ({
                                     </div>
 
                                     {/* Paystack Option (Direct) */}
-                                    {/* Hidden for MVP - Enforcing Wallet Flow for Escrow Consistency 
-                            <div 
-                                onClick={() => setPaymentMethod('paystack')}
-                                className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                                    paymentMethod === 'paystack' ? 'border-emerald-600 bg-emerald-50' : 'border-gray-200'
-                                }`}
-                            >
-                                ... Paystack UI ...
-                            </div> 
-                            */}
+                                    <div
+                                        onClick={() => setPaymentMethod('paystack')}
+                                        className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${paymentMethod === 'paystack' ? 'border-emerald-600 bg-emerald-50' : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <span className="text-2xl mr-3">💳</span>
+                                                <div>
+                                                    <div className="font-semibold text-gray-900">Pay with Card / Bank Transfer</div>
+                                                    <div className="text-sm text-gray-500">Secured by Paystack</div>
+                                                </div>
+                                            </div>
+                                            {paymentMethod === 'paystack' && (
+                                                <div className="w-5 h-5 rounded-full bg-emerald-600 flex items-center justify-center">
+                                                    <div className="w-2 h-2 bg-white rounded-full" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
 
                                     <div className="bg-blue-50 border-l-4 border-blue-500 p-4">
                                         <div className="flex">
@@ -534,6 +514,26 @@ const CheckoutModal = ({
                                         </div>
                                     </div>
 
+                                    {/* Pre-order Safety Notice */}
+                                    {cart.some(item => item.product.is_preorder) && (
+                                        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 mb-6">
+                                            <div className="flex">
+                                                <div className="flex-shrink-0">
+                                                    <span className="text-xl">🛡️</span>
+                                                </div>
+                                                <div className="ml-3">
+                                                    <h3 className="text-sm font-medium text-emerald-800">Safe & Secured Payment</h3>
+                                                    <div className="mt-2 text-sm text-emerald-700">
+                                                        <p>
+                                                            Your payment for this pre-order is held securely in escrow.
+                                                            Funds will <strong>only</strong> be released to the seller after you confirm satisfactory delivery.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="flex justify-between mt-8">
                                         <button
                                             onClick={() => setCheckoutStep('address')}
@@ -542,7 +542,7 @@ const CheckoutModal = ({
                                             Back
                                         </button>
                                         <button
-                                            onClick={createOrders}
+                                            onClick={processPayment}
                                             disabled={paymentProcessing || (paymentMethod === 'wallet' && !canPayWithWallet)}
                                             className="px-8 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                         >

@@ -14,6 +14,7 @@ const RegistrationModal = ({ onClose, onLogin, onRegister }) => {
     const [step, setStep] = useState('basic'); // basic, path_selection, partner_type, details, verification
     const [formData, setFormData] = useState({
         first_name: '',
+        middle_name: '',
         last_name: '',
         username: '',
         email_or_phone: '',

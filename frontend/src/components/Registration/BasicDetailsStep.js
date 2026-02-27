@@ -22,6 +22,13 @@ const BasicDetailsStep = ({ formData, updateFormData, onNext, onCancel }) => {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Important Notice */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                    <span className="font-semibold">Important:</span> Please use your full name exactly as it appears on your NIN or BVN for verification purposes.
+                </p>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
@@ -41,6 +48,15 @@ const BasicDetailsStep = ({ formData, updateFormData, onNext, onCancel }) => {
                         onChange={(e) => updateFormData({ last_name: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                         required
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name (Optional)</label>
+                    <input
+                        type="text"
+                        value={formData.middle_name || ''}
+                        onChange={(e) => updateFormData({ middle_name: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     />
                 </div>
             </div>

@@ -1,9 +1,9 @@
 
-from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks, Request
 from pydantic import BaseModel
 from app.models.user import User, UserRegister, UserLogin, CompleteRegistration, ForgotPasswordRequest, ResetPasswordRequest
-from app.core.security import hash_password, verify_password, create_token, encrypt_data
-from app.services.paystack import assign_dedicated_account, create_customer, resolve_bvn, resolve_bvn
+from app.core.security import hash_password, verify_password, create_token, encrypt_data, decrypt_data
+from app.services.paystack import assign_dedicated_account, create_customer, resolve_bvn
 
 # ... (omitted code) ...
 
@@ -13,11 +13,13 @@ from datetime import datetime, timedelta
 import jwt
 from app.core.config import settings
 from typing import Optional
+from app.core.rate_limit import limiter
 
 router = APIRouter()
 
 @router.post("/register")
-async def register(user_data: UserRegister):
+@limiter.limit("5/minute")
+async def register(request: Request, user_data: UserRegister):
     db = get_db()
     # Check if user exists
     if db.users.find_one({"$or": [{"email": user_data.email}, {"username": user_data.username}]}):
@@ -29,7 +31,8 @@ async def register(user_data: UserRegister):
         last_name=user_data.last_name,
         username=user_data.username,
         email=user_data.email,
-        phone=user_data.phone
+        phone=user_data.phone,
+        role=user_data.role
     )
     
     # Hash password and store
@@ -55,7 +58,8 @@ async def register(user_data: UserRegister):
     }
 
 @router.post("/login")
-async def login(login_data: UserLogin):
+@limiter.limit("5/minute")
+async def login(request: Request, login_data: UserLogin):
     db = get_db()
     # Find user by email or phone
     user = db.users.find_one({
@@ -68,6 +72,9 @@ async def login(login_data: UserLogin):
     
     if not user or not verify_password(login_data.password, user['password']):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+    if user.get('is_blocked'):
+        raise HTTPException(status_code=403, detail="You are blocked on the pyramyd marketplace due to violation of policy")
     
     token = create_token(user['id'])
     
@@ -106,7 +113,7 @@ async def complete_registration(registration_data: CompleteRegistration):
     user_role = None
     if registration_data.user_path == 'buyer':
         if registration_data.buyer_type == 'skip':
-            user_role = 'general_buyer'
+            user_role = 'personal'
         else:
             user_role = registration_data.buyer_type
     elif registration_data.user_path == 'partner':
@@ -139,95 +146,20 @@ async def complete_registration(registration_data: CompleteRegistration):
     if registration_data.business_category:
         user_dict['business_category'] = registration_data.business_category
     user_dict['verification_info'] = registration_data.verification_info or {}
+    
+    # Save document metadata (secure - only keys, not URLs)
+    if registration_data.documents_submitted:
+        user_dict['documents_submitted'] = registration_data.documents_submitted
+        user_dict['documents_verified'] = False
+        user_dict['documents_verified_at'] = None
+    
     user_dict['is_verified'] = False  # Will be updated after verification process
 
-    # Handle BVN and DVA generation for Partners
-    if registration_data.user_path == 'partner':
-        # 1. Identity Verification (Strict Name Match)
-        skip_dva = False
-        if registration_data.bvn:
-            try:
-                # Resolve BVN
-                bvn_data = resolve_bvn(registration_data.bvn)
-                if bvn_data and bvn_data.get('status'):
-                    # Check Name Match
-                    resolved_data = bvn_data.get('data', {})
-                    bvn_first_name = resolved_data.get('first_name', '').lower()
-                    bvn_last_name = resolved_data.get('last_name', '').lower()
-                    
-                    user_first = registration_data.first_name.lower()
-                    user_last = registration_data.last_name.lower()
-                    
-                    # Fuzzy match: User name contained in BVN name OR BVN name contained in User name
-                    fn_match = user_first in bvn_first_name or bvn_first_name in user_first
-                    ln_match = user_last in bvn_last_name or bvn_last_name in user_last
-                    
-                    if not fn_match:
-                         # raise HTTPException(status_code=400, detail=f"First name mismatch. Registered: {registration_data.first_name}, BVN: {resolved_data.get('first_name')}")
-                         print(f"WARNING: API Name Verification (First Name) mismatch. Registered: {registration_data.first_name}, BVN: {resolved_data.get('first_name')}")
-                         skip_dva = True
-                    
-                    if not ln_match:
-                         # Extra check for compound last names? Keep simple for now.
-                         # raise HTTPException(status_code=400, detail=f"Last name mismatch. Registered: {registration_data.last_name}, BVN: {resolved_data.get('last_name')}")
-                         print(f"WARNING: API Name Verification (Last Name) mismatch. Registered: {registration_data.last_name}, BVN: {resolved_data.get('last_name')}")
-                         skip_dva = True
-                else:
-                    # Log warning but proceed if test mode/network issue?
-                    # User asked for requirement. We should fail if we can't verify OR implement a robust retry.
-                    # For MVP, let's assume if status is false, BVN is invalid.
-                    pass
-                     
-            except HTTPException:
-                raise
-            except Exception as e:
-                print(f"BVN Verification Error (Ignored for MVP): {str(e)}")
-                # Fail hard on error per request
-                # raise HTTPException(status_code=400, detail="Identity verification failed. Please ensure your BVN is correct and names match.")
-                pass
-
+    # Handle BVN for Partners (Store only, Verify later)
+    if registration_data.user_path == 'partner' and registration_data.bvn:
         # Encrypt BVN (never store plain)
         user_dict['bvn'] = encrypt_data(registration_data.bvn)
-        
-        # Create DVA on Paystack
-        try:
-            if not skip_dva:
-                # We pass the input dict which has email, names, phone, and PLAIN BVN for the API call
-                dva_user_data = {
-                    "email": user_dict['email'],
-                    "first_name": user_dict['first_name'],
-                    "last_name": user_dict['last_name'],
-                    "phone": user_dict['phone']
-                }
-                print(f"DEBUG: Calling assign_dedicated_account with BVN: {registration_data.bvn}")
-                dva_result = assign_dedicated_account(dva_user_data, registration_data.bvn)
-                print(f"DEBUG: DVA Result: {dva_result}")
-            else:
-                dva_result = None
-                print("Skipping DVA creation due to name mismatch.")
-            
-            if dva_result and dva_result.get('status') and dva_result.get('data'):
-                dva_data = dva_result['data']
-                user_dict['dva_account_number'] = dva_data.get('account_number')
-                # Check structure of bank object from Paystack
-                bank_info = dva_data.get('bank')
-                user_dict['dva_bank_name'] = bank_info.get('name') if isinstance(bank_info, dict) else bank_info
-                
-                # Also save customer code
-                customer = dva_data.get('customer')
-                if customer:
-                    user_dict['paystack_customer_code'] = customer.get('customer_code')
-            
-            user_dict['wallet_balance'] = 0.0
-            
-        except Exception as e:
-            print(f"DVA Creation Failed: {str(e)}")
-            # For MVP, maybe we proceed without DVA but log error? 
-            # Or fail registration? User asked to create it immediately.
-            # Let's fail hard if it's a partner, or maybe soft fail and allow retry later.
-            # Decided: Soft fail, log it. User can retry 'create wallet' later.
-            user_dict['wallet_balance'] = 0.0
-            print("Proceeding without DVA info...")
+        user_dict['wallet_balance'] = 0.0
     
     db.users.insert_one(user_dict)
     
@@ -249,7 +181,8 @@ async def complete_registration(registration_data: CompleteRegistration):
     }
 
 @router.post("/forgot-password")
-async def forgot_password(request: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+@limiter.limit("3/minute")
+async def forgot_password(request: Request, password_request: ForgotPasswordRequest, background_tasks: BackgroundTasks):
     db = get_db()
     user = db.users.find_one({"email": request.email})
     if not user:
@@ -276,7 +209,8 @@ async def forgot_password(request: ForgotPasswordRequest, background_tasks: Back
     return {"message": "If an account exists with this email, a reset link will be sent."}
 
 @router.post("/reset-password")
-async def reset_password(request: ResetPasswordRequest):
+@limiter.limit("3/minute")
+async def reset_password(request: Request, reset_request: ResetPasswordRequest):
     try:
         payload = jwt.decode(request.token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
         if payload.get('type') != 'password_reset':
@@ -331,29 +265,45 @@ async def update_profile(
         
     return {"message": "Profile updated successfully"}
 
+class CreateDVARequest(BaseModel):
+    bvn: Optional[str] = None
+
 @router.post("/create-dva", response_model=dict)
 async def create_dva(
+    request: CreateDVARequest,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Manually trigger DVA creation for a partner.
-    Requires BVN to be present. Performs verification.
+    Allows updating BVN if one was not provided or needs correction.
     """
     db = get_db()
     
-    # Decrypt BVN
-    encrypted_bvn = current_user.get("bvn")
-    if not encrypted_bvn:
-        raise HTTPException(status_code=400, detail="No BVN found on account. Please contact support.")
+    # 0. Check if DVA already exists
+    if current_user.get("dva_account_number"):
+        raise HTTPException(status_code=400, detail="Dedicated Virtual Account already exists. You cannot create another one.")
     
-    try:
-        bvn = decrypt_data(encrypted_bvn)
-    except Exception:
-        raise HTTPException(status_code=500, detail="Error decrypting BVN")
+    bvn_to_use = None
+    
+    # If BVN provided in request, update it
+    if request.bvn:
+        # Encrypt and store new BVN
+        encrypted_new_bvn = encrypt_data(request.bvn)
+        db.users.update_one({"id": current_user["id"]}, {"$set": {"bvn": encrypted_new_bvn}})
+        bvn_to_use = request.bvn
+    else:
+        # Use stored BVN
+        encrypted_bvn = current_user.get("bvn")
+        if not encrypted_bvn:
+            raise HTTPException(status_code=400, detail="No BVN provided or found on account. Please provide your BVN.")
+        try:
+            bvn_to_use = decrypt_data(encrypted_bvn)
+        except Exception:
+            raise HTTPException(status_code=500, detail="Error decrypting stored BVN")
 
-    # 1. Verify Name Match 
+    # 1. Verify Name Match (Optional but recommended before creating DVA)
     try:
-        bvn_data = resolve_bvn(bvn)
+        bvn_data = resolve_bvn(bvn_to_use)
         if not bvn_data or not bvn_data.get('status'):
             raise HTTPException(status_code=400, detail="BVN verification failed")
 
@@ -373,8 +323,10 @@ async def create_dva(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error during DVA manual creation: {e}")
-        raise HTTPException(status_code=500, detail="Verification service error")
+        print(f"Error during DVA manual creation verification: {e}")
+        # Proceed or Fail? User explicitly asked for this feature to fix failures.
+        # Let's fail if verification fails here, so they know why.
+        raise HTTPException(status_code=400, detail="BVN Verification failed. Please ensure details match.")
 
     # 2. Create DVA
     dva_user_data = {
@@ -384,7 +336,7 @@ async def create_dva(
         "phone": current_user.get('phone')
     }
     
-    dva_result = assign_dedicated_account(dva_user_data, bvn)
+    dva_result = assign_dedicated_account(dva_user_data, bvn_to_use)
     
     if dva_result and dva_result.get('status') and dva_result.get('data'):
         dva_data = dva_result['data']
@@ -397,7 +349,8 @@ async def create_dva(
             {"id": current_user["id"]},
             {"$set": {
                 "dva_account_number": account_number,
-                "dva_bank_name": bank_name
+                "dva_bank_name": bank_name,
+                "paystack_customer_code": dva_data.get('customer', {}).get('customer_code')
             }}
         )
         return {

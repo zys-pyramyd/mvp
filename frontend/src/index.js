@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import "./index.css";
 import App from "./App";
+import ProductPage from "./components/product/ProductPage";
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import { AuthProvider } from "./context/AuthContext";
 import AdminLogin from "./AdminLogin";
@@ -16,6 +17,7 @@ root.render(
         <BrowserRouter>
           <Routes>
             <Route path="/pyadmin" element={<AdminLogin />} />
+            <Route path="/product/:id" element={<ProductPage />} />
             <Route path="*" element={<App />} />
           </Routes>
         </BrowserRouter>

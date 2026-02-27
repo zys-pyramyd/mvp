@@ -29,6 +29,7 @@ class Product(BaseModel):
     quantity_available: int
     minimum_order_quantity: int = 1
     location: str
+    colors: Optional[List[str]] = []
     farm_name: Optional[str] = None
     listed_by_agent: bool = False
     agent_id: Optional[str] = None
@@ -37,6 +38,9 @@ class Product(BaseModel):
     business_name: Optional[str] = None  # Business name for transparency
     images: List[str] = []
     platform: str  # "pyhub" or "pyexpress"
+    # Community logic
+    community_id: Optional[str] = None
+    community_name: Optional[str] = None
     # Logistics Management
     logistics_managed_by: str = "pyramyd"  # "pyramyd" or "seller"
     seller_delivery_fee: Optional[float] = None  # If seller manages logistics, their delivery fee (0 = free)
@@ -81,9 +85,12 @@ class ProductCreate(BaseModel):
     quantity_available: int
     minimum_order_quantity: int = 1
     location: str
+    colors: Optional[List[str]] = []
     farm_name: Optional[str] = None
     images: List[str] = []
     platform: str = "pyhub"
+    # Community logic
+    community_id: Optional[str] = None
     # Logistics Management
     logistics_managed_by: str = "pyramyd"  # "pyramyd" or "seller"
     seller_delivery_fee: Optional[float] = None  # If seller manages logistics

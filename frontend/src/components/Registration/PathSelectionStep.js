@@ -2,7 +2,11 @@ import React from 'react';
 
 const PathSelectionStep = ({ formData, updateFormData, onNext }) => {
     const handleSelect = (path) => {
-        updateFormData({ user_path: path });
+        const updates = { user_path: path };
+        if (path === 'buyer') {
+            updates.buyer_type = 'personal';
+        }
+        updateFormData(updates);
         onNext(path);
     };
 

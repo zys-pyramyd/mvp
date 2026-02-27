@@ -44,10 +44,18 @@ class UserRegister(BaseModel):
     email: str
     password: str
     phone: Optional[str] = None
+    role: Optional[UserRole] = None
 
 class UserLogin(BaseModel):
     email_or_phone: str
     password: str
+
+class DocumentMetadata(BaseModel):
+    """Metadata for uploaded documents (secure storage - no URLs)"""
+    key: str  # R2 storage key (e.g., "user-registration/abc-123.jpg")
+    uploaded_at: str
+    file_type: str
+    status: str = "pending_review"  # pending_review, approved, rejected
 
 class CompleteRegistration(BaseModel):
     first_name: str
@@ -65,6 +73,7 @@ class CompleteRegistration(BaseModel):
     partner_type: Optional[str] = None
     business_category: Optional[str] = None
     verification_info: Optional[dict] = None
+    documents_submitted: Optional[dict] = None  # Dict[str, DocumentMetadata]
     bvn: Optional[str] = None
 
 class SecureAccountDetails(BaseModel):

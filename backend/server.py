@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Dict
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +9,10 @@ from pydantic import BaseModel, Field, validator, EmailStr
 from database import db, get_client, get_db, get_collection
 from auth import get_current_user, create_access_token, get_password_hash, verify_password, JWT_SECRET, ALGORITHM
 from messaging.routes import router as messaging_router
+from app.models.user import ResetPasswordRequest
+from geo_helper import GeopyHelper
+
+GEOAPIFY_API_KEY = os.environ.get("GEOAPIFY_API_KEY")
 
 # --- R2 Cloudflare Integration ---
 import boto3
@@ -75,7 +79,7 @@ import logging
 from app.utils.market_data import get_market_estimate
 from app.models.tracking import TrackingLog, TrackingLogEntry
 from app.utils.geo import get_distance_km
-from app.api.deps import get_current_admin
+from app.api.deps import get_current_admin, validate_kyc_compliance, get_kyc_requirements
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -204,6 +208,16 @@ from app.utils.security import encrypt_data, decrypt_data
 
 
 
+# --- Rate Limiting ---
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.core.rate_limit import limiter
+
+# --- App Instantiation ---
+app = FastAPI(title="Pyramyd API", version="1.0.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # --- AUTHENTICATION & SECURITY ---
 security = HTTPBearer()
 
@@ -239,40 +253,29 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
-@app.post("/api/auth/login")
-async def login(login_data: LoginRequest):
-    # Find user by email, username, or phone
-    user = db.users.find_one({"$or": [
-        {"email": login_data.username},
-        {"username": login_data.username},
-        {"phone": login_data.username},
-        {"email_or_phone": login_data.username}
-    ]})
-    
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-        
-    if not verify_password(login_data.password, user["password"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-        
-    token = create_token(user["id"])
-    
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user_id": user["id"],
-        "username": user["username"],
-        "role": user.get("role", "buyer"),
-         "user": {
-            "id": user["id"],
-            "first_name": user.get("first_name"),
-            "last_name": user.get("last_name"),
-            "username": user["username"],
-            "email": user.get("email"),
-            "role": user.get("role"),
-            "profile_picture": user.get("profile_picture")
-        }
-    }
+# --- Modular Routes (Unified) ---
+from app.api.kyc import router as kyc_router
+from app.api.rfq import router as rfq_router
+from app.api.communities import router as communities_router
+from app.api.admin import router as admin_router
+from app.api.users import router as users_router
+from app.api.orders import router as orders_router
+from app.api.products import router as products_router
+
+from app.api.auth import router as auth_router
+from app.api.notifications import router as notifications_router
+
+app.include_router(kyc_router, prefix="/api/kyc", tags=["kyc"])
+app.include_router(rfq_router, prefix="/api/requests", tags=["rfq"])
+app.include_router(communities_router, prefix="/api/communities", tags=["communities"])
+app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
+app.include_router(users_router, prefix="/api/users", tags=["users"])
+app.include_router(orders_router, prefix="/api/orders", tags=["orders"])
+app.include_router(products_router, prefix="/api/products", tags=["products"])
+app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+app.include_router(notifications_router, prefix="/api/notifications", tags=["notifications"])
+
+
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
@@ -402,205 +405,7 @@ async def startup_db_client():
     except Exception as e:
         print(f"Error seeding admins: {e}")
 
-def get_kyc_requirements(user: dict) -> dict:
-    """Get specific KYC requirements based on user type"""
-    role = user.get("role", "")
-    business_category = user.get("business_category", "")
-    is_registered_business = user.get("is_registered_business", False)
-    
-    # Agent-specific KYC requirements
-    if role == "agent":
-        return {
-            "type": "agent",
-            "title": "Agent KYC Requirements",
-            "description": "Specialized requirements for agricultural agents",
-            "review_time": "1-3 business days",
-            "documents": [
-                "Headshot Photo (Camera captured)",
-                "National ID Document (NIN or BVN)",
-                "Utility Bill (Address verification)",
-                "Bank Statement (Financial verification)",
-                "Certificate of Incorporation (If registered business)",
-                "TIN Certificate (If registered business)"
-            ],
-            "information_required": [
-                "Business name and address",
-                "Personal identification details",
-                "Agricultural experience",
-                "Target operation locations",
-                "Expected farmer network size"
-            ],
-            "endpoint": "/api/kyc/agent/submit",
-            "benefits_after_approval": [
-                "Register and verify farmers",
-                "Earn commission on farmer sales",
-                "Access agent dashboard",
-                "Build farmer network"
-            ]
-        }
-    
-    # Farmer-specific KYC requirements  
-    elif role == "farmer":
-        return {
-            "type": "farmer",
-            "title": "Farmer KYC Requirements", 
-            "description": "Verification requirements for farmers",
-            "review_time": "24-48 hours (agent-verified) or 2-5 business days (self-verified)",
-            "documents": [
-                "Headshot Photo (Camera captured)",
-                "National ID Document (NIN or BVN)", 
-                "Farm Photo (Show your farming area)",
-                "Land Ownership Document (Certificate or lease agreement)"
-            ],
-            "information_required": [
-                "Personal identification details",
-                "Farm location and size",
-                "Primary crops grown",
-                "Farming experience",
-                "Land ownership status"
-            ],
-            "verification_options": [
-                {
-                    "method": "agent_verified",
-                    "title": "Agent Verification (Recommended)",
-                    "description": "Get verified by a registered agent for faster processing",
-                    "processing_time": "24-48 hours",
-                    "benefits": ["Faster approval", "Agent support", "Market access guidance"]
-                },
-                {
-                    "method": "self_verified", 
-                    "title": "Self Verification",
-                    "description": "Submit documents directly for verification",
-                    "processing_time": "2-5 business days",
-                    "benefits": ["Direct submission", "Full document control"]
-                }
-            ],
-            "endpoint": "/api/kyc/farmer/submit"
-        }
-    
-    # Business KYC requirements (existing)
-    elif role == "business":
-        if is_registered_business:
-            return {
-                "type": "registered_business",
-                "title": "Registered Business KYC",
-                "description": "Requirements for registered businesses",
-                "review_time": "2-5 business days",
-                "documents": [
-                    "Business Registration Number",
-                    "TIN Certificate", 
-                    "Certificate of Incorporation",
-                    "Business Address Verification (Utility Bill)"
-                ],
-                "endpoint": "/api/kyc/registered-business/submit"
-            }
-        else:
-            return {
-                "type": "unregistered_business",
-                "title": "Unregistered Business KYC", 
-                "description": "Requirements for unregistered businesses",
-                "review_time": "2-5 business days",
-                "documents": [
-                    "NIN or BVN",
-                    "Headshot Photo (Camera)",
-                    "National ID Document",
-                    "Utility Bill (Address Verification)"
-                ],
-                "endpoint": "/api/kyc/unregistered-entity/submit"
-            }
-    
-    # Default for other roles
-    else:
-        return {
-            "type": "unregistered_entity", 
-            "title": "Standard KYC Requirements",
-            "documents": [
-                "NIN or BVN",
-                "Headshot Photo (Camera)",
-                "National ID Document", 
-                "Utility Bill (Address Verification)"
-            ],
-            "endpoint": "/api/kyc/unregistered-entity/submit"
-        }
 
-def validate_kyc_compliance(user: dict, action: str = "general"):
-    """
-    Validate if user is KYC compliant for specific actions.
-    """
-    # Personal accounts don't require KYC
-    if user.get("role") == "personal":
-        return True
-    
-    # Check if KYC is required and approved
-    kyc_status = user.get("kyc_status", "not_started")
-    user_role = user.get("role", "")
-    
-    # Enhanced restrictions for agents - they must complete KYC before ANY platform actions
-    if user_role == "agent":
-        if kyc_status == "not_started":
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "error": "AGENT_KYC_REQUIRED",
-                    "message": "Agents must complete their KYC verification before performing any actions on the platform. Please submit your KYC documents to get started.",
-                    "kyc_status": kyc_status,
-                    "verification_time": "Verification takes within 24 hours to verify",
-                    "access_level": "view_only",
-                    "required_actions": get_kyc_requirements(user)
-                }
-            )
-        elif kyc_status == "pending":
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "error": "AGENT_KYC_PENDING", 
-                    "message": "Your KYC is under review. You can access the platform to view but cannot onboard farmers or publish farm produce until your status changes to verified.",
-                    "kyc_status": kyc_status,
-                    "verification_time": "Verification typically completes within 24 hours",
-                    "access_level": "view_only"
-                }
-            )
-        elif kyc_status == "rejected":
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "error": "AGENT_KYC_REJECTED",
-                    "message": "Your KYC was rejected. Please resubmit with correct documents. You can only view the platform until verification is completed.",
-                    "kyc_status": kyc_status,
-                    "access_level": "view_only",
-                    "required_actions": get_kyc_requirements(user)
-                }
-            )
-    
-    # For other roles (business, farmer, etc.) - standard KYC validation
-    if kyc_status != "approved":
-        status_messages = {
-            "not_started": "Please complete your KYC verification to perform this action",
-            "pending": "Your KYC is under review. You can perform this action once approved", 
-            "rejected": "Your KYC was rejected. Please resubmit with correct documents to continue"
-        }
-        
-        action_context = {
-            "sales": "receive payments or complete sales",
-            "register_farmers": "register farmers to your network",
-            "post_products": "post products for sale", 
-            "collect_payments": "collect payments from customers"
-        }
-        
-        context = action_context.get(action, "perform this action")
-        message = f"KYC verification required to {context}. {status_messages.get(kyc_status, 'KYC verification required')}"
-        
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "error": "KYC_REQUIRED",
-                "message": message,
-                "kyc_status": kyc_status,
-                "required_actions": get_kyc_requirements(user)
-            }
-        )
-    
-    return True
 
 def send_order_completion_email(order_data: dict):
     """Send order completion notification to support email"""
@@ -804,14 +609,13 @@ import app.api.kyc as kyc
 import app.api.auth as auth
 import app.api.communities as communities
 
-app = FastAPI(title="Pyramyd API", version="1.0.0")
-
-# Include KYC router
-app.include_router(kyc.router, prefix="/api/kyc", tags=["kyc"])
-app.include_router(communities.router, prefix="/api/communities", tags=["communities"])
-app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
-import app.api.rfq as rfq # Import newly created module
-app.include_router(rfq.router, prefix="/api/requests", tags=["rfq"])
+# app = FastAPI(title="Pyramyd API", version="1.0.0") # MOVED TO TOP
+# Duplicate router includes removed (Unified at top)
+# app.include_router(kyc.router, prefix="/api/kyc", tags=["kyc"])
+# app.include_router(communities.router, prefix="/api/communities", tags=["communities"])
+# app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+# import app.api.rfq as rfq 
+# app.include_router(rfq.router, prefix="/api/requests", tags=["rfq"])
 
 
 # CORS middleware
@@ -1117,17 +921,7 @@ class RatingCreate(BaseModel):
 
 
 
-class OrderStatus(str, Enum):
-    PENDING = "pending"
-    CONFIRMED = "confirmed"
-    PROCESSING = "processing"
-    IN_TRANSIT = "in_transit"
-    DELIVERED = "delivered"
-    CANCELLED = "cancelled"
-    HELD_IN_ESCROW = "held_in_escrow"
-    HELD_IN_ESCROW = "held_in_escrow"
-    DISPUTED = "disputed"
-    PREORDER_PENDING = "preorder_pending" # Money paid, waiting for release date
+from app.models.common import OrderStatus
 
 # Legacy generate_tracking_id removed. Imported from app.utils.id_generator
 from app.utils.id_generator import generate_tracking_id
@@ -2553,212 +2347,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         raise HTTPException(status_code=401, detail="Invalid token")
 
 # KYC Compliance Validation Helper Functions
-def validate_kyc_compliance(user: dict, action: str = "general"):
-    """
-    Validate if user is KYC compliant for specific actions.
-    
-    Args:
-        user: User document from database
-        action: Type of action being performed (e.g., 'sales', 'register_farmers', 'post_products', 'collect_payments')
-    
-    Returns:
-        bool: True if compliant, raises HTTPException if not
-    """
-    # Personal accounts don't require KYC
-    if user.get("role") == "personal":
-        return True
-    
-    # Check if KYC is required and approved
-    kyc_status = user.get("kyc_status", "not_started")
-    user_role = user.get("role", "")
-    
-    # Enhanced restrictions for agents - they must complete KYC before ANY platform actions
-    if user_role == "agent":
-        if kyc_status == "not_started":
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "error": "AGENT_KYC_REQUIRED",
-                    "message": "Agents must complete their KYC verification before performing any actions on the platform. Please submit your KYC documents to get started.",
-                    "kyc_status": kyc_status,
-                    "verification_time": "Verification takes within 24 hours to verify",
-                    "access_level": "view_only",
-                    "required_actions": get_kyc_requirements(user)
-                }
-            )
-        elif kyc_status == "pending":
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "error": "AGENT_KYC_PENDING", 
-                    "message": "Your KYC is under review. You can access the platform to view but cannot onboard farmers or publish farm produce until your status changes to verified.",
-                    "kyc_status": kyc_status,
-                    "verification_time": "Verification typically completes within 24 hours",
-                    "access_level": "view_only"
-                }
-            )
-        elif kyc_status == "rejected":
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "error": "AGENT_KYC_REJECTED",
-                    "message": "Your KYC was rejected. Please resubmit with correct documents. You can only view the platform until verification is completed.",
-                    "kyc_status": kyc_status,
-                    "access_level": "view_only",
-                    "required_actions": get_kyc_requirements(user)
-                }
-            )
-    
-    # For other roles (business, farmer, etc.) - standard KYC validation
-    if kyc_status != "approved":
-        status_messages = {
-            "not_started": "Please complete your KYC verification to perform this action",
-            "pending": "Your KYC is under review. You can perform this action once approved", 
-            "rejected": "Your KYC was rejected. Please resubmit with correct documents to continue"
-        }
-        
-        action_context = {
-            "sales": "receive payments or complete sales",
-            "register_farmers": "register farmers to your network",
-            "post_products": "post products for sale", 
-            "collect_payments": "collect payments from customers"
-        }
-        
-        context = action_context.get(action, "perform this action")
-        message = f"KYC verification required to {context}. {status_messages.get(kyc_status, 'KYC verification required')}"
-        
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "error": "KYC_REQUIRED",
-                "message": message,
-                "kyc_status": kyc_status,
-                "required_actions": get_kyc_requirements(user)
-            }
-        )
-    
-    return True
 
-def get_kyc_requirements(user: dict) -> dict:
-    """Get specific KYC requirements based on user type"""
-    role = user.get("role", "")
-    business_category = user.get("business_category", "")
-    is_registered_business = user.get("is_registered_business", False)
-    
-    # Agent-specific KYC requirements
-    if role == "agent":
-        return {
-            "type": "agent",
-            "title": "Agent KYC Requirements",
-            "description": "Specialized requirements for agricultural agents",
-            "review_time": "1-3 business days",
-            "documents": [
-                "Headshot Photo (Camera captured)",
-                "National ID Document (NIN or BVN)",
-                "Utility Bill (Address verification)",
-                "Bank Statement (Financial verification)",
-                "Certificate of Incorporation (If registered business)",
-                "TIN Certificate (If registered business)"
-            ],
-            "information_required": [
-                "Business name and address",
-                "Personal identification details",
-                "Agricultural experience",
-                "Target operation locations",
-                "Expected farmer network size"
-            ],
-            "endpoint": "/api/kyc/agent/submit",
-            "benefits_after_approval": [
-                "Register and verify farmers",
-                "Earn commission on farmer sales",
-                "Access agent dashboard",
-                "Build farmer network"
-            ]
-        }
-    
-    # Farmer-specific KYC requirements  
-    elif role == "farmer":
-        return {
-            "type": "farmer",
-            "title": "Farmer KYC Requirements", 
-            "description": "Verification requirements for farmers",
-            "review_time": "24-48 hours (agent-verified) or 2-5 business days (self-verified)",
-            "documents": [
-                "Headshot Photo (Camera captured)",
-                "National ID Document (NIN or BVN)", 
-                "Farm Photo (Show your farming area)",
-                "Land Ownership Document (Certificate or lease agreement)"
-            ],
-            "information_required": [
-                "Personal identification details",
-                "Farm location and size",
-                "Primary crops grown",
-                "Farming experience",
-                "Land ownership status"
-            ],
-            "verification_options": [
-                {
-                    "method": "agent_verified",
-                    "title": "Agent Verification (Recommended)",
-                    "description": "Get verified by a registered agent for faster processing",
-                    "processing_time": "24-48 hours",
-                    "benefits": ["Faster approval", "Agent support", "Market access guidance"]
-                },
-                {
-                    "method": "self_verified", 
-                    "title": "Self Verification",
-                    "description": "Submit documents directly for verification",
-                    "processing_time": "2-5 business days",
-                    "benefits": ["Direct submission", "Full document control"]
-                }
-            ],
-            "endpoint": "/api/kyc/farmer/submit"
-        }
-    
-    # Business KYC requirements (existing)
-    elif role == "business":
-        if is_registered_business:
-            return {
-                "type": "registered_business",
-                "title": "Registered Business KYC",
-                "description": "Requirements for registered businesses",
-                "review_time": "2-5 business days",
-                "documents": [
-                    "Business Registration Number",
-                    "TIN Certificate", 
-                    "Certificate of Incorporation",
-                    "Business Address Verification (Utility Bill)"
-                ],
-                "endpoint": "/api/kyc/registered-business/submit"
-            }
-        else:
-            return {
-                "type": "unregistered_business",
-                "title": "Unregistered Business KYC", 
-                "description": "Requirements for unregistered businesses",
-                "review_time": "2-5 business days",
-                "documents": [
-                    "NIN or BVN",
-                    "Headshot Photo (Camera)",
-                    "National ID Document",
-                    "Utility Bill (Address Verification)"
-                ],
-                "endpoint": "/api/kyc/unregistered-entity/submit"
-            }
-    
-    # Default for other roles
-    else:
-        return {
-            "type": "unregistered_entity", 
-            "title": "Standard KYC Requirements",
-            "documents": [
-                "NIN or BVN",
-                "Headshot Photo (Camera)",
-                "National ID Document", 
-                "Utility Bill (Address Verification)"
-            ],
-            "endpoint": "/api/kyc/unregistered-entity/submit"
-        }
 
 def validate_agent_farmer_registration(agent_user: dict, farmer_data: dict):
     """
@@ -3376,22 +2965,15 @@ async def create_order(items: List[CartItem], delivery_address: str, payment_met
             created_at=datetime.utcnow()
         )
         
-        # Set Specific Status for Preorders
+        # Set order type for preorders (status will be set below based on payment method)
         if group_data["order_type"] == "preorder":
-            order.status = OrderStatus.PREORDER_PENDING
             order.order_type = "preorder"
         
-        # Override status if Wallet Payment (Held in Escrow takes precedence for transaction, but we need to know it's a preorder)
-        # Actually, for Wallet, we debit and hold. 
-        # For standard: Status = PENDING -> (Paid) -> PROCESSING
-        # For preorder: Status = PENDING -> (Paid) -> PREORDER_PENDING
-        
+        # Set status based on payment method
+        # For both standard and preorder: payment is held in escrow until buyer confirms delivery
         if payment_method == "wallet":
-             # If paid by wallet, we move straight to 'PAID' state logic
-             if group_data["order_type"] == "preorder":
-                 order.status = OrderStatus.PREORDER_PENDING
-             else:
-                 order.status = OrderStatus.HELD_IN_ESCROW # Ready for processing
+            # If paid by wallet, funds are held in escrow
+            order.status = OrderStatus.HELD_IN_ESCROW
         
         order_dict = order.dict()
         order_dict['buyer_id'] = current_user['id']
@@ -3410,8 +2992,22 @@ async def create_order(items: List[CartItem], delivery_address: str, payment_met
         db.orders.insert_one(order_dict)
         created_order_ids.append(tracking_id)
         
+    # Prepare response message
+    response_message = "Orders created successfully"
+    buyer_notice = None
+    
+    # Check if any orders are pre-orders and add buyer protection notice
+    has_preorder = any(
+        db.orders.find_one({"order_id": order_id, "order_type": "preorder"})
+        for order_id in created_order_ids
+    )
+    
+    if has_preorder:
+        buyer_notice = "Your payment is held securely in escrow and will not be released to the seller until you confirm delivery. Your funds are protected."
+        
     return {
-        "message": "Orders created successfully",
+        "message": response_message,
+        "buyer_notice": buyer_notice,
         "order_ids": created_order_ids,
         "order_id": created_order_ids[0] if created_order_ids else None,
         "total_amount": grand_total_with_fees,
@@ -3784,6 +3380,19 @@ async def send_message(
     except Exception as e:
         print(f"Error sending message: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send message")
+
+@app.get("/api/messages/unread-count")
+async def get_unread_messages_count(current_user: dict = Depends(get_current_user)):
+    """Count unread messages for current user"""
+    try:
+        count = messages_collection.count_documents({
+            "recipient_username": current_user["username"],
+            "read": False
+        })
+        return {"unread_count": count}
+    except Exception as e:
+        print(f"Error counting unread messages: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to count unread messages")
 
 @app.get("/api/messages/conversations")
 async def get_conversations(current_user: dict = Depends(get_current_user)):
@@ -7048,7 +6657,7 @@ async def get_agent_farmers(current_user: dict = Depends(get_current_user)):
 
 
 
-@app.post("/api/products")
+# @app.post("/api/products")
 async def create_product(product_data: ProductCreate, current_user: dict = Depends(get_current_user)):
     if not current_user.get('role'):
         raise HTTPException(status_code=400, detail="Please select a role first")
@@ -10058,64 +9667,63 @@ async def check_rfq_auto_release():
     PyExpress: 3 Days
     FarmDeals: 14 Days
     """
-    logger.info("Running RFQ Auto-Release Check...")
-    # Find offers status="delivered"
-    offers = list(db.request_offers.find({"status": "delivered"}))
+    from app.services.payout_service import process_order_payout
+    
+    logger.info("Running RFQ Auto-Release Check (Unified)...")
+    
+    # --- New Logic (db.offers & db.requests) ---
+    offers = list(db.offers.find({"status": "delivered"}))
     
     for offer in offers:
-        request = db.buyer_requests.find_one({"id": offer["request_id"]})
-        if not request: continue
-        
-        # Rule: PyExpress (3 Days), FarmDeals (14 Days)
-        days_limit = 3 if request["platform"] == "PyExpress" else 14
-        
-        delivered_at = offer.get("date_delivered")
-        if not delivered_at: continue
-        
-        if datetime.utcnow() > delivered_at + timedelta(days=days_limit):
-            logger.info(f"Auto-Releasing Offer {offer['id']}")
+        try:
+            request = db.requests.find_one({"id": offer["request_id"]})
+            if not request: continue
             
-            # COPY PAYOUT LOGIC (Should be extracted to function in production)
-            amount = offer["price"]
-            fee = amount * 0.03
-            payout = amount - fee
+            # Rule: PyExpress (3 Days), FarmDeals (14 Days)
+            # Fix: Case Insensitive Check and safe get
+            platform = request.get("platform", "").lower()
+            days_limit = 3 if platform == "pyexpress" else 14
             
-            # Credit Seller
-            db.users.update_one(
-                {"id": offer["seller_id"]},
-                {
-                    "$inc": {"wallet_balance": payout},
-                    "$push": {
-                        "wallet_history": {
-                            "id": str(uuid.uuid4()),
-                            "type": "payout",
-                            "amount": payout,
-                            "description": f"Auto-Release Payout: {offer['id']}",
-                            "status": "success",
-                            "created_at": datetime.utcnow()
-                        }
-                    }
-                }
-            )
+            delivered_at = offer.get("delivered_at") or offer.get("date_delivered")
+            if not delivered_at: continue
             
-            # Log Settlement
-            settlement = {
-                "id": str(uuid.uuid4()),
-                "request_id": offer["request_id"],
-                "offer_id": offer["id"],
-                "amount": amount,
-                "fee": fee,
-                "payout_reference": f"AUTO-{uuid.uuid4().hex[:8]}",
-                "method_of_fulfillment": "Auto Release",
-                "created_at": datetime.utcnow()
-            }
-            db.settlement_logs.insert_one(settlement)
-            
-            # Update Offer
-            db.request_offers.update_one(
-                {"id": offer["id"]},
-                {"$set": {"status": "completed", "payout_status": "success"}}
-            ) 
+            if datetime.utcnow() > delivered_at + timedelta(days=days_limit):
+                logger.info(f"Auto-Releasing Offer {offer['id']} (Platform: {platform})")
+                
+                # 1. Find Linked Order
+                order = db.orders.find_one({"origin_offer_id": offer["id"]})
+                
+                if order:
+                    # Update Order to 'delivered' so payout service accepts it
+                    # (In case it was 'delivered_pending_confirmation')
+                    db.orders.update_one(
+                        {"order_id": order["order_id"]},
+                        {"$set": {"status": "delivered"}} 
+                    )
+                    
+                    # 2. Process Payout via Service
+                    success, msg = await process_order_payout(order["order_id"], db)
+                    
+                    if success:
+                        # 3. Update Offer to completed
+                        db.offers.update_one(
+                            {"id": offer["id"]},
+                            {"$set": {"status": "completed", "payout_status": "success", "auto_released": True}}
+                        )
+                        logger.info(f"Successfully auto-released offer {offer['id']}")
+                    else:
+                        logger.error(f"Failed to auto-release offer {offer['id']}: {msg}")
+                else:
+                    logger.warning(f"Order not found for offer {offer['id']}, skipping auto-release")
+                    
+        except Exception as e:
+            logger.error(f"Error processing auto-release for offer {offer.get('id')}: {e}")
+            continue
+
+    # --- Legacy Logic (db.request_offers) - Optional: Keep for backward compatibility if needed ---
+    # (Commented out to avoid confusion, assuming migration to new system)
+    # old_offers = list(db.request_offers.find({"status": "delivered"}))
+    # ... legacy logic ... 
 
 @app.on_event("startup")
 async def startup_event():

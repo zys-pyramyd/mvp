@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from app.api.deps import get_db, get_current_user
 from app.models.product import CartItem
 from app.models.order import Order
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
 import uuid
@@ -105,12 +105,7 @@ async def get_price_recommendations(
     request: GroupBuyingRequest, 
     current_user: dict = Depends(get_current_user)
 ):
-    # Route: /api/agent/group-buying/recommendations? No server.py had /api/group-buying/recommendations
-    # but I'll mount this router at /agent maybe?
-    # Server.py had: @app.post("/api/group-buying/recommendations")
-    # It was NOT under /api/agent.
-    # I should separate group buying if I want exact match, or client needs update.
-    # For now, I'll put it here.
+    # ... (existing code)
     if current_user.get('role') != 'agent':
         raise HTTPException(status_code=403, detail="Only agents can access group buying")
     
@@ -138,3 +133,126 @@ async def get_price_recommendations(
         })
         
     return recommendations
+
+# --- Missing Endpoints Implementation ---
+
+@router.get("/farmers")
+async def get_managed_farmers(current_user: dict = Depends(get_current_user)):
+    """Get farmers registered by this agent"""
+    if current_user.get('role') != 'agent':
+        raise HTTPException(status_code=403, detail="Only agents access this")
+        
+    db = get_db()
+    # Find users with role='farmer' and agent_id=current_user['id']
+    farmers = list(db.users.find({"role": "farmer", "agent_id": current_user['id']}))
+    
+    # Enrich with stats if needed (product count, sales)
+    for farmer in farmers:
+        farmer['id'] = farmer.get('id') or str(farmer['_id'])
+        farmer.pop('_id', None)
+        farmer.pop('password', None) # Security
+        
+        # Stats
+        farmer['product_count'] = db.products.count_documents({"seller_id": farmer['id']})
+        # Calculate sales (this is expensive aggregation, simplify for MVP)
+        farmer['total_sales'] = 0 
+        
+    return {"farmers": farmers}
+
+class RegisterFarmerRequest(BaseModel):
+    first_name: str
+    last_name: str
+    phone: str
+    gender: str
+    date_of_birth: str
+    address_street: Optional[str] = None
+    city: str
+    state: str
+    farm_location: str
+    farm_size: str
+    crops: str
+
+@router.post("/farmers/register")
+async def register_farmer(
+    data: RegisterFarmerRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Agent registers a farmer.
+    Farmer is auto-verified because Agent verified them.
+    """
+    if current_user.get('role') != 'agent':
+        raise HTTPException(status_code=403, detail="Only agents can register farmers")
+        
+    db = get_db()
+    from app.api.auth import get_password_hash
+    from app.utils.id_generator import generate_tracking_id # Reuse or UUID
+    
+    # Check if phone/username exists
+    if db.users.find_one({"phone": data.phone}):
+         raise HTTPException(status_code=400, detail="Farmer with this phone already exists")
+         
+    # Create Farmer User
+    farmer_id = str(uuid.uuid4())
+    username = f"{data.first_name.lower()}{data.last_name.lower()}{data.phone[-4:]}"
+    
+    farmer_dict = {
+        "id": farmer_id,
+        "first_name": data.first_name,
+        "last_name": data.last_name,
+        "username": username,
+        "email": f"{username}@placeholder.com", # Placeholder if no email
+        "phone": data.phone,
+        "role": "farmer",
+        "agent_id": current_user['id'], # Link to Agent
+        "is_verified": True, # AUTO-VERIFY
+        "verification_status": "verified",
+        "verification_note": f"Verified by Agent {current_user['username']}",
+        "gender": data.gender,
+        "date_of_birth": data.date_of_birth,
+        "address": f"{data.address_street}, {data.city}, {data.state}",
+        "city": data.city,
+        "state": data.state,
+        "farm_details": {
+            "location": data.farm_location,
+            "size": data.farm_size,
+            "crops": data.crops
+        },
+        "password": get_password_hash("123456"), # Default password, should change
+        "created_at": datetime.utcnow()
+    }
+    
+    db.users.insert_one(farmer_dict)
+    
+    return {"message": "Farmer registered successfully", "farmer_id": farmer_id}
+
+@router.get("/deliveries")
+async def get_agent_deliveries(current_user: dict = Depends(get_current_user)):
+    """Get deliveries assigned to agent or their sales"""
+    if current_user.get('role') != 'agent':
+        raise HTTPException(status_code=403, detail="Only agents access this")
+    
+    db = get_db()
+    # Deliveries where agent is involved?
+    # Or orders where agent's farmers are sellers?
+    # Or agent purchase orders?
+    # 'SellerDashboard.js' tabs imply 'Deliveries' might be logistics? 
+    # Or just orders managed.
+    # Let's return orders where agent_id is user OR seller's agent is user.
+    
+    # 1. Orders from Agent's Farmers
+    farmers = list(db.users.find({"agent_id": current_user['id']}, {"id": 1}))
+    farmer_ids = [f['id'] for f in farmers]
+    
+    query = {
+        "$or": [
+            {"agent_id": current_user['id']}, # Direct agent orders
+            {"seller_id": {"$in": farmer_ids}} # Orders from managed farmers
+        ]
+    }
+    
+    orders = list(db.orders.find(query).sort("created_at", -1))
+    for order in orders:
+        order['_id'] = str(order['_id'])
+        
+    return {"orders": orders}

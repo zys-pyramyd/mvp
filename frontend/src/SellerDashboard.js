@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { NIGERIAN_STATES } from './nigerianStates';
+import MyRequests from './components/rfq/MyRequests';
 
 const SellerDashboard = ({ user, token, onOpenChat }) => {
-    const [activeTab, setActiveTab] = useState('overview'); // overview, farmers, deliveries, inventory
+    const [activeTab, setActiveTab] = useState('overview'); // overview, farmers, deliveries, inventory, requests, quotations
     const [stats, setStats] = useState(null);
     const [farmers, setFarmers] = useState([]);
     const [deliveries, setDeliveries] = useState([]);
+    const [requests, setRequests] = useState([]);
+    const [quotations, setQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAddProduct, setShowAddProduct] = useState(false);
     const [deliveryCode, setDeliveryCode] = useState(null);
@@ -46,6 +49,28 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
                 if (res.ok) {
                     const data = await res.json();
                     setDeliveries(data.orders || []);
+                }
+            }
+
+            // Fetch My Requests
+            if (activeTab === 'requests') {
+                const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/requests/my-requests`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setRequests(Array.isArray(data) ? data : data.requests || []);
+                }
+            }
+
+            // Fetch Sent Quotations (Offers)
+            if (activeTab === 'quotations') {
+                const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/requests/my-offers`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setQuotations(Array.isArray(data) ? data : data.offers || []);
                 }
             }
 
@@ -136,6 +161,8 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
                     )}
                     <TabButton active={activeTab === 'deliveries'} onClick={() => setActiveTab('deliveries')} label="📦 Deliveries" />
                     <TabButton active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} label="📋 Inventory" />
+                    <TabButton active={activeTab === 'requests'} onClick={() => setActiveTab('requests')} label="📋 My Requests" />
+                    <TabButton active={activeTab === 'quotations'} onClick={() => setActiveTab('quotations')} label="🤝 Sent Quotations" />
                     <TabButton active={activeTab === 'wallet'} onClick={() => setActiveTab('wallet')} label="💰 My Earnings" />
                     <TabButton active={activeTab === 'account'} onClick={() => setActiveTab('account')} label="🏦 Account Settings" />
                 </div>
@@ -148,15 +175,15 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
                         <div className="space-y-8">
                             {/* Verification Status Badge */}
                             <div className={`p-4 rounded-lg flex justify-between items-center ${user.verification_status === 'verified' ? 'bg-emerald-50 border border-emerald-200' :
-                                    user.verification_status === 'pending' ? 'bg-yellow-50 border border-yellow-200' :
-                                        user.verification_status === 'rejected' ? 'bg-red-50 border border-red-200' :
-                                            'bg-gray-50 border border-gray-200'
+                                user.verification_status === 'pending' ? 'bg-yellow-50 border border-yellow-200' :
+                                    user.verification_status === 'rejected' ? 'bg-red-50 border border-red-200' :
+                                        'bg-gray-50 border border-gray-200'
                                 }`}>
                                 <div className="flex items-center gap-3">
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${user.verification_status === 'verified' ? 'bg-emerald-100 text-emerald-600' :
-                                            user.verification_status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
-                                                user.verification_status === 'rejected' ? 'bg-red-100 text-red-600' :
-                                                    'bg-gray-200 text-gray-500'
+                                        user.verification_status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
+                                            user.verification_status === 'rejected' ? 'bg-red-100 text-red-600' :
+                                                'bg-gray-200 text-gray-500'
                                         }`}>
                                         {user.verification_status === 'verified' ? '✓' :
                                             user.verification_status === 'pending' ? '⏳' :
@@ -164,9 +191,9 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
                                     </div>
                                     <div>
                                         <h3 className={`font-bold ${user.verification_status === 'verified' ? 'text-emerald-900' :
-                                                user.verification_status === 'pending' ? 'text-yellow-900' :
-                                                    user.verification_status === 'rejected' ? 'text-red-900' :
-                                                        'text-gray-900'
+                                            user.verification_status === 'pending' ? 'text-yellow-900' :
+                                                user.verification_status === 'rejected' ? 'text-red-900' :
+                                                    'text-gray-900'
                                             }`}>
                                             Account Status: {user.verification_status ? user.verification_status.charAt(0).toUpperCase() + user.verification_status.slice(1) : 'Unverified'}
                                         </h3>
@@ -262,6 +289,53 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
                         <div className="text-center py-12 text-gray-400">
                             {/* List products, including those managed for farmers */}
                             <p>Manage your inventory and products here.</p>
+                        </div>
+                    )}
+
+                    {!loading && activeTab === 'requests' && (
+                        <div className="bg-white p-4 rounded-lg">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold">My Buyer Requests</h3>
+                                <button
+                                    onClick={() => { if (window.openRequestWizard) window.openRequestWizard(); }}
+                                    className="bg-purple-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-purple-700 transition"
+                                >
+                                    + Create Request (Bulk Buy)
+                                </button>
+                            </div>
+                            <MyRequests requests={requests} onRefresh={fetchInitialData} />
+                        </div>
+                    )}
+
+                    {!loading && activeTab === 'quotations' && (
+                        <div className="bg-white p-4 rounded-lg">
+                            <h3 className="text-xl font-bold mb-6">Sent Quotations</h3>
+                            {quotations.length === 0 ? (
+                                <p className="text-gray-500 text-center py-8">You haven't submitted any quotations yet.</p>
+                            ) : (
+                                <div className="space-y-4">
+                                    {quotations.map(offer => (
+                                        <div key={offer.id} className="border p-4 rounded-lg">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <h4 className="font-bold">Request ID: {offer.request_id}</h4>
+                                                    <p className="text-sm text-gray-500">Date: {new Date(offer.created_at).toLocaleDateString()}</p>
+                                                </div>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${offer.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                                                    offer.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                                        'bg-yellow-100 text-yellow-800'
+                                                    }`}>
+                                                    {offer.status.toUpperCase()}
+                                                </span>
+                                            </div>
+                                            <div className="mt-2">
+                                                <p className="font-bold text-lg text-emerald-600">₦{offer.price?.toLocaleString()}</p>
+                                                {offer.notes && <p className="text-sm text-gray-600 mt-1">"{offer.notes}"</p>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -431,11 +505,66 @@ const AddFarmerModal = ({ onClose, onSuccess, token }) => {
     );
 };
 
+const PRODUCT_CATEGORIES = {
+    grains_cereals: {
+        label: "Grains & Cereals",
+        subcategories: ["maize", "rice", "wheat", "oat", "barley", "sorghum", "millet", "rye", "triticale"]
+    },
+    beans_legumes: {
+        label: "Beans & Legumes",
+        subcategories: ["lentils", "peas", "beans", "broad_beans", "groundnut", "soybeans"]
+    },
+    fish_meat: {
+        label: "Fish & Meat",
+        subcategories: ["fresh_fish", "dried_fish", "poultry", "beef", "goat_mutton", "pork", "snails"]
+    },
+    spices_vegetables: {
+        label: "Spices & Vegetables",
+        subcategories: ["leafy_vegetables", "peppers", "tomatoes", "onions", "ginger_garlic", "herbs_spices", "okra", "cucumber"]
+    },
+    tubers_roots: {
+        label: "Tubers & Roots",
+        subcategories: ["yam", "cassava", "sweet_potato", "chinese_yam", "taro", "potato", "carrots", "turnips", "parsnips", "radish", "celeriac", "ginger", "turmeric", "beets", "burdock_root"]
+    },
+    drinks_beverage: {
+        label: "Drinks & Beverage",
+        subcategories: ["milk", "chocolate_drinks", "water", "soft_drinks_carbonated", "juices_smoothies", "hot_beverage", "energy_drinks", "health_drinks", "dairy_plant_based", "cordials_squash"]
+    },
+    snacks_confectionaries: {
+        label: "Snacks & Confectionaries",
+        subcategories: ["chocolates", "candy_gummy", "chips_crisps", "pretzels_crackers", "popcorn", "nuts_seeds", "dried_fruits_trail_mix", "granola_energy_bars", "cookies_biscuits", "snack_cakes_pastries"]
+    },
+    sweets_sugar: {
+        label: "Sweets & Sugar",
+        subcategories: ["sugar", "honey", "dates", "agave", "artificial_sweetener", "syrups"]
+    },
+    farm_inputs: {
+        label: "Farm Inputs",
+        subcategories: []
+    },
+    flour_flakes: {
+        label: "Flour & Flakes",
+        subcategories: ["all_purpose_flour", "yam_flour", "cassava_flakes_garri", "cassava_flour", "bread_flour", "cake_flour", "pastry_flour", "whole_wheat", "self_rising_flour", "semolina_flour", "nut_flour", "coconut_flour", "rice_flour", "others"]
+    },
+    other: {
+        label: "Other",
+        subcategories: []
+    }
+};
+
+const formatLabel = (str) => {
+    return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+};
+
+const PREDEFINED_COLORS = ['white', 'brown', 'green', 'red', 'yellow', 'silver', 'black', 'grey', 'ash'];
+
 const AddProductModal = ({ onClose, onSuccess, token }) => {
     const [formData, setFormData] = useState({
         title: '',
         description: '',
         category: 'grains_cereals',
+        subcategory: '',
+        processing_level: 'unprocessed',
         price_per_unit: '',
         unit: 'kg',
         quantity: '',
@@ -443,6 +572,7 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
         city: '',
         pickup_address: '',
         country: 'Nigeria',
+        colors: [],
         seller_delivery_fee: 0,
         seller_delivery_fee: 0,
         images: [],
@@ -555,7 +685,12 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
         try {
             const payload = {
                 ...formData,
-                type: formData.is_preorder ? 'preorder' : 'standard'
+                type: formData.is_preorder ? 'preorder' : 'standard',
+                unit_of_measure: formData.unit,
+                quantity_available: parseInt(formData.quantity) || 0,
+                minimum_order_quantity: parseInt(formData.min_order_quantity) || 1,
+                colors: formData.colors,
+                // Category and Subcategory and processing_level pass smoothly without hacky mapping
             };
 
             const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/products`, {
@@ -625,13 +760,39 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
                             <select
                                 className="w-full border rounded p-2"
                                 value={formData.category}
-                                onChange={e => setFormData({ ...formData, category: e.target.value })}
+                                onChange={e => setFormData({ ...formData, category: e.target.value, subcategory: '' })}
                             >
-                                <option value="grains_cereals">Grains & Cereals</option>
-                                <option value="tubers_roots">Tubers & Roots</option>
-                                <option value="fish_meat">Fish & Meat</option>
-                                <option value="spices_vegetables">Spices & Vegetables</option>
-                                <option value="packaged_goods">Packaged Goods</option>
+                                {Object.entries(PRODUCT_CATEGORIES).map(([key, cat]) => (
+                                    <option key={key} value={key}>{cat.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        {PRODUCT_CATEGORIES[formData.category]?.subcategories?.length > 0 && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Subcategory</label>
+                                <select
+                                    required
+                                    className="w-full border rounded p-2"
+                                    value={formData.subcategory}
+                                    onChange={e => setFormData({ ...formData, subcategory: e.target.value })}
+                                >
+                                    <option value="">Select Subcategory</option>
+                                    {PRODUCT_CATEGORIES[formData.category].subcategories.map(sub => (
+                                        <option key={sub} value={sub}>{formatLabel(sub)}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Nutritional Mode</label>
+                            <select
+                                className="w-full border rounded p-2"
+                                value={formData.processing_level}
+                                onChange={e => setFormData({ ...formData, processing_level: e.target.value })}
+                            >
+                                <option value="unprocessed">Unprocessed</option>
+                                <option value="processed">Processed</option>
+                                <option value="ultraprocessed">Ultra-processed</option>
                             </select>
                         </div>
                     </div>
@@ -720,6 +881,27 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
                                 </div>
                             </div>
                         )}
+                    </div>
+
+                    <div className="border border-gray-200 p-4 rounded-lg">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Available Colors (Optional)</label>
+                        <p className="text-xs text-gray-500 mb-3">Select one or multiple colors if applicable to your product.</p>
+                        <div className="flex flex-wrap gap-3">
+                            {PREDEFINED_COLORS.map(c => (
+                                <label key={c} className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded-lg border cursor-pointer hover:bg-gray-100 transition-colors">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.colors.includes(c)}
+                                        onChange={e => {
+                                            if (e.target.checked) setFormData({ ...formData, colors: [...formData.colors, c] });
+                                            else setFormData({ ...formData, colors: formData.colors.filter(col => col !== c) });
+                                        }}
+                                        className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                                    />
+                                    {c.charAt(0).toUpperCase() + c.slice(1)}
+                                </label>
+                            ))}
+                        </div>
                     </div>
 
                     <div>

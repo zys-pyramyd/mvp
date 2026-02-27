@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PreOrderTimer from './PreOrderTimer';
 
 const VerifiedBadge = () => (
@@ -11,6 +12,7 @@ const VerifiedBadge = () => (
 
 const ProductCard = ({ product, variant, onOpenModal, onAddToCart, onCommit }) => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const navigate = useNavigate();
 
     // Helper to safely get images
     const getImages = () => {
@@ -46,12 +48,12 @@ const ProductCard = ({ product, variant, onOpenModal, onAddToCart, onCommit }) =
     const progress = getProgress();
 
     return (
-        <div
-            className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex flex-col min-h-0 cursor-pointer group"
-            onClick={handleClick}
-        >
+        <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex flex-col min-h-0 group">
             {/* Image Carousel Area */}
-            <div className="relative h-48 sm:h-56 bg-gray-100 rounded-t-lg overflow-hidden">
+            <div
+                className="relative h-48 sm:h-56 bg-gray-100 rounded-t-lg overflow-hidden cursor-pointer"
+                onClick={handleClick}
+            >
                 {images.length > 0 ? (
                     <img
                         src={images[currentImageIndex]}
@@ -134,10 +136,29 @@ const ProductCard = ({ product, variant, onOpenModal, onAddToCart, onCommit }) =
                     </div>
                 </div>
 
-                {/* Description Glimpse */}
-                <p className="text-xs text-gray-600 line-clamp-2 mb-3 h-8">
-                    {product.description || 'No description available'}
-                </p>
+                {/* Share Button (Absolute Top Right for easy access) */}
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        const shareData = {
+                            title: product.title || product.product_name,
+                            text: `Check out ${product.title || product.product_name} on FarmHub!`,
+                            url: window.location.href // Ideally this would be a specific product link
+                        };
+                        if (navigator.share) {
+                            navigator.share(shareData).catch(console.error);
+                        } else {
+                            navigator.clipboard.writeText(window.location.href);
+                            alert('Link copied to clipboard!');
+                        }
+                    }}
+                    className="absolute top-2 right-12 bg-white/80 hover:bg-white text-gray-700 p-1.5 rounded-full shadow-sm z-10 transition-colors"
+                    title="Share Product"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                </button>
 
                 {/* Pre-Order Timer */}
                 {product.is_preorder && (
@@ -185,25 +206,7 @@ const ProductCard = ({ product, variant, onOpenModal, onAddToCart, onCommit }) =
                     {/* Wholesale Info */}
                     {variant === 'wholesale' && (
                         <div className="bg-orange-50 p-2 rounded text-xs space-y-1 border border-orange-100">
-                            <div className="flex justify-between">
-                                <span className="text-orange-800">Available:</span>
-                                <span className="font-bold text-orange-900">{product.quantity_available} {product.unit}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-orange-800">Harvest:</span>
-                                <span className="font-bold text-orange-900">
-                                    {product.best_before ? new Date(product.best_before).toLocaleDateString() : 'Fresh'}
-                                </span>
-                            </div>
-                            {product.agent_name && (
-                                <div
-                                    className="pt-1 mt-1 border-t border-orange-200 text-blue-600 font-medium cursor-pointer flex items-center gap-1 hover:underline"
-                                    onClick={(e) => { e.stopPropagation(); onOpenModal(product); }}
-                                >
-                                    <span>🤝 {product.agent_name}</span>
-                                    {product.seller_is_verified && <VerifiedBadge />}
-                                </div>
-                            )}
+                            <span className="text-orange-800 font-medium">Wholesale / Farm Deal</span>
                         </div>
                     )}
 
@@ -226,7 +229,10 @@ const ProductCard = ({ product, variant, onOpenModal, onAddToCart, onCommit }) =
                     {/* Action Buttons */}
                     <div className="pt-2 grid grid-cols-2 gap-2">
                         <button
-                            onClick={(e) => { e.stopPropagation(); onOpenModal(product); }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/product/${product.id}`);
+                            }}
                             className="px-3 py-1.5 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                         >
                             More Info

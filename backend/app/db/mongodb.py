@@ -11,6 +11,8 @@ db = MongoDB()
 def get_database():
     return db.db
 
+get_db = get_database
+
 def connect_to_mongo():
     from app.core.config import settings
     db.client = MongoClient(settings.MONGO_URL)

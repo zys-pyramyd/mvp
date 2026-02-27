@@ -6,7 +6,9 @@ from app.models.common import DocumentType, KYCStatus
 from typing import List, Optional
 import base64
 import uuid
+import uuid
 from datetime import datetime
+from app.api.notifications import create_notification
 
 router = APIRouter()
 
@@ -37,6 +39,13 @@ async def upload_document(
     current_user: dict = Depends(get_current_user)
 ):
     """Upload a KYC document (ID, Passport, CAC, etc.)"""
+    # Check if KYC is already pending/approved
+    if current_user.get('kyc_status') in [KYCStatus.PENDING, KYCStatus.APPROVED]:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot upload documents. Your KYC status is {current_user.get('kyc_status')}"
+        )
+
     # Validate document type
     try:
         doc_type_enum = DocumentType(document_type)
@@ -77,6 +86,12 @@ async def submit_agent_kyc(
     """Submit full Agent KYC application"""
     db = get_db()
     
+    # Check Status
+    if current_user.get('kyc_status') == KYCStatus.PENDING:
+        raise HTTPException(status_code=400, detail="KYC Application already submitted and under review.")
+    if current_user.get('kyc_status') == KYCStatus.APPROVED:
+        raise HTTPException(status_code=400, detail="Your KYC is already approved.")
+    
     # Check if documents exist
     req_docs = [kyc_data.headshot_photo_id, kyc_data.national_id_document_id, kyc_data.utility_bill_id]
     for doc_id in req_docs:
@@ -109,6 +124,12 @@ async def submit_farmer_kyc(
 ):
     """Submit Farmer KYC application"""
     db = get_db()
+    
+    # Check Status
+    if current_user.get('kyc_status') == KYCStatus.PENDING:
+        raise HTTPException(status_code=400, detail="KYC Application already submitted and under review.")
+    if current_user.get('kyc_status') == KYCStatus.APPROVED:
+        raise HTTPException(status_code=400, detail="Your KYC is already approved.")
     
     # Save Farmer KYC
     kyc_record = kyc_data.dict()
@@ -227,6 +248,15 @@ async def approve_kyc(user_id: str, current_user: dict = Depends(get_current_use
         raise HTTPException(status_code=404, detail="User not found")
         
     return {"message": f"User {user_id} KYC approved and verified."}
+    
+    # Notify User
+    create_notification(
+        user_id=user_id,
+        title="KYC Approved",
+        message="Congratulations! Your KYC application has been approved. You are now a verified partner.",
+        type="kyc",
+        action_link="/profile"
+    )
 
 @router.post("/admin/reject/{user_id}")
 async def reject_kyc(user_id: str, reason: str = Body(..., embed=True), current_user: dict = Depends(get_current_user)):
@@ -244,7 +274,13 @@ async def reject_kyc(user_id: str, reason: str = Body(..., embed=True), current_
         }}
     )
     
-    # Notify user (mock)
-    # create_notification(user_id, f"Your KYC was rejected: {reason}")
+    # Notify user
+    create_notification(
+        user_id=user_id,
+        title="KYC Rejected",
+        message=f"Your KYC application was rejected. Reason: {reason}",
+        type="kyc",
+        action_link="/kyc/resubmit"
+    )
     
     return {"message": f"User {user_id} KYC rejected."}

@@ -28,21 +28,37 @@ class KYCStatus(str, Enum):
     REJECTED = "rejected"
 
 class ProductCategory(str, Enum):
-    GRAINS_LEGUMES = "grains_legumes"
+    GRAINS_CEREALS = "grains_cereals"
+    BEANS_LEGUMES = "beans_legumes"
     FISH_MEAT = "fish_meat"
     SPICES_VEGETABLES = "spices_vegetables" 
     TUBERS_ROOTS = "tubers_roots"
+    FLOUR_FLAKES = "flour_flakes"
+    DRINKS_BEVERAGE = "drinks_beverage"
+    SNACKS_CONFECTIONARIES = "snacks_confectionaries"
+    SWEETS_SUGAR = "sweets_sugar"
+    FARM_INPUTS = "farm_inputs"
+    OTHER = "other"
 
 # Subcategories
-class GrainsLegumesSubcategory(str, Enum):
+class GrainsCerealsSubcategory(str, Enum):
+    MAIZE = "maize"
     RICE = "rice"
     WHEAT = "wheat"
-    CORN_MAIZE = "corn_maize"
-    BEANS = "beans"
-    COWPEAS = "cowpeas"
-    GROUNDNUTS = "groundnuts"
-    SOYBEANS = "soybeans"
+    OAT = "oat"
+    BARLEY = "barley"
+    SORGHUM = "sorghum"
     MILLET = "millet"
+    RYE = "rye"
+    TRITICALE = "triticale"
+
+class BeansLegumesSubcategory(str, Enum):
+    LENTILS = "lentils"
+    PEAS = "peas"
+    BEANS = "beans"
+    BROAD_BEANS = "broad_beans"
+    GROUNDNUT = "groundnut"
+    SOYBEANS = "soybeans"
 
 class FishMeatSubcategory(str, Enum):
     FRESH_FISH = "fresh_fish"
@@ -64,30 +80,74 @@ class SpicesVegetablesSubcategory(str, Enum):
     CUCUMBER = "cucumber"
 
 class TubersRootsSubcategory(str, Enum):
-    YAMS = "yams"
+    YAM = "yam"
     CASSAVA = "cassava"
-    SWEET_POTATOES = "sweet_potatoes"
-    IRISH_POTATOES = "irish_potatoes"
-    COCOYAMS = "cocoyams"
-    PLANTAINS = "plantains"
-    DRIED_FISH = "dried_fish"
-    FROZEN_FISH = "frozen_fish"
-    FRESH_MEAT = "fresh_meat"
-    PROCESSED_MEAT = "processed_meat"
-    POULTRY = "poultry"
+    SWEET_POTATO = "sweet_potato"
+    CHINESE_YAM = "chinese_yam"
+    TARO = "taro"
+    POTATO = "potato"
+    CARROTS = "carrots"
+    TURNIPS = "turnips"
+    PARSNIPS = "parsnips"
+    RADISH = "radish"
+    CELERIAC = "celeriac"
+    GINGER = "ginger"
+    TURMERIC = "turmeric"
+    BEETS = "beets"
+    BURDOCK_ROOT = "burdock_root"
 
-class PepperVegetablesSubcategory(str, Enum):
-    PEPPERS = "peppers"
-    LEAFY_VEGETABLES = "leafy_vegetables"
-    ROOT_VEGETABLES = "root_vegetables"
-    ONIONS_GARLIC = "onions_garlic"
-    TOMATOES = "tomatoes"
-    HERBS_SPICES = "herbs_spices"
+class FlourFlakesSubcategory(str, Enum):
+    ALL_PURPOSE_FLOUR = "all_purpose_flour"
+    YAM_FLOUR = "yam_flour"
+    CASSAVA_FLAKES_GARRI = "cassava_flakes_garri"
+    CASSAVA_FLOUR = "cassava_flour"
+    BREAD_FLOUR = "bread_flour"
+    CAKE_FLOUR = "cake_flour"
+    PASTRY_FLOUR = "pastry_flour"
+    WHOLE_WHEAT = "whole_wheat"
+    SELF_RISING_FLOUR = "self_rising_flour"
+    SEMOLINA_FLOUR = "semolina_flour"
+    NUT_FLOUR = "nut_flour"
+    COCONUT_FLOUR = "coconut_flour"
+    RICE_FLOUR = "rice_flour"
+    OTHERS = "others"
+
+class DrinksBeverageSubcategory(str, Enum):
+    MILK = "milk"
+    CHOCOLATE_DRINKS = "chocolate_drinks"
+    WATER = "water"
+    SOFT_DRINKS_CARBONATED = "soft_drinks_carbonated"
+    JUICES_SMOOTHIES = "juices_smoothies"
+    HOT_BEVERAGE = "hot_beverage"
+    ENERGY_DRINKS = "energy_drinks"
+    HEALTH_DRINKS = "health_drinks"
+    DAIRY_PLANT_BASED = "dairy_plant_based"
+    CORDIALS_SQUASH = "cordials_squash"
+
+class SnacksConfectionariesSubcategory(str, Enum):
+    CHOCOLATES = "chocolates"
+    CANDY_GUMMY = "candy_gummy"
+    CHIPS_CRISPS = "chips_crisps"
+    PRETZELS_CRACKERS = "pretzels_crackers"
+    POPCORN = "popcorn"
+    NUTS_SEEDS = "nuts_seeds"
+    DRIED_FRUITS_TRAIL_MIX = "dried_fruits_trail_mix"
+    GRANOLA_ENERGY_BARS = "granola_energy_bars"
+    COOKIES_BISCUITS = "cookies_biscuits"
+    SNACK_CAKES_PASTRIES = "snack_cakes_pastries"
+
+class SweetsSugarSubcategory(str, Enum):
+    SUGAR = "sugar"
+    HONEY = "honey"
+    DATES = "dates"
+    AGAVE = "agave"
+    ARTIFICIAL_SWEETENER = "artificial_sweetener"
+    SYRUPS = "syrups"
 
 class ProcessingLevel(str, Enum):
-    NOT_PROCESSED = "not_processed"
-    SEMI_PROCESSED = "semi_processed"
+    UNPROCESSED = "unprocessed"
     PROCESSED = "processed"
+    ULTRAPROCESSED = "ultraprocessed"
 
 class OrderStatus(str, Enum):
     PENDING = "pending"
@@ -96,6 +156,9 @@ class OrderStatus(str, Enum):
     IN_TRANSIT = "in_transit"
     DELIVERED = "delivered"
     CANCELLED = "cancelled"
+    HELD_IN_ESCROW = "held_in_escrow"
+    DISPUTED = "disputed"
+    PREORDER_PENDING = "preorder_pending"
 
 class PreOrderStatus(str, Enum):
     DRAFT = "draft"
