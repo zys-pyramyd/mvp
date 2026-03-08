@@ -220,28 +220,34 @@ const ProductModal = ({ product, variant, isOpen, onClose, onAddToCart, onBuyNow
                         </div>
 
                         <div className="flex space-x-3">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
                             {variant === 'community' ? (
                                 <button
                                     onClick={() => handleAction('commit')}
                                     className="flex-1 bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 shadow-lg transform active:scale-95 transition-all"
                                 >
-                                    🤝 Commit to Group Order
+                                    🤝 Commit
                                 </button>
                             ) : (
-                                <>
+                                <div className="flex flex-col sm:flex-row gap-3 w-full">
                                     <button
                                         onClick={() => handleAction('cart')}
-                                        className="flex-1 bg-white border-2 border-emerald-600 text-emerald-700 py-3 rounded-lg font-bold hover:bg-emerald-50 transition-colors"
+                                        className="flex-1 w-full sm:w-1/2 bg-white border-2 border-emerald-600 text-emerald-700 py-3 rounded-lg font-bold hover:bg-emerald-50 transition-colors"
                                     >
-                                        Add to Cart
+                                        Add Item
                                     </button>
                                     <button
                                         onClick={() => handleAction('buyNow')}
-                                        className="flex-1 bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 shadow-lg transform active:scale-95 transition-all"
+                                        className="flex-1 w-full sm:w-1/2 bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 shadow-lg transform active:scale-95 transition-all"
                                     >
                                         Buy Now
                                     </button>
-                                </>
+                                </div>
                             )}
                         </div>
                     </div>

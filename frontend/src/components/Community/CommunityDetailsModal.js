@@ -439,7 +439,7 @@ const CommunityDetailsModal = ({ community, onClose, user, token, API_BASE_URL, 
                                             </div>
                                             {post.type === 'product' && post.is_available && (
                                                 <button className="bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold">
-                                                    Add to Cart
+                                                    Add Item
                                                 </button>
                                             )}
                                         </div>

@@ -16,7 +16,7 @@ class RequestItem(BaseModel):
     name: str
     quantity: float
     unit: str
-    specifications: Optional[str] = None
+    specifications: Optional[str] = Field(None, max_length=1000)
     target_price: Optional[float] = None
     moisture_content_percent: Optional[float] = None # Optional moisture content
 
@@ -38,7 +38,7 @@ class BuyerRequestCreate(BaseModel):
     price_range_min: Optional[float] = None
     price_range_max: Optional[float] = None
     
-    notes: Optional[str] = None # Description
+    notes: Optional[str] = Field(None, max_length=2000) # Description
     contact_phone: Optional[str] = None 
     payment_reference: Optional[str] = None
     amount_paid: Optional[float] = 0.0
@@ -57,7 +57,7 @@ class OfferCreate(BaseModel):
     moisture_content_percent: Optional[float] = None
     quotation_file: Optional[str] = None # PDF/Doc URL
     delivery_date: datetime
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=2000)
     quantity_offered: Optional[float] = None
 
 class RFQPaymentRequest(BaseModel):
@@ -77,11 +77,11 @@ class RequestUpdate(BaseModel):
     location: Optional[str] = None
     publish_date: Optional[datetime] = None
     expiry_date: Optional[datetime] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=2000)
     contact_phone: Optional[str] = None
 
 class AcceptOfferRequest(BaseModel):
-    acknowledgment_note: Optional[str] = None
+    acknowledgment_note: Optional[str] = Field(None, max_length=2000)
     acknowledgment_files: List[str] = []
     confirmed_delivery_date: Optional[datetime] = None
     payment_terms: Optional[dict] = None

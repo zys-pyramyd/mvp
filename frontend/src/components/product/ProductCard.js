@@ -116,7 +116,7 @@ const ProductCard = ({ product, variant, onOpenModal, onAddToCart, onCommit }) =
                 {/* Title & Price */}
                 <div className="flex justify-between items-start mb-2">
                     <div>
-                        <h3 className="font-bold text-gray-900 line-clamp-1" title={product.title || product.product_name}>
+                        <h3 className="font-bold text-gray-900 line-clamp-2 break-words" title={product.title || product.product_name}>
                             {product.title || product.product_name}
                         </h3>
                         {variant === 'retail' && product.brand_name && (
@@ -250,7 +250,7 @@ const ProductCard = ({ product, variant, onOpenModal, onAddToCart, onCommit }) =
                                 onClick={(e) => { e.stopPropagation(); onAddToCart(product); }}
                                 className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded transition-colors shadow-sm"
                             >
-                                Add Cart
+                                Add Item
                             </button>
                         )}
                     </div>

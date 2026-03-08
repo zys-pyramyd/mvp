@@ -25,6 +25,11 @@ class Settings:
     PAYSTACK_PUBLIC_KEY: str = os.environ.get("PAYSTACK_PUBLIC_KEY", "pk_test_dummy_paystack_key")
     PAYSTACK_API_URL: str = "https://api.paystack.co"
     
+    # Render overrides for production
+    if os.environ.get("ENVIRONMENT") == "production":
+        if PAYSTACK_SECRET_KEY == "sk_test_dummy_paystack_key":
+            print("WARNING: Using DUMMY Paystack Secret Key in PRODUCTION! Payments will fail.")
+    
     TWILIO_SID: str = os.environ.get("TWILIO_ACCOUNT_SID", "dummy_twilio_sid")
     TWILIO_TOKEN: str = os.environ.get("TWILIO_AUTH_TOKEN", "dummy_twilio_token")
     

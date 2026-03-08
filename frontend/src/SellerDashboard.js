@@ -346,7 +346,7 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
 
                 {/* Modals */}
                 {showAddProduct && (
-                    <AddProductModal onClose={() => setShowAddProduct(false)} onSuccess={() => { setShowAddProduct(false); fetchInitialData(); }} token={token} />
+                    <AddProductModal user={user} onClose={() => setShowAddProduct(false)} onSuccess={() => { setShowAddProduct(false); fetchInitialData(); }} token={token} />
                 )}
                 {showAddFarmer && (
                     <AddFarmerModal onClose={() => setShowAddFarmer(false)} onSuccess={() => { setShowAddFarmer(false); fetchInitialData(); }} token={token} />
@@ -508,39 +508,51 @@ const AddFarmerModal = ({ onClose, onSuccess, token }) => {
 const PRODUCT_CATEGORIES = {
     grains_cereals: {
         label: "Grains & Cereals",
-        subcategories: ["maize", "rice", "wheat", "oat", "barley", "sorghum", "millet", "rye", "triticale"]
+        subcategories: ["maize", "rice", "wheat", "oat", "barley", "sorghum", "millet", "rye", "triticale"].sort()
     },
     beans_legumes: {
         label: "Beans & Legumes",
-        subcategories: ["lentils", "peas", "beans", "broad_beans", "groundnut", "soybeans"]
+        subcategories: ["lentils", "peas", "beans", "broad_beans", "groundnut", "soybeans"].sort()
     },
     fish_meat: {
         label: "Fish & Meat",
-        subcategories: ["fresh_fish", "dried_fish", "poultry", "beef", "goat_mutton", "pork", "snails"]
+        subcategories: ["fresh_fish", "dried_fish", "poultry", "beef", "goat_mutton", "pork", "snails"].sort()
     },
     spices_vegetables: {
         label: "Spices & Vegetables",
-        subcategories: ["leafy_vegetables", "peppers", "tomatoes", "onions", "ginger_garlic", "herbs_spices", "okra", "cucumber"]
+        subcategories: ["leafy_vegetables", "peppers", "tomatoes", "onions", "ginger_garlic", "herbs_spices", "okra", "cucumber"].sort()
     },
     tubers_roots: {
         label: "Tubers & Roots",
-        subcategories: ["yam", "cassava", "sweet_potato", "chinese_yam", "taro", "potato", "carrots", "turnips", "parsnips", "radish", "celeriac", "ginger", "turmeric", "beets", "burdock_root"]
+        subcategories: ["yam", "cassava", "sweet_potato", "chinese_yam", "taro", "potato", "carrots", "turnips", "parsnips", "radish", "celeriac", "ginger", "turmeric", "beets", "burdock_root"].sort()
     },
     drinks_beverage: {
         label: "Drinks & Beverage",
-        subcategories: ["milk", "chocolate_drinks", "water", "soft_drinks_carbonated", "juices_smoothies", "hot_beverage", "energy_drinks", "health_drinks", "dairy_plant_based", "cordials_squash"]
+        subcategories: ["milk", "chocolate_drinks", "water", "soft_drinks_carbonated", "juices_smoothies", "hot_beverage", "energy_drinks", "health_drinks", "dairy_plant_based", "cordials_squash"].sort()
     },
     snacks_confectionaries: {
         label: "Snacks & Confectionaries",
-        subcategories: ["chocolates", "candy_gummy", "chips_crisps", "pretzels_crackers", "popcorn", "nuts_seeds", "dried_fruits_trail_mix", "granola_energy_bars", "cookies_biscuits", "snack_cakes_pastries"]
+        subcategories: ["chocolates", "candy_gummy", "chips_crisps", "pretzels_crackers", "popcorn", "nuts_seeds", "dried_fruits_trail_mix", "granola_energy_bars", "cookies_biscuits", "snack_cakes_pastries"].sort()
     },
     sweets_sugar: {
         label: "Sweets & Sugar",
-        subcategories: ["sugar", "honey", "dates", "agave", "artificial_sweetener", "syrups"]
+        subcategories: ["sugar", "honey", "dates", "agave", "artificial_sweetener", "syrups"].sort()
     },
     farm_inputs: {
         label: "Farm Inputs",
-        subcategories: []
+        subcategories: ["pesticides", "herbicides", "fertilizers", "farm_machines", "farm_tools", "seeds", "nursery_beds"].sort()
+    },
+    fruits: {
+        label: "Fruits",
+        subcategories: ["apples", "banana", "orange", "lemon_lime", "mango", "pineapple", "papaya", "kiwi", "avocado", "passion_fruit", "lychee", "dragon_fruit", "strawberries", "blueberries", "raspberries", "blackberries", "peaches", "plums", "cherries", "watermelon", "honeydew"].sort()
+    },
+    cash_crop: {
+        label: "Cash Crop",
+        subcategories: ["cocoa", "cashewnut", "sesame_seeds", "rubber"].sort()
+    },
+    feeds: {
+        label: "Feeds",
+        subcategories: ["chicken_feeds", "fish_feeds", "broiler_feeds", "layer_feeds", "cattle_feeds", "sheep_goat_feeds", "dairy_cattle_feeds", "dog_food", "cat_food", "bird_food", "floating_fish_pellets", "sinking_fish_pellet"].sort()
     },
     flour_flakes: {
         label: "Flour & Flakes",
@@ -556,9 +568,66 @@ const formatLabel = (str) => {
     return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 };
 
+const SearchableSelect = ({ options, value, onChange, placeholder }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
+
+    // options is array of {value, label}
+    const filteredOptions = options.filter(opt => opt.label.toLowerCase().includes(searchTerm.toLowerCase()));
+    const selectedLabel = options.find(opt => opt.value === value)?.label || '';
+
+    // Close dropdown on outside click
+    React.useEffect(() => {
+        const handleClickOutside = () => setIsOpen(false);
+        if (isOpen) {
+            document.addEventListener('click', handleClickOutside);
+        }
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, [isOpen]);
+
+    return (
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <div
+                className="w-full border rounded p-2 bg-white flex justify-between items-center cursor-pointer min-h-[42px]"
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                <span className={selectedLabel ? "text-gray-900" : "text-gray-400"}>{selectedLabel || placeholder}</span>
+                <span className="text-gray-500 text-xs">▼</span>
+            </div>
+            {isOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow-lg max-h-60 overflow-y-auto">
+                    <input
+                        type="text"
+                        autoFocus
+                        className="w-full p-2 border-b sticky top-0 bg-white outline-none"
+                        placeholder="Search..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    {filteredOptions.length > 0 ? filteredOptions.map(opt => (
+                        <div
+                            key={opt.value}
+                            className={`p-2 hover:bg-emerald-50 cursor-pointer ${value === opt.value ? 'bg-emerald-100 font-medium' : ''}`}
+                            onClick={() => {
+                                onChange(opt.value);
+                                setIsOpen(false);
+                                setSearchTerm('');
+                            }}
+                        >
+                            {opt.label}
+                        </div>
+                    )) : (
+                        <div className="p-2 text-gray-500 text-sm">No results found</div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const PREDEFINED_COLORS = ['white', 'brown', 'green', 'red', 'yellow', 'silver', 'black', 'grey', 'ash'];
 
-const AddProductModal = ({ onClose, onSuccess, token }) => {
+const AddProductModal = ({ user, onClose, onSuccess, token }) => {
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -574,9 +643,8 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
         country: 'Nigeria',
         colors: [],
         seller_delivery_fee: 0,
-        seller_delivery_fee: 0,
         images: [],
-        farmer_id: '', // For agents
+        farmer_identifier: '', // Replaced static farmer_id with identifier
         min_order_quantity: 1,
         is_preorder: false,
         preorder_deadline: '',
@@ -584,43 +652,60 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
     });
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [managedFarmers, setManagedFarmers] = useState([]); // Agents: list of farmers
 
-    // Fetch farmers for agents
-    React.useEffect(() => {
-        const fetchFarmers = async () => {
-            // We can reuse the same endpoint or pass it down. 
-            // For modularity, let's fetch if we think we are an agent? 
-            // Actually, better to check user role or passed prop 'isAgent'.
-            // Let's assume we can fetch if token is present.
-            try {
-                const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/agent/farmers`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    setManagedFarmers(data.farmers || []);
-                }
-            } catch (e) {
-                console.error("Failed to fetch farmers for dropdown", e);
+    // Auto-complete Farmer Search State
+    const [farmerSearch, setFarmerSearch] = useState('');
+    const [farmerResult, setFarmerResult] = useState(null); // { id, name }
+    const [isSearchingFarmer, setIsSearchingFarmer] = useState(false);
+    const [searchError, setSearchError] = useState('');
+    const [searchTimeout, setSearchTimeout] = useState(null);
+
+    // Dynamic Farmer Lookup API
+    const lookupFarmer = async (identifier) => {
+        if (!identifier || identifier.length < 3) {
+            setFarmerResult(null);
+            setSearchError('');
+            setFormData(prev => ({ ...prev, farmer_identifier: '' }));
+            return;
+        }
+
+        setIsSearchingFarmer(true);
+        setSearchError('');
+
+        try {
+            const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/agent/farmers/lookup?identifier=${encodeURIComponent(identifier)}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                setFarmerResult({ id: data.farmer_id, name: `${data.first_name} ${data.last_name}` });
+                setFormData(prev => ({ ...prev, farmer_identifier: identifier })); // Attach to payload
+            } else {
+                setFarmerResult(null);
+                setSearchError(data.detail || 'Farmer not found.');
+                setFormData(prev => ({ ...prev, farmer_identifier: '' }));
             }
-        };
-        // Simple check if we might be an agent (or just try fetching, API will reject if not)
-        fetchFarmers();
-    }, [token]);
+        } catch (e) {
+            console.error(e);
+            setSearchError('Error connecting to lookup check.');
+        } finally {
+            setIsSearchingFarmer(false);
+        }
+    };
 
-    const handleFarmerSelect = (e) => {
-        const farmerId = e.target.value;
-        const selectedFarmer = managedFarmers.find(f => f.id === farmerId);
+    const handleFarmerTyping = (e) => {
+        const val = e.target.value;
+        setFarmerSearch(val);
+        setFarmerResult(null); // Clear previous match visually
 
-        setFormData(prev => ({
-            ...prev,
-            farmer_id: farmerId,
-            // Auto-fill location from farmer if available
-            location: selectedFarmer?.state || prev.location,
-            city: selectedFarmer?.city || prev.city,
-            pickup_address: selectedFarmer?.address || prev.pickup_address
-        }));
+        if (searchTimeout) clearTimeout(searchTimeout);
+
+        const newTimeout = setTimeout(() => {
+            lookupFarmer(val);
+        }, 500); // 500ms debounce
+        setSearchTimeout(newTimeout);
     };
 
     const handleImageUpload = async (e) => {
@@ -726,21 +811,41 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Agent: Select Farmer */}
-                    {managedFarmers.length > 0 && (
+                    {/* Agent: Dynamic Farmer Lookup */}
+                    {user?.role === 'agent' && (
                         <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
                             <label className="block text-sm font-bold text-emerald-800 mb-1">Post on behalf of Farmer</label>
-                            <select
-                                className="w-full border rounded p-2"
-                                value={formData.farmer_id}
-                                onChange={handleFarmerSelect}
-                            >
-                                <option value="">Select Farmer (Optional - you are seller)</option>
-                                {managedFarmers.map(f => (
-                                    <option key={f.id} value={f.id}>{f.first_name} {f.last_name} ({f.location || 'No Loc'})</option>
-                                ))}
-                            </select>
-                            <p className="text-xs text-emerald-600 mt-1">If selected, sales will be recorded against this farmer.</p>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    className="w-full border rounded p-2"
+                                    placeholder="Enter Farmer Phone, Email or Username"
+                                    value={farmerSearch}
+                                    onChange={handleFarmerTyping}
+                                />
+                                {isSearchingFarmer && <span className="absolute right-3 top-2 text-gray-400 text-sm">Searching...</span>}
+                            </div>
+
+                            {searchError && <p className="text-xs text-red-600 mt-1">{searchError}</p>}
+
+                            {farmerResult && (
+                                <div className="mt-2 p-2 bg-white rounded border border-emerald-300 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold text-xs">
+                                            ✓
+                                        </div>
+                                        <span className="text-sm font-medium text-gray-800">Matched: {farmerResult.name}</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setFarmerResult(null); setFarmerSearch(''); setFormData(prev => ({ ...prev, farmer_identifier: '' })); }}
+                                        className="text-xs text-gray-500 hover:text-red-500"
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
+                            )}
+                            <p className="text-xs text-emerald-600 mt-2">If linked, sales will deposit directly to this farmer's account.</p>
                         </div>
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -756,31 +861,23 @@ const AddProductModal = ({ onClose, onSuccess, token }) => {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Category</label>
-                            <select
-                                className="w-full border rounded p-2"
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                            <SearchableSelect
+                                placeholder="Select Category"
                                 value={formData.category}
-                                onChange={e => setFormData({ ...formData, category: e.target.value, subcategory: '' })}
-                            >
-                                {Object.entries(PRODUCT_CATEGORIES).map(([key, cat]) => (
-                                    <option key={key} value={key}>{cat.label}</option>
-                                ))}
-                            </select>
+                                onChange={val => setFormData({ ...formData, category: val, subcategory: '' })}
+                                options={Object.entries(PRODUCT_CATEGORIES).map(([key, cat]) => ({ value: key, label: cat.label }))}
+                            />
                         </div>
                         {PRODUCT_CATEGORIES[formData.category]?.subcategories?.length > 0 && (
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Subcategory</label>
-                                <select
-                                    required
-                                    className="w-full border rounded p-2"
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Subcategory</label>
+                                <SearchableSelect
+                                    placeholder="Select Subcategory"
                                     value={formData.subcategory}
-                                    onChange={e => setFormData({ ...formData, subcategory: e.target.value })}
-                                >
-                                    <option value="">Select Subcategory</option>
-                                    {PRODUCT_CATEGORIES[formData.category].subcategories.map(sub => (
-                                        <option key={sub} value={sub}>{formatLabel(sub)}</option>
-                                    ))}
-                                </select>
+                                    onChange={val => setFormData({ ...formData, subcategory: val })}
+                                    options={PRODUCT_CATEGORIES[formData.category].subcategories.map(sub => ({ value: sub, label: formatLabel(sub) }))}
+                                />
                             </div>
                         )}
                         <div>

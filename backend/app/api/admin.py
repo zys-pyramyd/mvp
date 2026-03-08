@@ -6,6 +6,7 @@ from app.core.security import hash_password, decrypt_data
 from app.api.deps import get_db, get_current_user
 from app.services.paystack import assign_dedicated_account
 from app.core.config import settings
+import os
 
 router = APIRouter()
 
@@ -18,8 +19,9 @@ async def create_admin(request: CreateAdminRequest, current_user: dict = Depends
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # Verify secret key (extra layer of security)
-    if request.secret_key != settings.JWT_SECRET: # A simple check
-         raise HTTPException(status_code=403, detail="Invalid secret key")
+    admin_secret = os.environ.get("ADMIN_CREATION_SECRET")
+    if not admin_secret or request.secret_key != admin_secret:
+         raise HTTPException(status_code=403, detail="Invalid admin creation secret key")
          
     db = get_db()
     if db.users.find_one({"email": request.email}):

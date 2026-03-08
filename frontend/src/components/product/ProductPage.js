@@ -194,22 +194,22 @@ const ProductPage = () => {
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="flex gap-4 mb-10 pb-8 border-b border-gray-100">
+                            <div className="flex flex-col sm:flex-row gap-4 mb-10 pb-8 border-b border-gray-100">
                                 <button
                                     onClick={() => navigate('/', { state: { openProduct: product } })}
-                                    className="flex-1 bg-white border-2 border-emerald-600 text-emerald-700 px-6 py-4 rounded-xl font-bold text-lg hover:bg-emerald-50 transition-colors flex items-center justify-center"
+                                    className="flex-1 w-full bg-white border-2 border-emerald-600 text-emerald-700 px-6 py-4 rounded-xl font-bold text-lg hover:bg-emerald-50 transition-colors flex items-center justify-center"
                                 >
-                                    <span className="mr-2">🛒</span> Add to Cart
+                                    <span className="mr-2">🛒</span> Add Item
                                 </button>
                                 <button
                                     onClick={() => navigate('/', { state: { openProduct: product } })}
-                                    className="flex-1 bg-emerald-600 text-white px-6 py-4 rounded-xl font-bold text-lg hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all flex items-center justify-center transform hover:-translate-y-0.5"
+                                    className="flex-1 w-full bg-emerald-600 text-white px-6 py-4 rounded-xl font-bold text-lg hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all flex items-center justify-center transform hover:-translate-y-0.5"
                                 >
                                     Buy Now
                                 </button>
                                 <button
                                     onClick={handleShare}
-                                    className="p-4 bg-white border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors flex items-center justify-center group"
+                                    className="p-4 w-full sm:w-auto bg-white border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors flex items-center justify-center group"
                                     title="Share Product"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500 group-hover:text-emerald-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">

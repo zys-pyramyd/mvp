@@ -148,8 +148,14 @@ const MyRequests = ({ requests, myOffers = [], onRefresh }) => {
     const handleConfirmDelivery = async (offerId) => {
         const code = prompt("Enter the LAST 8 CHARACTERS of the Tracking ID to confirm receipt:");
         if (!code) return;
+
+        if (code.trim().length !== 8) {
+            alert("The confirmation code must be exactly 8 characters long (the last 8 characters of the Tracking ID).");
+            return;
+        }
+
         try {
-            await api.post(`/requests/offers/${offerId}/confirm-delivery`, { code });
+            await api.post(`/requests/offers/${offerId}/confirm-delivery`, { code: code.trim() });
             alert("Delivery Confirmed! Funds released.");
             if (onRefresh) onRefresh();
         } catch (err) {

@@ -38,7 +38,7 @@ const RequestsPage = ({ userRole, onClose }) => {
             if (filters.type !== 'all') params.append('type', filters.type);
             if (filters.location) params.append('location', filters.location);
 
-            const response = await api.get(`/requests?${params.toString()}`);
+            const response = await api.get(`/requests₦${params.toString()}`);
             setRequests(response.data || []);
         } catch (error) {
             console.error("Failed to fetch requests", error);

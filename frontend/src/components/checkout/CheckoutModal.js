@@ -582,6 +582,14 @@ const CheckoutModal = ({
                                 <span>- ₦{orderSummary.you_saved?.toLocaleString()}</span>
                             </div>
                         )}
+
+                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mt-4 mb-2">
+                            <h4 className="text-xs font-bold text-blue-900 mb-1">Dynamic Calculation Notice</h4>
+                            <p className="text-xs text-blue-800 leading-relaxed">
+                                Depending on your location and account type, dynamic <strong>Delivery Fees</strong> based on distance and a <strong>4% Agent Service Charge</strong> may be factored into your final Paystack checkout window.
+                            </p>
+                        </div>
+
                         <div className="pt-4 border-t border-gray-200">
                             <div className="flex justify-between text-lg font-bold">
                                 <span className="text-gray-900">Total</span>

@@ -76,8 +76,9 @@ async def create_order(
     if not items:
         raise HTTPException(status_code=400, detail="No items in order")
     
-    # NOTE: KYC validation removed - buyers don't need KYC to purchase
-    # KYC is only required for sellers when listing products (see products.py:236)
+    # Exclude personal buyers from KYC, but enforce it for business buyers
+    if current_user.get('role') == 'business' and current_user.get('kyc_status') != 'approved':
+        raise HTTPException(status_code=403, detail="Business buyers must have approved KYC to place orders.")
     
     db = get_db()
     order_items = []
@@ -110,6 +111,40 @@ async def create_order(
         elif seller_id != product['seller_id']:
             raise HTTPException(status_code=400, detail="All items must be from the same seller")
             
+    # Calculate Delivery Fee & Agent Buying Service Charge
+    product_cost_total = total_amount
+    total_delivery_fee = 0.0
+    logistics_managed_by = "pyramyd" # Default
+    
+    # Check if Seller manages logistics for the first product
+    first_product = db.products.find_one({"id": items[0].product_id})
+    if first_product and first_product.get('logistics_managed_by') == 'seller':
+        logistics_managed_by = 'seller'
+        for item in items:
+            p = db.products.find_one({"id": item.product_id})
+            total_delivery_fee += float(p.get('seller_delivery_fee', 0.0) or 0.0)
+    else:
+        # Pyramyd manages logistics: Dynamic Geoapify Distance
+        from app.utils.geo import get_distance_km
+        seller = db.users.find_one({"id": seller_id})
+        seller_address = seller.get("address", "") if seller else ""
+        
+        distance = get_distance_km(seller_address, delivery_address)
+        platform_type = first_product.get('platform', 'pyhub') if first_product else 'pyhub'
+        
+        delivery_base_fee = 0.0
+        delivery_per_km = 100.0 if platform_type == 'pyexpress' else 2.0
+        total_delivery_fee = delivery_base_fee + (delivery_per_km * distance)
+
+    # Calculate 4% Agent Buying Service Charge
+    agent_service_charge = 0.0
+    # Apply if the user is linked to an agent, or explicitly buying via agent
+    if current_user.get('agent_id'):
+        agent_service_charge = product_cost_total * 0.04
+
+    # Build final cart total
+    total_amount = product_cost_total + total_delivery_fee + agent_service_charge
+    
     # Payment Handling
     order_status = "pending"
     
@@ -183,10 +218,15 @@ async def create_order(
         "buyer_id": current_user['id'],
         "buyer_username": current_user['username'],
         "buyer_email": current_user.get('email'),
+        "buyer_agent_id": current_user.get('agent_id'),  # Record the buying agent for their 4% payout
         "seller_id": seller_id,
         "seller_username": seller_name,
         "items": order_items,
         "total_amount": total_amount,
+        "product_cost_total": product_cost_total,
+        "total_delivery_fee": total_delivery_fee,
+        "agent_service_charge": agent_service_charge,
+        "logistics_managed_by": logistics_managed_by,
         "delivery_address": delivery_address,
         "payment_method": order_req.payment_method,
         "payment_reference": order_req.payment_reference,

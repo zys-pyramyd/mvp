@@ -159,6 +159,34 @@ async def get_managed_farmers(current_user: dict = Depends(get_current_user)):
         
     return {"farmers": farmers}
 
+@router.get("/farmers/lookup")
+async def lookup_farmer(identifier: str, current_user: dict = Depends(get_current_user)):
+    """Lookup farmer by phone, email, or username for product listing validation."""
+    if current_user.get('role') != 'agent':
+        raise HTTPException(status_code=403, detail="Only agents can lookup farmers")
+        
+    db = get_db()
+    # Find farmer under this agent by identifier
+    query = {
+        "role": "farmer",
+        "agent_id": current_user['id'],
+        "$or": [
+            {"phone": identifier},
+            {"email": identifier},
+            {"username": identifier}
+        ]
+    }
+    
+    farmer = db.users.find_one(query)
+    if not farmer:
+        raise HTTPException(status_code=404, detail="Farmer not found or not managed by you")
+        
+    return {
+        "first_name": farmer.get("first_name"),
+        "last_name": farmer.get("last_name"),
+        "farmer_id": farmer.get("id") or str(farmer.get("_id"))
+    }
+
 class RegisterFarmerRequest(BaseModel):
     first_name: str
     last_name: str

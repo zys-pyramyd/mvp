@@ -156,18 +156,23 @@ async def get_bank_account(current_user: dict = Depends(get_current_user)):
     if not bank_details:
         return {}
         
-    return {
-        "bank_name": bank_details.get("bank_name"),
-        "account_name": bank_details.get("account_name"),
-        "account_number_masked": "****" + str(bank_details.get("last4", "0000")) 
-        # Wait, I didn't save last4. decrypting is expensive just to mask.
-        # But I need to decrypt to show last 4? Or I should have saved last 4.
-        # I'll decrypt for now.
-    }
-    # Correction: decrypt first
-    from app.utils.security import decrypt_data
-    decrypted_num = decrypt_data(bank_details.get("account_number"))
-    masked = f"****{decrypted_num[-4:]}" if decrypted_num else "****"
+    masked = "****"
+    try:
+        from app.core.security import decrypt_data
+        account_number_encrypted = bank_details.get("account_number")
+        
+        if account_number_encrypted:
+            # Check if it was saved encrypted (this is MVP defensive handling)
+            if len(account_number_encrypted) > 15: # Usually encrypted strings are long Base64
+                decrypted_num = decrypt_data(account_number_encrypted)
+                masked = f"****{str(decrypted_num)[-4:]}"
+            else:
+                # Was saved as literal string (Not great, but handled)
+                masked = f"****{str(account_number_encrypted)[-4:]}"
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to decrypt bank account: {e}")
+        masked = "****"
     
     return {
         "bank_name": bank_details.get("bank_name"),

@@ -1,6 +1,6 @@
 
 from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.models.user import User, UserRegister, UserLogin, CompleteRegistration, ForgotPasswordRequest, ResetPasswordRequest
 from app.core.security import hash_password, verify_password, create_token, encrypt_data, decrypt_data
 from app.services.paystack import assign_dedicated_account, create_customer, resolve_bvn
@@ -14,6 +14,8 @@ import jwt
 from app.core.config import settings
 from typing import Optional
 from app.core.rate_limit import limiter
+import os
+import re
 
 router = APIRouter()
 
@@ -197,10 +199,7 @@ async def forgot_password(request: Request, password_request: ForgotPasswordRequ
     )
     
     # Construct reset link
-    # Assuming frontend is on port 3000 or served by nginx
-    reset_link = f"{settings.PAYSTACK_API_URL.replace('https://api.paystack.co', 'http://localhost:3000')}/reset-password?token={reset_token}" # Hacky replacement or use env var
-    # Better to use a FRONTEND_URL env var, defaulting to localhost:3000?
-    frontend_url = "http://localhost:3000" # Hardcoded for now or use os.environ
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
     reset_link = f"{frontend_url}/reset-password?token={reset_token}"
 
     # In a real app, send email here. For MVP, log it.
@@ -234,9 +233,9 @@ async def reset_password(request: Request, reset_request: ResetPasswordRequest):
         raise HTTPException(status_code=400, detail="Invalid token")
 
 class UpdateProfileRequest(BaseModel):
-    first_name: Optional[str] = None
-    middle_name: Optional[str] = None
-    last_name: Optional[str] = None
+    first_name: Optional[str] = Field(None, min_length=2, max_length=50, pattern=r"^[A-Za-z\-']+$")
+    middle_name: Optional[str] = Field(None, max_length=50, pattern=r"^[A-Za-z\-']*$")
+    last_name: Optional[str] = Field(None, min_length=2, max_length=50, pattern=r"^[A-Za-z\-']+$")
 
 @router.patch("/profile", response_model=dict)
 async def update_profile(

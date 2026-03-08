@@ -16,7 +16,7 @@ class Product(BaseModel):
     # Enhanced category structure
     category: ProductCategory
     subcategory: Optional[str] = None  # Dynamic based on category
-    processing_level: ProcessingLevel = ProcessingLevel.NOT_PROCESSED
+    processing_level: ProcessingLevel = ProcessingLevel.UNPROCESSED
     price_per_unit: float
     original_price: Optional[float] = None  # Original price before discount
     # Discount system
@@ -74,7 +74,7 @@ class ProductCreate(BaseModel):
     # Enhanced category structure
     category: ProductCategory
     subcategory: Optional[str] = None  # Dynamic based on category
-    processing_level: ProcessingLevel = ProcessingLevel.NOT_PROCESSED
+    processing_level: ProcessingLevel = ProcessingLevel.UNPROCESSED
     price_per_unit: float
     # Discount options
     has_discount: bool = False
@@ -112,6 +112,9 @@ class ProductCreate(BaseModel):
     about_product: Optional[str] = None
     product_benefits: Optional[List[str]] = []
     usage_instructions: Optional[str] = None
+    
+    # Agent representation
+    farmer_identifier: Optional[str] = None  # Phone, Email, or Username of the farmer the agent is representing
 
 class CartItem(BaseModel):
     product_id: str

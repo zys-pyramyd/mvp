@@ -38,6 +38,9 @@ class ProductCategory(str, Enum):
     SNACKS_CONFECTIONARIES = "snacks_confectionaries"
     SWEETS_SUGAR = "sweets_sugar"
     FARM_INPUTS = "farm_inputs"
+    FRUITS = "fruits"
+    CASH_CROP = "cash_crop"
+    FEEDS = "feeds"
     OTHER = "other"
 
 # Subcategories
@@ -143,6 +146,58 @@ class SweetsSugarSubcategory(str, Enum):
     AGAVE = "agave"
     ARTIFICIAL_SWEETENER = "artificial_sweetener"
     SYRUPS = "syrups"
+
+class FruitsSubcategory(str, Enum):
+    APPLES = "apples"
+    BANANA = "banana"
+    ORANGE = "orange"
+    LEMON_LIME = "lemon_lime"
+    MANGO = "mango"
+    PINEAPPLE = "pineapple"
+    PAPAYA = "papaya"
+    KIWI = "kiwi"
+    AVOCADO = "avocado"
+    PASSION_FRUIT = "passion_fruit"
+    LYCHEE = "lychee"
+    DRAGON_FRUIT = "dragon_fruit"
+    STRAWBERRIES = "strawberries"
+    BLUEBERRIES = "blueberries"
+    RASPBERRIES = "raspberries"
+    BLACKBERRIES = "blackberries"
+    PEACHES = "peaches"
+    PLUMS = "plums"
+    CHERRIES = "cherries"
+    WATERMELON = "watermelon"
+    HONEYDEW = "honeydew"
+
+class CashCropSubcategory(str, Enum):
+    COCOA = "cocoa"
+    CASHEWNUT = "cashewnut"
+    SESAME_SEEDS = "sesame_seeds"
+    RUBBER = "rubber"
+
+class FeedsSubcategory(str, Enum):
+    CHICKEN_FEEDS = "chicken_feeds"
+    FISH_FEEDS = "fish_feeds"
+    BROILER_FEEDS = "broiler_feeds"
+    LAYER_FEEDS = "layer_feeds"
+    CATTLE_FEEDS = "cattle_feeds"
+    SHEEP_GOAT_FEEDS = "sheep_goat_feeds"
+    DAIRY_CATTLE_FEEDS = "dairy_cattle_feeds"
+    DOG_FOOD = "dog_food"
+    CAT_FOOD = "cat_food"
+    BIRD_FOOD = "bird_food"
+    FLOATING_FISH_PELLETS = "floating_fish_pellets"
+    SINKING_FISH_PELLET = "sinking_fish_pellet"
+
+class FarmInputsSubcategory(str, Enum):
+    PESTICIDES = "pesticides"
+    HERBICIDES = "herbicides"
+    FERTILIZERS = "fertilizers"
+    FARM_MACHINES = "farm_machines"
+    FARM_TOOLS = "farm_tools"
+    SEEDS = "seeds"
+    NURSERY_BEDS = "nursery_beds"
 
 class ProcessingLevel(str, Enum):
     UNPROCESSED = "unprocessed"

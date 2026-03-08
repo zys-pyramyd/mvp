@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Constants (Mirrored from server.py to avoid circular imports)
-FARMHUB_SERVICE_CHARGE = 0.10  # 10%
+FARMHUB_SERVICE_CHARGE = 0.05  # 5% (Reduced from 10%)
 AGENT_SALE_COMMISSION = 0.05   # 5%
 
 async def process_order_payout(order_id: str, db):
@@ -58,13 +58,52 @@ async def process_order_payout(order_id: str, db):
         )
         return False, "Seller not found"
         
+    # Ensure seller has payout destination (DVA or Bank)
+    seller_dva = seller.get("dva_account_number")
+    bank_details = seller.get("bank_details")
+    
+    if not seller_dva and not (bank_details and bank_details.get("account_number") and bank_details.get("bank_code")):
+        # Route to manual_reconciliations
+        db.manual_reconciliations.insert_one({
+            "order_id": order_id,
+            "user_id": seller_id,
+            "role": "seller",
+            "amount_expected": order.get("total_amount"),
+            "status": "pending",
+            "created_at": datetime.utcnow()
+        })
+        
+        # Mark order as pending reconciliation
+        db.orders.update_one(
+            {"order_id": order_id},
+            {"$set": {
+                "payout_status": "pending_reconciliation", 
+                "payout_error": "Missing DVA or Bank Details"
+            }}
+        )
+        
+        # Emit notification
+        db.notifications.insert_one({
+            "user_id": seller_id,
+            "title": "Payout Held for Reconciliation",
+            "message": f"Your payout for order #{order_id} is held by Pyramyd because you don't have a linked DVA or Bank Account. Please add one. Reconciliation happens 24 hours after adding details.",
+            "type": "payout_held",
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        })
+        logger.warning(f"Order {order_id} payout held. Missing DVA/Bank for seller {seller_id}")
+        return False, "Missing DVA or Bank Details. Routed to manual reconciliation."
+
     # Check for Agent (if seller has an agent)
-    # Logic: usually strictly based on 'selling_agent_id' in order, but MVP might not have it.
-    # We'll assume direct sale unless 'agent_id' is in order.
-    agent_id = order.get("agent_id") # populated if agent facilitated
+    selling_agent_id = order.get("agent_id") # populated if agent facilitated sale
+    buying_agent_id = order.get("buyer_agent_id")
     
     # 3. Calculate Splits
     total_amount = order.get("total_amount", 0.0)
+    product_cost_total = order.get("product_cost_total", total_amount)
+    total_delivery_fee = order.get("total_delivery_fee", 0.0)
+    buyer_agent_service_charge = order.get("agent_service_charge", 0.0)
+    logistics_managed_by = order.get("logistics_managed_by", "pyramyd")
     
     # Base Rates
     platform_fee_rate = FARMHUB_SERVICE_CHARGE
@@ -73,20 +112,28 @@ async def process_order_payout(order_id: str, db):
     platform = order.get("platform", "farm_deals") # Default to standard if missing
     seller_role = order.get("seller_role", "farmer")
     
-    agent_commission = 0.0
+    selling_agent_commission = 0.0
     
     if platform == "pyexpress" and seller_role == "business":
-        # PyExpress Business Sales: No Agent Commission
+        # PyExpress Business Sales: No Selling Agent Commission
         pass
-    elif agent_id:
-        # Standard Agent Commission if agent involved
-        agent_commission = total_amount * AGENT_SALE_COMMISSION
+    elif selling_agent_id:
+        # Standard Agent Commission if selling agent involved
+        selling_agent_commission = round(product_cost_total * AGENT_SALE_COMMISSION, 2)
+        # Note: Platform still takes its 5%, Agent takes an additional 5% totaling 10% deduction from seller.
         
-    platform_fee = total_amount * platform_fee_rate
+    platform_fee = round(product_cost_total * platform_fee_rate, 2)
         
-    seller_amount = total_amount - platform_fee - agent_commission
+    seller_amount = round(product_cost_total - platform_fee - selling_agent_commission, 2)
     
-    logger.info(f"Processing payout for order {order_id}. Total: ₦{total_amount}, Seller: ₦{seller_amount}, Platform: ₦{platform_fee}, Agent: ₦{agent_commission}")
+    # Apply Delivery Fee logic
+    if logistics_managed_by == "seller":
+        seller_amount += total_delivery_fee
+    elif logistics_managed_by == "pyramyd":
+        # Platform holds delivery fee to pay logistics
+        platform_fee += total_delivery_fee
+        
+    logger.info(f"Processing payout for order {order_id}. Total: ₦{total_amount}, Seller: ₦{seller_amount}, Platform: ₦{platform_fee}, Selling Agent: ₦{selling_agent_commission}, Buying Agent: ₦{buyer_agent_service_charge}")
     
     # 4. Update Wallets (Ledger)
     # Credit Seller
@@ -105,17 +152,34 @@ async def process_order_payout(order_id: str, db):
         }
     )
     
-    # Credit Agent
-    if agent_id:
+    # Credit Selling Agent
+    if selling_agent_id:
         db.users.update_one(
-            {"id": agent_id},
+            {"id": selling_agent_id},
             {
-                "$inc": {"wallet_balance": agent_commission},
+                "$inc": {"wallet_balance": selling_agent_commission},
                 "$push": {
                     "wallet_history": {
                         "type": "credit",
-                        "amount": agent_commission,
-                        "description": f"Commission for Order #{order_id}",
+                        "amount": selling_agent_commission,
+                        "description": f"Selling Commission for Order #{order_id}",
+                        "date": datetime.utcnow()
+                    }
+                }
+            }
+        )
+        
+    # Credit Buying Agent
+    if buying_agent_id and buyer_agent_service_charge > 0:
+        db.users.update_one(
+            {"id": buying_agent_id},
+            {
+                "$inc": {"wallet_balance": buyer_agent_service_charge},
+                "$push": {
+                    "wallet_history": {
+                        "type": "credit",
+                        "amount": buyer_agent_service_charge,
+                        "description": f"Buying Agent Service Charge for Order #{order_id}",
                         "date": datetime.utcnow()
                     }
                 }

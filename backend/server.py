@@ -789,6 +789,8 @@ class ProductCategory(str, Enum):
     PESTICIDES = "pesticides"
     SEEDS = "seeds"
     PACKAGED_GOODS = "packaged_goods"
+    FARM_INPUTS = "farm_inputs"
+    FEEDS = "feeds"
 
 class GrainsLegumesSubcategory(str, Enum):
     RICE = "rice"  # e.g. local rice, ofada rice, basmati rice
@@ -840,10 +842,62 @@ class PepperVegetablesSubcategory(str, Enum):
     TOMATOES = "tomatoes"
     HERBS_SPICES = "herbs_spices"
 
+class FruitsSubcategory(str, Enum):
+    APPLES = "apples"
+    BANANA = "banana"
+    ORANGE = "orange"
+    LEMON_LIME = "lemon_lime"
+    MANGO = "mango"
+    PINEAPPLE = "pineapple"
+    PAPAYA = "papaya"
+    KIWI = "kiwi"
+    AVOCADO = "avocado"
+    PASSION_FRUIT = "passion_fruit"
+    LYCHEE = "lychee"
+    DRAGON_FRUIT = "dragon_fruit"
+    STRAWBERRIES = "strawberries"
+    BLUEBERRIES = "blueberries"
+    RASPBERRIES = "raspberries"
+    BLACKBERRIES = "blackberries"
+    PEACHES = "peaches"
+    PLUMS = "plums"
+    CHERRIES = "cherries"
+    WATERMELON = "watermelon"
+    HONEYDEW = "honeydew"
+
+class CashCropSubcategory(str, Enum):
+    COCOA = "cocoa"
+    CASHEWNUT = "cashewnut"
+    SESAME_SEEDS = "sesame_seeds"
+    RUBBER = "rubber"
+
+class FeedsSubcategory(str, Enum):
+    CHICKEN_FEEDS = "chicken_feeds"
+    FISH_FEEDS = "fish_feeds"
+    BROILER_FEEDS = "broiler_feeds"
+    LAYER_FEEDS = "layer_feeds"
+    CATTLE_FEEDS = "cattle_feeds"
+    SHEEP_GOAT_FEEDS = "sheep_goat_feeds"
+    DAIRY_CATTLE_FEEDS = "dairy_cattle_feeds"
+    DOG_FOOD = "dog_food"
+    CAT_FOOD = "cat_food"
+    BIRD_FOOD = "bird_food"
+    FLOATING_FISH_PELLETS = "floating_fish_pellets"
+    SINKING_FISH_PELLET = "sinking_fish_pellet"
+
+class FarmInputsSubcategory(str, Enum):
+    PESTICIDES = "pesticides"
+    HERBICIDES = "herbicides"
+    FERTILIZERS = "fertilizers"
+    FARM_MACHINES = "farm_machines"
+    FARM_TOOLS = "farm_tools"
+    SEEDS = "seeds"
+    NURSERY_BEDS = "nursery_beds"
+
 class ProcessingLevel(str, Enum):
-    NOT_PROCESSED = "not_processed"  # Raw, natural state
-    SEMI_PROCESSED = "semi_processed"  # Partially processed 
-    PROCESSED = "processed"  # Fully processed/packaged
+    UNPROCESSED = "unprocessed"
+    PROCESSED = "processed"
+    ULTRAPROCESSED = "ultraprocessed"
 
 # All 36 Nigerian States + FCT Abuja
 NIGERIAN_STATES = [
@@ -1430,7 +1484,7 @@ class Product(BaseModel):
     # Enhanced category structure
     category: ProductCategory
     subcategory: Optional[str] = None  # Dynamic based on category
-    processing_level: ProcessingLevel = ProcessingLevel.NOT_PROCESSED
+    processing_level: ProcessingLevel = ProcessingLevel.UNPROCESSED
     price_per_unit: float
     original_price: Optional[float] = None  # Original price before discount
     # Discount system
@@ -1476,7 +1530,7 @@ class ProductCreate(BaseModel):
     # Enhanced category structure
     category: ProductCategory
     subcategory: Optional[str] = None  # Dynamic based on category
-    processing_level: ProcessingLevel = ProcessingLevel.NOT_PROCESSED
+    processing_level: ProcessingLevel = ProcessingLevel.UNPROCESSED
     price_per_unit: float
     # Discount options
     has_discount: bool = False
@@ -2515,6 +2569,7 @@ async def get_products(
     max_price: Optional[float] = None,
     only_preorders: Optional[bool] = None,
     search_term: Optional[str] = None,
+    city: Optional[str] = None,
     seller_type: Optional[str] = None,
     platform: Optional[str] = None,  # 'home' or 'farm_deals'
     global_search: Optional[bool] = None,  # Search across all platforms
@@ -2535,6 +2590,9 @@ async def get_products(
             if location:
                 products_query["location"] = {"$regex": location, "$options": "i"}
                 
+            if city:
+                products_query["city"] = {"$regex": city, "$options": "i"}
+                
             if min_price is not None or max_price is not None:
                 price_filter = {}
                 if min_price is not None:
@@ -2549,8 +2607,8 @@ async def get_products(
             # Platform-based filtering (skip if global search)
             if not global_search:
                 if platform == "home":
-                    # Home page: Only business and supplier products
-                    products_query["seller_type"] = {"$in": ["business", "supplier"]}
+                    # Home page: Only business products
+                    products_query["seller_type"] = {"$in": ["business"]}
                 elif platform == "farm_deals":
                     # Farm Deals page: Only farmer and agent products
                     products_query["seller_type"] = {"$in": ["farmer", "agent"]}
@@ -2586,6 +2644,9 @@ async def get_products(
             if location:
                 preorders_query["location"] = {"$regex": location, "$options": "i"}
                 
+            if city:
+                preorders_query["city"] = {"$regex": city, "$options": "i"}
+                
             if min_price is not None or max_price is not None:
                 price_filter = {}
                 if min_price is not None:
@@ -2608,8 +2669,8 @@ async def get_products(
             # Platform-based filtering for preorders (skip if global search)
             if not global_search:
                 if platform == "home":
-                    # Home page: Only business and supplier preorders
-                    preorders_query["seller_type"] = {"$in": ["business", "supplier"]}
+                    # Home page: Only business preorders
+                    preorders_query["seller_type"] = {"$in": ["business"]}
                 elif platform == "farm_deals":
                     # Farm Deals page: Only farmer and agent preorders
                     preorders_query["seller_type"] = {"$in": ["farmer", "agent"]}

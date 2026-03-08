@@ -91,10 +91,21 @@ const WalletModal = ({ isOpen, onClose, userProfile }) => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="bg-yellow-50 p-4 rounded-lg mb-4">
-                                    <p className="text-sm text-gray-700">
-                                        ⚠️ No dedicated virtual account found. Please contact support to activate your wallet.
-                                    </p>
+                                <div className="space-y-3 mb-4">
+                                    <div className="bg-yellow-50 p-4 rounded-lg">
+                                        <p className="text-sm text-gray-700">
+                                            ⚠️ No dedicated virtual account found. Please contact support to activate your wallet.
+                                        </p>
+                                    </div>
+                                    <div className="bg-red-50 p-4 rounded-lg border border-red-100 flex items-start gap-3">
+                                        <span className="text-xl">🛑</span>
+                                        <div>
+                                            <h4 className="text-sm font-bold text-red-900 mb-1">Payout Holds Active</h4>
+                                            <p className="text-xs text-red-800 leading-relaxed">
+                                                Because you do not have a registered Bank Account or Dedicated Virtual Account, any active sales payments will be routed directly to Pyramyd's Manual Reconciliation vault and held for 24-hours to protect your funds. Please update your banking details immediately.
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 

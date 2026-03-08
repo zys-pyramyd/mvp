@@ -75,6 +75,7 @@ async def get_products(
     max_price: Optional[float] = None,
     only_preorders: Optional[bool] = None,
     search_term: Optional[str] = None,
+    city: Optional[str] = None,
     seller_type: Optional[str] = None,
     platform: Optional[str] = None,  # 'home' or 'farm_deals'
     global_search: Optional[bool] = None,  # Search across all platforms
@@ -96,6 +97,9 @@ async def get_products(
             if location:
                 products_query["location"] = {"$regex": location, "$options": "i"}
                 
+            if city:
+                products_query["city"] = {"$regex": city, "$options": "i"}
+                
             if min_price is not None or max_price is not None:
                 price_filter = {}
                 if min_price is not None:
@@ -112,8 +116,8 @@ async def get_products(
             # Platform-based filtering (skip if global search)
             if not global_search:
                 if platform == "home":
-                    # Home page: Only business and supplier products
-                    products_query["seller_type"] = {"$in": ["business", "supplier"]}
+                    # Home page: Only business products
+                    products_query["seller_type"] = {"$in": ["business"]}
                 elif platform == "farm_deals":
                     # Farm Deals page: Only farmer and agent products
                     products_query["seller_type"] = {"$in": ["farmer", "agent"]}
@@ -149,6 +153,9 @@ async def get_products(
             if location:
                 preorders_query["location"] = {"$regex": location, "$options": "i"}
                 
+            if city:
+                preorders_query["city"] = {"$regex": city, "$options": "i"}
+                
             if min_price is not None or max_price is not None:
                 price_filter = {}
                 if min_price is not None:
@@ -171,8 +178,8 @@ async def get_products(
             # Platform-based filtering for preorders (skip if global search)
             if not global_search:
                 if platform == "home":
-                    # Home page: Only business and supplier preorders
-                    preorders_query["seller_type"] = {"$in": ["business", "supplier"]}
+                    # Home page: Only business preorders
+                    preorders_query["seller_type"] = {"$in": ["business"]}
                 elif platform == "farm_deals":
                     # Farm Deals page: Only farmer and agent preorders
                     preorders_query["seller_type"] = {"$in": ["farmer", "agent"]}
@@ -287,17 +294,65 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
     
     db = get_db()
     
+    # --- Agent Farmer Lookup Logic ---
+    seller_id = current_user['id']
+    seller_name = current_user['username']
+    seller_type = current_user.get('role')
+    seller_profile_picture = current_user.get('profile_picture')
+    seller_is_verified = current_user.get('is_verified', False)
+    business_name = current_user.get('business_name')
+    agent_id = None
+    agent_name = None
+    agent_profile_picture = None
+    listed_by_agent = False
+    
+    if user_role == 'agent' and product_data.farmer_identifier:
+        # Agent is listing on behalf of a farmer
+        farmer = db.users.find_one({
+            "role": "farmer",
+            "agent_id": current_user['id'],
+            "$or": [
+                {"phone": product_data.farmer_identifier},
+                {"email": product_data.farmer_identifier},
+                {"username": product_data.farmer_identifier}
+            ]
+        })
+        
+        if not farmer:
+            raise HTTPException(status_code=404, detail="Farmer not found or not managed by you")
+            
+        # Assign Seller to Farmer, Link Agent
+        seller_id = farmer.get('id') or str(farmer.get('_id'))
+        seller_name = farmer.get('username')
+        seller_type = "farmer"
+        seller_profile_picture = farmer.get('profile_picture')
+        seller_is_verified = farmer.get('is_verified', False)
+        business_name = farmer.get('business_name')
+        
+        agent_id = current_user['id']
+        agent_name = current_user['username']
+        agent_profile_picture = current_user.get('profile_picture')
+        listed_by_agent = True
+
+    product_dict_payload = product_data.dict()
+    product_dict_payload.pop('platform', None)
+    product_dict_payload.pop('farmer_identifier', None)
+
     # Create product with seller profile picture
     product = Product(
-        seller_id=current_user['id'],
-        seller_name=current_user['username'],
-        seller_type=current_user.get('role'),
-        seller_profile_picture=current_user.get('profile_picture'),  # Include seller's profile picture
-        seller_is_verified=current_user.get('is_verified', False),  # Verified status
-        community_name=community_name, # Community Name
-        business_name=current_user.get('business_name'),  # Include business name for transparency
+        seller_id=seller_id,
+        seller_name=seller_name,
+        seller_type=seller_type,
+        seller_profile_picture=seller_profile_picture,
+        seller_is_verified=seller_is_verified,
+        community_name=community_name,
+        business_name=business_name,
         platform=product_platform,
-        **{k: v for k, v in product_data.dict().items() if k != 'platform'}
+        listed_by_agent=listed_by_agent,
+        agent_id=agent_id,
+        agent_name=agent_name,
+        agent_profile_picture=agent_profile_picture,
+        **product_dict_payload
     )
     
     # Apply service charges based on role

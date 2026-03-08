@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import DealBoard from './components/rfq/DealBoard';
 import RequestWizard from './components/rfq/RequestWizard';
@@ -20,6 +20,7 @@ import MyRequests from './components/rfq/MyRequests';
 import PersonalDashboard from './components/Dashboard/PersonalDashboard';
 import SellerDashboard from './SellerDashboard';
 import AgentDeliveryDashboard from './AgentDeliveryDashboard';
+import ChatModal from './components/Chat/ChatModal';
 import './App.css';
 
 // Helper function to map backend order statuses to user-friendly display labels
@@ -512,14 +513,14 @@ function App() {
   // Category data with images
   const categoryData = [
     {
-      value: 'grains_legumes',
-      label: 'Grains & Legumes',
+      value: 'grains_cereals',
+      label: 'Grains & Cereals',
       image: 'https://images.unsplash.com/photo-1499529112087-3cb3b73cec95?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwzfHxhZ3JpY3VsdHVyYWwlMjBwcm9kdWN0c3xlbnwwfHx8fDE3NTM5NTM1ODd8MA&ixlib=rb-4.1.0&q=85'
     },
     {
-      value: 'spices_vegetables',
-      label: 'Vegetables & Spices',
-      image: 'https://images.unsplash.com/photo-1506368249639-73a05d6f6488?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHwxfHxzcGljZXN8ZW58MHx8fHwxNzUzOTUzNjAwfDA&ixlib=rb-4.1.0&q=85'
+      value: 'beans_legumes',
+      label: 'Beans & Legumes',
+      image: 'https://images.unsplash.com/photo-1515589656410-b4bf72922114?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxiZWFuc3xlbnwwfHx8fDE3NTM5NTM5ODN8MA&ixlib=rb-4.1.0&q=85'
     },
     {
       value: 'fish_meat',
@@ -527,9 +528,34 @@ function App() {
       image: 'https://images.pexels.com/photos/725992/pexels-photo-725992.jpeg'
     },
     {
+      value: 'spices_vegetables',
+      label: 'Spices & Vegetables',
+      image: 'https://images.unsplash.com/photo-1506368249639-73a05d6f6488?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHwxfHxzcGljZXN8ZW58MHx8fHwxNzUzOTUzNjAwfDA&ixlib=rb-4.1.0&q=85'
+    },
+    {
       value: 'tubers_roots',
-      label: 'Roots & Tubers',
+      label: 'Tubers & Roots',
       image: 'https://images.unsplash.com/photo-1587049016137-d2d2b14b0d61?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHx5YW18ZW58MHx8fHwxNzUzOTUzNzAwfDA&ixlib=rb-4.1.0&q=85'
+    },
+    {
+      value: 'drinks_beverage',
+      label: 'Drinks & Beverage',
+      image: 'https://images.unsplash.com/photo-1527661591475-527312dd65f5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxkcmlua3N8ZW58MHx8fDE3NTM5NTQwMTV8MA&ixlib=rb-4.1.0&q=85'
+    },
+    {
+      value: 'snacks_confectionaries',
+      label: 'Snacks & Confectionaries',
+      image: 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxzbmFja3N8ZW58MHx8fDE3NTM5NTQwMzF8MA&ixlib=rb-4.1.0&q=85'
+    },
+    {
+      value: 'sweets_sugar',
+      label: 'Sweets & Sugar',
+      image: 'https://images.unsplash.com/photo-1582293041079-7814c2f12063?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxzdWdhcnxlbnwwfHx8fDE3NTM5NTQwNTh8MA&ixlib=rb-4.1.0&q=85'
+    },
+    {
+      value: 'farm_inputs',
+      label: 'Farm Inputs',
+      image: 'https://images.unsplash.com/photo-1581578017093-cd30fce4eeb7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwzfHxmZXJ0aWxpemVyfGVufDB8fHx8MTc1Mzk1MzYwOHww&ixlib=rb-4.1.0&q=85'
     },
     {
       value: 'fruits',
@@ -542,34 +568,19 @@ function App() {
       image: 'https://images.unsplash.com/photo-1502395809857-fd80069897d0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxjb3R0b258ZW58MHx8fHwxNzUzOTUzNjM4fDA&ixlib=rb-4.1.0&q=85'
     },
     {
-      value: 'fertilizer',
-      label: 'Fertilizer',
-      image: 'https://images.unsplash.com/photo-1655130944329-b3a63166f6b5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwxfHxmZXJ0aWxpemVyfGVufDB8fHx8MTc1Mzk1MzYwOHww&ixlib=rb-4.1.0&q=85'
-    },
-    {
-      value: 'herbicides',
-      label: 'Herbicides',
-      image: 'https://images.unsplash.com/photo-1581578017093-cd30fce4eeb7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwzfHxmZXJ0aWxpemVyfGVufDB8fHx8MTc1Mzk1MzYwOHww&ixlib=rb-4.1.0&q=85'
-    },
-    {
-      value: 'pesticides',
-      label: 'Pesticides',
-      image: 'https://images.unsplash.com/photo-1581578017093-cd30fce4eeb7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwzfHxmZXJ0aWxpemVyfGVufDB8fHx8MTc1Mzk1MzYwOHww&ixlib=rb-4.1.0&q=85'
-    },
-    {
-      value: 'seeds',
-      label: 'Seeds',
-      image: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NjZ8MHwxfHNlYXJjaHwxfHxzZWVkc3xlbnwwfHx8fDE3NTM5NTM2MTZ8MA&ixlib=rb-4.1.0&q=85'
-    },
-    {
-      value: 'packaged_goods',
-      label: 'Packaged Goods',
-      image: 'https://images.unsplash.com/photo-1741522226997-a34b5a45c648?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwxfHxwYWNrYWdlZCUyMGZvb2R8ZW58MHx8fHwxNzUzOTUzNjQ0fDA&ixlib=rb-4.1.0&q=85'
-    },
-    {
       value: 'feeds',
       label: 'Feeds',
       image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxhbmltYWwlMjBmZWVkfGVufDB8fHx8MTc1Mzk1MzY1MHww&ixlib=rb-4.1.0&q=85'
+    },
+    {
+      value: 'flour_flakes',
+      label: 'Flour & Flakes',
+      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxmbG91cnxlbnwwfHx8fDE3NTM5NTQxMDZ8MA&ixlib=rb-4.1.0&q=85'
+    },
+    {
+      value: 'other',
+      label: 'Other',
+      image: 'https://images.unsplash.com/photo-1741522226997-a34b5a45c648?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwxfHxwYWNrYWdlZCUyMGZvb2R8ZW58MHx8fHwxNzUzOTUzNjQ0fDA&ixlib=rb-4.1.0&q=85'
     }
   ];
 
@@ -858,6 +869,9 @@ function App() {
       // Add advanced filters
       if (filters.location) {
         url += `&location=${filters.location}`;
+      }
+      if (filters.city) {
+        url += `&city=${encodeURIComponent(filters.city.trim())}`;
       }
       if (filters.min_price) {
         url += `&min_price=${filters.min_price}`;
@@ -1150,7 +1164,7 @@ function App() {
       if (filters.vehicle_type) queryParams.append('vehicle_type', filters.vehicle_type);
       if (filters.min_rating) queryParams.append('min_rating', filters.min_rating);
 
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/drivers/find-drivers?${queryParams}`);
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/drivers/find-drivers₦${queryParams}`);
       if (response.ok) {
         const data = await response.json();
         setAvailableDrivers(data.drivers || []);
@@ -1765,13 +1779,13 @@ function App() {
       const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: email, password: password })
+        body: JSON.stringify({ email_or_phone: email, password: password })
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('token', data.access_token);
+        localStorage.setItem('token', data.token);
         // Set user immediately if available, otherwise fetch profile
         if (data.user) {
           setUser(data.user);
@@ -2410,7 +2424,7 @@ function App() {
         Request ID: ${result.request_id}
         Total destinations: ${result.total_destinations}
         Quantity: ${result.total_quantity} ${result.quantity_unit}
-        Estimated price: ?${result.estimated_price}
+        Estimated price: ₦${result.estimated_price}
         OTP: ${result.delivery_otp}`);
 
         setShowCreateDeliveryRequest(false);
@@ -2913,15 +2927,15 @@ function App() {
 
       let successMessage = `Orders created successfully! 
       Total orders: ${orders.length}
-      Total amount: ?${totalAmount.toLocaleString()}
+      Total amount: ₦${totalAmount.toLocaleString()}
       Order IDs: ${orders.map(o => o.order_id).join(', ')}`;
 
       // Add delivery cost breakdown if applicable
       const totalDeliveryCost = orders.reduce((sum, order) => sum + (order.cost_breakdown?.delivery_cost || 0), 0);
       if (totalDeliveryCost > 0) {
         successMessage += `\n\nCost Breakdown:
-        Product Total: ?${(totalAmount - totalDeliveryCost).toLocaleString()}
-        Delivery Cost: ?${totalDeliveryCost.toLocaleString()}`;
+        Product Total: ₦${(totalAmount - totalDeliveryCost).toLocaleString()}
+        Delivery Cost: ₦${totalDeliveryCost.toLocaleString()}`;
       }
       // Add drop-off location info if applicable
       const dropoffOrders = orders.filter(o => o.delivery_info?.method === 'dropoff');
@@ -3036,11 +3050,11 @@ function App() {
         const breakdown = result.breakdown;
         const confirmPayment = window.confirm(
           `Payment Breakdown:\n\n` +
-          `Product Total: ?${breakdown.product_total.toLocaleString()}\n` +
-          `Delivery Fee (${breakdown.delivery_state}): ?${breakdown.delivery_fee.toLocaleString()}\n` +
-          `Platform Charges: ?${breakdown.platform_cut.toLocaleString()}\n` +
-          (breakdown.agent_commission > 0 ? `Your Commission (${breakdown.agent_tier || ''}): ?${breakdown.agent_commission.toLocaleString()}\n` : '') +
-          `\nTotal Amount: ?${result.amount.toLocaleString()}\n\n` +
+          `Product Total: ₦${breakdown.product_total.toLocaleString()}\n` +
+          `Delivery Fee (${breakdown.delivery_state}): ₦${breakdown.delivery_fee.toLocaleString()}\n` +
+          `Platform Charges: ₦${breakdown.platform_cut.toLocaleString()}\n` +
+          (breakdown.agent_commission > 0 ? `Your Commission (${breakdown.agent_tier || ''}): ₦${breakdown.agent_commission.toLocaleString()}\n` : '') +
+          `\nTotal Amount: ₦${result.amount.toLocaleString()}\n\n` +
           `Proceed to payment gateway?`
         );
 
@@ -3867,7 +3881,7 @@ function App() {
                       <h4 className="font-semibold text-gray-900 mb-2">{product.title}</h4>
                       <p className="text-sm text-gray-600 mb-2 line-clamp-2">{product.description}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-lg font-bold text-emerald-600">?{product.price}</span>
+                        <span className="text-lg font-bold text-emerald-600">₦{product.price}</span>
                         <div className="flex items-center gap-2 text-sm text-gray-500">
                           <span> {product.likes_count || 0}</span>
                           <span> {product.comments_count || 0}</span>
@@ -4561,7 +4575,7 @@ function App() {
                       }}
                       className="flex items-center justify-between w-full px-4 py-2 text-sm text-emerald-600 hover:bg-gray-50 font-medium"
                     >
-                      <span>📦 My Offers / Requests</span>
+                      <span>ðŸ“¦ My Offers / Requests</span>
                       {pendingOffersCount > 0 && (
                         <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                           {pendingOffersCount}
@@ -4851,58 +4865,29 @@ function App() {
                   {showAdvancedFilters && (
                     <div className="mt-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {/* Location Filter */}
+                        {/* Advanced Location Filters */}
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
                           <select
                             value={filters.location}
                             onChange={(e) => setFilters(prev => ({ ...prev, location: e.target.value }))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           >
-                            <option value="">All Locations</option>
+                            <option value="">All States</option>
                             {availableLocations.map(location => (
                               <option key={location} value={location}>{location}</option>
                             ))}
                           </select>
                         </div>
-
-                        {/* Price Range */}
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Min Price (?)</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">City / L.G.A.</label>
                           <input
-                            type="number"
-                            placeholder="Min price"
-                            value={filters.min_price}
-                            onChange={(e) => setFilters(prev => ({ ...prev, min_price: e.target.value }))}
+                            type="text"
+                            placeholder="Specific city..."
+                            value={filters.city || ''}
+                            onChange={(e) => setFilters(prev => ({ ...prev, city: e.target.value }))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Max Price (?)</label>
-                          <input
-                            type="number"
-                            placeholder="Max price"
-                            value={filters.max_price}
-                            onChange={(e) => setFilters(prev => ({ ...prev, max_price: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          />
-                        </div>
-
-                        {/* Seller Type - Hardcoded Options */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Seller Type</label>
-                          <select
-                            value={filters.seller_type}
-                            onChange={(e) => setFilters(prev => ({ ...prev, seller_type: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          >
-                            <option value="">All Sellers</option>
-                            <option value="farmer">Farmer</option>
-                            <option value="agent">Agent</option>
-                            <option value="business">Business</option>
-                            <option value="supplier">Supplier</option>
-                          </select>
                         </div>
                       </div>
 
@@ -4922,6 +4907,7 @@ function App() {
                             onClick={() => {
                               setFilters({
                                 category: '',
+                                city: '',
                                 location: '',
                                 min_price: '',
                                 max_price: '',
@@ -4955,7 +4941,7 @@ function App() {
                   <>
                     <div className="mt-4 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
                       <div className="flex items-start gap-3">
-                        <div className="bg-emerald-100 p-2 rounded-lg text-2xl">⚡</div>
+                        <div className="bg-emerald-100 p-2 rounded-lg text-2xl">âš¡</div>
                         <div>
                           <h3 className="font-bold text-gray-900">Create Custom Order</h3>
                           <p className="text-sm text-gray-600">
@@ -5161,7 +5147,7 @@ function App() {
                         }}
                         className="px-3 sm:px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-medium text-xs sm:text-sm"
                       >
-                        See More in Farm Deals ?
+                        See More in Farm Deals →
                       </button>
                     </div>
 
@@ -5189,7 +5175,7 @@ function App() {
                               )}
 
                               <div className="absolute top-2 left-2 bg-orange-500 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-bold flex items-center">
-                                ? PRE-ORDER
+                                ⏳ PRE-ORDER
                               </div>
 
                               {/* Pre-order percentage badge */}
@@ -5209,7 +5195,7 @@ function App() {
                               {/* Enhanced Pricing for Pre-orders */}
                               <div className="flex items-center space-x-2 mb-2">
                                 <span className="text-base sm:text-lg font-bold text-orange-600">
-                                  ?{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
+                                  ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
                                   {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) &&
                                     <span className="text-xs sm:text-sm font-medium text-gray-600 ml-1">
                                       ({product.unit_specification || product.unit_of_measure || 'standard'})
@@ -5264,7 +5250,7 @@ function App() {
                                 }}
                                 className="w-full py-2 px-3 sm:px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors text-xs sm:text-sm"
                               >
-                                Add Pre-order to Cart
+                                Add Item
                               </button>
                             </div>
                           </div>
@@ -5325,7 +5311,7 @@ function App() {
                         onClick={() => scrollCategories('left')}
                         className="hidden md:flex items-center justify-center w-10 h-10 bg-white shadow-md rounded-full border hover:bg-gray-50 transition-colors mr-2 z-10"
                       >
-                        <span className="text-gray-600">?</span>
+                        <span className="text-gray-600">◀</span>
                       </button>
 
                       {/* Categories Container */}
@@ -5362,10 +5348,10 @@ function App() {
                             >
                               <div className="text-center">
                                 <div className="text-2xl mb-1">
-                                  {key === 'grains_legumes' ? '' :
-                                    key === 'fish_meat' ? '' :
-                                      key === 'spices_vegetables' ? '?' :
-                                        key === 'tubers_roots' ? '' : ''}
+                                  {key === 'grains_legumes' ? '🌾' :
+                                    key === 'fish_meat' ? '🥩' :
+                                      key === 'spices_vegetables' ? '🌶️' :
+                                        key === 'tubers_roots' ? '🍠' : '📦'}
                                 </div>
                                 <div className="text-xs font-medium text-gray-700 mb-1">{category.name}</div>
                                 {/* Show example products */}
@@ -5386,7 +5372,7 @@ function App() {
                         onClick={() => scrollCategories('right')}
                         className="hidden md:flex items-center justify-center w-10 h-10 bg-white shadow-md rounded-full border hover:bg-gray-50 transition-colors ml-2 z-10"
                       >
-                        <span className="text-gray-600">?</span>
+                        <span className="text-gray-600">▶</span>
                       </button>
                     </div>
 
@@ -5444,7 +5430,7 @@ function App() {
                             {/* View Details Overlay */}
                             <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all flex items-center justify-center rounded-t-lg">
                               <div className="bg-white bg-opacity-0 hover:bg-opacity-90 text-transparent hover:text-gray-800 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm font-medium transition-all">
-                                ? View Details
+                                👁️ View Details
                               </div>
                             </div>
 
@@ -5466,7 +5452,7 @@ function App() {
                             {product.has_discount && product.discount_value && (
                               <div className="absolute top-12 right-2 bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-lg animate-pulse">
                                 {product.discount_type === 'percentage' && `${product.discount_value}% OFF`}
-                                {product.discount_type === 'fixed' && `?${product.discount_value} OFF`}
+                                {product.discount_type === 'fixed' && `₦${product.discount_value} OFF`}
                               </div>
                             )}
 
@@ -5493,10 +5479,10 @@ function App() {
                               {product.has_discount && product.original_price ? (
                                 <div>
                                   <div className="text-xs sm:text-sm text-gray-500 line-through">
-                                    ?{product.original_price}/{product.unit || product.unit_of_measure || 'kg'}
+                                    ₦{product.original_price}/{product.unit || product.unit_of_measure || 'kg'}
                                   </div>
                                   <div className="text-lg sm:text-xl font-bold text-red-600">
-                                    ?{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
+                                    ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
                                     {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) &&
                                       <span className="text-xs sm:text-sm font-medium text-gray-600 ml-1">
                                         ({product.unit_specification || product.unit_of_measure || 'standard'})
@@ -5504,12 +5490,12 @@ function App() {
                                     }
                                   </div>
                                   <div className="text-xs text-green-600 font-medium">
-                                    You save ?{product.discount_amount}!
+                                    You save ₦{product.discount_amount}!
                                   </div>
                                 </div>
                               ) : (
                                 <div className="text-lg sm:text-xl font-bold text-emerald-600">
-                                  ?{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
+                                  ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
                                   {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) &&
                                     <span className="text-xs sm:text-sm font-medium text-gray-600 ml-1">
                                       ({product.unit_specification || product.unit_of_measure || 'standard'})
@@ -5591,7 +5577,7 @@ function App() {
                                 }`}>
                                 {product.seller_delivery_fee === 0
                                   ? ' FREE DELIVERY by Seller'
-                                  : ` Delivery: ?${product.seller_delivery_fee} (Seller Managed)`
+                                  : ` Delivery: ₦${product.seller_delivery_fee} (Seller Managed)`
                                 }
                               </div>
                             )}
@@ -5607,7 +5593,7 @@ function App() {
                                       : 'text-gray-300'
                                       }`}
                                   >
-                                    ?
+                                    ⭐
                                   </span>
                                 ))}
                               </div>
@@ -5751,7 +5737,7 @@ function App() {
                                   : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                                   }`}
                               >
-                                {product.type === 'preorder' ? 'Add Pre-order to Cart' : 'Add to Cart'}
+                                Add Item
                               </button>
                             </div>
                           </div>
@@ -5767,21 +5753,15 @@ function App() {
       </div >
 
       {/* Registration Modal */}
-      {showAuthModal && (
-        <RegistrationModal
-          onClose={() => setShowAuthModal(false)}
-          onLogin={(data) => {
-            localStorage.setItem('token', data.token);
-            setUser(data.user);
-            setShowAuthModal(false);
-          }}
-          onRegister={(data) => {
-            localStorage.setItem('token', data.token);
-            setUser(data.user);
-            setShowAuthModal(false);
-          }}
-        />
-      )}
+      {
+        showAuthModal && (
+          <RegistrationModal
+            onClose={() => setShowAuthModal(false)}
+            onLogin={handleNewLogin}
+            onRegister={handleNewRegistration}
+          />
+        )
+      }
 
       {/* Comprehensive Checkout Page */}
       {
@@ -5868,7 +5848,7 @@ function App() {
                                         {item.unit_specification && ` (${item.unit_specification})`}
                                       </span>
                                       <span className="text-gray-700">
-                                        <strong>Price:</strong> ?{item.product.price_per_unit}/{item.unit}
+                                        <strong>Price:</strong> ₦{item.product.price_per_unit}/{item.unit}
                                       </span>
                                       <span className={`px-2 py-1 rounded-full text-xs ${item.delivery_method === 'platform'
                                         ? 'bg-blue-100 text-blue-800'
@@ -5892,7 +5872,7 @@ function App() {
                                           </span>
                                         ) : (
                                           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                            Vendor Delivery: ?{item.product.seller_delivery_fee?.toLocaleString()}
+                                            Vendor Delivery: ₦{item.product.seller_delivery_fee?.toLocaleString()}
                                           </span>
                                         )}
                                       </div>
@@ -5901,7 +5881,7 @@ function App() {
 
                                   <div className="text-right">
                                     <div className="text-lg font-semibold text-gray-900">
-                                      ?{(item.product.price_per_unit * item.quantity).toLocaleString()}
+                                      ₦{(item.product.price_per_unit * item.quantity).toLocaleString()}
                                     </div>
                                     <button
                                       onClick={() => removeCartItem(item.id)}
@@ -6161,7 +6141,7 @@ function App() {
                                 Processing...
                               </>
                             ) : (
-                              `Pay ?${orderSummary.total?.toLocaleString() || 0} Securely`
+                              `Pay ₦${orderSummary.total?.toLocaleString() || 0} Securely`
                             )}
                           </button>
                         </div>
@@ -6177,33 +6157,33 @@ function App() {
                       <div className="space-y-3">
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Product Total ({orderSummary.item_count} items)</span>
-                          <span className="font-medium">?{orderSummary.product_total?.toLocaleString() || 0}</span>
+                          <span className="font-medium">₦{orderSummary.product_total?.toLocaleString() || 0}</span>
                         </div>
 
                         {orderSummary.platform_service_charge > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Service Charge (10%)</span>
-                            <span className="font-medium">?{orderSummary.platform_service_charge?.toLocaleString() || 0}</span>
+                            <span className="font-medium">₦{orderSummary.platform_service_charge?.toLocaleString() || 0}</span>
                           </div>
                         )}
 
                         {orderSummary.platform_commission > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Platform Commission (2.5%)</span>
-                            <span className="font-medium">?{orderSummary.platform_commission?.toLocaleString() || 0}</span>
+                            <span className="font-medium">₦{orderSummary.platform_commission?.toLocaleString() || 0}</span>
                           </div>
                         )}
 
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Delivery Fees</span>
-                          <span className="font-medium">?{orderSummary.delivery_total?.toLocaleString() || 0}</span>
+                          <span className="font-medium">₦{orderSummary.delivery_total?.toLocaleString() || 0}</span>
                         </div>
 
                         {orderSummary.is_agent && orderSummary.agent_commission > 0 && (
                           <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 -mx-1">
                             <div className="flex justify-between text-sm">
                               <span className="text-emerald-700 font-medium"> Your Agent Commission (4%)</span>
-                              <span className="font-semibold text-emerald-700">?{orderSummary.agent_commission?.toLocaleString() || 0}</span>
+                              <span className="font-semibold text-emerald-700">₦{orderSummary.agent_commission?.toLocaleString() || 0}</span>
                             </div>
                             <p className="text-xs text-emerald-600 mt-1">
                               Paid separately to your account after order completion
@@ -6214,16 +6194,16 @@ function App() {
                         <div className="border-t border-gray-200 pt-3">
                           <div className="flex justify-between">
                             <span className="text-lg font-semibold text-gray-900">Total to Pay</span>
-                            <span className="text-lg font-semibold text-emerald-600">?{orderSummary.total?.toLocaleString() || 0}</span>
+                            <span className="text-lg font-semibold text-emerald-600">₦{orderSummary.total?.toLocaleString() || 0}</span>
                           </div>
                         </div>
 
                         {/* Breakdown Info */}
                         <div className="text-xs text-gray-500 mt-2 space-y-1">
-                          <div> Vendor receives: ?{orderSummary.product_total?.toLocaleString() || 0}</div>
-                          <div> Platform fee: ?{orderSummary.platform_cut?.toLocaleString() || 0}</div>
+                          <div> Vendor receives: ₦{orderSummary.product_total?.toLocaleString() || 0}</div>
+                          <div> Platform fee: ₦{orderSummary.platform_cut?.toLocaleString() || 0}</div>
                           {orderSummary.is_agent && (
-                            <div className="text-emerald-600 font-medium"> Your commission: ?{orderSummary.agent_commission?.toLocaleString() || 0}</div>
+                            <div className="text-emerald-600 font-medium"> Your commission: ₦{orderSummary.agent_commission?.toLocaleString() || 0}</div>
                           )}
                         </div>
                       </div>
@@ -6595,7 +6575,7 @@ function App() {
                     <div>
                       <div className="text-sm font-medium text-gray-700">Price</div>
                       <div className="text-sm text-gray-900">
-                        ?{trackingData.negotiated_price || trackingData.estimated_price}
+                        ₦{trackingData.negotiated_price || trackingData.estimated_price}
                       </div>
                     </div>
                   </div>
@@ -6722,7 +6702,7 @@ function App() {
                   <div className="bg-emerald-50 p-3 rounded-lg">
                     <div className="text-sm text-gray-600">Price per unit</div>
                     <div className="text-xl font-bold text-emerald-600">
-                      ?{selectedPreOrder.price_per_unit}/{selectedPreOrder.unit}
+                      ₦{selectedPreOrder.price_per_unit}/{selectedPreOrder.unit}
                     </div>
                   </div>
                   <div className="bg-orange-50 p-3 rounded-lg">
@@ -6794,9 +6774,9 @@ function App() {
                           const partial = Math.round(total * selectedPreOrder.partial_payment_percentage);
 
                           document.getElementById('summary-quantity').textContent = `${quantity} ${selectedPreOrder.unit}`;
-                          document.getElementById('summary-total').textContent = `?${total}`;
-                          document.getElementById('summary-partial').textContent = `?${partial}`;
-                          document.getElementById('summary-remaining').textContent = `?${total - partial}`;
+                          document.getElementById('summary-total').textContent = `₦${total}`;
+                          document.getElementById('summary-partial').textContent = `₦${partial}`;
+                          document.getElementById('summary-remaining').textContent = `₦${total - partial}`;
                         }}
                       />
                     </div>
@@ -6806,7 +6786,7 @@ function App() {
                       <div className="space-y-1 text-sm">
                         <div className="flex justify-between">
                           <span>Unit price:</span>
-                          <span>?{selectedPreOrder.price_per_unit}</span>
+                          <span>₦{selectedPreOrder.price_per_unit}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Quantity:</span>
@@ -6814,15 +6794,15 @@ function App() {
                         </div>
                         <div className="flex justify-between font-medium">
                           <span>Total amount:</span>
-                          <span id="summary-total">?{selectedPreOrder.price_per_unit}</span>
+                          <span id="summary-total">₦{selectedPreOrder.price_per_unit}</span>
                         </div>
                         <div className="flex justify-between text-orange-600">
                           <span>Partial payment now:</span>
-                          <span id="summary-partial">?{Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
+                          <span id="summary-partial">₦{Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
                         </div>
                         <div className="flex justify-between text-gray-600">
                           <span>Remaining on delivery:</span>
-                          <span id="summary-remaining">?{selectedPreOrder.price_per_unit - Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
+                          <span id="summary-remaining">₦{selectedPreOrder.price_per_unit - Math.round(selectedPreOrder.price_per_unit * selectedPreOrder.partial_payment_percentage)}</span>
                         </div>
                       </div>
                     </div>
@@ -6848,7 +6828,7 @@ function App() {
 
                           if (response.ok) {
                             const result = await response.json();
-                            alert(`Pre-order placed successfully! Order ID: ${result.order_id}\nPartial payment: ?${result.partial_amount}\nRemaining: ?${result.remaining_amount}`);
+                            alert(`Pre-order placed successfully! Order ID: ${result.order_id}\nPartial payment: ₦${result.partial_amount}\nRemaining: ₦${result.remaining_amount}`);
                             setShowPreOrderDetails(false);
                             setSelectedPreOrder(null);
                             fetchProducts(); // Refresh products to update stock
@@ -7211,7 +7191,7 @@ function App() {
                               {item.product.product_name || item.product.crop_type}
                             </h3>
                             <p className="text-xs text-gray-600">
-                              ?{item.product.price_per_unit}/{item.unit}
+                              ₦{item.product.price_per_unit}/{item.unit}
                               {item.unit_specification && <span className="text-gray-500"> ({item.unit_specification})</span>}  {item.product.seller_username}
                             </p>
                           </div>
@@ -7265,7 +7245,7 @@ function App() {
                         {/* Item Total */}
                         <div className="text-right">
                           <span className="font-semibold text-emerald-600">
-                            ?{(item.product.price_per_unit * item.quantity).toLocaleString()}
+                            ₦{(item.product.price_per_unit * item.quantity).toLocaleString()}
                           </span>
                         </div>
                       </div>
@@ -7280,16 +7260,16 @@ function App() {
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Items ({getActiveCartItems().reduce((sum, item) => sum + item.quantity, 0)})</span>
-                      <span className="font-medium">?{getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0).toLocaleString()}</span>
+                      <span className="font-medium">₦{getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Est. Delivery</span>
-                      <span className="font-medium">?{Math.round(getActiveCartItems().length * 350).toLocaleString()}</span>
+                      <span className="font-medium">₦{Math.round(getActiveCartItems().length * 350).toLocaleString()}</span>
                     </div>
                     <div className={`flex justify-between font-semibold pt-2 border-t border-gray-200 ${activeCartTab === 'pyexpress' ? 'text-emerald-600' : 'text-orange-600'
                       }`}>
                       <span>Total</span>
-                      <span>?{(getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0) + Math.round(getActiveCartItems().length * 350)).toLocaleString()}</span>
+                      <span>₦{(getActiveCartItems().reduce((sum, item) => sum + (item.product.price_per_unit * item.quantity), 0) + Math.round(getActiveCartItems().length * 350)).toLocaleString()}</span>
                     </div>
                   </div>
 
@@ -7320,208 +7300,18 @@ function App() {
       }
 
       {/* Enhanced Messaging Modal */}
-      {
-        showMessaging && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
-            <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-lg flex flex-col">
-              <div className="p-4 border-b border-gray-200">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-semibold">Messages</h2>
-                  <button
-                    onClick={() => setShowMessaging(false)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-
-                  </button>
-                </div>
-              </div>
-
-              {!selectedConversation ? (
-                <div className="flex-1 p-4">
-                  {/* Username Search */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Search users by username
-                    </label>
-                    <input
-                      type="text"
-                      value={usernameSearch}
-                      onChange={(e) => {
-                        setUsernameSearch(e.target.value);
-                        searchUsers(e.target.value);
-                      }}
-                      placeholder="Enter username..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    />
-                  </div>
-
-                  {/* Search Results */}
-                  {foundUsers.length > 0 && (
-                    <div className="mb-4">
-                      <h3 className="text-sm font-medium text-gray-700 mb-2">Found Users</h3>
-                      <div className="space-y-2">
-                        {foundUsers.map(foundUser => (
-                          <div
-                            key={foundUser.username}
-                            onClick={() => startConversation(foundUser)}
-                            className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className="w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center font-semibold">
-                                {foundUser.username.charAt(0).toUpperCase()}
-                              </div>
-                              <div>
-                                <p className="font-medium text-gray-900">
-                                  {foundUser.first_name} {foundUser.last_name}
-                                </p>
-                                <p className="text-sm text-gray-500">@{foundUser.username}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Recent Conversations */}
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">Recent Conversations</h3>
-                    {conversations.length === 0 ? (
-                      <p className="text-gray-500 text-center">No conversations yet. Search for users to start messaging!</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {conversations.map(conversation => (
-                          <div
-                            key={conversation.id}
-                            onClick={() => setSelectedConversation(conversation)}
-                            className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
-                                {conversation.avatar}
-                              </div>
-                              <div>
-                                <p className="font-medium text-gray-900">{conversation.name}</p>
-                                <p className="text-sm text-gray-500">Click to view messages</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex-1 flex flex-col">
-                  {/* Conversation Header */}
-                  <div className="p-3 border-b border-gray-200 bg-gray-50">
-                    <div className="flex items-center space-x-3">
-                      <button
-                        onClick={() => setSelectedConversation(null)}
-                        className="text-gray-500 hover:text-gray-700"
-                      >
-                        ?
-                      </button>
-                      <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
-                        {selectedConversation.avatar}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{selectedConversation.name}</p>
-                        <p className="text-sm text-gray-500">Online</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Messages Area */}
-                  <div className="flex-1 p-4 overflow-y-auto">
-                    {messages.filter(msg => msg.conversation_id === selectedConversation.id).length === 0 ? (
-                      <p className="text-gray-500 text-center">No messages yet. Start the conversation!</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {messages.filter(msg => msg.conversation_id === selectedConversation.id).map(message => (
-                          <div
-                            key={message.id}
-                            className={`flex ${message.sender === user.username ? 'justify-end' : 'justify-start'}`}
-                          >
-                            <div className={`max-w-xs px-3 py-2 rounded-lg ${message.sender === user.username
-                              ? 'bg-emerald-500 text-white'
-                              : 'bg-gray-200 text-gray-900'
-                              }`}>
-                              {message.type === 'audio' ? (
-                                <div>
-                                  <audio controls className="w-full">
-                                    <source src={message.content} type="audio/webm" />
-                                    Your browser does not support the audio element.
-                                  </audio>
-                                  <p className="text-xs mt-1 opacity-75">Voice message</p>
-                                </div>
-                              ) : (
-                                <p>{message.content || message.text}</p>
-                              )}
-                              <p className="text-xs mt-1 opacity-75">
-                                {new Date(message.timestamp).toLocaleTimeString()}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Message Input Area */}
-                  <div className="p-4 border-t border-gray-200">
-                    {audioBlob && (
-                      <div className="mb-3 p-2 bg-green-50 rounded-lg border border-green-200">
-                        <p className="text-sm text-green-700 mb-2">Voice message recorded</p>
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={sendAudioMessage}
-                            className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
-                          >
-                            Send
-                          </button>
-                          <button
-                            onClick={() => setAudioBlob(null)}
-                            className="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex space-x-2">
-                      <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                        placeholder="Type a message..."
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      />
-                      <button
-                        onClick={isRecording ? stopRecording : startRecording}
-                        className={`px-3 py-2 rounded-lg font-medium ${isRecording
-                          ? 'bg-red-500 text-white hover:bg-red-600'
-                          : 'bg-blue-500 text-white hover:bg-blue-600'
-                          }`}
-                      >
-                        {isRecording ? '' : ''}
-                      </button>
-                      <button
-                        onClick={sendMessage}
-                        className="px-3 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium"
-                      >
-                        Send
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )
-      }
+      {showMessaging && (
+        <ChatModal
+          isOpen={showMessaging}
+          onClose={() => {
+            setShowMessaging(false);
+            setChatConfig(null);
+          }}
+          user={user}
+          API_BASE_URL={API_BASE_URL}
+          initialContext={chatConfig}
+        />
+      )}
 
       {/* Order Tracking Modal */}
       {
@@ -7565,7 +7355,7 @@ function App() {
                         </div>
 
                         <div className="text-sm text-gray-600 mb-2">
-                          <p><strong>Total:</strong> ?{order.total_amount.toLocaleString()}</p>
+                          <p><strong>Total:</strong> ₦{order.total_amount.toLocaleString()}</p>
                           <p><strong>Items:</strong> {order.items.length} item(s)</p>
                           <p><strong>Delivery:</strong> {order.delivery_address}</p>
                         </div>
@@ -7574,7 +7364,7 @@ function App() {
                           {order.items.map((item, index) => (
                             <div key={index} className="flex justify-between text-sm">
                               <span>{item.title}  {item.quantity}</span>
-                              <span>?{item.total.toLocaleString()}</span>
+                              <span>₦{item.total.toLocaleString()}</span>
                             </div>
                           ))}
                         </div>
@@ -7861,7 +7651,7 @@ function App() {
                     <div className="flex items-center space-x-4">
                       {/* Enhanced Pricing Display */}
                       <div className="text-3xl font-bold text-emerald-600">
-                        ?{selectedProduct.price_per_unit}/{selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'}
+                        ₦{selectedProduct.price_per_unit}/{selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'}
                         {(selectedProduct.unit_specification) &&
                           <span className="text-lg font-medium text-gray-600 ml-2">
                             ({selectedProduct.unit_specification})
@@ -7929,9 +7719,19 @@ function App() {
                           <span className="text-sm text-gray-600">Agent:</span>
                           <div className="font-medium text-blue-600">@{selectedProduct.agent_username}</div>
                           <div className="flex items-center mt-1">
-                            <span className="text-yellow-400">?</span>
+                            <span className="text-yellow-400">★</span>
                             <span className="text-sm text-gray-600 ml-2">4.2/5 (Agent Rating)</span>
                           </div>
+                          <button
+                            onClick={() => {
+                              setChatConfig({ recipient: selectedProduct.agent_username, message: `Hi, I'm interested in your product: ${selectedProduct.product_name || selectedProduct.crop_type}` });
+                              setShowMessaging(true);
+                              closeProductDetail(); // Optional: close product detail or keep it open in background
+                            }}
+                            className="mt-2 px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg hover:bg-emerald-200 transition-colors flex items-center gap-1"
+                          >
+                            💬 Message Agent
+                          </button>
                         </div>
                       )}
 
@@ -8084,7 +7884,7 @@ function App() {
                                         <div className="text-xs mt-1">
                                           {deliveryOptions.delivery_costs.dropoff.is_free
                                             ? 'Free'
-                                            : `?${deliveryOptions.delivery_costs.dropoff.cost}`
+                                            : `₦${deliveryOptions.delivery_costs.dropoff.cost}`
                                           }
                                         </div>
                                       </button>
@@ -8100,7 +7900,7 @@ function App() {
                                         <div className="text-xs mt-1">
                                           {deliveryOptions.delivery_costs.shipping.is_free
                                             ? 'Free'
-                                            : `?${deliveryOptions.delivery_costs.shipping.cost}`
+                                            : `₦${deliveryOptions.delivery_costs.shipping.cost}`
                                           }
                                         </div>
                                       </button>
@@ -8125,7 +7925,7 @@ function App() {
                                         Pick up your order at a convenient market or location
                                         {deliveryOptions.delivery_costs.dropoff.cost > 0 && (
                                           <span className="text-emerald-600 font-medium ml-2">
-                                            (?{deliveryOptions.delivery_costs.dropoff.cost} fee)
+                                            (₦{deliveryOptions.delivery_costs.dropoff.cost} fee)
                                           </span>
                                         )}
                                       </div>
@@ -8145,7 +7945,7 @@ function App() {
                                         We'll deliver directly to your address
                                         {deliveryOptions.delivery_costs.shipping.cost > 0 && (
                                           <span className="text-blue-600 font-medium ml-2">
-                                            (?{deliveryOptions.delivery_costs.shipping.cost} fee)
+                                            (₦{deliveryOptions.delivery_costs.shipping.cost} fee)
                                           </span>
                                         )}
                                       </div>
@@ -8165,201 +7965,207 @@ function App() {
                           </div>
                         </div>
 
-                        {/* Enhanced Add to Cart Button */}
-                        <button
-                          onClick={() => {
-                            const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
-                            const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg';
-                            const specification = selectedProduct.unit_specification || 'standard';
 
-                            const productId = selectedProduct.id || selectedProduct._id;
-                            const deliveryOptions = productDeliveryOptions[productId];
+                        {/* Action Buttons Container */}
+                        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                          {/* Cancel Button */}
+                          <button
+                            onClick={closeProductDetail}
+                            className="w-full sm:w-1/3 py-3 px-4 rounded-lg font-bold text-sm sm:text-base transition-colors border-2 border-gray-300 text-gray-700 hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
 
-                            if (!deliveryOptions) {
-                              alert('Unable to determine delivery options. Please try again.');
-                              return;
-                            }
-
-                            // Determine actual delivery method based on what's supported
-                            let deliveryMethod = selectedDeliveryMethod;
-                            if (!deliveryOptions.supports_dropoff_delivery && !deliveryOptions.supports_shipping_delivery) {
-                              alert('This product has no available delivery methods. Please contact the supplier.');
-                              return;
-                            }
-
-                            // Default to available method if current selection isn't supported
-                            if (deliveryMethod === 'dropoff' && !deliveryOptions.supports_dropoff_delivery) {
-                              deliveryMethod = 'shipping';
-                            } else if (deliveryMethod === 'shipping' && !deliveryOptions.supports_shipping_delivery) {
-                              deliveryMethod = 'dropoff';
-                            }
-
-                            let deliveryDetails = null;
-
-                            // Validate and get delivery details based on method
-                            if (deliveryMethod === 'dropoff') {
-                              const dropoffLocationId = document.getElementById('detail-dropoff')?.value;
-                              if (!dropoffLocationId) {
-                                alert('Please select a drop-off location');
-                                return;
-                              }
-
-                              const dropoffLocation = dropOffLocations.find(loc => loc.id.toString() === dropoffLocationId);
-                              if (!dropoffLocation) {
-                                alert('Invalid drop-off location selected');
-                                return;
-                              }
-
-                              deliveryDetails = {
-                                type: 'dropoff',
-                                dropoffLocation: dropoffLocation,
-                                cost: deliveryOptions.delivery_costs.dropoff.cost
-                              };
-                            } else if (deliveryMethod === 'shipping') {
-                              const shippingAddress = document.getElementById('detail-shipping-address')?.value?.trim();
-                              if (!shippingAddress) {
-                                alert('Please enter your delivery address');
-                                return;
-                              }
-
-                              deliveryDetails = {
-                                type: 'shipping',
-                                shippingAddress: shippingAddress,
-                                cost: deliveryOptions.delivery_costs.shipping.cost
-                              };
-                            }
-
-                            const cartItem = {
-                              ...selectedProduct,
-                              cartQuantity: quantity,
-                              cartUnit: unit,
-                              cartSpecification: specification,
-                              deliveryMethod: deliveryMethod,
-                              deliveryDetails: deliveryDetails
-                            };
-
-                            // Use the appropriate parameters for addEnhancedToCart based on delivery method
-                            if (deliveryMethod === 'dropoff') {
-                              addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff', deliveryDetails.dropoffLocation);
-                            } else {
-                              addEnhancedToCart(cartItem, quantity, unit, specification, 'platform', null, deliveryDetails.shippingAddress);
-                            }
-
-                            closeProductDetail();
-                          }}
-                          className={`w-full py-3 px-6 rounded-lg font-bold text-lg transition-colors mb-3 ${selectedProduct.type === 'preorder'
-                            ? 'bg-orange-600 hover:bg-orange-700 text-white'
-                            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                            }`}
-                        >
-                          {selectedProduct.type === 'preorder' ? ' Add Pre-order to Cart' : ' Add to Cart'}
-                        </button>
-
-                        {/* Buy Now Button */}
-                        <button
-                          onClick={() => {
-                            const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
-                            const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg';
-                            const specification = selectedProduct.unit_specification || 'standard';
-
-                            const productId = selectedProduct.id || selectedProduct._id;
-                            const deliveryOptions = productDeliveryOptions[productId];
-
-                            if (!deliveryOptions) {
-                              alert('Unable to determine delivery options. Please try again.');
-                              return;
-                            }
-
-                            // Determine actual delivery method based on what's supported
-                            let deliveryMethod = selectedDeliveryMethod;
-                            if (!deliveryOptions.supports_dropoff_delivery && !deliveryOptions.supports_shipping_delivery) {
-                              alert('This product has no available delivery methods. Please contact the supplier.');
-                              return;
-                            }
-
-                            // Default to available method if current selection isn't supported
-                            if (deliveryMethod === 'dropoff' && !deliveryOptions.supports_dropoff_delivery) {
-                              deliveryMethod = 'shipping';
-                            } else if (deliveryMethod === 'shipping' && !deliveryOptions.supports_shipping_delivery) {
-                              deliveryMethod = 'dropoff';
-                            }
-
-                            let deliveryDetails = null;
-
-                            // Validate and get delivery details based on method
-                            if (deliveryMethod === 'dropoff') {
-                              const dropoffLocationId = document.getElementById('detail-dropoff')?.value;
-                              if (!dropoffLocationId) {
-                                alert('Please select a drop-off location');
-                                return;
-                              }
-
-                              const dropoffLocation = dropOffLocations.find(loc => loc.id.toString() === dropoffLocationId);
-                              if (!dropoffLocation) {
-                                alert('Invalid drop-off location selected');
-                                return;
-                              }
-
-                              deliveryDetails = {
-                                type: 'dropoff',
-                                dropoffLocation: dropoffLocation,
-                                cost: deliveryOptions.delivery_costs.dropoff.cost
-                              };
-                            } else if (deliveryMethod === 'shipping') {
-                              const shippingAddress = document.getElementById('detail-shipping-address')?.value?.trim();
-                              if (!shippingAddress) {
-                                alert('Please enter your delivery address');
-                                return;
-                              }
-
-                              deliveryDetails = {
-                                type: 'shipping',
-                                shippingAddress: shippingAddress,
-                                cost: deliveryOptions.delivery_costs.shipping.cost
-                              };
-                            }
-
-                            const cartItem = {
-                              ...selectedProduct,
-                              cartQuantity: quantity,
-                              cartUnit: unit,
-                              cartSpecification: specification,
-                              deliveryMethod: deliveryMethod,
-                              deliveryDetails: deliveryDetails
-                            };
-
-                            // Use the appropriate parameters for addEnhancedToCart based on delivery method
-                            if (deliveryMethod === 'dropoff') {
-                              addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff', deliveryDetails.dropoffLocation);
-                            } else {
-                              addEnhancedToCart(cartItem, quantity, unit, specification, 'platform', null, deliveryDetails.shippingAddress);
-                            }
-
-                            closeProductDetail();
-                            setTimeout(() => {
-                              proceedToCheckout();
-                            }, 300); // Allow cart state to update
-                          }}
-                          className={`w-full py-3 px-6 rounded-lg font-bold text-lg transition-colors border-2 ${selectedProduct.type === 'preorder'
-                            ? 'border-orange-600 text-orange-600 hover:bg-orange-50'
-                            : 'border-emerald-600 text-emerald-600 hover:bg-emerald-50'
-                            }`}
-                        >
-                          {selectedProduct.type === 'preorder' ? ' Buy Pre-order Now' : ' Buy Now'}
-                        </button>
-
-                        {/* Rate Product Button */}
-                        {user && (
+                          {/* Add Item Button */}
                           <button
                             onClick={() => {
+                              const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
+                              const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg';
+                              const specification = selectedProduct.unit_specification || 'standard';
+
                               const productId = selectedProduct.id || selectedProduct._id;
-                              openRatingModal('product_rating', productId, null, null);
+                              const deliveryOptions = productDeliveryOptions[productId];
+
+                              if (!deliveryOptions) {
+                                alert('Unable to determine delivery options. Please try again.');
+                                return;
+                              }
+
+                              let deliveryMethod = selectedDeliveryMethod;
+                              if (!deliveryOptions.supports_dropoff_delivery && !deliveryOptions.supports_shipping_delivery) {
+                                alert('This product has no available delivery methods. Please contact the supplier.');
+                                return;
+                              }
+
+                              if (deliveryMethod === 'dropoff' && !deliveryOptions.supports_dropoff_delivery) {
+                                deliveryMethod = 'shipping';
+                              } else if (deliveryMethod === 'shipping' && !deliveryOptions.supports_shipping_delivery) {
+                                deliveryMethod = 'dropoff';
+                              }
+
+                              let deliveryDetails = null;
+
+                              if (deliveryMethod === 'dropoff') {
+                                const dropoffLocationId = document.getElementById('detail-dropoff')?.value;
+                                if (!dropoffLocationId) {
+                                  alert('Please select a drop-off location');
+                                  return;
+                                }
+
+                                const dropoffLocation = dropOffLocations.find(loc => loc.id.toString() === dropoffLocationId);
+                                if (!dropoffLocation) {
+                                  alert('Invalid drop-off location selected');
+                                  return;
+                                }
+
+                                deliveryDetails = {
+                                  type: 'dropoff',
+                                  dropoffLocation: dropoffLocation,
+                                  cost: deliveryOptions.delivery_costs.dropoff.cost
+                                };
+                              } else if (deliveryMethod === 'shipping') {
+                                const shippingAddress = document.getElementById('detail-shipping-address')?.value?.trim();
+                                if (!shippingAddress) {
+                                  alert('Please enter your delivery address');
+                                  return;
+                                }
+
+                                deliveryDetails = {
+                                  type: 'shipping',
+                                  shippingAddress: shippingAddress,
+                                  cost: deliveryOptions.delivery_costs.shipping.cost
+                                };
+                              }
+
+                              const cartItem = {
+                                ...selectedProduct,
+                                cartQuantity: quantity,
+                                cartUnit: unit,
+                                cartSpecification: specification,
+                                deliveryMethod: deliveryMethod,
+                                deliveryDetails: deliveryDetails
+                              };
+
+                              if (deliveryMethod === 'dropoff') {
+                                addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff', deliveryDetails.dropoffLocation);
+                              } else {
+                                addEnhancedToCart(cartItem, quantity, unit, specification, 'platform', null, deliveryDetails.shippingAddress);
+                              }
+
+                              closeProductDetail();
                             }}
-                            className="w-full mt-3 py-2 px-6 border-2 border-yellow-400 text-yellow-600 rounded-lg font-medium text-sm hover:bg-yellow-50 transition-colors"
+                            className={`w-full sm:w-1/3 py-3 px-4 rounded-lg font-bold text-sm sm:text-base transition-colors ${selectedProduct.type === 'preorder'
+                              ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                              : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              }`}
                           >
-                            ? Rate this Product
+                            Add Item
                           </button>
-                        )}
+
+                          {/* Buy Now Button */}
+                          <button
+                            onClick={() => {
+                              const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
+                              const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg';
+                              const specification = selectedProduct.unit_specification || 'standard';
+
+                              const productId = selectedProduct.id || selectedProduct._id;
+                              const deliveryOptions = productDeliveryOptions[productId];
+
+                              if (!deliveryOptions) {
+                                alert('Unable to determine delivery options. Please try again.');
+                                return;
+                              }
+
+                              let deliveryMethod = selectedDeliveryMethod;
+                              if (!deliveryOptions.supports_dropoff_delivery && !deliveryOptions.supports_shipping_delivery) {
+                                alert('This product has no available delivery methods. Please contact the supplier.');
+                                return;
+                              }
+
+                              if (deliveryMethod === 'dropoff' && !deliveryOptions.supports_dropoff_delivery) {
+                                deliveryMethod = 'shipping';
+                              } else if (deliveryMethod === 'shipping' && !deliveryOptions.supports_shipping_delivery) {
+                                deliveryMethod = 'dropoff';
+                              }
+
+                              let deliveryDetails = null;
+
+                              if (deliveryMethod === 'dropoff') {
+                                const dropoffLocationId = document.getElementById('detail-dropoff')?.value;
+                                if (!dropoffLocationId) {
+                                  alert('Please select a drop-off location');
+                                  return;
+                                }
+
+                                const dropoffLocation = dropOffLocations.find(loc => loc.id.toString() === dropoffLocationId);
+                                if (!dropoffLocation) {
+                                  alert('Invalid drop-off location selected');
+                                  return;
+                                }
+
+                                deliveryDetails = {
+                                  type: 'dropoff',
+                                  dropoffLocation: dropoffLocation,
+                                  cost: deliveryOptions.delivery_costs.dropoff.cost
+                                };
+                              } else if (deliveryMethod === 'shipping') {
+                                const shippingAddress = document.getElementById('detail-shipping-address')?.value?.trim();
+                                if (!shippingAddress) {
+                                  alert('Please enter your delivery address');
+                                  return;
+                                }
+
+                                deliveryDetails = {
+                                  type: 'shipping',
+                                  shippingAddress: shippingAddress,
+                                  cost: deliveryOptions.delivery_costs.shipping.cost
+                                };
+                              }
+
+                              const cartItem = {
+                                ...selectedProduct,
+                                cartQuantity: quantity,
+                                cartUnit: unit,
+                                cartSpecification: specification,
+                                deliveryMethod: deliveryMethod,
+                                deliveryDetails: deliveryDetails
+                              };
+
+                              if (deliveryMethod === 'dropoff') {
+                                addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff', deliveryDetails.dropoffLocation);
+                              } else {
+                                addEnhancedToCart(cartItem, quantity, unit, specification, 'platform', null, deliveryDetails.shippingAddress);
+                              }
+
+                              closeProductDetail();
+                              setTimeout(() => {
+                                proceedToCheckout();
+                              }, 300); // Allow cart state to update
+                            }}
+                            className={`w-full sm:w-1/3 py-3 px-4 rounded-lg font-bold text-sm sm:text-base transition-colors border-2 ${selectedProduct.type === 'preorder'
+                              ? 'border-orange-600 text-orange-600 hover:bg-orange-50'
+                              : 'border-emerald-600 text-emerald-600 hover:bg-emerald-50'
+                              }`}
+                          >
+                            {selectedProduct.type === 'preorder' ? ' Buy Pre-order Now' : ' Buy Now'}
+                          </button>
+                        </div>
+
+                        {/* Rate Product Button */}
+                        {
+                          user && (
+                            <button
+                              onClick={() => {
+                                const productId = selectedProduct.id || selectedProduct._id;
+                                openRatingModal('product_rating', productId, null, null);
+                              }}
+                              className="w-full mt-3 py-2 px-6 border-2 border-yellow-400 text-yellow-600 rounded-lg font-medium text-sm hover:bg-yellow-50 transition-colors"
+                            >
+                              ⭐ Rate this Product
+                            </button>
+                          )
+                        }
                       </div>
                     </div>
                   </div>
@@ -8379,7 +8185,7 @@ function App() {
                           {product.product_name || product.crop_type}
                         </h4>
                         <div className="text-orange-600 font-bold">
-                          ?{product.price_per_unit}/{product.unit || 'kg'}
+                          ₦{product.price_per_unit}/{product.unit || 'kg'}
                         </div>
                       </div>
                     ))}
@@ -8443,7 +8249,7 @@ function App() {
                           className="hidden"
                         />
                         <span className="text-2xl text-gray-300 hover:text-yellow-400 transition-colors">
-                          ?
+                          ⭐
                         </span>
                       </label>
                     ))}
@@ -8783,20 +8589,20 @@ function App() {
                 <div className="mb-8 p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg">
                   <h3 className="text-lg font-semibold mb-2">Wallet Balance</h3>
                   <div className="text-3xl font-bold mb-4">
-                    ?{walletSummary ? walletSummary.balance.toLocaleString() : '0'}
+                    ₦{walletSummary ? walletSummary.balance.toLocaleString() : '0'}
                   </div>
                   <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
                       <div className="text-purple-200">Total Funded</div>
-                      <div className="font-medium">?{walletSummary ? walletSummary.total_funded.toLocaleString() : '0'}</div>
+                      <div className="font-medium">₦{walletSummary ? walletSummary.total_funded.toLocaleString() : '0'}</div>
                     </div>
                     <div>
                       <div className="text-purple-200">Total Spent</div>
-                      <div className="font-medium">?{walletSummary ? walletSummary.total_spent.toLocaleString() : '0'}</div>
+                      <div className="font-medium">₦{walletSummary ? walletSummary.total_spent.toLocaleString() : '0'}</div>
                     </div>
                     <div>
                       <div className="text-purple-200">Withdrawn</div>
-                      <div className="font-medium">?{walletSummary ? walletSummary.total_withdrawn.toLocaleString() : '0'}</div>
+                      <div className="font-medium">₦{walletSummary ? walletSummary.total_withdrawn.toLocaleString() : '0'}</div>
                     </div>
                   </div>
                 </div>
@@ -8866,7 +8672,7 @@ function App() {
                             }`}>
                             <div className="font-semibold">
                               {transaction.transaction_type.includes('funding') || transaction.transaction_type.includes('redemption') ? '+' : '-'}
-                              ?{transaction.amount.toLocaleString()}
+                              ₦{transaction.amount.toLocaleString()}
                             </div>
                             <div className="text-xs text-gray-500">
                               Status: {transaction.status}
@@ -8907,7 +8713,7 @@ function App() {
 
                 try {
                   await fundWallet(amount, fundingMethod, description);
-                  alert(`Successfully funded wallet with ?${parseFloat(amount).toLocaleString()}`);
+                  alert(`Successfully funded wallet with ₦${parseFloat(amount).toLocaleString()}`);
                   setShowFundWallet(false);
                 } catch (error) {
                   alert('Failed to fund wallet: ' + error.message);
@@ -9055,10 +8861,10 @@ function App() {
                               {giftCard.card_code}
                             </div>
                             <div className="text-lg font-bold">
-                              ?{giftCard.amount.toLocaleString()}
+                              ₦{giftCard.amount.toLocaleString()}
                             </div>
                             <div className="text-sm text-gray-600">
-                              Balance: ?{giftCard.balance.toLocaleString()}
+                              Balance: ₦{giftCard.balance.toLocaleString()}
                             </div>
                             {giftCard.recipient_name && (
                               <div className="text-sm text-gray-600">
@@ -9105,7 +8911,7 @@ function App() {
 
                 try {
                   const result = await createGiftCard(amount, recipientEmail, recipientName, message);
-                  alert(`Gift card created successfully!\nCard Code: ${result.gift_card.card_code}\nAmount: ?${parseFloat(amount).toLocaleString()}`);
+                  alert(`Gift card created successfully!\nCard Code: ${result.gift_card.card_code}\nAmount: ₦${parseFloat(amount).toLocaleString()}`);
                   setShowCreateGiftCard(false);
                 } catch (error) {
                   alert('Failed to create gift card: ' + error.message);
@@ -9212,7 +9018,7 @@ function App() {
 
                 try {
                   const result = await redeemGiftCard(cardCode, amount);
-                  alert(`Gift card redeemed successfully!\nRedeemed: ?${result.redeemed_amount.toLocaleString()}\nNew wallet balance: ?${result.new_wallet_balance.toLocaleString()}`);
+                  alert(`Gift card redeemed successfully!\nRedeemed: ₦${result.redeemed_amount.toLocaleString()}\nNew wallet balance: ₦${result.new_wallet_balance.toLocaleString()}`);
                   setShowRedeemGiftCard(false);
                   setGiftCardDetails(null);
                 } catch (error) {
@@ -9258,7 +9064,7 @@ function App() {
                           Gift Card Found!
                         </div>
                         <div className="text-sm text-green-700">
-                          Available Balance: ?{giftCardDetails.balance.toLocaleString()}
+                          Available Balance: ₦{giftCardDetails.balance.toLocaleString()}
                         </div>
                         <div className="text-sm text-green-600">
                           Status: {giftCardDetails.status}
@@ -9369,7 +9175,7 @@ function App() {
                 onClick={() => setShowFarmerDashboard(false)}
                 className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-2 shadow"
               >
-                ✕ Close
+                âœ• Close
               </button>
               <SellerDashboard user={user} token={localStorage.getItem('token')} />
             </div>
@@ -9386,7 +9192,7 @@ function App() {
                 onClick={() => setShowAgentDashboard(false)}
                 className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-2 shadow"
               >
-                ✕ Close
+                âœ• Close
               </button>
               <SellerDashboard user={user} token={localStorage.getItem('token')} />
             </div>
@@ -9403,7 +9209,7 @@ function App() {
                 onClick={() => setShowPersonalDashboard(false)}
                 className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-2 shadow"
               >
-                ✕ Close
+                âœ• Close
               </button>
               <PersonalDashboard user={user} />
             </div>
@@ -9470,7 +9276,7 @@ function App() {
                             <div className="text-xs text-gray-500 capitalize">{item.category.replace('_', ' ')}</div>
                           </div>
                           <div className="text-right">
-                            <div className="text-xl font-bold text-gray-900">?{item.price.toLocaleString()}</div>
+                            <div className="text-xl font-bold text-gray-900">₦{item.price.toLocaleString()}</div>
                             <div className={`text-sm font-medium ${item.trend.startsWith('+') ? 'text-green-600' : 'text-red-600'
                               }`}>
                               {item.trend}
@@ -9636,20 +9442,24 @@ function App() {
         }}
       />
 
-      {showMyOrders && (
-        <MyOrdersModal onClose={() => setShowMyOrders(false)} />
-      )}
+      {
+        showMyOrders && (
+          <MyOrdersModal onClose={() => setShowMyOrders(false)} />
+        )
+      }
 
       {/* Floating My Orders Button */}
-      {user && (
-        <button
-          onClick={() => setShowMyOrders(true)}
-          className="fixed bottom-24 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg z-50 hover:bg-blue-700 flex items-center justify-center transition-all transform hover:scale-105"
-          title="My Orders"
-        >
-          <span className="text-xl">📦</span>
-        </button>
-      )}
+      {
+        user && (
+          <button
+            onClick={() => setShowMyOrders(true)}
+            className="fixed bottom-24 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg z-50 hover:bg-blue-700 flex items-center justify-center transition-all transform hover:scale-105"
+            title="My Orders"
+          >
+            <span className="text-xl">ðŸ“¦</span>
+          </button>
+        )
+      }
 
     </div >
 
@@ -9658,3 +9468,4 @@ function App() {
 }
 
 export default App;
+

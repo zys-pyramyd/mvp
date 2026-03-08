@@ -12,6 +12,7 @@ const AdminDashboard = () => {
     const [usersList, setUsersList] = useState([]);
     const [pendingKyc, setPendingKyc] = useState([]);
     const [ordersList, setOrdersList] = useState([]);
+    const [pendingReconciliations, setPendingReconciliations] = useState([]);
 
     // Fetch Stats on Load
     useEffect(() => {
@@ -23,6 +24,7 @@ const AdminDashboard = () => {
         if (activeTab === 'users') fetchUsers();
         if (activeTab === 'kyc') fetchPendingKyc();
         if (activeTab === 'orders') fetchOrders();
+        if (activeTab === 'reconciliations') fetchReconciliations();
     }, [activeTab]);
 
     const fetchAdminStats = async () => {
@@ -70,6 +72,20 @@ const AdminDashboard = () => {
             if (response.ok) {
                 const data = await response.json();
                 setOrdersList(data.orders);
+            }
+        } catch (err) { console.error(err); }
+        setLoading(false);
+    };
+
+    const fetchReconciliations = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/admin/reconciliations`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setPendingReconciliations(data);
             }
         } catch (err) { console.error(err); }
         setLoading(false);
@@ -254,6 +270,13 @@ const AdminDashboard = () => {
                             className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'orders' ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50'}`}
                         >
                             <span>📦</span> Global Orders
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('reconciliations')}
+                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'reconciliations' ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <span>🏦</span> Reconciliations
+                            {pendingReconciliations.length > 0 && <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{pendingReconciliations.length}</span>}
                         </button>
                     </div>
                 </div>
@@ -484,6 +507,76 @@ const AdminDashboard = () => {
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'reconciliations' && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <div>
+                                    <h2 className="text-2xl font-bold">Manual Reconciliations</h2>
+                                    <p className="text-gray-500 text-sm mt-1">Funds held in platform account due to missing user bank details.</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                {pendingReconciliations.length === 0 ? (
+                                    <div className="p-12 text-center text-gray-500">
+                                        <span className="text-4xl block mb-2">🏛️</span>
+                                        No pending reconciliations found in the vault.
+                                    </div>
+                                ) : (
+                                    <table className="min-w-full divide-y divide-gray-200">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order/Ref ID</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User ID</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role Type</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Held</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {pendingReconciliations.map((rec, i) => (
+                                                <tr key={rec._id || i} className="hover:bg-gray-50">
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        {new Date(rec.created_at).toLocaleDateString()}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap font-mono text-sm text-blue-600">
+                                                        {rec.order_id}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-900">
+                                                        {rec.user_id}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full capitalize 
+                                                            ${rec.role === 'seller' ? 'bg-indigo-100 text-indigo-800' : 'bg-orange-100 text-orange-800'}`}>
+                                                            {rec.role}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-600">
+                                                        ₦{rec.amount?.toLocaleString()}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${rec.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
+                                                            {rec.status.toUpperCase()}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                        {rec.status === 'pending' && (
+                                                            <button className="text-emerald-600 hover:text-emerald-900 bg-emerald-50 px-3 py-1 rounded border border-emerald-200" onClick={() => alert('Direct user to provide bank details first, then use Wallet payout API to release.')}>
+                                                                Resolve Vault
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
                             </div>
                         </div>
                     )}
