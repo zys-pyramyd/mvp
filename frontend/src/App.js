@@ -17,10 +17,10 @@ import RegistrationModal from './components/registration/RegistrationModal';
 import DVAPromptModal from './components/profile/DVAPromptModal';
 import MyOrdersModal from './components/profile/MyOrdersModal';
 import MyRequests from './components/rfq/MyRequests';
-import PersonalDashboard from './components/Dashboard/PersonalDashboard';
+import PersonalDashboard from './components/dashboard/PersonalDashboard';
 import SellerDashboard from './SellerDashboard';
 import AgentDeliveryDashboard from './AgentDeliveryDashboard';
-import ChatModal from './components/Chat/ChatModal';
+import ChatModal from './components/chat/ChatModal';
 import './App.css';
 
 // Helper function to map backend order statuses to user-friendly display labels
