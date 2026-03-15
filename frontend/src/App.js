@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import DealBoard from './components/rfq/DealBoard';
 import RequestWizard from './components/rfq/RequestWizard';
@@ -13,7 +13,7 @@ import RecommendedCommunities from './components/community/RecommendedCommunitie
 import GlobalFeed from './components/community/GlobalFeed';
 import TrendingProducts from './components/community/TrendingProducts';
 import AdminDashboard from './components/admin/AdminDashboard';
-import RegistrationModal from './components/Registration/RegistrationModal';
+import RegistrationModal from './components/registration/RegistrationModal';
 import DVAPromptModal from './components/profile/DVAPromptModal';
 import MyOrdersModal from './components/profile/MyOrdersModal';
 import MyRequests from './components/rfq/MyRequests';
