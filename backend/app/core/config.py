@@ -11,8 +11,26 @@ class Settings:
     PROJECT_NAME: str = "Pyramyd Agritech"
     PROJECT_VERSION: str = "1.0.0"
     
-    # Database
-    MONGO_URL: str = os.environ.get("MONGO_URL", "mongodb://localhost:27017/")
+    import urllib.parse
+    
+    # Environment variables for MongoDB
+    MONGO_USERNAME: str = os.environ.get("MONGO_USERNAME", "")
+    MONGO_PASSWORD: str = os.environ.get("MONGO_PASSWORD", "")
+    MONGO_CLUSTER: str = os.environ.get("MONGO_CLUSTER")
+    MONGO_DB_NAME: str = os.environ.get("MONGO_DB_NAME", "pyramyd")
+    MONGO_AUTH_SOURCE: str = os.environ.get("MONGO_AUTH_SOURCE", "admin")
+    
+    # Generate MONGO_URL dynamically
+    if MONGO_USERNAME and MONGO_PASSWORD:
+        encoded_password = urllib.parse.quote_plus(MONGO_PASSWORD)
+        # Use srv format if it's atlas/remote
+        if "mongodb.net" in MONGO_CLUSTER:
+            MONGO_URL: str = f"mongodb+srv://{MONGO_USERNAME}:{encoded_password}@{MONGO_CLUSTER}/?authSource={MONGO_AUTH_SOURCE}&retryWrites=true&w=majority&appName=Pyramyd"
+        else:
+            MONGO_URL: str = f"mongodb://{MONGO_USERNAME}:{encoded_password}@{MONGO_CLUSTER}/?authSource={MONGO_AUTH_SOURCE}"
+    else:
+        # Fallback to direct URL or localhost
+        MONGO_URL: str = os.environ.get("MONGO_URL", f"mongodb://{MONGO_CLUSTER}/")
     
     # Security
     JWT_SECRET: str = os.environ.get("JWT_SECRET", "your-secret-key-here-change-in-production")

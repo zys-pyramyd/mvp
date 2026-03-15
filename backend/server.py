@@ -67,6 +67,7 @@ class DocumentMetadata(BaseModel):
 # Helper functions (Auth helpers moved to auth.py)
 
 import jwt
+import bcrypt
 from enum import Enum
 from cryptography.fernet import Fernet
 import base64
@@ -87,10 +88,29 @@ logger = logging.getLogger(__name__)
 
 # Environment variables - ALL SENSITIVE DATA MUST BE IN ENV
 # In production, ensure these are set in the dashboard (Render/Heroku/etc)
-MONGO_URL = os.environ.get('MONGO_URL')
-if not MONGO_URL:
-    # Fallback for local dev ONLY if needed, but preferably crash in prod if missing
-    MONGO_URL = 'mongodb://localhost:27017/'
+import urllib.parse
+
+# Environment variables for MongoDB
+MONGO_USERNAME = os.environ.get("MONGO_USERNAME", "")
+MONGO_PASSWORD = os.environ.get("MONGO_PASSWORD", "")
+MONGO_CLUSTER = os.environ.get("MONGO_CLUSTER")
+MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME", "pyramyd")
+MONGO_AUTH_SOURCE = os.environ.get("MONGO_AUTH_SOURCE", "admin")
+
+# Generate MONGO_URL dynamically
+if MONGO_USERNAME and MONGO_PASSWORD:
+    encoded_password = urllib.parse.quote_plus(MONGO_PASSWORD)
+    # Use srv format if it's atlas/remote
+    if "mongodb.net" in MONGO_CLUSTER:
+        MONGO_URL = f"mongodb+srv://{MONGO_USERNAME}:{encoded_password}@{MONGO_CLUSTER}/?authSource={MONGO_AUTH_SOURCE}&retryWrites=true&w=majority&appName=Pyramyd"
+    else:
+        MONGO_URL = f"mongodb://{MONGO_USERNAME}:{encoded_password}@{MONGO_CLUSTER}/?authSource={MONGO_AUTH_SOURCE}"
+else:
+    # Fallback to direct URL or localhost (for local development)
+    MONGO_URL = os.environ.get('MONGO_URL')
+    if not MONGO_URL:
+        # Fallback for local dev ONLY if needed, but preferably crash in prod if missing
+        MONGO_URL = f'mongodb://{MONGO_CLUSTER}/'
 
 JWT_SECRET = os.environ.get('JWT_SECRET')
 if not JWT_SECRET:
@@ -372,36 +392,36 @@ async def reset_password(request: ResetPasswordRequest):
     
     return {"message": "Password reset successfully. You can now login."}
 
-ADMIN_EMAILS = ["abdulazeezshakrullah@gmail.com", "abdulazeezshakrullah@pyramydhub.com"]
-
 @app.on_event("startup")
 async def startup_db_client():
-    print("Checking for admin users...")
+    if not ADMIN_EMAIL or not ADMIN_PASSWORD:
+        print("Skipping admin creation: ADMIN_EMAIL or ADMIN_PASSWORD not set in environment.")
+        return
+
+    print("Checking for admin user from environment variables...")
     try:
-        initial_password = "AdminInitialPassword123!" # Default initial password
-        hashed = hash_password(initial_password)
+        hashed = hash_password(ADMIN_PASSWORD)
         
-        for email in ADMIN_EMAILS:
-            user = db.users.find_one({"email": email})
-            if not user:
-                print(f"Creating admin user: {email}")
-                new_admin = {
-                    "id": str(uuid.uuid4()),
-                    "email": email,
-                    "password": hashed,
-                    "role": "admin",
-                    "username": email.split('@')[0],
-                    "first_name": "Abdulazeez",
-                    "last_name": "Shakrullah",
-                    "is_verified": True,
-                    "created_at": datetime.utcnow()
-                }
-                db.users.insert_one(new_admin)
-                print(f"Admin created: {email}, Default Password: {initial_password}")
-            else:
-                if user.get("role") != "admin":
-                    db.users.update_one({"_id": user["_id"]}, {"$set": {"role": "admin"}})
-                    print(f"Updated role to admin for {email}")
+        user = db.users.find_one({"email": ADMIN_EMAIL})
+        if not user:
+            print(f"Creating admin user: {ADMIN_EMAIL}")
+            new_admin = {
+                "id": str(uuid.uuid4()),
+                "email": ADMIN_EMAIL,
+                "password": hashed,
+                "role": "admin",
+                "username": ADMIN_EMAIL.split('@')[0],
+                "first_name": "Admin",
+                "last_name": "User",
+                "is_verified": True,
+                "created_at": datetime.utcnow()
+            }
+            db.users.insert_one(new_admin)
+            print(f"Admin created: {ADMIN_EMAIL}")
+        else:
+            if user.get("role") != "admin":
+                db.users.update_one({"_id": user["_id"]}, {"$set": {"role": "admin"}})
+                print(f"Updated role to admin for {ADMIN_EMAIL}")
     except Exception as e:
         print(f"Error seeding admins: {e}")
 
