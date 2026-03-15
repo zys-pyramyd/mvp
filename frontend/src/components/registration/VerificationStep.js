@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Camera, Upload, Check, FileText } from 'lucide-react';
-import TermsOfUseModal from '../Legal/TermsOfUseModal';
-import PrivacyPolicyModal from '../Legal/PrivacyPolicyModal';
+import TermsOfUseModal from '../legal/TermsOfUseModal';
+import PrivacyPolicyModal from '../legal/PrivacyPolicyModal';
 
 const VerificationStep = ({ formData, updateFormData, onRegister, onBack, role, requiredDocs, docLabels }) => {
     const [uploading, setUploading] = useState({}); // { docKey: boolean }
