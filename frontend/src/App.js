@@ -41,6 +41,15 @@ const getOrderStatusDisplay = (status) => {
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
 
+// All 36 Nigerian states + FCT for the advanced filter dropdown
+const NIGERIAN_STATES = [
+  'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue',
+  'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu',
+  'FCT - Abuja', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina',
+  'Kebbi', 'Kogi', 'Kwara', 'Lagos', 'Nasarawa', 'Niger', 'Ogun', 'Ondo',
+  'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara'
+];
+
 // Custom Icons as SVG components using provided designs
 const AddToCartIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -169,6 +178,7 @@ function App() {
   const [audioBlob, setAudioBlob] = useState(null);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [showMyOrders, setShowMyOrders] = useState(false);
+  const [ordersModalTab, setOrdersModalTab] = useState('all');
   const [showOrderTracking, setShowOrderTracking] = useState(false);
   const [orders, setOrders] = useState([]);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
@@ -315,10 +325,6 @@ function App() {
 
   // Category navigation state
   const [categoryScrollPosition, setCategoryScrollPosition] = useState(0);
-
-  // Product Detail Page state
-  const [showProductDetail, setShowProductDetail] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
 
   // Profile Picture state
   const [showProfilePictureUpload, setShowProfilePictureUpload] = useState(false);
@@ -922,43 +928,7 @@ function App() {
   };
 
   const getMockProducts = () => {
-    return [
-      {
-        id: 'mock-1',
-        _id: 'mock-1',
-        product_name: 'Mock Testing Product 1',
-        crop_type: 'Mock Testing Product 1',
-        description: 'This is a mocked product to test the Buy Now cart flow.',
-        price_per_unit: 5000,
-        unit: 'kg',
-        unit_of_measure: 'kg',
-        unit_specification: 'Bag',
-        quantity: 200,
-        available_stock: 200,
-        location: 'Mock Location',
-        farm_name: 'Mock Farm',
-        seller_type: 'farmer',
-        type: 'product',
-        images: []
-      },
-      {
-        id: 'mock-2',
-        _id: 'mock-2',
-        product_name: 'Mock Preorder Product',
-        crop_type: 'Mock Preorder Product',
-        description: 'This is a mocked preorder product to test the checkout flow.',
-        price_per_unit: 10000,
-        unit: 'ton',
-        unit_of_measure: 'ton',
-        quantity: 50,
-        available_stock: 50,
-        location: 'Mock Location',
-        farm_name: 'Mock Farm',
-        seller_type: 'business',
-        type: 'preorder',
-        images: []
-      }
-    ];
+    return [];
   };
 
   const fetchCategories = async () => {
@@ -1923,20 +1893,29 @@ function App() {
   // Location functions
   const fetchAvailableLocations = async () => {
     try {
-      // Extract unique locations from products
-      // Extract unique locations from products and normalize against standard list
-      const productLocations = [...new Set(products.map(p => {
-        if (!p.location) return null;
-        const normalized = p.location.trim();
-        // Try to match with standard state list
-        const match = NIGERIAN_STATES.find(s => s.toLowerCase() === normalized.toLowerCase());
-        return match || normalized;
-      }))].filter(Boolean).sort();
+      // Start with all 36 Nigerian states as the base list
+      const baseStates = [...NIGERIAN_STATES];
 
-      setAvailableLocations(productLocations);
-      return productLocations;
+      // Extract any unique locations from loaded products that may not be in the standard list
+      const productStates = products
+        .map(p => {
+          if (!p.location) return null;
+          const normalized = p.location.trim();
+          // Check if it already matches something in base list (case-insensitive)
+          const alreadyIncluded = baseStates.some(s => s.toLowerCase() === normalized.toLowerCase());
+          return alreadyIncluded ? null : normalized;
+        })
+        .filter(Boolean);
+
+      // Merge: Nigerian states first, then any extra unlisted product states
+      const allLocations = [...baseStates, ...new Set(productStates)].sort();
+
+      setAvailableLocations(allLocations);
+      return allLocations;
     } catch (error) {
       console.error('Error fetching locations:', error);
+      // Fallback to just the full states list
+      setAvailableLocations([...NIGERIAN_STATES]);
     }
   };
 
@@ -2192,41 +2171,6 @@ function App() {
       case 'all': return cart;
       default: return cart;
     }
-  };
-
-
-  // Product Detail functions
-  const openProductDetail = async (product) => {
-    setSelectedProduct(product);
-    setShowProductDetail(true);
-
-    // Fetch delivery options for this product
-    const productId = product.id || product._id;
-    if (productId) {
-      const deliveryOptions = await fetchProductDeliveryOptions(productId);
-
-      // Set default delivery method based on what's supported
-      if (deliveryOptions) {
-        if (deliveryOptions.supports_dropoff_delivery) {
-          setSelectedDeliveryMethod('dropoff');
-        } else if (deliveryOptions.supports_shipping_delivery) {
-          setSelectedDeliveryMethod('shipping');
-        }
-      }
-    }
-  };
-
-  const closeProductDetail = () => {
-    setShowProductDetail(false);
-    setSelectedProduct(null);
-    setSelectedDeliveryMethod('dropoff'); // Reset to default
-  };
-
-  const logout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
-    setCart([]);
-    setShowProfileMenu(false);
   };
 
   // Audio recording functions
@@ -4641,11 +4585,23 @@ function App() {
                       onClick={() => {
                         setShowProfileMenu(false);
                         fetchOrders();
-                        setShowOrderTracking(true);
+                        setOrdersModalTab('all');
+                        setShowMyOrders(true);
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                     >
                       My Orders
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setOrdersModalTab('commits');
+                        setShowMyOrders(true);
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm text-purple-600 font-medium hover:bg-purple-50"
+                    >
+                      📦 My Commits
                     </button>
 
                     <button
@@ -4806,7 +4762,6 @@ function App() {
                         </div>
                         <GlobalFeed
                           API_BASE_URL={process.env.REACT_APP_BACKEND_URL}
-                          onOpenProduct={openProductDetail}
                           onJoinCommunity={handleJoinCommunity}
                         />
                       </div>
@@ -4829,263 +4784,210 @@ function App() {
             currentPlatform !== 'communities' && (
               <div>
                 {/* Original Platform Content (Home & Farm Deals) */}
-                {/* Search Bar */}
-                <div className="mb-6">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search products..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
-                    />
-                    <button className="absolute right-3 top-3 text-emerald-600 hover:text-emerald-700">
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Advanced Filters Toggle & Panel - Moved under search bar */}
-                <div className="mb-4">
-                  <button
-                    onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                    className="flex items-center space-x-2 text-sm text-gray-600 hover:text-emerald-600 font-medium my-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-                    </svg>
-                    <span>Advanced Filters</span>
-                    <svg className={`w-4 h-4 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-
-                  {showAdvancedFilters && (
-                    <div className="mt-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {/* Advanced Location Filters */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-                          <select
-                            value={filters.location}
-                            onChange={(e) => setFilters(prev => ({ ...prev, location: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          >
-                            <option value="">All States</option>
-                            {availableLocations.map(location => (
-                              <option key={location} value={location}>{location}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">City / L.G.A.</label>
-                          <input
-                            type="text"
-                            placeholder="Specific city..."
-                            value={filters.city || ''}
-                            onChange={(e) => setFilters(prev => ({ ...prev, city: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mt-4 flex items-center justify-between">
-                        <label className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            checked={filters.only_preorders}
-                            onChange={(e) => setFilters(prev => ({ ...prev, only_preorders: e.target.checked }))}
-                            className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                          />
-                          <span className="text-sm font-medium text-gray-700">Show only pre-orders</span>
-                        </label>
-
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => {
-                              setFilters({
-                                category: '',
-                                city: '',
-                                location: '',
-                                min_price: '',
-                                max_price: '',
-                                only_preorders: false,
-                                seller_type: ''
-                              });
-                              setSelectedCategory('');
-                            }}
-                            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
-                          >
-                            Clear All
-                          </button>
-                          <button
-                            onClick={() => {
-                              fetchProducts();
-                              setShowAdvancedFilters(false);
-                            }}
-                            className="px-4 py-1 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg"
-                          >
-                            Apply Filters
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Instant Request CTA (PyExpress / Home) - DISABLED/COMING SOON */}
-                {/* 
-                {currentPlatform === 'home' && (
-                  <>
-                    <div className="mt-4 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        <div className="bg-emerald-100 p-2 rounded-lg text-2xl">âš¡</div>
-                        <div>
-                          <h3 className="font-bold text-gray-900">Create Custom Order</h3>
-                          <p className="text-sm text-gray-600">
-                            Create your order in one place from businesses within your city.
-                            <strong> Get delivery within 2 to 6 hours</strong> after order is picked.
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          if (!user) {
-                            alert("Please sign in to create a request");
-                            setShowAuthModal(true);
-                            return;
-                          }
-                          setWizardType('instant');
-                          setShowRequestWizard(true);
-                        }}
-                        className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all whitespace-nowrap"
-                      >
-                        Create Instant Request
+                {/* Hero Grid Container: Search/Filter (Left) & Carousel (Right) */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+                  {/* Left Column: Search & Filter (spans 5 cols on lg) */}
+                  <div className="lg:col-span-5 flex flex-col gap-4">
+                    {/* Search Bar */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Search products..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+                      />
+                      <button className="absolute right-3 top-3 text-emerald-600 hover:text-emerald-700">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
                       </button>
                     </div>
 
-                    <div className="mt-8">
-                      <RequestFeed type="instant" userRole={user?.role} />
-                    </div>
-                  </>
-                )} 
-                */}
-
-                {/* Standard Request CTA (Farm Deals) */}
-                {currentPlatform === 'buy_from_farm' && (
-                  <>
-                    <div className="mt-4 bg-gradient-to-r from-green-50 to-amber-50 border border-green-100 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        <div className="bg-green-100 p-2 rounded-lg text-2xl"></div>
-                        <div>
-                          <h3 className="font-bold text-gray-900">Bulk Farm Request</h3>
-                          <p className="text-sm text-gray-600">
-                            Post a request for bulk commodities.
-                            <strong> Verified farmers & agents</strong> will submit competitive bids.
-                          </p>
-                        </div>
-                      </div>
+                    {/* Advanced Filters Toggle & Panel */}
+                    <div>
                       <button
-                        onClick={() => {
-                          if (!user) {
-                            alert("Please sign in to create a request");
-                            setShowAuthModal(true);
-                            return;
-                          }
-                          setWizardType('standard');
-                          setShowRequestWizard(true);
-                        }}
-                        className="w-full sm:w-auto px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all whitespace-nowrap"
+                        onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                        className="flex items-center space-x-2 text-sm text-gray-600 hover:text-emerald-600 font-medium my-1"
                       >
-                        Create Standard Request
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+                        </svg>
+                        <span>Advanced Filters</span>
+                        <svg className={`w-4 h-4 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
                       </button>
-                    </div>
 
-                    {/* Standard Requests Feed */}
-                    <div className="mt-8">
-                      <RequestFeed type="standard" userRole={user?.role} />
-                    </div>
-                  </>
-                )}
+                      {showAdvancedFilters && (
+                        <div className="mt-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Advanced Location Filters */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                              <select
+                                value={filters.location}
+                                onChange={(e) => setFilters(prev => ({ ...prev, location: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              >
+                                <option value="">All States</option>
+                                {availableLocations.map(location => (
+                                  <option key={location} value={location}>{location}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">City / L.G.A.</label>
+                              <input
+                                type="text"
+                                placeholder="Specific city..."
+                                value={filters.city || ''}
+                                onChange={(e) => setFilters(prev => ({ ...prev, city: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              />
+                            </div>
+                            <div className="md:col-span-2">
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                              <select
+                                value={filters.category || ''}
+                                onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              >
+                                <option value="">All Categories</option>
+                                {categories.map((cat, idx) => (
+                                  <option key={idx} value={cat.name}>{cat.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
 
+                          <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <label className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={filters.only_preorders}
+                                onChange={(e) => setFilters(prev => ({ ...prev, only_preorders: e.target.checked }))}
+                                className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                              />
+                              <span className="text-sm font-medium text-gray-700">Show only pre-orders</span>
+                            </label>
 
-                {/* Auto-changing Slides */}
-                <div className="mb-6">
-                  <div className={`relative bg-gradient-to-r ${slideContent[currentSlide].bgGradient} rounded-xl p-6 overflow-hidden transition-all duration-500`}>
-                    <div className="text-center">
-                      <div className="min-h-[100px] flex flex-col items-center justify-center">
-                        <div>
-                          <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                            {slideContent[currentSlide].title}
-                          </h2>
-                          <p className="text-gray-600 text-sm mb-4">
-                            {slideContent[currentSlide].description}
-                          </p>
-
-                          {/* CTA Button */}
-                          {slideContent[currentSlide].cta && (
-                            <button
-                              onClick={() => handleSlideAction(slideContent[currentSlide].cta.action)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md hover:shadow-lg transform hover:scale-105 duration-200"
-                            >
-                              {slideContent[currentSlide].cta.text}
-                            </button>
-                          )}
+                            <div className="flex space-x-2 justify-end">
+                              <button
+                                onClick={() => {
+                                  setFilters({
+                                    category: '',
+                                    city: '',
+                                    location: '',
+                                    min_price: '',
+                                    max_price: '',
+                                    only_preorders: false,
+                                    seller_type: ''
+                                  });
+                                  setSelectedCategory('');
+                                }}
+                                className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+                              >
+                                Clear All
+                              </button>
+                              <button
+                                onClick={() => {
+                                  fetchProducts();
+                                  setShowAdvancedFilters(false);
+                                }}
+                                className="px-4 py-1 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg"
+                              >
+                                Apply Filters
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-
-                      {/* Pagination dots */}
-                      <div className="flex justify-center space-x-2 mt-4">
-                        {slideContent.map((_, index) => (
-                          <div
-                            key={index}
-                            onClick={() => setCurrentSlide(index)}
-                            className={`w-2 h-2 rounded-full cursor-pointer transition-colors ${index === currentSlide ? 'bg-emerald-500' : 'bg-gray-300 hover:bg-gray-400'
-                              }`}
-                          ></div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Background decoration */}
-                    <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 opacity-10">
-                      <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
+                      )}
                     </div>
                   </div>
-                </div>
 
-                {/* Create Pre-order Button - Only for sellers */}
-                <div className="mb-4 flex justify-end">
-                  {user && ['farmer', 'supplier', 'processor', 'agent'].includes(user.role) && (
-                    <button
-                      onClick={() => setShowCreatePreOrder(true)}
-                      className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-                    >
-                      + Create Pre-order
-                    </button>
-                  )}
-                </div>
+                  {/* Right Column: Hero Carousel & CTAs (spans 7 cols on lg) */}
+                  <div className="lg:col-span-7 flex flex-col justify-center">
+                    {/* Auto-changing Slides */}
+                    <div className={`relative bg-gradient-to-r ${slideContent[currentSlide].bgGradient} rounded-xl p-6 overflow-hidden transition-all duration-500 h-full flex flex-col justify-center min-h-[180px]`}>
+                      <div className="text-center z-10">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                          {slideContent[currentSlide].title}
+                        </h2>
+                        <p className="text-gray-700 text-sm mb-4">
+                          {slideContent[currentSlide].description}
+                        </p>
 
-                {/* Location Filter */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium text-gray-700"> Location:</span>
-                      <select
-                        value={locationFilter}
-                        onChange={(e) => setLocationFilter(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      >
-                        <option value="">All Locations</option>
-                        {availableLocations.map(location => (
-                          <option key={location} value={location}>{location}</option>
-                        ))}
-                      </select>
+                        {/* CTA Button */}
+                        {slideContent[currentSlide].cta && (
+                          <button
+                            onClick={() => handleSlideAction(slideContent[currentSlide].cta.action)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md hover:shadow-lg transform hover:scale-105 duration-200"
+                          >
+                            {slideContent[currentSlide].cta.text}
+                          </button>
+                        )}
+
+                        {/* Pagination dots */}
+                        <div className="flex justify-center space-x-2 mt-4">
+                          {slideContent.map((_, index) => (
+                            <div
+                              key={index}
+                              onClick={() => setCurrentSlide(index)}
+                              className={`w-2 h-2 rounded-full cursor-pointer transition-colors ${index === currentSlide ? 'bg-emerald-500' : 'bg-transparent border border-gray-400 hover:bg-gray-300'}`}
+                            ></div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Background decoration */}
+                      <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 opacity-10 z-0">
+                        <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
                     </div>
+
+                    {/* Standard Request CTA (Farm Deals) */}
+                    {currentPlatform === 'buy_from_farm' && (
+                      <div className="mt-4 bg-gradient-to-r from-green-50 to-amber-50 border border-green-100 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <div className="bg-green-100 p-2 rounded-lg text-xl flex items-center justify-center">🤝</div>
+                          <div>
+                            <h3 className="font-bold text-gray-900 text-sm">Bulk Farm Request</h3>
+                            <p className="text-xs text-gray-600">
+                              Post a request. Verified farmers & agents will submit bids.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (!user) {
+                              alert("Please sign in to create a request");
+                              setShowAuthModal(true);
+                              return;
+                            }
+                            setWizardType('standard');
+                            setShowRequestWizard(true);
+                          }}
+                          className="w-full sm:w-auto px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow-sm whitespace-nowrap"
+                        >
+                          Create Request
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Create Pre-order Button - Only for sellers */}
+                    {user && ['farmer', 'supplier', 'processor', 'agent'].includes(user.role) && (
+                      <div className="mt-4 flex justify-end">
+                        <button
+                          onClick={() => setShowCreatePreOrder(true)}
+                          className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
+                        >
+                          + Create Pre-order
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -5129,147 +5031,6 @@ function App() {
                     ))}
                   </div>
                 </div>
-
-                {/* Pre-Order Sales Section - Only show on Home page */}
-                {currentPlatform === 'home' && (
-                  <div className="mb-8">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900"> Pre-Order Sales</h3>
-                        <p className="text-sm text-gray-600">Secure your products in advance with special pre-order pricing!</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          // Go to Farm Deals page with preorder filter
-                          setCurrentPlatform('buy_from_farm');
-                          setFilters(prev => ({ ...prev, only_preorders: true }));
-                          setTimeout(() => fetchProducts(), 100); // Small delay to ensure platform is set
-                        }}
-                        className="px-3 sm:px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-medium text-xs sm:text-sm"
-                      >
-                        See More in Farm Deals →
-                      </button>
-                    </div>
-
-                    {/* Pre-Order Products Horizontal Scroll */}
-                    <div className="relative">
-                      <div className="flex overflow-x-auto space-x-3 sm:space-x-4 pb-4 scrollbar-hide">
-                        {products.filter(product => product.type === 'preorder').slice(0, 6).map((product, index) => (
-                          <div key={`preorder-${product.id || product._id || index}`} className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg shadow-md hover:shadow-lg transition-all flex-shrink-0 w-72 sm:w-80 border-2 border-orange-200 hover:border-orange-300 cursor-pointer">
-                            {/* Pre-Order Badge */}
-                            <div
-                              className="relative"
-                              onClick={() => openProductDetail(product)}
-                              title="Click to view product details"
-                            >
-                              {product.images && product.images.length > 0 ? (
-                                <img
-                                  src={product.images[0]}
-                                  alt={product.product_name || product.crop_type}
-                                  className="w-full h-32 sm:h-40 object-cover rounded-t-lg"
-                                />
-                              ) : (
-                                <div className="w-full h-32 sm:h-40 bg-gradient-to-r from-orange-200 to-orange-300 flex items-center justify-center rounded-t-lg">
-                                  <span className="text-orange-600 font-medium text-sm sm:text-base"> Pre-Order Product</span>
-                                </div>
-                              )}
-
-                              <div className="absolute top-2 left-2 bg-orange-500 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-bold flex items-center">
-                                ⏳ PRE-ORDER
-                              </div>
-
-                              {/* Pre-order percentage badge */}
-                              <div className="absolute top-2 right-2 bg-red-500 text-white px-1.5 sm:px-2 py-1 rounded-full text-xs font-bold">
-                                {product.partial_payment_percentage ?
-                                  `${Math.round(product.partial_payment_percentage * 100)}% Payment` :
-                                  '100% Payment'
-                                }
-                              </div>
-                            </div>
-
-                            <div className="p-3 sm:p-4">
-                              <h4 className="font-bold text-gray-900 mb-2 text-sm sm:text-base line-clamp-1">
-                                {product.product_name || product.crop_type}
-                              </h4>
-
-                              {/* Enhanced Pricing for Pre-orders */}
-                              <div className="flex items-center space-x-2 mb-2">
-                                <span className="text-base sm:text-lg font-bold text-orange-600">
-                                  ₦{product.price_per_unit}/{product.unit || product.unit_of_measure || 'kg'}
-                                  {(product.unit_specification || product.unit_of_measure !== (product.unit || 'kg')) &&
-                                    <span className="text-xs sm:text-sm font-medium text-gray-600 ml-1">
-                                      ({product.unit_specification || product.unit_of_measure || 'standard'})
-                                    </span>
-                                  }
-                                </span>
-                              </div>
-
-                              {/* Pre-order specific info */}
-                              <div className="mb-3 p-2 sm:p-3 bg-orange-50 rounded-lg border border-orange-200">
-                                <div className="text-xs text-orange-800 space-y-1">
-                                  <div className="flex justify-between">
-                                    <span> Payment Required:</span>
-                                    <span className="font-bold">
-                                      {product.partial_payment_percentage ?
-                                        `${Math.round(product.partial_payment_percentage * 100)}%` :
-                                        '100%'
-                                      }
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span> Available:</span>
-                                    <span className="font-bold">{product.available_stock || product.total_stock} {product.unit}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span> Delivery:</span>
-                                    <span className="font-bold text-xs">{new Date(product.delivery_date).toLocaleDateString()}</span>
-                                  </div>
-                                  {product.orders_count > 0 && (
-                                    <div className="flex justify-between">
-                                      <span> Pre-orders:</span>
-                                      <span className="font-bold text-green-600">{product.orders_count}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Location */}
-                              <div className="text-xs text-gray-600 mb-3 flex items-center line-clamp-1">
-                                {product.location}
-                              </div>
-
-                              {/* Action button */}
-                              <button
-                                onClick={() => {
-                                  const quantity = 1;
-                                  const unit = product.unit || 'kg';
-                                  const specification = product.unit_specification || '';
-                                  const deliveryMethod = 'platform';
-
-                                  addEnhancedToCart(product, quantity, unit, specification, deliveryMethod);
-                                }}
-                                className="w-full py-2 px-3 sm:px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors text-xs sm:text-sm"
-                              >
-                                Add Item
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-
-                        {/* Show message if no pre-orders */}
-                        {products.filter(product => product.type === 'preorder').length === 0 && (
-                          <div className="w-full text-center py-6 sm:py-8 bg-orange-50 rounded-lg border-2 border-dashed border-orange-200">
-                            <div className="text-orange-600">
-                              <div className="text-xl sm:text-2xl mb-2"></div>
-                              <h4 className="font-medium text-gray-700 text-sm sm:text-base">No Pre-Orders Available</h4>
-                              <p className="text-xs sm:text-sm text-gray-500">Check back soon for exciting pre-order deals!</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Enhanced Category Navigation & Filters */}
                 <div className="mb-6 space-y-4">
@@ -5411,8 +5172,8 @@ function App() {
                         <div key={product.id || product._id || index} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex flex-col min-h-0">
                           {/* Product Image - Responsive */}
                           <div
-                            className="relative cursor-pointer"
-                            onClick={() => openProductDetail(product)}
+                            className="relative group cursor-pointer"
+                            onClick={() => navigate(`/product/${product.id || product._id}`)}
                             title="Click to view product details"
                           >
                             {product.images && product.images.length > 0 ? (
@@ -5842,14 +5603,49 @@ function App() {
                                       {item.product.description || 'Fresh organic produce'}
                                     </p>
 
-                                    <div className="flex items-center space-x-4 text-sm">
-                                      <span className="text-gray-700">
-                                        <strong>Quantity:</strong> {item.quantity} {item.unit}
-                                        {item.unit_specification && ` (${item.unit_specification})`}
+                                    <div className="flex items-center space-x-4 text-sm mt-2">
+                                      <div className="flex items-center space-x-2 bg-white border border-gray-200 rounded-lg p-1">
+                                        <button 
+                                          onClick={() => {
+                                            const newCart = [...cart];
+                                            const itemIndex = newCart.findIndex(cItem => cItem.id === item.id);
+                                            if (itemIndex >= 0 && newCart[itemIndex].quantity > 1) {
+                                              newCart[itemIndex].quantity -= 1;
+                                              setCart(newCart);
+                                            }
+                                          }}
+                                          className="w-6 h-6 flex items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+                                          disabled={item.quantity <= 1}
+                                        >
+                                          -
+                                        </button>
+                                        <span className="text-gray-900 font-medium px-2 min-w-[20px] text-center">
+                                          {item.quantity}
+                                        </span>
+                                        <button 
+                                          onClick={() => {
+                                            const newCart = [...cart];
+                                            const itemIndex = newCart.findIndex(cItem => cItem.id === item.id);
+                                            if (itemIndex >= 0) {
+                                              // Optional: Check against max available stock if needed
+                                              newCart[itemIndex].quantity += 1;
+                                              setCart(newCart);
+                                            }
+                                          }}
+                                          className="w-6 h-6 flex items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                      
+                                      <span className="text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                                        {item.unit}{item.unit_specification ? ` (${item.unit_specification})` : ''}
                                       </span>
-                                      <span className="text-gray-700">
-                                        <strong>Price:</strong> ₦{item.product.price_per_unit}/{item.unit}
+                                      
+                                      <span className="text-gray-700 font-medium">
+                                        ₦{item.product.price_per_unit}/{item.unit}
                                       </span>
+                                      
                                       <span className={`px-2 py-1 rounded-full text-xs ${item.delivery_method === 'platform'
                                         ? 'bg-blue-100 text-blue-800'
                                         : 'bg-green-100 text-green-800'
@@ -6007,7 +5803,7 @@ function App() {
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
                             <select
-                              value={shippingAddress.country}
+                              value={shippingAddress.country || 'Nigeria'}
                               onChange={(e) => setShippingAddress(prev => ({ ...prev, country: e.target.value }))}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
                             >
@@ -7636,567 +7432,6 @@ function App() {
         )
       }
 
-      {/* Product Detail Modal - Simplified Version */}
-      {
-        showProductDetail && selectedProduct && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
-              {/* Header */}
-              <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-blue-50">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                      {selectedProduct.product_name || selectedProduct.crop_type}
-                    </h1>
-                    <div className="flex items-center space-x-4">
-                      {/* Enhanced Pricing Display */}
-                      <div className="text-3xl font-bold text-emerald-600">
-                        ₦{selectedProduct.price_per_unit}/{selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'}
-                        {(selectedProduct.unit_specification) &&
-                          <span className="text-lg font-medium text-gray-600 ml-2">
-                            ({selectedProduct.unit_specification})
-                          </span>
-                        }
-                      </div>
-
-                      {/* Pre-order Badge */}
-                      {selectedProduct.type === 'preorder' && (
-                        <div className="bg-orange-500 text-white px-4 py-2 rounded-full text-sm font-bold">
-                          ? PRE-ORDER
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={closeProductDetail}
-                    className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
-                  >
-
-                  </button>
-                </div>
-              </div>
-
-              {/* Content - Scrollable */}
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Left Column - Product Image and Info */}
-                  <div>
-                    {/* Product Image */}
-                    {selectedProduct.images && selectedProduct.images.length > 0 ? (
-                      <img
-                        src={selectedProduct.images[0]}
-                        alt={selectedProduct.product_name || selectedProduct.crop_type}
-                        className="w-full h-64 object-cover rounded-lg shadow-lg mb-4"
-                      />
-                    ) : (
-                      <div className="w-full h-64 bg-gradient-to-r from-gray-200 to-gray-300 flex items-center justify-center rounded-lg shadow-lg mb-4">
-                        <span className="text-gray-500 text-lg"> Product Image</span>
-                      </div>
-                    )}
-
-                    {/* Product Description */}
-                    <div className="mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Product Description</h3>
-                      <p className="text-gray-600 leading-relaxed">
-                        {selectedProduct.description || 'High quality organic produce from certified farms. Fresh, nutritious, and carefully handled to ensure maximum freshness and quality.'}
-                      </p>
-                    </div>
-
-                    {/* Location and Seller Info */}
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Seller Information</h3>
-
-                      {selectedProduct.farm_name && (
-                        <div className="mb-2">
-                          <span className="text-sm text-gray-600">Farm:</span>
-                          <div className="font-medium text-gray-800">{selectedProduct.farm_name}</div>
-                        </div>
-                      )}
-
-                      {selectedProduct.agent_username && (
-                        <div className="mb-2">
-                          <span className="text-sm text-gray-600">Agent:</span>
-                          <div className="font-medium text-blue-600">@{selectedProduct.agent_username}</div>
-                          <div className="flex items-center mt-1">
-                            <span className="text-yellow-400">★</span>
-                            <span className="text-sm text-gray-600 ml-2">4.2/5 (Agent Rating)</span>
-                          </div>
-                          <button
-                            onClick={() => {
-                              setChatConfig({ recipient: selectedProduct.agent_username, message: `Hi, I'm interested in your product: ${selectedProduct.product_name || selectedProduct.crop_type}` });
-                              setShowMessaging(true);
-                              closeProductDetail(); // Optional: close product detail or keep it open in background
-                            }}
-                            className="mt-2 px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg hover:bg-emerald-200 transition-colors flex items-center gap-1"
-                          >
-                            💬 Message Agent
-                          </button>
-                        </div>
-                      )}
-
-                      <div>
-                        <span className="text-sm text-gray-600">Location:</span>
-                        <div className="font-medium text-gray-800"> {selectedProduct.location}</div>
-                      </div>
-
-                      {/* About Product Section */}
-                      <div className="mt-8 border-t border-gray-100 pt-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-3">About this Product</h3>
-                        <p className="text-gray-700 whitespace-pre-line mb-4">
-                          {selectedProduct.about_product || selectedProduct.description || 'No detailed description available.'}
-                        </p>
-
-                        {selectedProduct.product_benefits && selectedProduct.product_benefits.length > 0 && (
-                          <div className="mb-4">
-                            <h4 className="font-medium text-gray-900 mb-2">Key Benefits</h4>
-                            <ul className="list-disc pl-5 space-y-1 text-gray-600">
-                              {selectedProduct.product_benefits.map((benefit, idx) => (
-                                <li key={idx}>{benefit}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {selectedProduct.usage_instructions && (
-                          <div>
-                            <h4 className="font-medium text-gray-900 mb-2">Usage Instructions</h4>
-                            <p className="text-gray-600 whitespace-pre-line">
-                              {selectedProduct.usage_instructions}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column - Purchase Options */}
-                  <div>
-                    {/* Stock Information */}
-                    <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Stock Information</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <span className="text-sm text-gray-600">Available:</span>
-                          <div className="font-semibold text-emerald-600">
-                            {selectedProduct.type === 'preorder' ? (
-                              `${selectedProduct.available_stock || selectedProduct.total_stock || 100} ${selectedProduct.unit || 'kg'}`
-                            ) : (
-                              `${selectedProduct.quantity || '100'} ${selectedProduct.unit || 'kg'}`
-                            )}
-                          </div>
-                        </div>
-
-                        {selectedProduct.type === 'preorder' && (
-                          <>
-                            <div>
-                              <span className="text-sm text-gray-600">Payment Required:</span>
-                              <div className="font-semibold text-blue-600">
-                                {selectedProduct.partial_payment_percentage ?
-                                  `${Math.round(selectedProduct.partial_payment_percentage * 100)}%` :
-                                  '100%'
-                                }
-                              </div>
-                            </div>
-                            <div>
-                              <span className="text-sm text-gray-600">Delivery:</span>
-                              <div className="font-semibold text-gray-700">
-                                {new Date(selectedProduct.delivery_date).toLocaleDateString()}
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Purchase Options */}
-                    <div className="p-4 bg-emerald-50 rounded-lg">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Purchase Options</h3>
-
-                      {/* Product Unit Display (Read-only for buyers) */}
-                      <div className="mb-4 p-3 bg-emerald-100 rounded-lg border border-emerald-300">
-                        <div className="text-sm font-medium text-emerald-700">
-                          Unit: {selectedProduct.unit || selectedProduct.unit_of_measure || 'kg'}
-                          {(selectedProduct.unit_specification) &&
-                            <span className="ml-2 text-emerald-600">({selectedProduct.unit_specification})</span>
-                          }
-                        </div>
-                        <div className="text-xs text-emerald-600 mt-1">
-                          Select how many {selectedProduct.unit || selectedProduct.unit_of_measure || 'units'} you want to buy
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        {/* Quantity and Drop-off Location Selection */}
-                        <div className="grid grid-cols-1 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Quantity (Number of {selectedProduct.unit || selectedProduct.unit_of_measure || 'units'})
-                            </label>
-                            <input
-                              type="number"
-                              min="1"
-                              max={selectedProduct.quantity || selectedProduct.available_stock || selectedProduct.total_stock || 100}
-                              defaultValue="1"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                              id={`detail-quantity`}
-                              placeholder="1, 2, 3..."
-                            />
-                            <div className="text-xs text-gray-500 mt-1">
-                              Max available: {selectedProduct.quantity || selectedProduct.available_stock || selectedProduct.total_stock || 100}
-                            </div>
-                          </div>
-
-                          {/* Enhanced Delivery Options Selection */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Delivery Options</label>
-
-                            {(() => {
-                              const productId = selectedProduct.id || selectedProduct._id;
-                              const deliveryOptions = productDeliveryOptions[productId];
-
-                              if (!deliveryOptions) {
-                                return (
-                                  <div className="p-3 bg-gray-100 rounded-lg">
-                                    <div className="text-gray-600">Loading delivery options...</div>
-                                  </div>
-                                );
-                              }
-
-                              const supportsBoth = deliveryOptions.supports_dropoff_delivery && deliveryOptions.supports_shipping_delivery;
-                              const supportsDropoff = deliveryOptions.supports_dropoff_delivery;
-                              const supportsShipping = deliveryOptions.supports_shipping_delivery;
-
-                              return (
-                                <div className="space-y-3">
-                                  {/* Delivery Method Selection (only show if both are supported) */}
-                                  {supportsBoth && (
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => setSelectedDeliveryMethod('dropoff')}
-                                        className={`p-3 rounded-lg border-2 transition-colors ${selectedDeliveryMethod === 'dropoff'
-                                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
-                                          }`}
-                                      >
-                                        <div className="text-sm font-medium"> Drop-off Location</div>
-                                        <div className="text-xs mt-1">
-                                          {deliveryOptions.delivery_costs.dropoff.is_free
-                                            ? 'Free'
-                                            : `₦${deliveryOptions.delivery_costs.dropoff.cost}`
-                                          }
-                                        </div>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setSelectedDeliveryMethod('shipping')}
-                                        className={`p-3 rounded-lg border-2 transition-colors ${selectedDeliveryMethod === 'shipping'
-                                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
-                                          }`}
-                                      >
-                                        <div className="text-sm font-medium"> Home Delivery</div>
-                                        <div className="text-xs mt-1">
-                                          {deliveryOptions.delivery_costs.shipping.is_free
-                                            ? 'Free'
-                                            : `₦${deliveryOptions.delivery_costs.shipping.cost}`
-                                          }
-                                        </div>
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {/* Drop-off Location Selection */}
-                                  {(selectedDeliveryMethod === 'dropoff' || (supportsDropoff && !supportsBoth)) && (
-                                    <div>
-                                      <select
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                                        id="detail-dropoff"
-                                      >
-                                        <option value="">Select drop-off location</option>
-                                        {dropOffLocations.map(location => (
-                                          <option key={location.id} value={location.id}>
-                                            {location.name} - {location.city}, {location.state}
-                                          </option>
-                                        ))}
-                                      </select>
-                                      <div className="text-xs text-gray-500 mt-1">
-                                        Pick up your order at a convenient market or location
-                                        {deliveryOptions.delivery_costs.dropoff.cost > 0 && (
-                                          <span className="text-emerald-600 font-medium ml-2">
-                                            (₦{deliveryOptions.delivery_costs.dropoff.cost} fee)
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Shipping Address Input */}
-                                  {(selectedDeliveryMethod === 'shipping' || (supportsShipping && !supportsBoth)) && (
-                                    <div>
-                                      <textarea
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                        id="detail-shipping-address"
-                                        placeholder="Enter your full delivery address..."
-                                        rows="3"
-                                      ></textarea>
-                                      <div className="text-xs text-gray-500 mt-1">
-                                        We'll deliver directly to your address
-                                        {deliveryOptions.delivery_costs.shipping.cost > 0 && (
-                                          <span className="text-blue-600 font-medium ml-2">
-                                            (₦{deliveryOptions.delivery_costs.shipping.cost} fee)
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Delivery Notes */}
-                                  {deliveryOptions.delivery_notes && (
-                                    <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                      <div className="text-xs font-medium text-yellow-800">Delivery Notes:</div>
-                                      <div className="text-xs text-yellow-700 mt-1">{deliveryOptions.delivery_notes}</div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        </div>
-
-
-                        {/* Action Buttons Container */}
-                        <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                          {/* Cancel Button */}
-                          <button
-                            onClick={closeProductDetail}
-                            className="w-full sm:w-1/3 py-3 px-4 rounded-lg font-bold text-sm sm:text-base transition-colors border-2 border-gray-300 text-gray-700 hover:bg-gray-50"
-                          >
-                            Cancel
-                          </button>
-
-                          {/* Add Item Button */}
-                          <button
-                            onClick={() => {
-                              const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
-                              const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg';
-                              const specification = selectedProduct.unit_specification || 'standard';
-
-                              const productId = selectedProduct.id || selectedProduct._id;
-                              const deliveryOptions = productDeliveryOptions[productId];
-
-                              if (!deliveryOptions) {
-                                alert('Unable to determine delivery options. Please try again.');
-                                return;
-                              }
-
-                              let deliveryMethod = selectedDeliveryMethod;
-                              if (!deliveryOptions.supports_dropoff_delivery && !deliveryOptions.supports_shipping_delivery) {
-                                alert('This product has no available delivery methods. Please contact the supplier.');
-                                return;
-                              }
-
-                              if (deliveryMethod === 'dropoff' && !deliveryOptions.supports_dropoff_delivery) {
-                                deliveryMethod = 'shipping';
-                              } else if (deliveryMethod === 'shipping' && !deliveryOptions.supports_shipping_delivery) {
-                                deliveryMethod = 'dropoff';
-                              }
-
-                              let deliveryDetails = null;
-
-                              if (deliveryMethod === 'dropoff') {
-                                const dropoffLocationId = document.getElementById('detail-dropoff')?.value;
-                                if (!dropoffLocationId) {
-                                  alert('Please select a drop-off location');
-                                  return;
-                                }
-
-                                const dropoffLocation = dropOffLocations.find(loc => loc.id.toString() === dropoffLocationId);
-                                if (!dropoffLocation) {
-                                  alert('Invalid drop-off location selected');
-                                  return;
-                                }
-
-                                deliveryDetails = {
-                                  type: 'dropoff',
-                                  dropoffLocation: dropoffLocation,
-                                  cost: deliveryOptions.delivery_costs.dropoff.cost
-                                };
-                              } else if (deliveryMethod === 'shipping') {
-                                const shippingAddress = document.getElementById('detail-shipping-address')?.value?.trim();
-                                if (!shippingAddress) {
-                                  alert('Please enter your delivery address');
-                                  return;
-                                }
-
-                                deliveryDetails = {
-                                  type: 'shipping',
-                                  shippingAddress: shippingAddress,
-                                  cost: deliveryOptions.delivery_costs.shipping.cost
-                                };
-                              }
-
-                              const cartItem = {
-                                ...selectedProduct,
-                                cartQuantity: quantity,
-                                cartUnit: unit,
-                                cartSpecification: specification,
-                                deliveryMethod: deliveryMethod,
-                                deliveryDetails: deliveryDetails
-                              };
-
-                              if (deliveryMethod === 'dropoff') {
-                                addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff', deliveryDetails.dropoffLocation);
-                              } else {
-                                addEnhancedToCart(cartItem, quantity, unit, specification, 'platform', null, deliveryDetails.shippingAddress);
-                              }
-
-                              closeProductDetail();
-                            }}
-                            className={`w-full sm:w-1/3 py-3 px-4 rounded-lg font-bold text-sm sm:text-base transition-colors ${selectedProduct.type === 'preorder'
-                              ? 'bg-orange-600 hover:bg-orange-700 text-white'
-                              : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                              }`}
-                          >
-                            Add Item
-                          </button>
-
-                          {/* Buy Now Button */}
-                          <button
-                            onClick={() => {
-                              const quantity = parseFloat(document.getElementById('detail-quantity')?.value) || 1;
-                              const unit = selectedProduct.unit || selectedProduct.unit_of_measure || 'kg';
-                              const specification = selectedProduct.unit_specification || 'standard';
-
-                              const productId = selectedProduct.id || selectedProduct._id;
-                              const deliveryOptions = productDeliveryOptions[productId];
-
-                              if (!deliveryOptions) {
-                                alert('Unable to determine delivery options. Please try again.');
-                                return;
-                              }
-
-                              let deliveryMethod = selectedDeliveryMethod;
-                              if (!deliveryOptions.supports_dropoff_delivery && !deliveryOptions.supports_shipping_delivery) {
-                                alert('This product has no available delivery methods. Please contact the supplier.');
-                                return;
-                              }
-
-                              if (deliveryMethod === 'dropoff' && !deliveryOptions.supports_dropoff_delivery) {
-                                deliveryMethod = 'shipping';
-                              } else if (deliveryMethod === 'shipping' && !deliveryOptions.supports_shipping_delivery) {
-                                deliveryMethod = 'dropoff';
-                              }
-
-                              let deliveryDetails = null;
-
-                              if (deliveryMethod === 'dropoff') {
-                                const dropoffLocationId = document.getElementById('detail-dropoff')?.value;
-                                if (!dropoffLocationId) {
-                                  alert('Please select a drop-off location');
-                                  return;
-                                }
-
-                                const dropoffLocation = dropOffLocations.find(loc => loc.id.toString() === dropoffLocationId);
-                                if (!dropoffLocation) {
-                                  alert('Invalid drop-off location selected');
-                                  return;
-                                }
-
-                                deliveryDetails = {
-                                  type: 'dropoff',
-                                  dropoffLocation: dropoffLocation,
-                                  cost: deliveryOptions.delivery_costs.dropoff.cost
-                                };
-                              } else if (deliveryMethod === 'shipping') {
-                                const shippingAddress = document.getElementById('detail-shipping-address')?.value?.trim();
-                                if (!shippingAddress) {
-                                  alert('Please enter your delivery address');
-                                  return;
-                                }
-
-                                deliveryDetails = {
-                                  type: 'shipping',
-                                  shippingAddress: shippingAddress,
-                                  cost: deliveryOptions.delivery_costs.shipping.cost
-                                };
-                              }
-
-                              const cartItem = {
-                                ...selectedProduct,
-                                cartQuantity: quantity,
-                                cartUnit: unit,
-                                cartSpecification: specification,
-                                deliveryMethod: deliveryMethod,
-                                deliveryDetails: deliveryDetails
-                              };
-
-                              if (deliveryMethod === 'dropoff') {
-                                addEnhancedToCart(cartItem, quantity, unit, specification, 'dropoff', deliveryDetails.dropoffLocation);
-                              } else {
-                                addEnhancedToCart(cartItem, quantity, unit, specification, 'platform', null, deliveryDetails.shippingAddress);
-                              }
-
-                              closeProductDetail();
-                              setTimeout(() => {
-                                proceedToCheckout();
-                              }, 300); // Allow cart state to update
-                            }}
-                            className={`w-full sm:w-1/3 py-3 px-4 rounded-lg font-bold text-sm sm:text-base transition-colors border-2 ${selectedProduct.type === 'preorder'
-                              ? 'border-orange-600 text-orange-600 hover:bg-orange-50'
-                              : 'border-emerald-600 text-emerald-600 hover:bg-emerald-50'
-                              }`}
-                          >
-                            {selectedProduct.type === 'preorder' ? ' Buy Pre-order Now' : ' Buy Now'}
-                          </button>
-                        </div>
-
-                        {/* Rate Product Button */}
-                        {
-                          user && (
-                            <button
-                              onClick={() => {
-                                const productId = selectedProduct.id || selectedProduct._id;
-                                openRatingModal('product_rating', productId, null, null);
-                              }}
-                              className="w-full mt-3 py-2 px-6 border-2 border-yellow-400 text-yellow-600 rounded-lg font-medium text-sm hover:bg-yellow-50 transition-colors"
-                            >
-                              ⭐ Rate this Product
-                            </button>
-                          )
-                        }
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Simple Pre-Order and Recommended Sections */}
-                <div className="mt-8 pt-8 border-t border-gray-200">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4"> More Pre-Orders Available</h2>
-                  <div className="flex space-x-4 overflow-x-auto pb-4">
-                    {products.filter(product =>
-                      product.type === 'preorder' &&
-                      (product.id || product._id) !== (selectedProduct.id || selectedProduct._id)
-                    ).slice(0, 3).map((product, index) => (
-                      <div key={index} className="flex-shrink-0 w-48 bg-orange-50 rounded-lg p-3 border border-orange-200 cursor-pointer"
-                        onClick={() => setSelectedProduct(product)}>
-                        <h4 className="font-bold text-sm text-gray-900 mb-1">
-                          {product.product_name || product.crop_type}
-                        </h4>
-                        <div className="text-orange-600 font-bold">
-                          ₦{product.price_per_unit}/{product.unit || 'kg'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
       {/* Rating Modal */}
       {
         showRatingModal && ratingModalData && (
@@ -9444,7 +8679,13 @@ function App() {
 
       {
         showMyOrders && (
-          <MyOrdersModal onClose={() => setShowMyOrders(false)} />
+          <MyOrdersModal 
+            initialTab={ordersModalTab}
+            onClose={() => {
+              setShowMyOrders(false);
+              setOrdersModalTab('all');
+            }} 
+          />
         )
       }
 

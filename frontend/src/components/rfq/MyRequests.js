@@ -70,7 +70,7 @@ const CountdownTimer = ({ publishDate, expiryDate }) => {
 
 
 const MyRequests = ({ requests, myOffers = [], onRefresh }) => {
-    const [activeTab, setActiveTab] = useState('requests'); // 'requests' | 'offers'
+    const [activeTab, setActiveTab] = useState('requests'); // 'requests' | 'offers' | 'orders'
     const [expandedRequestId, setExpandedRequestId] = useState(null);
     const [zoomedImage, setZoomedImage] = useState(null);
     const [editRequestModal, setEditRequestModal] = useState(null);
@@ -203,6 +203,21 @@ const MyRequests = ({ requests, myOffers = [], onRefresh }) => {
                             {myOffers.filter(o => o.status === 'accepted_by_buyer').length}
                         </span>
                     )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('orders')}
+                    className={`relative py-3 px-2 font-medium border-b-2 transition-colors ${activeTab === 'orders' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    RFQ Orders
+                    {(() => {
+                        // Count orders that need attention: accepted status
+                        const sellerOrders = myOffers.filter(o => ['accepted', 'delivered', 'completed'].includes(o.status)).length;
+                        const buyerOrders = requests.reduce((acc, r) => acc + (r.offers || []).filter(o => ['accepted', 'delivered', 'completed'].includes(o.status)).length, 0);
+                        const total = sellerOrders + buyerOrders;
+                        return total > 0 ? (
+                            <span className="absolute -top-1 -right-4 bg-emerald-500 text-white rounded-full px-2 py-0.5 text-xs font-bold shadow-sm">{total}</span>
+                        ) : null;
+                    })()}
                 </button>
             </div>
 
@@ -424,6 +439,99 @@ const MyRequests = ({ requests, myOffers = [], onRefresh }) => {
                         </div>
                     )}
                 </>
+            ) : activeTab === 'orders' ? (
+                /* RFQ Orders - Both buyer and winning seller see orders here */
+                (() => {
+                    const sellerOrders = myOffers
+                        .filter(o => ['accepted', 'delivered', 'completed'].includes(o.status))
+                        .map(o => ({ ...o, viewAs: 'seller' }));
+
+                    const buyerOrders = requests.flatMap(req =>
+                        (req.offers || [])
+                            .filter(o => ['accepted', 'delivered', 'completed'].includes(o.status))
+                            .map(o => ({ ...o, viewAs: 'buyer', request_title: req.items?.[0]?.name || req.title || req.id }))
+                    );
+
+                    const allOrders = [...sellerOrders, ...buyerOrders];
+
+                    if (allOrders.length === 0) {
+                        return (
+                            <div className="text-center py-16">
+                                <div className="text-5xl mb-3">📦</div>
+                                <p className="text-gray-500 text-lg font-medium">No RFQ orders yet</p>
+                                <p className="text-gray-400 text-sm mt-1">Orders appear here once a bid is accepted by both parties.</p>
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {allOrders.map((order, idx) => (
+                                <div key={`${order.id}-${idx}`} className="border rounded-xl p-4 shadow-sm bg-white">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h3 className="font-bold text-gray-900 text-base">{order.request_title || 'RFQ Order'}</h3>
+                                            <p className="text-xs text-gray-500 mt-0.5">
+                                                {order.viewAs === 'seller' ? `Buyer: ${order.buyer_username || 'Buyer'}` : `Seller: ${order.seller_username}`}
+                                            </p>
+                                        </div>
+                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                                            order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                            order.status === 'delivered' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-yellow-100 text-yellow-800'
+                                        }`}>
+                                            {order.status.replace(/_/g, ' ').toUpperCase()}
+                                        </span>
+                                    </div>
+
+                                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold mb-3 ${
+                                        order.viewAs === 'seller' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'
+                                    }`}>
+                                        {order.viewAs === 'seller' ? '🤝 You are the Seller' : '🛒 You are the Buyer'}
+                                    </span>
+
+                                    <div className="text-xl font-bold text-emerald-600 mb-3">
+                                        ₦{order.price?.toLocaleString()}
+                                    </div>
+
+                                    {(order.tracking_id || order.order_id) && (
+                                        <div className="bg-gray-50 rounded-lg p-3 mb-3">
+                                            <p className="text-xs text-gray-500 mb-1">Tracking ID</p>
+                                            <p className="font-mono font-bold text-sm text-gray-900 break-all">{order.tracking_id || order.order_id}</p>
+                                        </div>
+                                    )}
+
+                                    {order.items?.length > 0 && (
+                                        <div className="text-xs text-gray-600 space-y-1 mb-3">
+                                            {order.items.map((item, i) => (
+                                                <div key={i} className="flex justify-between">
+                                                    <span>{item.name} ({item.quantity} {item.unit})</span>
+                                                    <span className="font-medium">₦{item.target_price?.toLocaleString()}/{item.unit}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {order.confirmed_delivery_date && (
+                                        <p className="text-xs text-gray-500 mb-3">📅 Delivery: {new Date(order.confirmed_delivery_date).toLocaleDateString()}</p>
+                                    )}
+
+                                    {order.status === 'delivered' && order.viewAs === 'buyer' && (
+                                        <button
+                                            onClick={() => handleConfirmDelivery(order.id)}
+                                            className="w-full py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors"
+                                        >
+                                            ✅ Confirm Receipt
+                                        </button>
+                                    )}
+                                    {order.status === 'completed' && (
+                                        <p className="text-center text-emerald-600 font-semibold text-sm">✓ Fulfilled &amp; Paid</p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })()
             ) : (
                 /* My Offers Tab View */
                 <div className="deals-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>

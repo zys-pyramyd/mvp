@@ -145,7 +145,7 @@ async def get_products(
         
         # Pre-orders query (if not filtering out pre-orders)
         if only_preorders or only_preorders is None:
-            preorders_query = {"status": PreOrderStatus.PUBLISHED}
+            preorders_query = {"status": PreOrderStatus.PUBLISHED, "is_preorder": True}
             
             if category:
                 preorders_query["product_category"] = category
@@ -201,11 +201,11 @@ async def get_products(
                 limit_preorders = max(limit_preorders, int(limit * 0.25))  # Always allow at least 25% for pre-orders
             
             if limit_preorders > 0:
-                preorders = list(db.preorders.find(preorders_query).sort("created_at", -1).skip(skip).limit(limit_preorders))
+                preorders = list(db.products.find(preorders_query).sort("created_at", -1).skip(skip).limit(limit_preorders))
                 
                 # Clean up pre-orders
                 for preorder in preorders:
-                    preorder.pop('_id', None)
+                    preorder["_id"] = str(preorder["_id"])
                     if "created_at" in preorder and isinstance(preorder["created_at"], datetime):
                         preorder["created_at"] = preorder["created_at"].isoformat()
                     if "updated_at" in preorder and isinstance(preorder["updated_at"], datetime):
@@ -215,7 +215,7 @@ async def get_products(
                     preorder["type"] = "preorder"
                 
                 results["preorders"] = preorders
-                results["total_count"] += db.preorders.count_documents(preorders_query)
+                results["total_count"] += db.products.count_documents(preorders_query)
         
         results["total_pages"] = (results["total_count"] + limit - 1) // limit
         

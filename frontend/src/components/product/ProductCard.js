@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ShoppingCart } from 'lucide-react';
 import PreOrderTimer from './PreOrderTimer';
 
 const VerifiedBadge = () => (
@@ -23,16 +24,8 @@ const ProductCard = ({ product, variant, onOpenModal, onAddToCart, onCommit }) =
     const images = getImages();
     const hasMultipleImages = images.length > 1;
 
-    // Navigation for Carousel
-    const nextImage = (e) => {
-        e.stopPropagation();
-        setCurrentImageIndex((prev) => (prev + 1) % images.length);
-    };
-
-    const prevImage = (e) => {
-        e.stopPropagation();
-        setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
-    };
+    // Navigation for Carousel - kept for potential future use
+    // but controls are hidden since clicking goes to product page
 
     // Click Handler - Default to Open Modal
     const handleClick = () => onOpenModal(product);
@@ -52,7 +45,10 @@ const ProductCard = ({ product, variant, onOpenModal, onAddToCart, onCommit }) =
             {/* Image Carousel Area */}
             <div
                 className="relative h-48 sm:h-56 bg-gray-100 rounded-t-lg overflow-hidden cursor-pointer"
-                onClick={handleClick}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/product/${product.id || product._id}`);
+                }}
             >
                 {images.length > 0 ? (
                     <img
@@ -66,31 +62,16 @@ const ProductCard = ({ product, variant, onOpenModal, onAddToCart, onCommit }) =
                     </div>
                 )}
 
-                {/* Carousel Controls */}
+                {/* Dot indicators if multiple images */}
                 {hasMultipleImages && (
-                    <>
-                        <button
-                            onClick={prevImage}
-                            className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white rounded-full p-1 hover:bg-opacity-75 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            ←
-                        </button>
-                        <button
-                            onClick={nextImage}
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white rounded-full p-1 hover:bg-opacity-75 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            →
-                        </button>
-                        {/* Dots */}
-                        <div className="absolute bottom-2 left-0 right-0 flex justify-center space-x-1">
-                            {images.map((_, idx) => (
-                                <div
-                                    key={idx}
-                                    className={`w-1.5 h-1.5 rounded-full ${idx === currentImageIndex ? 'bg-white' : 'bg-white bg-opacity-50'}`}
-                                />
-                            ))}
-                        </div>
-                    </>
+                    <div className="absolute bottom-2 left-0 right-0 flex justify-center space-x-1">
+                        {images.map((_, idx) => (
+                            <div
+                                key={idx}
+                                className={`w-1.5 h-1.5 rounded-full ${idx === currentImageIndex ? 'bg-white' : 'bg-white bg-opacity-50'}`}
+                            />
+                        ))}
+                    </div>
                 )}
 
                 {/* Badges */}
@@ -116,7 +97,14 @@ const ProductCard = ({ product, variant, onOpenModal, onAddToCart, onCommit }) =
                 {/* Title & Price */}
                 <div className="flex justify-between items-start mb-2">
                     <div>
-                        <h3 className="font-bold text-gray-900 line-clamp-2 break-words" title={product.title || product.product_name}>
+                        <h3 
+                            className="font-bold text-gray-800 text-sm sm:text-base line-clamp-1 truncate hover:text-emerald-600 transition-colors cursor-pointer"
+                            title={product.title || product.product_name}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/product/${product.id || product._id}`);
+                            }}
+                        >
                             {product.title || product.product_name}
                         </h3>
                         {variant === 'retail' && product.brand_name && (
@@ -184,76 +172,41 @@ const ProductCard = ({ product, variant, onOpenModal, onAddToCart, onCommit }) =
                     </div>
                 )}
 
-                {/* Variant Specific Info */}
-                <div className="mt-auto space-y-2">
-
-                    {/* Retail Info */}
-                    {variant === 'retail' && (
-                        <div className="text-xs text-gray-500 space-y-1">
-                            <div className="flex items-center gap-1">
-                                <span>📦 Min Order:</span>
-                                <span className="font-medium text-gray-900">{product.minimum_order_quantity || 1} {product.unit}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <span>🏷️ Expiry:</span>
-                                <span className="font-medium text-gray-900">
-                                    {product.expiry_date ? new Date(product.expiry_date).toLocaleDateString() : 'N/A'}
-                                </span>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Wholesale Info */}
-                    {variant === 'wholesale' && (
-                        <div className="bg-orange-50 p-2 rounded text-xs space-y-1 border border-orange-100">
-                            <span className="text-orange-800 font-medium">Wholesale / Farm Deal</span>
-                        </div>
-                    )}
-
-                    {/* Community Info */}
-                    {variant === 'community' && (
-                        <div className="space-y-2">
-                            <div className="bg-gray-200 rounded-full h-2 overflow-hidden">
-                                <div
-                                    className="bg-purple-600 h-full transition-all duration-500"
-                                    style={{ width: `${progress.percent}%` }}
-                                />
-                            </div>
-                            <div className="flex justify-between text-xs text-purple-700 font-medium">
-                                <span>{progress.committed} committed</span>
-                                <span>{progress.target} goal</span>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="pt-2 grid grid-cols-2 gap-2">
+                {/* Action Buttons */}
+                <div className="mt-auto pt-3 flex gap-2 w-full">
+                    {variant === 'community' ? (
                         <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/product/${product.id}`);
-                            }}
-                            className="px-3 py-1.5 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                            onClick={(e) => { e.stopPropagation(); onCommit(product); }}
+                            className="w-full px-3 py-2 text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 rounded transition-colors shadow-sm"
                         >
-                            More Info
+                            Commit to Buy
                         </button>
-
-                        {variant === 'community' ? (
+                    ) : (
+                        <>
                             <button
-                                onClick={(e) => { e.stopPropagation(); onCommit(product); }}
-                                className="px-3 py-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded transition-colors shadow-sm"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    // Trigger buy now - typically routes to checkout
+                                    if (product.id || product._id) {
+                                        navigate(`/checkout?product=${product.id || product._id}&buyNow=true`);
+                                    }
+                                }}
+                                className="w-[80%] px-3 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded transition-colors shadow-sm text-center"
                             >
-                                Commit
+                                Buy Now
                             </button>
-                        ) : (
                             <button
-                                onClick={(e) => { e.stopPropagation(); onAddToCart(product); }}
-                                className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded transition-colors shadow-sm"
+                                onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    onAddToCart(product); 
+                                }}
+                                className="w-[20%] flex items-center justify-center p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded transition-colors shadow-sm border border-emerald-100"
+                                title="Add to Cart"
                             >
-                                Add Item
+                                <ShoppingCart size={20} />
                             </button>
-                        )}
-                    </div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const ProductModal = ({ product, variant, isOpen, onClose, onAddToCart, onBuyNow, onCommit, onChatAgent, dropOffLocations = [] }) => {
     const [quantity, setQuantity] = useState(1);
+    const navigate = useNavigate();
     const [selectedDropOff, setSelectedDropOff] = useState('');
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -81,7 +83,15 @@ const ProductModal = ({ product, variant, isOpen, onClose, onAddToCart, onBuyNow
                             {variant === 'wholesale' && <span className="text-orange-600 font-bold text-xs tracking-wider">FARM DEAL WHOLESALE</span>}
                             {variant === 'retail' && <span className="text-emerald-600 font-bold text-xs tracking-wider">PYEXPRESS RETAIL</span>}
                             {variant === 'community' && <span className="text-purple-600 font-bold text-xs tracking-wider">COMMUNITY BUY</span>}
-                            <h2 className="text-2xl font-bold text-gray-900 mt-1">{product.title || product.product_name}</h2>
+                            <h2 
+                                className="text-2xl font-bold text-gray-900 mt-1 cursor-pointer hover:text-emerald-600 transition-colors"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/product/${product.id || product._id}`);
+                                }}
+                            >
+                                {product.title || product.product_name}
+                            </h2>
                             <p className="text-sm text-gray-500">{product.category}</p>
                         </div>
                         <button onClick={onClose} className="hidden md:block text-gray-400 hover:text-gray-600 text-2xl">
@@ -239,7 +249,7 @@ const ProductModal = ({ product, variant, isOpen, onClose, onAddToCart, onBuyNow
                                         onClick={() => handleAction('cart')}
                                         className="flex-1 w-full sm:w-1/2 bg-white border-2 border-emerald-600 text-emerald-700 py-3 rounded-lg font-bold hover:bg-emerald-50 transition-colors"
                                     >
-                                        Add Item
+                                        Add to Cart
                                     </button>
                                     <button
                                         onClick={() => handleAction('buyNow')}

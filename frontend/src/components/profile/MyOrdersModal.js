@@ -3,11 +3,11 @@ import api from '../../services/api';
 import OrderDetails from '../checkout/OrderDetails';
 import './MyOrdersModal.css';
 
-const MyOrdersModal = ({ onClose }) => {
+const MyOrdersModal = ({ onClose, initialTab = 'all' }) => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedOrderId, setSelectedOrderId] = useState(null);
-    const [activeTab, setActiveTab] = useState('all');
+    const [activeTab, setActiveTab] = useState(initialTab);
 
     useEffect(() => {
         fetchOrders();
@@ -30,6 +30,7 @@ const MyOrdersModal = ({ onClose }) => {
             'pending': '#ffeaa7',
             'pending_payment': '#ffeaa7',
             'held_in_escrow': '#74b9ff',
+            'preorder_pending': '#a29bfe', // Color for commits
             'delivered': '#55efc4',
             'completed': '#81ecec',
             'cancelled': '#fab1a0'
@@ -40,7 +41,9 @@ const MyOrdersModal = ({ onClose }) => {
     const filterOrders = () => {
         switch (activeTab) {
             case 'pending':
-                return orders.filter(o => ['pending', 'held_in_escrow', 'pending_payment'].includes(o.status));
+                return orders.filter(o => ['pending', 'held_in_escrow', 'pending_payment'].includes(o.status) && o.status !== 'preorder_pending');
+            case 'commits':
+                return orders.filter(o => o.status === 'preorder_pending');
             case 'delivered':
                 return orders.filter(o => o.status === 'delivered');
             case 'completed':
@@ -48,6 +51,7 @@ const MyOrdersModal = ({ onClose }) => {
             case 'cancelled':
                 return orders.filter(o => o.status === 'cancelled');
             default:
+                // Hide commits from 'all' tab if we have a dedicated tab for them, or keep them. Let's keep them in 'all'.
                 return orders;
         }
     };
@@ -57,7 +61,9 @@ const MyOrdersModal = ({ onClose }) => {
     const getTabCount = (tab) => {
         switch (tab) {
             case 'pending':
-                return orders.filter(o => ['pending', 'held_in_escrow', 'pending_payment'].includes(o.status)).length;
+                return orders.filter(o => ['pending', 'held_in_escrow', 'pending_payment'].includes(o.status) && o.status !== 'preorder_pending').length;
+            case 'commits':
+                return orders.filter(o => o.status === 'preorder_pending').length;
             case 'delivered':
                 return orders.filter(o => o.status === 'delivered').length;
             case 'completed':
@@ -108,6 +114,12 @@ const MyOrdersModal = ({ onClose }) => {
                             onClick={() => setActiveTab('pending')}
                         >
                             Pending <span className="tab-count">{getTabCount('pending')}</span>
+                        </button>
+                        <button
+                            className={`tab-button ${activeTab === 'commits' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('commits')}
+                        >
+                            Commits <span className="tab-count">{getTabCount('commits')}</span>
                         </button>
                         <button
                             className={`tab-button ${activeTab === 'delivered' ? 'active' : ''}`}
