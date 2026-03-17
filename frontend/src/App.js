@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import DealBoard from './components/rfq/DealBoard';
 import RequestWizard from './components/rfq/RequestWizard';
 import RequestFeed from './components/rfq/RequestFeed';
@@ -108,6 +108,14 @@ const OffersIcon = () => (
 
 function App() {
   const API_BASE_URL = process.env.REACT_APP_BACKEND_URL;
+  const navigate = useNavigate();
+
+  // Navigate to product detail page (used by community components)
+  const openProductDetail = (product) => {
+    if (product && (product.id || product._id)) {
+      navigate(`/product/${product.id || product._id}`);
+    }
+  };
 
   const [user, setUser] = useState(null);
   // Initialize with Home page (formerly PyExpress) as default

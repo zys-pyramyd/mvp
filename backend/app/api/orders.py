@@ -303,7 +303,7 @@ async def create_order(
             
             # Get callback URL from environment or use default
             import os
-            frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+            frontend_url = os.getenv("FRONTEND_URL", "https://pyramydhub.com")
             callback_url = f"{frontend_url}/orders/{order_id}/payment-callback"
             
             result = initialize_transaction(

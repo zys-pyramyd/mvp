@@ -199,7 +199,7 @@ async def forgot_password(request: Request, password_request: ForgotPasswordRequ
     )
     
     # Construct reset link
-    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    frontend_url = os.environ.get("FRONTEND_URL", "https://pyramydhub.com")
     reset_link = f"{frontend_url}/reset-password?token={reset_token}"
 
     # In a real app, send email here. For MVP, log it.

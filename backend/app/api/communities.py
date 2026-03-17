@@ -277,7 +277,8 @@ async def create_community(
         "creator_id": current_user["id"],
         "created_at": datetime.utcnow(),
         "members_count": 1,
-        "is_private": community_data.is_private
+        "is_private": community_data.is_private,
+        "is_active": True
     }
     
     db.communities.insert_one(community)

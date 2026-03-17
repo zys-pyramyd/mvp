@@ -63,7 +63,7 @@ class Settings:
     ADMIN_PASSWORD_HASH: str = os.environ.get("ADMIN_PASSWORD_HASH", "$2b$12$9O44mlAapYPMR81xvcyBhOHUYkD2vNPy./jp6Bf3HM/8PHY3QCR9i")
     
     # CORS
-    BACKEND_CORS_ORIGINS: list = [os.environ.get("FRONTEND_URL", "*"), "http://localhost:3000", "http://localhost:3001"]
+    BACKEND_CORS_ORIGINS: list = [os.environ.get("FRONTEND_URL", "https://pyramydhub.com"), "https://pyramydhub.com", "https://www.pyramydhub.com", "http://localhost:3000", "http://localhost:3001"]
     
     def __init__(self):
         # Allow comma-separated strings for CORS

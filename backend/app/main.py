@@ -21,11 +21,10 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # SECURITY: CORS Configuration
 # In production, replace with your actual domain
 allowed_origins = [
+    "https://pyramydhub.com",
+    "https://www.pyramydhub.com",
     "http://localhost:3000",  # Development
     "http://localhost:3001",
-    # Add production domains here:
-    # "https://yourdomain.com",
-    # "https://www.yourdomain.com",
 ]
 
 if settings.BACKEND_CORS_ORIGINS:

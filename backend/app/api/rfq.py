@@ -135,7 +135,7 @@ async def initialize_rfq_payment(
         }
         
         # Get callback URL
-        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        frontend_url = os.getenv("FRONTEND_URL", "https://pyramydhub.com")
         callback_url = f"{frontend_url}/rfq/payment-callback"
         
         result = initialize_transaction(
