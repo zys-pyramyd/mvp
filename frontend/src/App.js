@@ -5002,14 +5002,14 @@ function App() {
                 {/* Categories - Swipeable Cards */}
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">Shop by Category</h3>
-                  <div className="flex overflow-x-auto space-x-4 pb-4 scrollbar-hide">
+                  <div className="flex overflow-x-auto space-x-3 pb-3 scrollbar-hide">
                     {/* All Categories Card */}
                     <div
                       onClick={() => setSelectedCategory('')}
-                      className={`flex-shrink-0 cursor-pointer transition-all duration-200 ${selectedCategory === '' ? 'transform scale-105' : 'hover:transform hover:scale-105'
+                      className={`flex-shrink-0 cursor-pointer transition-all duration-200 active:scale-90 ${selectedCategory === '' ? 'transform scale-105' : 'hover:transform hover:scale-105'
                         }`}
                     >
-                      <div className="w-24 h-24 rounded-xl overflow-hidden mb-2 bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                      <div className="w-16 h-16 rounded-xl overflow-hidden mb-1.5 bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm">
                         <span className="text-white text-xs font-medium">All</span>
                       </div>
                       <p className="text-xs text-center text-gray-700 font-medium">All Categories</p>
@@ -5020,21 +5020,21 @@ function App() {
                       <div
                         key={category.value}
                         onClick={() => setSelectedCategory(category.value)}
-                        className={`flex-shrink-0 cursor-pointer transition-all duration-200 ${selectedCategory === category.value ? 'transform scale-105' : 'hover:transform hover:scale-105'
+                        className={`flex-shrink-0 cursor-pointer transition-all duration-200 active:scale-90 ${selectedCategory === category.value ? 'transform scale-105' : 'hover:transform hover:scale-105'
                           }`}
                       >
-                        <div className={`w-24 h-24 rounded-xl overflow-hidden mb-2 border-2 transition-colors ${selectedCategory === category.value ? 'border-emerald-500' : 'border-gray-200'
+                        <div className={`w-16 h-16 rounded-xl overflow-hidden mb-1.5 border-2 transition-colors shadow-sm ${selectedCategory === category.value ? 'border-emerald-500 shadow-emerald-200' : 'border-gray-200'
                           }`}>
                           <img
                             src={category.image}
                             alt={category.label}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" fill="%23f3f4f6"><rect width="96" height="96" fill="%23f3f4f6"/><text x="48" y="48" text-anchor="middle" dy="0.3em" font-family="Arial" font-size="12" fill="%236b7280">' + category.label + '</text></svg>';
+                              e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="%23f3f4f6"><rect width="64" height="64" fill="%23f3f4f6"/><text x="32" y="32" text-anchor="middle" dy="0.3em" font-family="Arial" font-size="10" fill="%236b7280">' + category.label + '</text></svg>';
                             }}
                           />
                         </div>
-                        <p className="text-xs text-center text-gray-700 font-medium">{category.label}</p>
+                        <p className="text-xs text-center text-gray-700 font-medium max-w-[64px] truncate">{category.label}</p>
                       </div>
                     ))}
                   </div>
@@ -5075,13 +5075,6 @@ function App() {
                   {/* Enhanced Category Navigation */}
                   <div className="relative">
                     <div className="flex items-center">
-                      {/* Left Scroll Button */}
-                      <button
-                        onClick={() => scrollCategories('left')}
-                        className="hidden md:flex items-center justify-center w-10 h-10 bg-white shadow-md rounded-full border hover:bg-gray-50 transition-colors mr-2 z-10"
-                      >
-                        <span className="text-gray-600">◀</span>
-                      </button>
 
                       {/* Categories Container */}
                       <div
@@ -5135,16 +5128,7 @@ function App() {
                           );
                         })}
                       </div>
-
-                      {/* Right Scroll Button */}
-                      <button
-                        onClick={() => scrollCategories('right')}
-                        className="hidden md:flex items-center justify-center w-10 h-10 bg-white shadow-md rounded-full border hover:bg-gray-50 transition-colors ml-2 z-10"
-                      >
-                        <span className="text-gray-600">▶</span>
-                      </button>
                     </div>
-
                   </div>
                 </div>
               </div>
@@ -5153,10 +5137,7 @@ function App() {
 
 
 
-          {/* Mobile Swipe Hint */}
-          <div className="md:hidden text-center text-xs text-gray-500 mt-2">
-            Swipe to see more categories
-          </div>
+
 
 
 
