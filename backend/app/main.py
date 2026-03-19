@@ -47,7 +47,13 @@ app.include_router(api_router, prefix="/api")
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "service": "Pyramyd API"}
+    try:
+        from app.db.mongodb import db
+        # Ping the MongoDB server
+        db.client.admin.command('ping')
+        return {"status": "healthy", "service": "Pyramyd API", "db": "connected"}
+    except Exception as e:
+        return {"status": "unhealthy", "service": "Pyramyd API", "db": "error", "error": str(e)}
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

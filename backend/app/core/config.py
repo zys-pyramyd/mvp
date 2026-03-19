@@ -3,9 +3,10 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load env variables from .env file if present
+# Load env variables from .env file only in development (non‑production)
 env_path = Path(__file__).resolve().parent.parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
+if os.getenv("ENVIRONMENT") != "production":
+    load_dotenv(dotenv_path=env_path)
 
 class Settings:
     PROJECT_NAME: str = "Pyramyd Agritech"
@@ -72,12 +73,19 @@ class Settings:
 
         # Critical: Encryption Key Handling
         if not self.ENCRYPTION_KEY:
-            if os.environ.get("ENVIRONMENT") == "production":
-                 raise ValueError("CRITICAL: ENCRYPTION_KEY is missing in production. Data processing will fail.")
+            if os.getenv("ENVIRONMENT") == "production":
+                raise ValueError("CRITICAL: ENCRYPTION_KEY is missing in production. Data processing will fail.")
             else:
                 # Dev Only: Auto-generate with warning
                 from cryptography.fernet import Fernet
                 print("WARNING: Using auto-generated ENCRYPTION_KEY. Data will not persist across restarts.")
                 self.ENCRYPTION_KEY = Fernet.generate_key().decode()
+
+        # Production validation for required MongoDB variables
+        if os.getenv("ENVIRONMENT") == "production":
+            required_vars = ["MONGO_USERNAME", "MONGO_PASSWORD", "MONGO_CLUSTER"]
+            missing = [var for var in required_vars if not getattr(self, var)]
+            if missing:
+                raise ValueError(f"Missing required env vars for production: {', '.join(missing)}")
 
 settings = Settings()

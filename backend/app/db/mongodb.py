@@ -17,13 +17,13 @@ def connect_to_mongo():
     from app.core.config import settings
     db.client = MongoClient(settings.MONGO_URL)
     try:
-        # Default to 'pyramyd' if not in connection string, or rely on client.get_default_database
-        # server.py used "client['pyramyd']" mostly implicitly via connection or similar.
-        # We will be explicit.
+        # Explicitly select the database
         db.db = db.client.get_database("pyramyd")
-        print("Connected to MongoDB")
+        # Ping the server to ensure connectivity
+        db.client.admin.command('ping')
+        print("Connected to MongoDB and ping successful")
     except Exception as e:
-        print(f"Could not connect to MongoDB: {e}")
+        print(f"Could not connect to MongoDB or ping failed: {e}")
         raise e
 
 def close_mongo_connection():
