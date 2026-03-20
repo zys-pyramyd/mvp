@@ -1,15 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, lazy, Suspense } from 'react';
+import debounce from 'lodash.debounce';
 import { X, ArrowLeft } from 'lucide-react';
 import LoginStep from './LoginStep';
 import BasicDetailsStep from './BasicDetailsStep';
 import PathSelectionStep from './PathSelectionStep';
 import PartnerTypeSelectionStep from './PartnerTypeSelectionStep';
-import BuyerFlow from './BuyerFlow';
-import AgentFlow from './AgentFlow';
-import FarmerFlow from './FarmerFlow';
-import BusinessFlow from './BusinessFlow';
+// Flow components are lazy-loaded below
+
 
 const RegistrationModal = ({ onClose, onLogin, onRegister }) => {
+  const [globalLoading, setGlobalLoading] = useState(false);
+  // Debounced form data updater to reduce re-renders
+  const debouncedUpdate = useCallback(
+    debounce((updates) => {
+      setFormData(prev => ({ ...prev, ...updates }));
+    }, 200),
+    []
+  );
+  const updateFormData = (updates) => {
+    debouncedUpdate(updates);
+  };
+
+  // Wrapper for registration submission to manage global loading state
+  const handleRegister = async (data) => {
+    setGlobalLoading(true);
+    try {
+      await onRegister(data);
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
     const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
     const [step, setStep] = useState('basic'); // basic, path_selection, partner_type, details, verification
     const [formData, setFormData] = useState({
@@ -72,9 +92,7 @@ const RegistrationModal = ({ onClose, onLogin, onRegister }) => {
         }
     };
 
-    const updateFormData = (updates) => {
-        setFormData(prev => ({ ...prev, ...updates }));
-    };
+    // Removed original updateFormData; using debounced version above
 
     const renderCurrentStep = () => {
         if (authMode === 'login') {
@@ -108,7 +126,6 @@ const RegistrationModal = ({ onClose, onLogin, onRegister }) => {
                             if (path === 'partner') {
                                 setStep('partner_type');
                             } else {
-                                // Buyer flow now goes to details for extra info
                                 setStep('details');
                             }
                         }}
@@ -124,19 +141,46 @@ const RegistrationModal = ({ onClose, onLogin, onRegister }) => {
                 );
             case 'details':
             case 'verification':
+                // Lazy load heavy flows
+                const LazyBuyerFlow = lazy(() => import('./BuyerFlow'));
+                const LazyAgentFlow = lazy(() => import('./AgentFlow'));
+                const LazyFarmerFlow = lazy(() => import('./FarmerFlow'));
+                const LazyBusinessFlow = lazy(() => import('./BusinessFlow'));
+                const LazyVerificationStep = lazy(() => import('./VerificationStep'));
                 if (formData.user_path === 'buyer') {
-                    return <BuyerFlow step={step} formData={formData} updateFormData={updateFormData} setStep={setStep} onRegister={onRegister} />;
+                    return (
+                        <Suspense fallback={<div className="text-center py-4">Loading...</div>}>
+                            <LazyBuyerFlow step={step} formData={formData} updateFormData={updateFormData} setStep={setStep} onRegister={handleRegister} />
+                        </Suspense>
+                    );
                 }
                 if (formData.partner_type === 'agent') {
-                    return <AgentFlow step={step} formData={formData} updateFormData={updateFormData} setStep={setStep} onRegister={onRegister} />;
+                    return (
+                        <Suspense fallback={<div className="text-center py-4">Loading...</div>}>
+                            <LazyAgentFlow step={step} formData={formData} updateFormData={updateFormData} setStep={setStep} onRegister={handleRegister} />
+                        </Suspense>
+                    );
                 }
                 if (formData.partner_type === 'farmer') {
-                    return <FarmerFlow step={step} formData={formData} updateFormData={updateFormData} setStep={setStep} onRegister={onRegister} />;
+                    return (
+                        <Suspense fallback={<div className="text-center py-4">Loading...</div>}>
+                            <LazyFarmerFlow step={step} formData={formData} updateFormData={updateFormData} setStep={setStep} onRegister={handleRegister} />
+                        </Suspense>
+                    );
                 }
                 if (formData.partner_type === 'business') {
-                    return <BusinessFlow step={step} formData={formData} updateFormData={updateFormData} setStep={setStep} onRegister={onRegister} />;
+                    return (
+                        <Suspense fallback={<div className="text-center py-4">Loading...</div>}>
+                            <LazyBusinessFlow step={step} formData={formData} updateFormData={updateFormData} setStep={setStep} onRegister={handleRegister} />
+                        </Suspense>
+                    );
                 }
-                return <div>Unknown Role Flow</div>;
+                // Fallback to verification step if none matched
+                return (
+                    <Suspense fallback={<div className="text-center py-4">Loading...</div>}>
+                        <LazyVerificationStep step={step} formData={formData} updateFormData={updateFormData} onRegister={handleRegister} onBack={handleBack} role={formData.partner_type} requiredDocs={['headshot','id_document']} docLabels={{headshot:'Headshot',id_document:'ID Document'}} isSubmitting={globalLoading} />
+                    </Suspense>
+                );
             default:
                 return <div>Unknown Step</div>;
         }
@@ -164,6 +208,12 @@ const RegistrationModal = ({ onClose, onLogin, onRegister }) => {
 
                     {renderCurrentStep()}
                 </div>
+                {/* Global loading overlay */}
+                {globalLoading && (
+                    <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center">
+                        <div className="text-emerald-600 font-semibold">Submitting...</div>
+                    </div>
+                )}
             </div>
         </div>
     );

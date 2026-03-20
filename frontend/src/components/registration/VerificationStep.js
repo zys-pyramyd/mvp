@@ -3,7 +3,7 @@ import { Camera, Upload, Check, FileText } from 'lucide-react';
 import TermsOfUseModal from '../legal/TermsOfUseModal';
 import PrivacyPolicyModal from '../legal/PrivacyPolicyModal';
 
-const VerificationStep = ({ formData, updateFormData, onRegister, onBack, role, requiredDocs, docLabels }) => {
+const VerificationStep = ({ formData, updateFormData, onRegister, onBack, role, requiredDocs, docLabels, isSubmitting }) => {
     const [uploading, setUploading] = useState({}); // { docKey: boolean }
     const [previewUrls, setPreviewUrls] = useState({}); // { docKey: url } (blob urls)
     const [fileTypes, setFileTypes] = useState({}); // { docKey: 'image' | 'pdf' }
@@ -306,10 +306,10 @@ const VerificationStep = ({ formData, updateFormData, onRegister, onBack, role, 
                 )}
                 <button
                     onClick={() => onRegister(formData)}
-                    disabled={!isComplete || !formData.agreedToTerms}
+                    disabled={!isComplete || !formData.agreedToTerms || isSubmitting}
                     className={`bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium flex-1 ml-4 disabled:bg-gray-300 disabled:cursor-not-allowed ${!onBack ? 'w-full' : ''}`}
                 >
-                    Complete Registration
+                    {isSubmitting ? 'Submitting...' : 'Complete Registration'}
                 </button>
                 {showTerms && <TermsOfUseModal onClose={() => setShowTerms(false)} zIndex={60} />}
                 {showPrivacy && <PrivacyPolicyModal onClose={() => setShowPrivacy(false)} zIndex={60} />}
