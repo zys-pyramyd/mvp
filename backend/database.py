@@ -42,8 +42,10 @@ def get_db():
                 kwargs['tlsCAFile'] = certifi.where()
 
             _client = MongoClient(
-                MONGO_URL, 
-                serverSelectionTimeoutMS=10000, 
+                MONGO_URL,
+                serverSelectionTimeoutMS=10000,
+                maxPoolSize=50,
+                minPoolSize=5,
                 **kwargs
             )
             print("Client initialized (Lazy)")
@@ -88,3 +90,17 @@ def get_client():
     if _client is None:
         get_db() # This initializes _client
     return _client
+
+
+def ping_db() -> bool:
+    """Ping the MongoDB server to keep connection alive.
+    Returns True if ping succeeds, False otherwise.
+    """
+    try:
+        client = get_client()
+        if client:
+            client.admin.command('ping')
+            return True
+    except Exception as e:
+        print(f"MongoDB ping failed: {e}")
+    return False

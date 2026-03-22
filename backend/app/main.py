@@ -7,6 +7,8 @@ from app.api import api_router
 from app.core.config import settings
 from app.db.mongodb import connect_to_mongo, close_mongo_connection
 from app.db.init_db import initialize_database
+import logging
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -42,6 +44,18 @@ app.add_middleware(
 app.add_event_handler("startup", connect_to_mongo)
 app.add_event_handler("startup", initialize_database)
 app.add_event_handler("shutdown", close_mongo_connection)
+
+# Region verification and health scheduler
+@app.on_event("startup")
+def verify_region_and_start_scheduler():
+    render_region = os.getenv("RENDER_SERVICE_REGION")
+    mongo_region = os.getenv("MONGO_CLUSTER_REGION")
+    if render_region and mongo_region and render_region != mongo_region:
+        logging.warning(f"Render region ({render_region}) differs from MongoDB region ({mongo_region})")
+    # Start health check scheduler to ping every 5 minutes
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(health_check, "interval", minutes=5)
+    scheduler.start()
 
 app.include_router(api_router, prefix="/api")
 
