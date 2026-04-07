@@ -46,6 +46,33 @@ async def register(request: Request, user_data: UserRegister):
     # Generate token
     token = create_token(user.id)
     
+    # Send Welcome Email via ZeptoMail
+    if settings.ZEPTOMAIL_TOKEN and user.email:
+        try:
+            from app.utils.email import send_zeptomail
+            welcome_html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h1 style="color: #059669; margin: 0;">Welcome to Pyramyd!</h1>
+                </div>
+                <p style="font-size: 16px;">Hello {user.first_name},</p>
+                <p style="font-size: 16px;">Your account has been successfully created. We're thrilled to have you connected to our premier agricultural marketplace.</p>
+                <p style="font-size: 16px;">You can now browse products, manage your profile, and connect with verified buyers and sellers seamlessly.</p>
+                <br/>
+                <p style="color: #666; font-size: 14px;">Best Regards,<br/><strong>The Pyramyd Team</strong></p>
+            </div>
+            """
+            send_zeptomail(
+                to_email=user.email,
+                subject="Welcome to Pyramyd!",
+                html_content=welcome_html,
+                to_name=f"{user.first_name} {user.last_name}"
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to send welcome email: {str(e)}")
+            pass
+    
     return {
         "message": "User registered successfully",
         "token": token,
@@ -125,8 +152,9 @@ async def complete_registration(registration_data: CompleteRegistration):
             user_role = registration_data.partner_type
     
 
-    print(f"DEBUG: Path={registration_data.user_path}, Type={registration_data.partner_type}, Category={registration_data.business_category}")
-    print(f"DEBUG: Assigned UserRole={user_role}")
+    import logging
+    logging.getLogger(__name__).debug(f"Registration: Path={registration_data.user_path}, Type={registration_data.partner_type}")
+    logging.getLogger(__name__).debug(f"Assigned UserRole={user_role}")
 
     # Create user with complete information
     user = User(
@@ -168,6 +196,33 @@ async def complete_registration(registration_data: CompleteRegistration):
     # Generate token
     token = create_token(user.id)
     
+    # Send Welcome Email via ZeptoMail
+    if settings.ZEPTOMAIL_TOKEN and user.email:
+        try:
+            from app.utils.email import send_zeptomail
+            welcome_html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h1 style="color: #059669; margin: 0;">Welcome to Pyramyd!</h1>
+                </div>
+                <p style="font-size: 16px;">Hello {user.first_name},</p>
+                <p style="font-size: 16px;">Your account has been successfully created. We're thrilled to have you connected to our premier agricultural marketplace.</p>
+                <p style="font-size: 16px;">You can now browse products, manage your profile, and connect with verified buyers and sellers seamlessly.</p>
+                <br/>
+                <p style="color: #666; font-size: 14px;">Best Regards,<br/><strong>The Pyramyd Team</strong></p>
+            </div>
+            """
+            send_zeptomail(
+                to_email=user.email,
+                subject="Welcome to Pyramyd!",
+                html_content=welcome_html,
+                to_name=f"{user.first_name} {user.last_name}"
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to send welcome email: {str(e)}")
+            pass
+    
     return {
         "message": "Registration completed successfully",
         "token": token,
@@ -186,7 +241,7 @@ async def complete_registration(registration_data: CompleteRegistration):
 @limiter.limit("3/minute")
 async def forgot_password(request: Request, password_request: ForgotPasswordRequest, background_tasks: BackgroundTasks):
     db = get_db()
-    user = db.users.find_one({"email": request.email})
+    user = db.users.find_one({"email": password_request.email})
     if not user:
         # Don't reveal if user exists
         return {"message": "If an account exists with this email, a reset link will be sent."}
@@ -202,8 +257,31 @@ async def forgot_password(request: Request, password_request: ForgotPasswordRequ
     frontend_url = os.environ.get("FRONTEND_URL", "https://pyramydhub.com")
     reset_link = f"{frontend_url}/reset-password?token={reset_token}"
 
-    # In a real app, send email here. For MVP, log it.
-    print(f"PASSWORD RESET LINK for {request.email}: {reset_link}")
+    from app.utils.email import send_zeptomail
+    reset_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+        <h2 style="color: #059669;">Password Reset Request</h2>
+        <p style="font-size: 16px;">Hello {user.get('first_name', 'User')},</p>
+        <p style="font-size: 16px;">We received a request to reset the password for your Pyramyd account.</p>
+        <p style="font-size: 16px;">Click the button below to set a new password. This link expires securely in 1 hour.</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{reset_link}" style="display: inline-block; padding: 12px 24px; background-color: #059669; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Reset Password</a>
+        </div>
+        <p style="font-size: 14px; color: #666;">If the button doesn't work, copy and paste this link into your browser:<br/>
+        <span style="color: #059669;">{reset_link}</span></p>
+        <br/>
+        <p style="font-size: 14px; color: #999;">If you didn't request this password reset, you can safely ignore this email.</p>
+    </div>
+    """
+    send_zeptomail(
+        to_email=user['email'],
+        subject="Pyramyd Password Reset",
+        html_content=reset_html,
+        to_name=user.get('first_name', 'User')
+    )
+    
+    import logging
+    logging.getLogger(__name__).info(f"Password reset link emailed to {password_request.email}")
     
     return {"message": "If an account exists with this email, a reset link will be sent."}
 
@@ -211,7 +289,7 @@ async def forgot_password(request: Request, password_request: ForgotPasswordRequ
 @limiter.limit("3/minute")
 async def reset_password(request: Request, reset_request: ResetPasswordRequest):
     try:
-        payload = jwt.decode(request.token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(reset_request.token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
         if payload.get('type') != 'password_reset':
             raise HTTPException(status_code=400, detail="Invalid token type")
             
@@ -222,7 +300,7 @@ async def reset_password(request: Request, reset_request: ResetPasswordRequest):
             raise HTTPException(status_code=404, detail="User not found")
             
         # Update password
-        new_password_hash = hash_password(request.new_password)
+        new_password_hash = hash_password(reset_request.new_password)
         db.users.update_one({'id': user_id}, {'$set': {'password': new_password_hash}})
         
         return {"message": "Password updated successfully"}
@@ -322,7 +400,8 @@ async def create_dva(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error during DVA manual creation verification: {e}")
+        import logging
+        logging.getLogger(__name__).error(f"Error during DVA manual creation verification: {e}")
         # Proceed or Fail? User explicitly asked for this feature to fix failures.
         # Let's fail if verification fails here, so they know why.
         raise HTTPException(status_code=400, detail="BVN Verification failed. Please ensure details match.")

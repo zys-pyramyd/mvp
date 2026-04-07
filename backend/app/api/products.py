@@ -7,6 +7,7 @@ from app.models.common import ProductCategory, PreOrderStatus
 from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
+from app.utils.sanitize import sanitize_regex
 
 class CommentCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=1000)
@@ -95,10 +96,10 @@ async def get_products(
                 products_query["category"] = category
                 
             if location:
-                products_query["location"] = {"$regex": location, "$options": "i"}
+                products_query["location"] = {"$regex": sanitize_regex(location), "$options": "i"}
                 
             if city:
-                products_query["city"] = {"$regex": city, "$options": "i"}
+                products_query["city"] = {"$regex": sanitize_regex(city), "$options": "i"}
                 
             if min_price is not None or max_price is not None:
                 price_filter = {}
@@ -123,10 +124,11 @@ async def get_products(
                     products_query["seller_type"] = {"$in": ["farmer", "agent"]}
                 
             if search_term:
+                safe_term = sanitize_regex(search_term)
                 products_query["$or"] = [
-                    {"crop_type": {"$regex": search_term, "$options": "i"}},
-                    {"location": {"$regex": search_term, "$options": "i"}},
-                    {"farm_name": {"$regex": search_term, "$options": "i"}}
+                    {"crop_type": {"$regex": safe_term, "$options": "i"}},
+                    {"location": {"$regex": safe_term, "$options": "i"}},
+                    {"farm_name": {"$regex": safe_term, "$options": "i"}}
                 ]
             
             # Get products
@@ -222,7 +224,8 @@ async def get_products(
         return results
         
     except Exception as e:
-        print(f"Error getting products: {str(e)}")
+        import logging
+        logging.getLogger(__name__).error(f"Error getting products: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get products")
 
 @router.get("/categories")
@@ -272,6 +275,7 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
         pass
         
     # Community Product Logic
+    db = get_db()
     if product_data.community_id:
         product_platform = 'community'
         # Verify user is member of community
@@ -291,8 +295,6 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
         community_name = community.get('name') if community else None
     else:
         community_name = None
-    
-    db = get_db()
     
     # --- Agent Farmer Lookup Logic ---
     seller_id = current_user['id']

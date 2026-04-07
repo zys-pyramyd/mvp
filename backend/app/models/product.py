@@ -75,15 +75,15 @@ class ProductCreate(BaseModel):
     category: ProductCategory
     subcategory: Optional[str] = None  # Dynamic based on category
     processing_level: ProcessingLevel = ProcessingLevel.UNPROCESSED
-    price_per_unit: float
+    price_per_unit: float = Field(..., ge=0)
     # Discount options
     has_discount: bool = False
     discount_type: Optional[str] = None  # "percentage" or "fixed"
-    discount_value: Optional[float] = None  # Percentage (e.g., 10 for 10%) or fixed amount (e.g., 500)
+    discount_value: Optional[float] = Field(None, ge=0)  # Percentage (e.g., 10 for 10%) or fixed amount (e.g., 500)
     unit_of_measure: str
     unit_specification: Optional[str] = None  # "100kg", "big", "5 litres", etc.
-    quantity_available: int
-    minimum_order_quantity: int = 1
+    quantity_available: int = Field(..., ge=0)
+    minimum_order_quantity: int = Field(1, ge=1)
     location: str
     colors: Optional[List[str]] = []
     farm_name: Optional[str] = None
@@ -93,12 +93,12 @@ class ProductCreate(BaseModel):
     community_id: Optional[str] = None
     # Logistics Management
     logistics_managed_by: str = "pyramyd"  # "pyramyd" or "seller"
-    seller_delivery_fee: Optional[float] = None  # If seller manages logistics
+    seller_delivery_fee: Optional[float] = Field(None, ge=0)  # If seller manages logistics
     # Enhanced delivery options for suppliers
     supports_dropoff_delivery: bool = True  # Whether supplier accepts drop-off locations  
     supports_shipping_delivery: bool = True  # Whether supplier accepts shipping addresses
-    delivery_cost_dropoff: float = 0.0  # Cost for drop-off delivery (0.0 = free)
-    delivery_cost_shipping: float = 0.0  # Cost for shipping delivery (0.0 = free)
+    delivery_cost_dropoff: float = Field(0.0, ge=0)  # Cost for drop-off delivery (0.0 = free)
+    delivery_cost_shipping: float = Field(0.0, ge=0)  # Cost for shipping delivery (0.0 = free)
     delivery_notes: Optional[str] = None  # Special delivery instructions/notes
     
     # Pre-order fields
@@ -106,7 +106,7 @@ class ProductCreate(BaseModel):
     preorder_available_date: Optional[datetime] = None
     preorder_end_date: Optional[datetime] = None
     
-    preorder_target_quantity: Optional[int] = None
+    preorder_target_quantity: Optional[int] = Field(None, ge=1)
     
     # About product
     about_product: Optional[str] = None
@@ -118,7 +118,7 @@ class ProductCreate(BaseModel):
 
 class CartItem(BaseModel):
     product_id: str
-    quantity: int
+    quantity: int = Field(..., ge=1)
 
 class Rating(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))

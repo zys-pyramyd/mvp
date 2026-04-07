@@ -13,18 +13,14 @@ COMMUNITY_BUYER_SERVICE_CHARGE = 0.05
 
 def initialize_community_payment(payment_data: dict, user: dict, delivery_fee: float, delivery_method: str):
     """
-    Initialize payment for Community.
-    Uses dynamic subaccount and transaction charge.
+    Initialize standard escrow payment for Community.
+    All funds route to the main platform account for escrow.
     """
     product_total = payment_data.get("product_total", 0)
     product_id = payment_data.get("product_id")
     order_id = payment_data.get("order_id")
     customer_state = payment_data.get("customer_state")
-    subaccount_code = payment_data.get("subaccount_code")
     callback_url = payment_data.get("callback_url", "")
-    
-    if not subaccount_code:
-        raise HTTPException(status_code=400, detail="Subaccount code is required for Community transactions")
     
     # Convert to kobo
     product_total_kobo = naira_to_kobo(product_total)
@@ -42,13 +38,10 @@ def initialize_community_payment(payment_data: dict, user: dict, delivery_fee: f
     # Generate unique reference
     reference = f"PYR_COMM_{uuid.uuid4().hex[:12].upper()}"
     
-    # Prepare Paystack payload
+    # Prepare Paystack payload (No subaccounts)
     paystack_data = {
         "email": user["email"],
         "amount": total_amount_kobo,
-        "subaccount": subaccount_code,
-        "transaction_charge": platform_cut_kobo,
-        "bearer": "account",
         "reference": reference,
         "callback_url": callback_url,
         "metadata": {
@@ -69,8 +62,6 @@ def initialize_community_payment(payment_data: dict, user: dict, delivery_fee: f
         "reference": reference,
         "amount_kobo": total_amount_kobo,
         "platform_cut_kobo": platform_cut_kobo,
-        "subaccount_code": subaccount_code,
-        "split_code": None,
         "breakdown": {
             "product_total": kobo_to_naira(product_total_kobo),
             "delivery_fee": kobo_to_naira(delivery_fee_kobo),

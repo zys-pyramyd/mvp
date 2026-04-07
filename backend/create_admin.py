@@ -48,30 +48,13 @@ def create_admin_user(email, password, first_name="Admin", last_name="User"):
         password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         
         # Create admin user document
-        admin_user = {
-            "id": str(uuid.uuid4()),
-            "first_name": first_name,
-            "last_name": last_name,
-            "username": email.split('@')[0],  # Use email prefix as username
-            "email": email,
-            "phone": "+234000000000",  # Placeholder
-            "password": password_hash,
-            "role": "admin",
-            "is_verified": True,
-            "created_at": datetime.utcnow(),
-            "profile_picture": None
-        }
-        
-        # Insert into database
-        result = db.users.insert_one(admin_user)
-        
-        print("\n✅ Admin user created successfully!")
-        print(f"📧 Email: {email}")
-        print(f"👤 Username: {admin_user['username']}")
-        print(f"🆔 User ID: {admin_user['id']}")
-        print(f"\n🔐 Login with these credentials on your app's login page")
-        
-        return True
+        # Use shared admin creation utility
+        try:
+            from app.db.admin_utils import create_admin_user
+            create_admin_user(email, password_hash, first_name, last_name)
+        except Exception as e:
+            print(f"❌ Error creating admin user: {str(e)}")
+            return False
         
     except Exception as e:
         print(f"❌ Error creating admin user: {str(e)}")

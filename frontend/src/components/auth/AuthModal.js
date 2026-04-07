@@ -162,6 +162,15 @@ const AuthModal = () => {
         }
     };
 
+    const isLoginFormValid = authForm.email_or_phone.trim() !== '' && authForm.password.trim() !== '';
+    const isBasicFormValid = authForm.first_name.trim() !== '' && 
+                             authForm.last_name.trim() !== '' && 
+                             authForm.username.trim() !== '' && 
+                             authForm.email_or_phone.trim() !== '' && 
+                             authForm.password.trim() !== '' && 
+                             authForm.gender !== '' && 
+                             authForm.date_of_birth !== '';
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -199,7 +208,12 @@ const AuthModal = () => {
 
                             <button
                                 type="submit"
-                                className="w-full bg-emerald-600 text-white py-2 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+                                disabled={!isLoginFormValid}
+                                className={`w-full text-white py-2 px-4 rounded-lg font-medium transition-colors ${
+                                    !isLoginFormValid 
+                                    ? 'bg-gray-400 cursor-not-allowed' 
+                                    : 'bg-emerald-600 hover:bg-emerald-700'
+                                }`}
                             >
                                 Sign In
                             </button>
@@ -312,7 +326,12 @@ const AuthModal = () => {
 
                                     <button
                                         type="submit"
-                                        className="w-full bg-emerald-600 text-white py-2 px-4 rounded-full hover:bg-emerald-700 transition-colors font-medium"
+                                        disabled={!isBasicFormValid}
+                                        className={`w-full text-white py-2 px-4 rounded-full font-medium transition-colors ${
+                                            !isBasicFormValid
+                                            ? 'bg-gray-400 cursor-not-allowed'
+                                            : 'bg-emerald-600 hover:bg-emerald-700'
+                                        }`}
                                     >
                                         Continue
                                     </button>

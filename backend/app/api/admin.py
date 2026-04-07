@@ -123,7 +123,8 @@ async def verify_user(user_id: str, current_user: dict = Depends(get_current_use
             else:
                  dva_message = f". DVA creation failed: {dva_result.get('message')}. User can retry in profile."
         except Exception as e:
-            print(f"Verify User DVA Error: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Verify User DVA Error: {e}")
             dva_message = ". DVA creation error (check logs). User can retry."
 
     # Update user verification status (Always verify if admin clicked it, regardless of DVA)
@@ -281,3 +282,68 @@ async def manual_release_payout(order_id: str, current_user: dict = Depends(get_
         raise HTTPException(status_code=400, detail=f"Payout failed: {msg}")
         
     return {"message": "Payout manually released."}
+
+
+from pydantic import BaseModel
+
+class ManualWithdrawalRequest(BaseModel):
+    amount: float
+    reason: str
+
+@router.post("/users/{user_id}/manual-withdrawal")
+async def manual_withdrawal(
+    user_id: str, 
+    request: ManualWithdrawalRequest, 
+    current_user: dict = Depends(get_current_user)
+):
+    """Manually deduct funds from a user's wallet (e.g., cash payout off-platform)"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    if request.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than zero")
+        
+    db = get_db()
+    
+    # 1. Verify user and balance
+    target_user = db.users.find_one({"id": user_id})
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    current_balance = target_user.get("wallet_balance", 0.0)
+    if current_balance < request.amount:
+        raise HTTPException(status_code=400, detail=f"Insufficient funds. User balance is {current_balance}")
+        
+    # 2. Deduct from wallet atomically
+    result = db.users.update_one(
+        {"id": user_id, "wallet_balance": {"$gte": request.amount}},
+        {"$inc": {"wallet_balance": -request.amount}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=400, detail="Failed to deduct funds (balance may have changed)")
+        
+    # 3. Create Transaction Record
+    import uuid
+    transaction_id = str(uuid.uuid4())
+    
+    transaction = {
+        "id": transaction_id,
+        "user_id": user_id,
+        "type": "debit",
+        "category": "manual_withdrawal",
+        "amount": request.amount,
+        "reference": f"MAN_WD_{transaction_id[:8].upper()}",
+        "description": f"Manual Admin Withdrawal: {request.reason}",
+        "status": "success",
+        "processed_by": current_user["username"],
+        "created_at": datetime.utcnow()
+    }
+    
+    db.wallet_transactions.insert_one(transaction)
+    
+    return {
+        "message": f"Successfully deducted NGN {request.amount} from user wallet.",
+        "new_balance": current_balance - request.amount,
+        "reference": transaction["reference"]
+    }

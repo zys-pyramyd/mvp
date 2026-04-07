@@ -52,6 +52,26 @@ const formatLabel = (str) => {
     return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 };
 
+const ALL_SUBCATEGORIES = Object.entries(PRODUCT_CATEGORIES).flatMap(([catKey, catVal]) => 
+    catVal.subcategories.map(sub => ({
+        value: sub,
+        label: formatLabel(sub),
+        parentCat: catKey,
+        parentLabel: catVal.label
+    }))
+).sort((a, b) => a.label.localeCompare(b.label));
+
+Object.entries(PRODUCT_CATEGORIES).forEach(([catKey, catVal]) => {
+    if(catVal.subcategories.length === 0) {
+        ALL_SUBCATEGORIES.push({
+            value: catKey,
+            label: catVal.label,
+            parentCat: catKey,
+            parentLabel: catVal.label
+        });
+    }
+});
+
 const PREDEFINED_COLORS = ['white', 'brown', 'green', 'red', 'yellow', 'silver', 'black', 'grey', 'ash'];
 
 const CommunityProductModal = ({ community, onClose, onSuccess }) => {
@@ -202,33 +222,34 @@ const CommunityProductModal = ({ community, onClose, onSuccess }) => {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Category</label>
+                            <label className="block text-sm font-medium text-gray-700">Select Produce / Item</label>
                             <select
+                                required
                                 className="w-full border rounded p-2"
-                                value={formData.category}
-                                onChange={e => setFormData({ ...formData, category: e.target.value, subcategory: '' })}
+                                value={formData.subcategory || formData.category}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    const match = ALL_SUBCATEGORIES.find(s => s.value === val);
+                                    if(match) {
+                                        setFormData({ 
+                                            ...formData, 
+                                            category: match.parentCat, 
+                                            subcategory: match.parentCat === match.value ? '' : match.value 
+                                        });
+                                    }
+                                }}
                             >
-                                {Object.entries(PRODUCT_CATEGORIES).map(([key, cat]) => (
-                                    <option key={key} value={key}>{cat.label}</option>
+                                <option value="">Select an Item...</option>
+                                {ALL_SUBCATEGORIES.map(s => (
+                                    <option key={s.value} value={s.value}>{s.label} ({s.parentLabel})</option>
                                 ))}
                             </select>
+                            {formData.category && (
+                                <p className="text-xs text-emerald-600 mt-1">
+                                    Auto-matched to: <span className="font-bold">{PRODUCT_CATEGORIES[formData.category]?.label}</span>
+                                </p>
+                            )}
                         </div>
-                        {PRODUCT_CATEGORIES[formData.category]?.subcategories?.length > 0 && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Subcategory</label>
-                                <select
-                                    required
-                                    className="w-full border rounded p-2"
-                                    value={formData.subcategory}
-                                    onChange={e => setFormData({ ...formData, subcategory: e.target.value })}
-                                >
-                                    <option value="">Select Subcategory</option>
-                                    {PRODUCT_CATEGORIES[formData.category].subcategories.map(sub => (
-                                        <option key={sub} value={sub}>{formatLabel(sub)}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Nutritional Mode</label>
                             <select

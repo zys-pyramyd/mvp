@@ -13,18 +13,14 @@ HOME_BUYER_SERVICE_CHARGE = 0.03
 
 def initialize_pyexpress_payment(payment_data: dict, user: dict, delivery_fee: float, delivery_method: str):
     """
-    Initialize payment for PyExpress (Home).
-    Uses dynamic subaccount and transaction charge.
+    Initialize standard escrow payment for PyExpress (Home).
+    All funds route to the main platform account for escrow.
     """
     product_total = payment_data.get("product_total", 0)
     product_id = payment_data.get("product_id")
     order_id = payment_data.get("order_id")
     customer_state = payment_data.get("customer_state")
-    subaccount_code = payment_data.get("subaccount_code")
     callback_url = payment_data.get("callback_url", "")
-    
-    if not subaccount_code:
-        raise HTTPException(status_code=400, detail="Subaccount code is required for Home transactions")
     
     # Convert to kobo
     product_total_kobo = naira_to_kobo(product_total)
@@ -42,16 +38,10 @@ def initialize_pyexpress_payment(payment_data: dict, user: dict, delivery_fee: f
     # Generate unique reference
     reference = f"PYR_HOME_{uuid.uuid4().hex[:12].upper()}"
     
-    # Prepare Paystack payload
+    # Prepare Paystack payload (No subaccounts)
     paystack_data = {
         "email": user["email"],
         "amount": total_amount_kobo,
-        "subaccount": subaccount_code,
-        "transaction_charge": platform_cut_kobo,
-        "bearer": "account",  # Platform pays Paystack fees (or rather, fees are deducted from subaccount share? No, bearer=account means main account pays fees)
-        # Actually, if we set transaction_charge, that amount goes to main account.
-        # Paystack fees are usually deducted from the transaction amount.
-        # If bearer=account, main account bears paystack fees.
         "reference": reference,
         "callback_url": callback_url,
         "metadata": {
@@ -72,8 +62,6 @@ def initialize_pyexpress_payment(payment_data: dict, user: dict, delivery_fee: f
         "reference": reference,
         "amount_kobo": total_amount_kobo,
         "platform_cut_kobo": platform_cut_kobo,
-        "subaccount_code": subaccount_code,
-        "split_code": None,
         "breakdown": {
             "product_total": kobo_to_naira(product_total_kobo),
             "delivery_fee": kobo_to_naira(delivery_fee_kobo),

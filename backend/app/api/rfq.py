@@ -568,7 +568,7 @@ async def confirm_offer_terms(
         "created_at": datetime.utcnow()
     }
 
-    db.orders.insert_one(order_data)
+    db.rfq_orders.insert_one(order_data)
 
     # Update offer status
     db.offers.update_one(
@@ -672,9 +672,9 @@ async def mark_offer_delivered(
     
     # 4. Update Linked Order Status
     # We need to find the order generated from this offer
-    order = db.orders.find_one({"origin_offer_id": offer_id})
+    order = db.rfq_orders.find_one({"origin_offer_id": offer_id})
     if order:
-        db.orders.update_one(
+        db.rfq_orders.update_one(
             {"order_id": order['order_id']}, 
             {"$set": {"status": "delivered_pending_confirmation"}}
         )
@@ -717,7 +717,7 @@ async def list_my_offers(current_user: dict = Depends(get_current_user)):
         
         # If Accepted/Delivered, include Tracking ID from Order
         if offer['status'] in ['accepted', 'delivered', 'completed']:
-            order = db.orders.find_one({"origin_offer_id": offer['id']})
+            order = db.rfq_orders.find_one({"origin_offer_id": offer['id']})
             if order:
                 offer_data['tracking_id'] = order['order_id']
                 offer_data['delivery_otp'] = order['order_id'] 
@@ -756,7 +756,7 @@ async def confirm_delivery(
         raise HTTPException(status_code=403, detail="Only the buyer can confirm delivery")
 
     # 2. Find Order
-    order = db.orders.find_one({"origin_offer_id": offer_id})
+    order = db.rfq_orders.find_one({"origin_offer_id": offer_id})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
         
@@ -768,7 +768,7 @@ async def confirm_delivery(
         
     # 4. Complete Process
     # Update Order
-    db.orders.update_one(
+    db.rfq_orders.update_one(
         {"order_id": tracking_id},
         {"$set": {"status": "delivered", "confirmed_by_buyer": True, "completed_at": datetime.utcnow()}}
     )
@@ -789,7 +789,8 @@ async def confirm_delivery(
     if not success:
         # Log error but don't fail the request user-side 
         # (Status is already updated, admin can fix payout)
-        print(f"Payout failed for {tracking_id}: {msg}")
+        import logging
+        logging.getLogger(__name__).error(f"Payout failed for {tracking_id}: {msg}")
         return {"message": "Delivery confirmed! Payment processing status: Pending Admin Review"}
 
     return {"message": "Delivery confirmed! Funds released to seller."}
@@ -851,7 +852,7 @@ async def take_instant_request(
         "created_at": datetime.utcnow()
     }
     
-    db.orders.insert_one(order_data)
+    db.rfq_orders.insert_one(order_data)
     
     # 4. Close Request
     db.requests.update_one({"id": request_id}, {"$set": {"status": "completed"}})
@@ -873,7 +874,7 @@ async def take_instant_request(
     }
     db.offers.insert_one(offer)
     
-    db.orders.update_one({"order_id": tracking_id}, {"$set": {"origin_offer_id": offer_id}})
+    db.rfq_orders.update_one({"order_id": tracking_id}, {"$set": {"origin_offer_id": offer_id}})
 
     return {
         "message": "Job Taken Successfully!",

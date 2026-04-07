@@ -10,46 +10,28 @@ export const AuthProvider = ({ children }) => {
     const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
 
     useEffect(() => {
-        // Check for token on initial load
         const checkAuth = async () => {
             const token = localStorage.getItem('token');
             if (token) {
                 try {
-                    // Verify token and get user profile
-                    // Since we don't know the exact endpoint for "get current user",
-                    // we'll assume there is one or imply it from successful requests.
-                    // However, standard practice is GET /api/auth/me or similar.
-                    // If not available, we might just trust the token (less secure) or assume the user is logged in
-                    // if we have data.
-                    // App.js used to set user from login response.
-                    // It didn't seem to fetch user on load (based on my search failure).
-                    // I will implement a check if possible, or just look for 'user' in localStorage if it was stored?
-                    // Existing App.js didn't show 'user' in localStorage.
-
-                    // Let's try to hit a protected endpoint or just proceed.
-                    // For now, I'll rely on a valid token. 
-                    // If possible, I'll decode the JWT to get user info if it's there?
-                    // Or I'll set a placeholder user or fetch profile.
-
-                    // Let's assume we can fetch profile. 
-                    // const response = await api.get('/api/users/profile'); // Hypothetical
-                    // setUser(response.data);
-
-                    // Since I can't confirm the endpoint, I will leave it empty for now 
-                    // and let the existing components handle scenarios where 'user' might be populated later.
-                    // actually, without 'user', the UI shows 'Sign In'.
-                    // So we NEED to restore 'user'.
-
-                    // Let's look at `App.js` `handleAuth`. It sets `setUser(data.user)`.
-                    // We should store `user` in localStorage too to persist it easily if there's no endpoint.
-                    const storedUser = localStorage.getItem('user');
-                    if (storedUser) {
-                        setUser(JSON.parse(storedUser));
-                    }
+                    // Verify token by fetching user profile from server
+                    const response = await api.get('/api/user/profile');
+                    const serverUser = response.data;
+                    setUser(serverUser);
+                    localStorage.setItem('user', JSON.stringify(serverUser));
                 } catch (error) {
-                    console.error('Auth verification failed', error);
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
+                    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+                        // Token is invalid or expired — log out
+                        console.warn('Token expired or invalid, logging out');
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                    } else {
+                        // Server unreachable — fall back to cached user data
+                        const storedUser = localStorage.getItem('user');
+                        if (storedUser) {
+                            setUser(JSON.parse(storedUser));
+                        }
+                    }
                 }
             }
             setLoading(false);

@@ -7,6 +7,7 @@ from app.models.community import Community, CommunityProduct
 from datetime import datetime
 from pydantic import BaseModel, Field
 import html
+from app.utils.sanitize import sanitize_regex
 
 router = APIRouter()
 
@@ -52,11 +53,12 @@ async def search_communities(
             # Search communities
             query = {}
             if q:
+                safe_q = sanitize_regex(q)
                 query = {
                     "$or": [
-                        {"name": {"$regex": q, "$options": "i"}},
-                        {"description": {"$regex": q, "$options": "i"}},
-                        {"category": {"$regex": q, "$options": "i"}}
+                        {"name": {"$regex": safe_q, "$options": "i"}},
+                        {"description": {"$regex": safe_q, "$options": "i"}},
+                        {"category": {"$regex": safe_q, "$options": "i"}}
                     ]
                 }
             
@@ -193,12 +195,17 @@ async def get_community_posts(community_id: str, limit: int = 20):
     cursor = db.community_posts.find({"community_id": community_id}).sort("created_at", -1).limit(limit)
     posts = list(cursor)
     
-    # Enrich with author info
+    # Batch-load author info to avoid N+1 queries
+    user_ids = list(set(p.get("user_id") for p in posts if p.get("user_id")))
+    users_map = {}
+    if user_ids:
+        users_cursor = db.users.find({"id": {"$in": user_ids}}, {"id": 1, "first_name": 1, "last_name": 1})
+        users_map = {u["id"]: u for u in users_cursor}
+    
     for p in posts:
         p.pop('_id', None)
-        user = db.users.find_one({"id": p.get("user_id")})
+        user = users_map.get(p.get("user_id"))
         p["author"] = f"{user.get('first_name', '')} {user.get('last_name', '')}" if user else "Unknown"
-        # Format date for frontend
         if isinstance(p.get("created_at"), datetime):
             p["date"] = p.get("created_at").strftime("%Y-%m-%d %H:%M")
         else:
@@ -437,15 +444,22 @@ async def get_community_members(community_id: str, current_user: dict = Depends(
     """Get list of community members"""
     db = get_db()
     
-    # Verify membership (optional, but good for privacy if private community)
-    # For now, allow checking members if you are in it
-    
     cursor = db.community_members.find({"community_id": community_id})
     members = list(cursor)
     
+    # Batch-load user profiles to avoid N+1 queries
+    user_ids = [m["user_id"] for m in members]
+    users_map = {}
+    if user_ids:
+        users_cursor = db.users.find(
+            {"id": {"$in": user_ids}},
+            {"id": 1, "username": 1, "first_name": 1, "last_name": 1, "profile_picture": 1}
+        )
+        users_map = {u["id"]: u for u in users_cursor}
+    
     results = []
     for m in members:
-        user = db.users.find_one({"id": m["user_id"]})
+        user = users_map.get(m["user_id"])
         if user:
             results.append({
                 "user_id": m["user_id"],

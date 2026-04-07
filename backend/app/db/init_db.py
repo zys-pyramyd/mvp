@@ -27,31 +27,10 @@ def create_default_admin():
     admin_password_hash = settings.ADMIN_PASSWORD_HASH
     
     # Create default admin user
-    admin_user = {
-        "id": str(uuid.uuid4()),
-        "first_name": "Pyramyd",
-        "last_name": "Admin",
-        "username": "pyramyd_admin",
-        "email": admin_email,
-        "phone": "+234000000000",
-        "password": admin_password_hash,
-        "role": "admin",
-        "is_verified": True,
-        "created_at": datetime.utcnow(),
-        "profile_picture": None
-    }
-    
+    # Create default admin user using shared utility
     try:
-        db.users.insert_one(admin_user)
-        print("=" * 60)
-        print("DEFAULT ADMIN USER CREATED")
-        print("=" * 60)
-        print(f"Email: {admin_email}")
-        print(f"Username: pyramyd_admin")
-        print(f"Password: [HIDDEN] (Use 'admin123' if default)")
-        print("=" * 60)
-        print("IMPORTANT: Change the password after first login!")
-        print("=" * 60)
+        from .admin_utils import create_admin_user
+        create_admin_user(admin_email, admin_password_hash, first_name="Pyramyd", last_name="Admin")
     except Exception as e:
         print(f"Error creating default admin: {str(e)}")
 

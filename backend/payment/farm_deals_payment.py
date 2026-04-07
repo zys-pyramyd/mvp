@@ -3,9 +3,7 @@ from datetime import datetime
 from .paystack import (
     paystack_request, 
     naira_to_kobo, 
-    kobo_to_naira, 
-    FARMHUB_SPLIT_GROUP, 
-    FARMHUB_SUBACCOUNT
+    kobo_to_naira
 )
 
 # FARMHUB: 10% service charge (extracted from vendor, vendor gets 90%)
@@ -13,8 +11,8 @@ FARMHUB_SERVICE_CHARGE = 0.10
 
 def initialize_farmhub_payment(payment_data: dict, user: dict, delivery_fee: float, delivery_method: str):
     """
-    Initialize payment for FarmHub (Farm Deals).
-    Uses Paystack Split Group for automatic splitting.
+    Initialize standard escrow payment for FarmHub (Farm Deals).
+    All funds route to the main platform account for escrow.
     """
     product_total = payment_data.get("product_total", 0)
     product_id = payment_data.get("product_id")
@@ -37,11 +35,10 @@ def initialize_farmhub_payment(payment_data: dict, user: dict, delivery_fee: flo
     # Generate unique reference
     reference = f"PYR_FARM_{uuid.uuid4().hex[:12].upper()}"
     
-    # Prepare Paystack payload
+    # Prepare Paystack payload (No split groups or subaccounts)
     paystack_data = {
         "email": user["email"],
         "amount": total_amount_kobo,
-        "split_code": FARMHUB_SPLIT_GROUP,
         "reference": reference,
         "callback_url": callback_url,
         "metadata": {
@@ -62,8 +59,6 @@ def initialize_farmhub_payment(payment_data: dict, user: dict, delivery_fee: flo
         "reference": reference,
         "amount_kobo": total_amount_kobo,
         "platform_cut_kobo": platform_cut_kobo,
-        "subaccount_code": FARMHUB_SUBACCOUNT,
-        "split_code": FARMHUB_SPLIT_GROUP,
         "breakdown": {
             "product_total": kobo_to_naira(product_total_kobo),
             "delivery_fee": kobo_to_naira(delivery_fee_kobo),

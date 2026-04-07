@@ -17,16 +17,16 @@ const Footer = ({ onOpenTerms, onOpenPrivacy, onOpenAbout, onNavigate }) => {
                             Connecting rural farmers to urban markets. Experience fresh produce, fair prices, and fast delivery.
                         </p>
                         <div className="flex gap-4">
-                            <a href="#" className="w-8 h-8 rounded-full bg-emerald-800 flex items-center justify-center hover:bg-emerald-700 transition">
+                            <a href="#!" onClick={(e) => e.preventDefault()} className="w-8 h-8 rounded-full bg-emerald-800 flex items-center justify-center hover:bg-emerald-700 transition cursor-default">
                                 <Facebook size={16} />
                             </a>
-                            <a href="#" className="w-8 h-8 rounded-full bg-emerald-800 flex items-center justify-center hover:bg-emerald-700 transition">
+                            <a href="#!" onClick={(e) => e.preventDefault()} className="w-8 h-8 rounded-full bg-emerald-800 flex items-center justify-center hover:bg-emerald-700 transition cursor-default">
                                 <Twitter size={16} />
                             </a>
-                            <a href="#" className="w-8 h-8 rounded-full bg-emerald-800 flex items-center justify-center hover:bg-emerald-700 transition">
+                            <a href="#!" onClick={(e) => e.preventDefault()} className="w-8 h-8 rounded-full bg-emerald-800 flex items-center justify-center hover:bg-emerald-700 transition cursor-default">
                                 <Instagram size={16} />
                             </a>
-                            <a href="#" className="w-8 h-8 rounded-full bg-emerald-800 flex items-center justify-center hover:bg-emerald-700 transition">
+                            <a href="#!" onClick={(e) => e.preventDefault()} className="w-8 h-8 rounded-full bg-emerald-800 flex items-center justify-center hover:bg-emerald-700 transition cursor-default">
                                 <Linkedin size={16} />
                             </a>
                         </div>

@@ -568,6 +568,27 @@ const formatLabel = (str) => {
     return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 };
 
+const ALL_SUBCATEGORIES = Object.entries(PRODUCT_CATEGORIES).flatMap(([catKey, catVal]) => 
+    catVal.subcategories.map(sub => ({
+        value: sub,
+        label: formatLabel(sub),
+        parentCat: catKey,
+        parentLabel: catVal.label
+    }))
+).sort((a, b) => a.label.localeCompare(b.label));
+
+// Append overarching categories that have no direct subcategories
+Object.entries(PRODUCT_CATEGORIES).forEach(([catKey, catVal]) => {
+    if(catVal.subcategories.length === 0) {
+        ALL_SUBCATEGORIES.push({
+            value: catKey,
+            label: catVal.label,
+            parentCat: catKey,
+            parentLabel: catVal.label
+        });
+    }
+});
+
 const SearchableSelect = ({ options, value, onChange, placeholder }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isOpen, setIsOpen] = useState(false);
@@ -861,25 +882,28 @@ const AddProductModal = ({ user, onClose, onSuccess, token }) => {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Select Produce / Item</label>
                             <SearchableSelect
-                                placeholder="Select Category"
-                                value={formData.category}
-                                onChange={val => setFormData({ ...formData, category: val, subcategory: '' })}
-                                options={Object.entries(PRODUCT_CATEGORIES).map(([key, cat]) => ({ value: key, label: cat.label }))}
+                                placeholder="Search for Maize, Tomatoes, Tractors..."
+                                value={formData.subcategory || formData.category}
+                                onChange={val => {
+                                    const match = ALL_SUBCATEGORIES.find(s => s.value === val);
+                                    if(match) {
+                                        setFormData({ 
+                                            ...formData, 
+                                            category: match.parentCat, 
+                                            subcategory: match.parentCat === match.value ? '' : match.value 
+                                        });
+                                    }
+                                }}
+                                options={ALL_SUBCATEGORIES.map(s => ({ value: s.value, label: `${s.label} (${s.parentLabel})` }))}
                             />
+                            {formData.category && (
+                                <p className="text-xs text-emerald-600 mt-1">
+                                    Auto-matched to: <span className="font-bold">{PRODUCT_CATEGORIES[formData.category]?.label}</span>
+                                </p>
+                            )}
                         </div>
-                        {PRODUCT_CATEGORIES[formData.category]?.subcategories?.length > 0 && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Subcategory</label>
-                                <SearchableSelect
-                                    placeholder="Select Subcategory"
-                                    value={formData.subcategory}
-                                    onChange={val => setFormData({ ...formData, subcategory: val })}
-                                    options={PRODUCT_CATEGORIES[formData.category].subcategories.map(sub => ({ value: sub, label: formatLabel(sub) }))}
-                                />
-                            </div>
-                        )}
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Nutritional Mode</label>
                             <select
@@ -943,41 +967,18 @@ const AddProductModal = ({ user, onClose, onSuccess, token }) => {
                     </div>
 
                     {/* Pre-order Section */}
-                    <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                        <div className="flex items-center gap-2 mb-3">
+                    <div className="bg-orange-50 p-4 rounded-lg border border-orange-200 opacity-50" title="This feature is coming soon">
+                        <div className="flex items-center gap-2 mb-1">
                             <input
                                 type="checkbox"
                                 id="is_preorder"
-                                checked={formData.is_preorder}
-                                onChange={e => setFormData({ ...formData, is_preorder: e.target.checked })}
-                                className="w-4 h-4 text-orange-600 rounded"
+                                checked={false}
+                                disabled
+                                className="w-4 h-4 text-orange-600 rounded cursor-not-allowed"
                             />
-                            <label htmlFor="is_preorder" className="font-bold text-orange-800">Enable Pre-order / Group Buy</label>
+                            <label htmlFor="is_preorder" className="font-bold text-orange-800 cursor-not-allowed">Enable Pre-order / Group Buy (Coming Soon)</label>
                         </div>
-
-                        {formData.is_preorder && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Target Quantity</label>
-                                    <input
-                                        type="number"
-                                        className="w-full border rounded p-2"
-                                        value={formData.target_quantity}
-                                        onChange={e => setFormData({ ...formData, target_quantity: e.target.value })}
-                                        placeholder="Goal to reach"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Deadline</label>
-                                    <input
-                                        type="date"
-                                        className="w-full border rounded p-2"
-                                        value={formData.preorder_deadline}
-                                        onChange={e => setFormData({ ...formData, preorder_deadline: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                        )}
+                        <p className="text-xs text-orange-700 mt-1 ml-6">Advance booking capabilities are temporarily disabled.</p>
                     </div>
 
                     <div className="border border-gray-200 p-4 rounded-lg">

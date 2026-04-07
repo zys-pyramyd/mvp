@@ -61,8 +61,8 @@ def create_notification(user_id: str, title: str, message: str, type: str = "sys
     Internal helper to create a notification. 
     Can be imported by other modules (kyc, orders, etc).
     """
-    from app.db.mongodb import get_database # Avoid circular import of get_db dependency
-    db = get_database()
+    from database import get_db  # Use the actual database module
+    db = get_db()
     
     notification = Notification(
         user_id=user_id,
@@ -76,5 +76,6 @@ def create_notification(user_id: str, title: str, message: str, type: str = "sys
         db.notifications.insert_one(notification.dict())
         return True
     except Exception as e:
-        print(f"Failed to create notification: {e}")
+        import logging
+        logging.getLogger(__name__).error(f"Failed to create notification: {e}")
         return False

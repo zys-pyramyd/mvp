@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from app.api.deps import get_db, get_current_user
 from typing import List, Optional
+from app.utils.sanitize import sanitize_regex
 
 # Router for /api/users (Plural)
 router = APIRouter()
@@ -66,7 +67,8 @@ async def get_public_user_profile(username: str):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting public user profile: {str(e)}")
+        import logging
+        logging.getLogger(__name__).error(f"Error getting public user profile: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get user profile")
 
 @router.get("/search")
@@ -78,11 +80,12 @@ async def search_users(q: str = Query(..., min_length=1), current_user: dict = D
     db = get_db()
     
     # Search by username, first_name, or last_name (case insensitive)
+    safe_q = sanitize_regex(q)
     query = {
         "$or": [
-            {"username": {"$regex": q, "$options": "i"}},
-            {"first_name": {"$regex": q, "$options": "i"}},
-            {"last_name": {"$regex": q, "$options": "i"}}
+            {"username": {"$regex": safe_q, "$options": "i"}},
+            {"first_name": {"$regex": safe_q, "$options": "i"}},
+            {"last_name": {"$regex": safe_q, "$options": "i"}}
         ]
     }
     

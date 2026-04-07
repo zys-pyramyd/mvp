@@ -6,7 +6,6 @@ from app.models.common import DocumentType, KYCStatus
 from typing import List, Optional
 import base64
 import uuid
-import uuid
 from datetime import datetime
 from app.api.notifications import create_notification
 
@@ -246,8 +245,6 @@ async def approve_kyc(user_id: str, current_user: dict = Depends(get_current_use
     
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
-        
-    return {"message": f"User {user_id} KYC approved and verified."}
     
     # Notify User
     create_notification(
@@ -257,6 +254,8 @@ async def approve_kyc(user_id: str, current_user: dict = Depends(get_current_use
         type="kyc",
         action_link="/profile"
     )
+        
+    return {"message": f"User {user_id} KYC approved and verified."}
 
 @router.post("/admin/reject/{user_id}")
 async def reject_kyc(user_id: str, reason: str = Body(..., embed=True), current_user: dict = Depends(get_current_user)):

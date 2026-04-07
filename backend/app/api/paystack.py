@@ -7,13 +7,6 @@ import logging
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-@router.post("/webhook")
-async def paystack_webhook(request: Request, x_paystack_signature: str = Header(None)):
-    """
-    Comprehensive Paystack Webhook Handler
-    ... (existing docstring)
-    """
-
 from pydantic import BaseModel
 from typing import Optional
 from app.services.paystack import initialize_transaction

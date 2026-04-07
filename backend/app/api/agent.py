@@ -213,7 +213,7 @@ async def register_farmer(
         raise HTTPException(status_code=403, detail="Only agents can register farmers")
         
     db = get_db()
-    from app.api.auth import get_password_hash
+    from app.core.security import hash_password
     from app.utils.id_generator import generate_tracking_id # Reuse or UUID
     
     # Check if phone/username exists
@@ -246,7 +246,7 @@ async def register_farmer(
             "size": data.farm_size,
             "crops": data.crops
         },
-        "password": get_password_hash("123456"), # Default password, should change
+        "password": hash_password("123456"), # Default password, should change
         "created_at": datetime.utcnow()
     }
     

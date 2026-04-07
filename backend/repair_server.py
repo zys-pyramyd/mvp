@@ -1,27 +1,52 @@
-
 import os
+import re
 
-file_path = r'c:\Users\Downloads\mvp\backend\server.py'
+files = [
+    r'c:\Users\Downloads\mvp\backend\app\api\logistics.py',
+    r'c:\Users\Downloads\mvp\backend\app\api\group_buying.py',
+    r'c:\Users\Downloads\mvp\backend\app\api\preorders.py',
+    r'c:\Users\Downloads\mvp\backend\app\api\messages.py'
+]
 
-try:
-    with open(file_path, 'rb') as f:
+for file_path in files:
+    if not os.path.exists(file_path):
+        continue
+        
+    with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    # Repair: Remove null bytes
-    new_content = content.replace(b'\x00', b'')
+    # 1. Purge all errant db injections
+    content = content.replace(' db = get_db()\n ', '')
+    content = content.replace('db = get_db()\n ', '')
+    content = content.replace('db = get_db()\n', '')
+    content = content.replace('db = get_db()', '')
 
-    if len(new_content) != len(content):
-        print(f"Removed {len(content) - len(new_content)} null bytes.")
-        # Create backup
-        with open(file_path + '.bak', 'wb') as f:
-            f.write(content)
-        
-        # Write back
-        with open(file_path, 'wb') as f:
-            f.write(new_content)
-        print("File repaired.")
-    else:
-        print("No null bytes found to remove.")
+    # 2. Inject safely. We inject right after `):` when it's part of an async def.
+    # Let's find every `async def` and inject after the docstring or signature.
+    
+    parts = content.split('async def ')
+    new_content = parts[0]
+    for part in parts[1:]:
+        match = re.search(r'\):\s*\n', part)
+        if match:
+            idx = match.end()
+            doc_match = re.match(r'(\s*\"\"\"[\s\S]*?\"\"\"\s*\n)', part[idx:])
+            if doc_match:
+                idx += doc_match.end()
+            
+            part = part[:idx] + '    db = get_db()\n' + part[idx:]
+        else:
+            match2 = re.search(r'\)\s*->[^:]+:\s*\n', part)
+            if match2:
+                idx = match2.end()
+                doc_match = re.match(r'(\s*\"\"\"[\s\S]*?\"\"\"\s*\n)', part[idx:])
+                if doc_match:
+                    idx += doc_match.end()
+                part = part[:idx] + '    db = get_db()\n' + part[idx:]
 
-except Exception as e:
-    print(f"Error repairing file: {e}")
+        new_content += 'async def ' + part
+
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(new_content)
+
+    print(f"Fixed {file_path}")

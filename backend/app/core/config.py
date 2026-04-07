@@ -34,34 +34,28 @@ class Settings:
         MONGO_URL: str = os.environ.get("MONGO_URL", f"mongodb://{MONGO_CLUSTER}/")
     
     # Security
-    JWT_SECRET: str = os.environ.get("JWT_SECRET", "your-secret-key-here-change-in-production")
+    JWT_SECRET: str = os.environ.get("JWT_SECRET", "")
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRATION_MINUTES: int = 60 * 24  # 24 hours
+    JWT_EXPIRATION_MINUTES: int = 60 * 2  # 2 hours
     ENCRYPTION_KEY: str = os.environ.get("ENCRYPTION_KEY")
     
-    # External APIs
-    PAYSTACK_SECRET_KEY: str = os.environ.get("PAYSTACK_SECRET_KEY", "sk_test_dummy_paystack_key")
-    PAYSTACK_PUBLIC_KEY: str = os.environ.get("PAYSTACK_PUBLIC_KEY", "pk_test_dummy_paystack_key")
+    # External APIs — no defaults, must be set in env
+    PAYSTACK_SECRET_KEY: str = os.environ.get("PAYSTACK_SECRET_KEY", "")
+    PAYSTACK_PUBLIC_KEY: str = os.environ.get("PAYSTACK_PUBLIC_KEY", "")
     PAYSTACK_API_URL: str = "https://api.paystack.co"
     
-    # Render overrides for production
-    if os.environ.get("ENVIRONMENT") == "production":
-        if PAYSTACK_SECRET_KEY == "sk_test_dummy_paystack_key":
-            print("WARNING: Using DUMMY Paystack Secret Key in PRODUCTION! Payments will fail.")
+    TWILIO_SID: str = os.environ.get("TWILIO_ACCOUNT_SID", "")
+    TWILIO_TOKEN: str = os.environ.get("TWILIO_AUTH_TOKEN", "")
     
-    TWILIO_SID: str = os.environ.get("TWILIO_ACCOUNT_SID", "dummy_twilio_sid")
-    TWILIO_TOKEN: str = os.environ.get("TWILIO_AUTH_TOKEN", "dummy_twilio_token")
-    
-    KWIK_API_KEY: str = os.environ.get("KWIK_API_KEY", "dummy_kwik_key")
+    KWIK_API_KEY: str = os.environ.get("KWIK_API_KEY", "")
     KWIK_API_URL: str = "https://api.kwik.delivery/v1"
     
-    # Business Logic
-    FARMHUB_SPLIT_GROUP: str = os.environ.get("FARMHUB_SPLIT_GROUP", "SPL_dCqIOTFNRu")
-    FARMHUB_SUBACCOUNT: str = os.environ.get("FARMHUB_SUBACCOUNT", "ACCT_c94r8ia2jeg41lx")
+    # Business Logic — must be set via env in production
+    pass
     
     # Admin
     ADMIN_EMAIL: str = os.environ.get("ADMIN_EMAIL", "admin@pyramydhub.com")
-    ADMIN_PASSWORD_HASH: str = os.environ.get("ADMIN_PASSWORD_HASH", "$2b$12$9O44mlAapYPMR81xvcyBhOHUYkD2vNPy./jp6Bf3HM/8PHY3QCR9i")
+    ADMIN_PASSWORD_HASH: str = os.environ.get("ADMIN_PASSWORD_HASH", "")
     
     # CORS
     BACKEND_CORS_ORIGINS: list = [os.environ.get("FRONTEND_URL", "https://pyramydhub.com"), "https://pyramydhub.com", "https://www.pyramydhub.com", "http://localhost:3000", "http://localhost:3001"]
@@ -78,8 +72,18 @@ class Settings:
             else:
                 # Dev Only: Auto-generate with warning
                 from cryptography.fernet import Fernet
-                print("WARNING: Using auto-generated ENCRYPTION_KEY. Data will not persist across restarts.")
+                import logging
+                logging.getLogger(__name__).warning("Using auto-generated ENCRYPTION_KEY. Data will not persist across restarts.")
                 self.ENCRYPTION_KEY = Fernet.generate_key().decode()
+
+        # Critical: JWT Secret Handling
+        if not self.JWT_SECRET:
+            if os.getenv("ENVIRONMENT") == "production":
+                raise ValueError("CRITICAL: JWT_SECRET is missing in production. Authentication will be insecure.")
+            else:
+                import logging
+                logging.getLogger(__name__).warning("JWT_SECRET not set. Using insecure dev default.")
+                self.JWT_SECRET = "dev-only-insecure-secret-change-me"
 
         # Production validation for required MongoDB variables
         if os.getenv("ENVIRONMENT") == "production":
@@ -87,5 +91,10 @@ class Settings:
             missing = [var for var in required_vars if not getattr(self, var)]
             if missing:
                 raise ValueError(f"Missing required env vars for production: {', '.join(missing)}")
+
+            # Validate critical payment/auth secrets
+            if not self.PAYSTACK_SECRET_KEY:
+                import logging
+                logging.getLogger(__name__).error("PAYSTACK_SECRET_KEY not set in production. Payments will fail.")
 
 settings = Settings()

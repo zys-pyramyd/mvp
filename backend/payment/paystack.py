@@ -15,23 +15,10 @@ PAYSTACK_API_URL = "https://api.paystack.co"
 PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_dummy_paystack_key')
 PAYSTACK_PUBLIC_KEY = os.environ.get('PAYSTACK_PUBLIC_KEY', 'pk_test_dummy_paystack_key')
 
-# Farm Deals Fixed Split Group (Sophie Farms Investment Ltd)
-FARMHUB_SPLIT_GROUP = os.environ.get('FARMHUB_SPLIT_GROUP', '')
-FARMHUB_SUBACCOUNT = os.environ.get('FARMHUB_SUBACCOUNT', '')
+
 
 # Paystack Models
-class PaystackSubaccount(BaseModel):
-    """Paystack subaccount for vendors/farmers/communities"""
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str
-    subaccount_code: str  # From Paystack (ACCT_xxxxxxxxxx)
-    business_name: str
-    account_number: str
-    bank_code: str
-    bank_name: str
-    percentage_charge: float = 0.0  # Always 0.0 for fixed split
-    is_active: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+
 
 class PaystackTransaction(BaseModel):
     """Transaction record with split details"""
@@ -45,7 +32,6 @@ class PaystackTransaction(BaseModel):
     delivery_fee: int  # In kobo
     platform_cut: int  # In kobo (transaction_charge)
     total_amount: int  # In kobo (what customer pays)
-    subaccount_code: str  # Recipient subaccount
     vendor_share: int  # In kobo
     buyer_is_agent: bool = False
     agent_commission: int = 0  # In kobo (4% if agent)

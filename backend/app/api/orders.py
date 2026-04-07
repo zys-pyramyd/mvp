@@ -69,7 +69,8 @@ async def create_order(
     order_req: CreateOrderRequest, 
     current_user: dict = Depends(get_current_user)
 ):
-    print("DEBUG: ENTERING CREATE_ORDER")
+    import logging
+    logging.getLogger(__name__).debug("ENTERING CREATE_ORDER")
     items = order_req.items
     delivery_address = order_req.delivery_address
     
@@ -207,10 +208,6 @@ async def create_order(
         # Order stays pending until payment is confirmed via webhook
         order_status = "pending"
 
-    from app.utils.id_generator import generate_tracking_id
-    
-    # Generate order ID
-    order_id = generate_tracking_id()
     
     # Store explicit items list in order dict
     order_dict = {
@@ -237,7 +234,8 @@ async def create_order(
     }
     
     
-    print(f"DEBUG: Inserting Order: {order_dict}")
+    import logging
+    logging.getLogger(__name__).debug(f"Inserting Order: {order_dict.get('order_id')}")
     try:
         db.orders.insert_one(order_dict)
     except Exception as e:

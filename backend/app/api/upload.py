@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from app.api.deps import get_current_user
 import os
 import uuid
 import logging
@@ -13,7 +14,7 @@ class UploadSignRequest(BaseModel):
     contentType: str
 
 @router.post("/sign-public")
-async def sign_public_upload(request: UploadSignRequest):
+async def sign_public_upload(request: UploadSignRequest, current_user: dict = Depends(get_current_user)):
     """
     Generate presigned URL for file upload to R2/CDN
     Used for registration documents and other uploads

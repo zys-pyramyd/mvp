@@ -4870,14 +4870,13 @@ function App() {
                           </div>
 
                           <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                            <label className="flex items-center space-x-2">
+                            <label className="flex items-center space-x-2 opacity-50">
                               <input
                                 type="checkbox"
-                                checked={filters.only_preorders}
-                                onChange={(e) => setFilters(prev => ({ ...prev, only_preorders: e.target.checked }))}
-                                className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                                disabled
+                                className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 cursor-not-allowed"
                               />
-                              <span className="text-sm font-medium text-gray-700">Show only pre-orders</span>
+                              <span className="text-sm font-medium text-gray-700">Pre-orders (Coming Soon)</span>
                             </label>
 
                             <div className="flex space-x-2 justify-end">
@@ -4989,10 +4988,11 @@ function App() {
                     {user && ['farmer', 'supplier', 'processor', 'agent'].includes(user.role) && (
                       <div className="mt-4 flex justify-end">
                         <button
-                          onClick={() => setShowCreatePreOrder(true)}
-                          className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
+                          disabled
+                          className="px-4 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed font-medium text-sm shadow-sm"
+                          title="This feature is coming soon"
                         >
-                          + Create Pre-order
+                          + Create Pre-order (Coming Soon)
                         </button>
                       </div>
                     )}
@@ -5050,18 +5050,14 @@ function App() {
                           <span className="text-orange-600"></span>
                           <span className="text-sm font-medium text-orange-800">Filter by Pre-Orders:</span>
                         </div>
-                        <label className="flex items-center space-x-2">
+                        <label className="flex items-center space-x-2 opacity-50 cursor-not-allowed">
                           <input
                             type="checkbox"
-                            checked={filters.only_preorders}
-                            onChange={(e) => {
-                              setFilters(prev => ({ ...prev, only_preorders: e.target.checked }));
-                              // Auto-apply filter
-                              setTimeout(() => fetchProducts(), 100);
-                            }}
-                            className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                            checked={false}
+                            disabled
+                            className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500 cursor-not-allowed"
                           />
-                          <span className="text-sm text-orange-700">Show only pre-order products</span>
+                          <span className="text-sm text-orange-700">Pre-orders (Coming Soon)</span>
                         </label>
                       </div>
                       {filters.only_preorders && (
