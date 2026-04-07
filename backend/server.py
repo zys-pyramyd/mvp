@@ -6341,7 +6341,7 @@ async def paystack_webhook(request: Request):
 if __name__ == "__main__":
     # Start Server
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8001")))
 
 # --- Bank Account Management ---
 
