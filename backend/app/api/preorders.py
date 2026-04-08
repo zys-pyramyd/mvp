@@ -8,6 +8,9 @@ import uuid
 import random
 import string
 
+from app.models.order import PreOrderCreate
+from app.models.common import PreOrderStatus
+
 router = APIRouter()
 
 @router.post("/api/preorders/create")

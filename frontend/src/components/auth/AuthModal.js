@@ -700,13 +700,7 @@ const AuthModal = () => {
                                             <div className="text-sm text-gray-600">Individual farmer growing produce</div>
                                         </button>
 
-                                        <button
-                                            onClick={() => handlePartnerTypeSelection('driver')}
-                                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
-                                        >
-                                            <div className="font-medium">Driver</div>
-                                            <div className="text-sm text-gray-600">Delivery driver for transport services</div>
-                                        </button>
+
 
                                         <button
                                             onClick={() => handlePartnerTypeSelection('storage_owner')}
@@ -817,7 +811,7 @@ const AuthModal = () => {
                                         </div>
 
                                         {/* Different verification based on role */}
-                                        {(partnerType === 'agent' || partnerType === 'driver') && (
+                                        {partnerType === 'agent' && (
                                             <>
                                                 <div className="mb-4 p-3 bg-blue-100 rounded-lg">
                                                     <p className="text-sm text-blue-800 font-medium">Required: NIN and Photo for verification</p>

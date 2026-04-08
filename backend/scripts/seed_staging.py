@@ -30,7 +30,7 @@ def seed_users():
     password = "Password123!"
     hashed_pw = get_password_hash(password)
     
-    roles = ['admin', 'buyer', 'farmer', 'agent', 'business', 'driver']
+    roles = ['admin', 'buyer', 'farmer', 'agent', 'business']
     users = []
     created_users = {}
     

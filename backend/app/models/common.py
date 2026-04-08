@@ -223,11 +223,7 @@ class PreOrderStatus(str, Enum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
-class DriverStatus(str, Enum):
-    OFFLINE = "offline"
-    ONLINE = "online"
-    BUSY = "busy"
-    ON_DELIVERY = "on_delivery"
+
 
 class DeliveryStatus(str, Enum):
     PENDING = "pending"
@@ -237,23 +233,13 @@ class DeliveryStatus(str, Enum):
     DELIVERED = "delivered"
     CANCELLED = "cancelled"
 
-class VehicleType(str, Enum):
-    MOTORCYCLE = "motorcycle"
-    CAR = "car"
-    VAN = "van"
-    TRUCK = "truck"
-    BICYCLE = "bicycle"
 
-class DriverSubscriptionStatus(str, Enum):
-    TRIAL = "trial"
-    ACTIVE = "active"
-    EXPIRED = "expired"
-    SUSPENDED = "suspended"
+
+
 
 class RatingType(str, Enum):
     USER_RATING = "user_rating"
     PRODUCT_RATING = "product_rating"
-    DRIVER_RATING = "driver_rating"
     ORDER_RATING = "order_rating"
 
 class TransactionType(str, Enum):
@@ -264,7 +250,6 @@ class TransactionType(str, Enum):
     GIFT_CARD_PURCHASE = "gift_card_purchase"
     GIFT_CARD_REDEMPTION = "gift_card_redemption"
     COMMISSION_PAYMENT = "commission_payment"
-    DRIVER_PAYMENT = "driver_payment"
 
 class TransactionStatus(str, Enum):
     PENDING = "pending"

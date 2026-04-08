@@ -38,12 +38,9 @@ const Header = ({
     kycStatus,
     // Navigation/Modal setters
     setShowProfilePictureUpload,
-    setShowDriverManagement,
-    setShowFindDrivers,
     setShowFarmerDashboard,
     setShowAgentDashboard,
     setShowMarketChart,
-    setShowDriverPortal,
     setShowLogisticsDashboard,
     setShowCreateDeliveryRequest,
     setShowAddDropOff,
@@ -239,25 +236,7 @@ const Header = ({
                                                     <span className="mr-3">📷</span> Change Photo
                                                 </button>
 
-                                                {/* Driver Management - For Logistics Business */}
-                                                {user.role === 'business' && user.business_category === 'logistics_business' && (
-                                                    <button
-                                                        onClick={() => { setShowProfileMenu(false); setShowDriverManagement(true); }}
-                                                        className="group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                    >
-                                                        <span className="mr-3">🚛</span> Manage Drivers
-                                                    </button>
-                                                )}
 
-                                                {/* Find Drivers - For Everyone except Drivers */}
-                                                {user.role !== 'driver' && (
-                                                    <button
-                                                        onClick={() => { setShowProfileMenu(false); setShowFindDrivers(true); }}
-                                                        className="group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                    >
-                                                        <span className="mr-3">🔍</span> Find Drivers
-                                                    </button>
-                                                )}
 
                                                 {/* Dashboards based on role */}
                                                 <button
@@ -303,22 +282,7 @@ const Header = ({
                                                     <span className="mr-3">📊</span> Market Prices
                                                 </button>
 
-                                                {user.role === 'driver' && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => { setShowProfileMenu(false); setShowDriverPortal(true); }}
-                                                            className="group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                        >
-                                                            <span className="mr-3">🚛</span> Driver Portal
-                                                        </button>
-                                                        <button
-                                                            onClick={() => { setShowProfileMenu(false); setShowLogisticsDashboard(true); }}
-                                                            className="group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                        >
-                                                            <span className="mr-3">📦</span> Deliveries
-                                                        </button>
-                                                    </>
-                                                )}
+
 
                                                 <button
                                                     onClick={() => { setShowProfileMenu(false); setShowCreateDeliveryRequest(true); }}

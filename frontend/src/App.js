@@ -215,15 +215,6 @@ function App() {
   const [productRatings, setProductRatings] = useState({});
 
   // Driver management state (for logistics businesses)
-  const [showDriverManagement, setShowDriverManagement] = useState(false);
-  const [driverSlots, setDriverSlots] = useState([]);
-  const [availableDrivers, setAvailableDrivers] = useState([]);
-  const [showFindDrivers, setShowFindDrivers] = useState(false);
-  const [driverSearchFilters, setDriverSearchFilters] = useState({
-    location: '',
-    vehicle_type: '',
-    min_rating: null
-  });
 
   // Digital wallet state
   const [showWallet, setShowWallet] = useState(false);
@@ -369,34 +360,7 @@ function App() {
     seller_type: ''
   });
   // Driver system state
-  const [showDriverPortal, setShowDriverPortal] = useState(false);
-  const [showLogisticsDashboard, setShowLogisticsDashboard] = useState(false);
-  const [showAddDriver, setShowAddDriver] = useState(false);
-  const [showCreateDeliveryRequest, setShowCreateDeliveryRequest] = useState(false);
-  const [driverStatus, setDriverStatus] = useState('offline');
-  const [availableDeliveries, setAvailableDeliveries] = useState([]);
-  const [myDrivers, setMyDrivers] = useState([]);
-  const [myVehicles, setMyVehicles] = useState([]);
-  const [newDriverForm, setNewDriverForm] = useState({
-    driver_name: '',
-    phone_number: '',
-    email: '',
-    profile_picture: '',
-    driver_license: '',
-    vehicle_type: 'motorcycle',
-    plate_number: '',
-    make_model: '',
-    color: '',
-    year: ''
-  });
   // Enhanced driver system state
-  const [driverSearch, setDriverSearch] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [selectedDriver, setSelectedDriver] = useState(null);
-  const [showDriverMessages, setShowDriverMessages] = useState(false);
-  const [deliveryMessages, setDeliveryMessages] = useState([]);
-  const [currentDeliveryChat, setCurrentDeliveryChat] = useState('');
-  const [newDeliveryMessage, setNewDeliveryMessage] = useState('');
   const [pickupCoordinates, setPickupCoordinates] = useState(null);
   const [deliveryCoordinates, setDeliveryCoordinates] = useState([]);
   const [showMap, setShowMap] = useState(false);
@@ -1061,79 +1025,11 @@ function App() {
   };
 
   // Driver management functions (for logistics businesses)
-  const fetchDriverSlots = async () => {
-    if (!user || user.role !== 'logistics') return;
+  ;
 
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/driver-slots/my-slots`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+  ;
 
-      if (response.ok) {
-        const data = await response.json();
-        setDriverSlots(data.slots || []);
-        return data;
-      }
-    } catch (error) {
-      console.error('Error fetching driver slots:', error);
-    }
-    return null;
-  };
-
-  const purchaseDriverSlots = async (slotsCount) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/driver-slots/purchase`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ slots_count: slotsCount })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        await fetchDriverSlots(); // Refresh slots
-        return result;
-      } else {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to purchase driver slots');
-      }
-    } catch (error) {
-      console.error('Error purchasing driver slots:', error);
-      throw error;
-    }
-  };
-
-  const assignDriverToSlot = async (slotId, driverData) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/driver-slots/${slotId}/assign-driver`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(driverData)
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        await fetchDriverSlots(); // Refresh slots
-        return result;
-      } else {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to assign driver to slot');
-      }
-    } catch (error) {
-      console.error('Error assigning driver:', error);
-      throw error;
-    }
-  };
+  ;
 
   const fetchAvailableDrivers = async (filters = {}) => {
     try {
@@ -2302,54 +2198,10 @@ function App() {
     }
   };
 
-  const acceptDelivery = async (requestId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/delivery/${requestId}/accept`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        alert(`Delivery accepted! OTP: ${result.delivery_otp}\nPickup: ${result.pickup_address}\nDelivery: ${result.delivery_address}`);
-        fetchAvailableDeliveries();
-      } else {
-        const error = await response.json();
-        alert(`Error: ${error.detail}`);
-      }
-    } catch (error) {
-      console.error('Error accepting delivery:', error);
-      alert('Error accepting delivery');
-    }
-  };
+  ;
 
   // Enhanced driver system functions
-  const searchDrivers = async (pickupLocation) => {
-    try {
-      const token = localStorage.getItem('token');
-      let url = `${process.env.REACT_APP_BACKEND_URL}/api/drivers/search?min_rating=3.0&radius_km=50`;
-
-      if (pickupLocation && pickupLocation.lat && pickupLocation.lng) {
-        url += `&pickup_lat=${pickupLocation.lat}&pickup_lng=${pickupLocation.lng}`;
-      }
-
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data.drivers || []);
-      }
-    } catch (error) {
-      console.error('Error searching drivers:', error);
-    }
-  };
+  ;
 
   const createEnhancedDeliveryRequest = async () => {
     try {
@@ -2405,30 +2257,7 @@ function App() {
     }
   };
 
-  const sendDeliveryMessage = async (requestId, content, type = 'text') => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/delivery/${requestId}/message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          content,
-          type,
-          location_data: type === 'location' ? pickupCoordinates : null
-        })
-      });
-
-      if (response.ok) {
-        fetchDeliveryMessages(requestId); // Refresh messages
-        setNewDeliveryMessage('');
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
-    }
-  };
+  ;
 
   const fetchDeliveryMessages = async (requestId) => {
     try {
@@ -2449,21 +2278,7 @@ function App() {
     }
   };
 
-  const updateDriverLocation = async (lat, lng, address) => {
-    try {
-      const token = localStorage.getItem('token');
-      await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/drivers/location`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ lat, lng, address })
-      });
-    } catch (error) {
-      console.error('Error updating location:', error);
-    }
-  };
+  ;
 
   const addDeliveryDestination = () => {
     setMultipleDestinations([...multipleDestinations, '']);
@@ -2525,24 +2340,7 @@ function App() {
     }));
   };
 
-  const fetchMyDrivers = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/logistics/my-drivers`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setMyDrivers(data.drivers || []);
-        setMyVehicles(data.vehicles || []);
-      }
-    } catch (error) {
-      console.error('Error fetching drivers:', error);
-    }
-  };
+  ;
 
   const addEnhancedToCart = (product, quantity, unit, specification, deliveryMethod, dropoffLocation = null, shippingAddress = null) => {
     const existingItem = cart.find(item => item.product_id === (product.id || product._id));

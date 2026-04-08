@@ -75,24 +75,13 @@ class DeliveryRequest(BaseModel):
     product_details: str
     weight_kg: Optional[float] = None
     special_instructions: Optional[str] = None
-    assigned_driver_id: Optional[str] = None
-    preferred_driver_id: Optional[str] = None  # For driver search and selection
     status: DeliveryStatus = DeliveryStatus.PENDING
     delivery_otp: Optional[str] = None
-    chat_messages: List[dict] = []  # Messaging between requester and driver
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
-class DeliveryMessage(BaseModel):
-    id: Optional[str] = None
-    delivery_request_id: str
-    sender_username: str
-    sender_type: str  # "requester" or "driver"
-    message_type: str  # "text", "location", "image"
-    content: str
-    location_data: Optional[dict] = None  # For location sharing
-    timestamp: Optional[datetime] = None
+
 
 class DeliveryRequestCreate(BaseModel):
     order_id: str
@@ -107,7 +96,6 @@ class DeliveryRequestCreate(BaseModel):
     weight_kg: Optional[float] = None
     special_instructions: Optional[str] = None
     estimated_price: float
-    preferred_driver_username: Optional[str] = None  # For driver selection
 
 class PreOrder(BaseModel):
     id: Optional[str] = None
