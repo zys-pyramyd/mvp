@@ -8,6 +8,10 @@ import uuid
 import random
 import string
 
+from app.api.agent import GroupBuyingRequest
+from order.community_order import process_create_group_order
+from order.farm_deals_order import process_create_outsourced_order
+
 router = APIRouter()
 
 @router.post("/api/group-buying/recommendations")
