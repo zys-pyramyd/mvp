@@ -134,8 +134,8 @@ def init_db_indexes(db_instance=None):
     Initialize critical MongoDB indexes to ensure production performance.
     Avoids full collection scans on frequent queries.
     """
-    database = db_instance or get_db()
-    if not database:
+    database = db_instance if db_instance is not None else get_db()
+    if database is None:
         logger.warning("Could not initialize indexes: No database connection.")
         return
 
