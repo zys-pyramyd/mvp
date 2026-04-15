@@ -6,7 +6,9 @@ import WalletModal from './components/wallet/WalletModal';
 import RegistrationModal from './components/registration/RegistrationModal';
 import DVAPromptModal from './components/profile/DVAPromptModal';
 import MyOrdersModal from './components/profile/MyOrdersModal';
+import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
+
 
 // Lazy loaded heavy components
 const DealBoard = lazy(() => import('./components/rfq/DealBoard'));
@@ -163,21 +165,44 @@ function App() {
   const [myOffers, setMyOffers] = useState([]);
   const [showMyRequestsPage, setShowMyRequestsPage] = useState(false);
 
-  // Handle /pyadmin route
+  // Handle /pyadmin route — supports ?tab=kyc&user=<userId> deep-links from email
+  const [adminInitialTab, setAdminInitialTab] = useState('overview');
+  const [adminHighlightUser, setAdminHighlightUser] = useState(null);
+  // Flag: user landed on /pyadmin without being logged in — show login first
+  const [pendingAdminRoute, setPendingAdminRoute] = useState(false);
+
   useEffect(() => {
     if (window.location.pathname === '/pyadmin') {
+      const params = new URLSearchParams(window.location.search);
+      const tab  = params.get('tab') || 'overview';
+      const uid  = params.get('user') || null;
+      setAdminInitialTab(tab);
+      setAdminHighlightUser(uid);
+
       if (user && user.role === 'admin') {
+        // Already logged in as admin — open dashboard directly
         setShowAdminDashboard(true);
-      } else if (user && user.role !== 'admin') {
-        // Redirect or show access denied? 
-        // For MVP, just don't show, dashboard handles access denied internally if rendered.
-        // But here we toggle the modal state.
-        // Maybe we shouldn't use a modal for /pyadmin if it's a "endpoint"?
-        // But App.js structure is single-page with modals.
-        // Let's stick to opening the "modal" which is actually a full screened div in the existing code.
+      } else if (!user) {
+        // Not logged in — save intent and open the login modal
+        setPendingAdminRoute(true);
+        setShowAuthModal(true);
       }
+      // If logged in but not admin — silently ignore (dashboard handles access denied)
     }
   }, [user]);
+
+  // After login: if they came from a /pyadmin link, open admin dashboard
+  // This fires whenever `user` resolves from null to a real user
+  useEffect(() => {
+    if (pendingAdminRoute && user) {
+      setPendingAdminRoute(false);
+      setShowAuthModal(false);
+      if (user.role === 'admin') {
+        setShowAdminDashboard(true);
+      }
+      // Non-admin who landed on /pyadmin: access denied handled inside AdminDashboard
+    }
+  }, [pendingAdminRoute, user]);
 
   // Enhanced messaging state
   const [showMessaging, setShowMessaging] = useState(false);
@@ -1695,7 +1720,7 @@ function App() {
       }
     } catch (error) {
       console.error('Login Error:', error);
-      alert(error.message);
+      // Re-throw so LoginStep can surface the error inline (no browser alert)
       throw error;
     }
   };
@@ -1714,23 +1739,25 @@ function App() {
         localStorage.setItem('token', data.token);
         setUser(data.user);
         setShowAuthModal(false);
-        alert(`Welcome ${data.user.first_name}! Registration successful.`);
 
         // Post-registration setup
         fetchWalletSummary();
         fetchUserCommunities();
         fetchKYCStatus();
 
-        // If farmer/agent, redirect to dashboard or show welcome
-        if (['farmer', 'agent'].includes(data.user.role)) {
+        // Partner roles need admin verification — redirect to pyhub so they see the pending state
+        if (['farmer', 'agent', 'business'].includes(data.user.role)) {
           setCurrentPlatform('pyhub');
         }
       } else {
-        throw new Error(data.detail || 'Registration failed');
+        // Throw so RegistrationModal's globalLoading state catches and the form stays open
+        const msg = data.detail || data.message || 'Registration failed. Please try again.';
+        throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
       }
     } catch (error) {
       console.error('Registration Error:', error);
-      alert(error.message);
+      // Re-throw — RegistrationModal wraps onRegister in try/finally and
+      // the individual Flow components surface the error inline.
       throw error;
     }
   };
@@ -5311,11 +5338,21 @@ function App() {
       {/* Registration Modal */}
       {
         showAuthModal && (
-          <RegistrationModal
-            onClose={() => setShowAuthModal(false)}
-            onLogin={handleNewLogin}
-            onRegister={handleNewRegistration}
-          />
+          <ErrorBoundary fallback={
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg w-full max-w-sm p-6 text-center">
+                <p className="text-gray-900 font-bold mb-2">Registration Unavailable</p>
+                <p className="text-gray-500 text-sm mb-4">An error occurred while loading the registration form. Please try again.</p>
+                <button onClick={() => setShowAuthModal(false)} className="w-full bg-emerald-600 text-white py-2 rounded-lg font-medium hover:bg-emerald-700">Close</button>
+              </div>
+            </div>
+          }>
+            <RegistrationModal
+              onClose={() => setShowAuthModal(false)}
+              onLogin={handleNewLogin}
+              onRegister={handleNewRegistration}
+            />
+          </ErrorBoundary>
         )
       }
 
@@ -8205,9 +8242,21 @@ function App() {
                 onClick={() => setShowFarmerDashboard(false)}
                 className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-2 shadow"
               >
-                âœ• Close
+                ✕ Close
               </button>
-              <SellerDashboard user={user} token={localStorage.getItem('token')} />
+              <ErrorBoundary fallback={
+                <div className="flex flex-col items-center justify-center py-20 gap-4 text-center px-6">
+                  <p className="text-gray-600 font-medium">Could not load the dashboard.</p>
+                  <p className="text-gray-400 text-sm">Please close and try again.</p>
+                  <button onClick={() => setShowFarmerDashboard(false)} className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">Close</button>
+                </div>
+              }>
+                <SellerDashboard
+                  user={user}
+                  token={localStorage.getItem('token')}
+                  onGoHome={() => setShowFarmerDashboard(false)}
+                />
+              </ErrorBoundary>
             </div>
           </div>
         )
@@ -8222,9 +8271,21 @@ function App() {
                 onClick={() => setShowAgentDashboard(false)}
                 className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-2 shadow"
               >
-                âœ• Close
+                ✕ Close
               </button>
-              <SellerDashboard user={user} token={localStorage.getItem('token')} />
+              <ErrorBoundary fallback={
+                <div className="flex flex-col items-center justify-center py-20 gap-4 text-center px-6">
+                  <p className="text-gray-600 font-medium">Could not load the dashboard.</p>
+                  <p className="text-gray-400 text-sm">Please close and try again.</p>
+                  <button onClick={() => setShowAgentDashboard(false)} className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">Close</button>
+                </div>
+              }>
+                <SellerDashboard
+                  user={user}
+                  token={localStorage.getItem('token')}
+                  onGoHome={() => setShowAgentDashboard(false)}
+                />
+              </ErrorBoundary>
             </div>
           </div>
         )
@@ -8239,29 +8300,31 @@ function App() {
                 onClick={() => setShowPersonalDashboard(false)}
                 className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-2 shadow"
               >
-                âœ• Close
+                ✕ Close
               </button>
-              <PersonalDashboard user={user} />
+              <ErrorBoundary fallback={
+                <div className="flex flex-col items-center justify-center py-20 gap-4 text-center px-6">
+                  <p className="text-gray-600 font-medium">Could not load your dashboard.</p>
+                  <p className="text-gray-400 text-sm">Please close and try again.</p>
+                  <button onClick={() => setShowPersonalDashboard(false)} className="px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">Close</button>
+                </div>
+              }>
+                <PersonalDashboard user={user} />
+              </ErrorBoundary>
             </div>
           </div>
         )
       }
 
-      {/* Admin Dashboard */}
+      {/* Admin Dashboard — full-screen overlay, supports ?tab=kyc&user=<id> deep-link */}
       {
         showAdminDashboard && user && user.role === 'admin' && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-semibold">? Admin Dashboard</h2>
-                  <button onClick={() => setShowAdminDashboard(false)} className="text-gray-500 hover:text-gray-700"></button>
-                </div>
-              </div>
-              <div className="p-6">
-                <AdminDashboard />
-              </div>
-            </div>
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-100">
+            <AdminDashboard
+              onClose={() => setShowAdminDashboard(false)}
+              initialTab={adminInitialTab}
+              highlightUserId={adminHighlightUser}
+            />
           </div>
         )
       }

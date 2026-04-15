@@ -1,319 +1,427 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * OrderDetails — Order detail modal for buyers.
+ *
+ * Design principles:
+ *  - NO browser alert() / confirm() dialogs.  All confirmation flows are
+ *    inline within the modal using a <ConfirmPanel> component.
+ *  - When order.status === 'delivered', a prominent delivery banner is shown
+ *    at the TOP of the modal — not buried in a conditional block.
+ *  - Notification toast replaces alert() for success/error feedback.
+ *  - Full status-colour system via CSS custom properties.
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import './OrderDetails.css';
 
+// ---------------------------------------------------------------------------
+// Status helpers
+// ---------------------------------------------------------------------------
+
+const STATUS_META = {
+  pending:          { label: 'Pending',           cls: 'status-pending'   },
+  pending_payment:  { label: 'Awaiting Payment',  cls: 'status-pending'   },
+  held_in_escrow:   { label: 'Held in Escrow',    cls: 'status-escrow'    },
+  processing:       { label: 'Processing',        cls: 'status-processing'},
+  shipped:          { label: 'Shipped',            cls: 'status-shipped'   },
+  delivered:        { label: 'Delivered',          cls: 'status-delivered' },
+  completed:        { label: 'Completed',          cls: 'status-completed' },
+  cancelled:        { label: 'Cancelled',          cls: 'status-cancelled' },
+};
+
+const statusMeta = (status) =>
+  STATUS_META[status] || { label: status?.replace(/_/g, ' '), cls: 'status-pending' };
+
+const canModify = (status) =>
+  ['pending', 'held_in_escrow', 'pending_payment'].includes(status);
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function InlineSpinner() {
+  return <div className="od-spinner" />;
+}
+
+function Toast({ toast }) {
+  if (!toast) return null;
+  return (
+    <div className={`od-toast od-toast--${toast.type}`}>
+      {toast.type === 'success' ? '✅' : '❌'} {toast.message}
+    </div>
+  );
+}
+
+/**
+ * ConfirmPanel — replaces window.confirm().
+ * Slides in at the bottom of the modal body.
+ */
+function ConfirmPanel({ action, order, selectedItemCount, selectedTotal, onConfirm, onCancel, loading }) {
+  if (!action) return null;
+
+  const isDelivery  = action === 'delivery';
+  const isCancel    = action === 'cancel';
+  const isRemove    = action === 'remove';
+
+  return (
+    <div className="od-confirm-panel">
+      {isDelivery && (
+        <>
+          <div className="od-confirm-icon od-confirm-icon--green">🛡️</div>
+          <h4 className="od-confirm-title">Confirm Delivery Receipt</h4>
+          <p className="od-confirm-desc">
+            Confirming will release{' '}
+            <strong>₦{order.total_amount?.toLocaleString()}</strong> from escrow to the seller.
+          </p>
+          <p className="od-confirm-note">Only confirm once you've physically received your items.</p>
+        </>
+      )}
+      {isCancel && (
+        <>
+          <div className="od-confirm-icon od-confirm-icon--red">🚫</div>
+          <h4 className="od-confirm-title">Cancel Entire Order?</h4>
+          <p className="od-confirm-desc">
+            You'll receive a full refund of{' '}
+            <strong>₦{order.total_amount?.toLocaleString()}</strong> to your wallet.
+          </p>
+          <p className="od-confirm-note">This action cannot be undone.</p>
+        </>
+      )}
+      {isRemove && (
+        <>
+          <div className="od-confirm-icon od-confirm-icon--amber">🗑️</div>
+          <h4 className="od-confirm-title">Remove {selectedItemCount} Item{selectedItemCount !== 1 ? 's' : ''}?</h4>
+          <p className="od-confirm-desc">
+            Refund of <strong>₦{selectedTotal?.toLocaleString()}</strong> will be returned to your wallet.
+          </p>
+          <p className="od-confirm-note">
+            {selectedItemCount === (order.items?.length ?? 1)
+              ? 'This will cancel the entire order.'
+              : `${(order.items?.length ?? 1) - selectedItemCount} item(s) will remain in the order.`}
+          </p>
+        </>
+      )}
+      <div className="od-confirm-actions">
+        <button className="od-btn od-btn--ghost" onClick={onCancel} disabled={loading}>
+          Go Back
+        </button>
+        <button
+          className={`od-btn ${isDelivery ? 'od-btn--green' : isCancel ? 'od-btn--red' : 'od-btn--amber'}`}
+          onClick={onConfirm}
+          disabled={loading}
+        >
+          {loading ? <><InlineSpinner /> Processing...</> : isDelivery ? '✅ Yes, Confirm Receipt' : isCancel ? '🚫 Yes, Cancel Order' : '🗑️ Remove Items'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 const OrderDetails = ({ orderId, onClose, onUpdate }) => {
-    const [order, setOrder] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [selectedItems, setSelectedItems] = useState([]);
-    const [actionLoading, setActionLoading] = useState(false);
+  const [order,         setOrder]         = useState(null);
+  const [loading,       setLoading]       = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [pendingAction, setPendingAction] = useState(null); // 'delivery' | 'cancel' | 'remove'
+  const [toast,         setToast]         = useState(null);
 
-    useEffect(() => {
-        fetchOrderDetails();
-    }, [orderId]);
+  const showToast = useCallback((type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4500);
+  }, []);
 
-    const fetchOrderDetails = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get(`/orders/${orderId}`);
-            setOrder(response.data);
-        } catch (error) {
-            console.error('Failed to fetch order:', error);
-            alert('Failed to load order details');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-
-    if (loading) {
-        return (
-            <div className="modal-overlay">
-                <div className="modal-content order-details-modal">
-                    <div className="loading-spinner">Loading order details...</div>
-                </div>
-            </div>
-        );
+  const fetchOrder = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get(`/orders/${orderId}`);
+      setOrder(data);
+    } catch {
+      showToast('error', 'Failed to load order details. Please try again.');
+    } finally {
+      setLoading(false);
     }
+  }, [orderId, showToast]);
 
-    if (!order) {
-        return null;
-    }
+  useEffect(() => { fetchOrder(); }, [fetchOrder]);
 
-    // Normalize items for unified/RFQ handling
-    const orderItems = order.items || (order.product_details ? [{
-        product_id: order.product_id || order.product_details.id,
-        title: order.product_details.title || order.product_details.name,
+  // ── Derived values ────────────────────────────────────────────────────────
+
+  const orderItems = order
+    ? order.items || (order.product_details ? [{
+        product_id:     order.product_id || order.product_details.id,
+        title:          order.product_details.title || order.product_details.name,
         price_per_unit: order.product_details.price || order.product_details.price_per_unit,
-        quantity: order.quantity,
-        total: order.total_amount
-    }] : []);
+        quantity:       order.quantity,
+        total:          order.total_amount,
+      }] : [])
+    : [];
 
-    const canModifyOrder = () => {
-        return ['pending', 'held_in_escrow', 'pending_payment'].includes(order.status);
-    };
+  const selectedTotal = orderItems
+    .filter(i => selectedItems.includes(i.product_id))
+    .reduce((sum, i) => sum + (i.total || (i.quantity * i.price_per_unit) || 0), 0);
 
-    const handleSelectItem = (productId) => {
-        setSelectedItems(prev =>
-            prev.includes(productId)
-                ? prev.filter(id => id !== productId)
-                : [...prev, productId]
-        );
-    };
+  // ── Select helpers ────────────────────────────────────────────────────────
 
-    const handleSelectAll = () => {
-        if (selectedItems.length === orderItems.length) {
-            setSelectedItems([]);
+  const toggleItem    = (id) => setSelectedItems(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleAll     = ()  => setSelectedItems(prev => prev.length === orderItems.length ? [] : orderItems.map(i => i.product_id));
+
+  // ── API actions ───────────────────────────────────────────────────────────
+
+  const executeAction = async () => {
+    setActionLoading(true);
+    try {
+      if (pendingAction === 'delivery') {
+        await api.post(`/orders/${orderId}/confirm-delivery`);
+        showToast('success', '✅ Delivery confirmed! Payment has been released to the seller.');
+        setPendingAction(null);
+        if (onUpdate) onUpdate();
+        if (onClose)  onClose();
+
+      } else if (pendingAction === 'cancel') {
+        const { data } = await api.post(`/orders/${orderId}/cancel`);
+        showToast('success', `Order cancelled. ₦${data.refund_amount?.toLocaleString()} refunded to your wallet.`);
+        setPendingAction(null);
+        if (onUpdate) onUpdate();
+        if (onClose)  onClose();
+
+      } else if (pendingAction === 'remove') {
+        const isFullCancel = selectedItems.length === orderItems.length;
+
+        if (isFullCancel || !order.items) {
+          // Single-item orders — just cancel
+          const { data } = await api.post(`/orders/${orderId}/cancel`);
+          showToast('success', `Order cancelled. ₦${data.refund_amount?.toLocaleString()} refunded to your wallet.`);
+          setPendingAction(null);
+          if (onUpdate) onUpdate();
+          if (onClose)  onClose();
         } else {
-            setSelectedItems(orderItems.map(item => item.product_id));
+          const { data } = await api.post(`/orders/${orderId}/remove-items`, { product_ids: selectedItems });
+          showToast('success', `Items removed. ₦${data.refund_amount?.toLocaleString()} refunded to your wallet.`);
+          setSelectedItems([]);
+          setPendingAction(null);
+          fetchOrder();
+          if (onUpdate) onUpdate();
         }
-    };
+      }
+    } catch (err) {
+      showToast('error', err.response?.data?.detail || 'Action failed. Please try again.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
-    const calculateSelectedTotal = () => {
-        return orderItems
-            .filter(item => selectedItems.includes(item.product_id))
-            .reduce((sum, item) => sum + (item.total || (item.quantity * item.price_per_unit)), 0);
-    };
+  // ── Loading / null states ─────────────────────────────────────────────────
 
-    const handleRemoveItems = async () => {
-        if (selectedItems.length === 0) {
-            alert('Please select items to remove');
-            return;
-        }
-
-        const selectedTotal = calculateSelectedTotal();
-        const isFullCancellation = selectedItems.length === orderItems.length;
-
-        const confirmMessage = isFullCancellation
-            ? `Cancel entire order?\n\nRefund: ₦${selectedTotal.toLocaleString()}\n\nThis action cannot be undone.`
-            : `Remove ${selectedItems.length} item(s)?\n\nRefund: ₦${selectedTotal.toLocaleString()}\nNew Total: ₦${(order.total_amount - selectedTotal).toLocaleString()}\n\nThis action cannot be undone.`;
-
-        if (!confirm(confirmMessage)) return;
-
-        setActionLoading(true);
-        try {
-            // If checking out via unified, user can't remove items, only cancel full order
-            if (!order.items && order.product_details) {
-                await handleCancelOrder(); // Redirect to cancel logic
-                return;
-            }
-
-            const response = await api.post(`/orders/${orderId}/remove-items`, {
-                product_ids: selectedItems
-            });
-
-            const { refund_processed, refund_amount, items_remaining, message } = response.data;
-
-            if (items_remaining === 0) {
-                // Full cancellation
-                alert(`✅ ${message}\n\n💰 Refund: ₦${refund_amount.toLocaleString()}\n\nYour order has been cancelled.`);
-                if (onUpdate) onUpdate();
-                if (onClose) onClose();
-            } else {
-                // Partial removal
-                alert(`✅ ${message}\n\n💰 Refund: ₦${refund_amount.toLocaleString()}\n📦 ${items_remaining} item(s) remaining`);
-                setSelectedItems([]);
-                fetchOrderDetails(); // Refresh to show updated order
-            }
-        } catch (error) {
-            alert(error.response?.data?.detail || 'Failed to remove items');
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
-    const handleCancelOrder = async () => {
-        if (!confirm(`Cancel this order?\n\nYou will receive a full refund of ₦${order.total_amount.toLocaleString()}\n\nThis action cannot be undone.`)) {
-            return;
-        }
-
-        setActionLoading(true);
-        try {
-            const response = await api.post(`/orders/${orderId}/cancel`);
-            const { refund_processed, refund_amount, message } = response.data;
-
-            alert(`✅ ${message}\n\n💰 Refund: ₦${refund_amount.toLocaleString()}\n\nFunds have been returned to your wallet.`);
-
-            if (onUpdate) onUpdate();
-            if (onClose) onClose();
-        } catch (error) {
-            alert(error.response?.data?.detail || 'Failed to cancel order');
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
-    const handleConfirmDelivery = async () => {
-        if (!confirm('Have you received this order?\n\nConfirming usage of funds will release payment to the seller.\nThis action helps sellers get paid faster!')) return;
-
-        setActionLoading(true);
-        try {
-            await api.post(`/orders/${orderId}/confirm-delivery`);
-            alert('✅ Delivery Confirmed!\nThank you for shopping with Pyramyd. The order is now complete.');
-            if (onUpdate) onUpdate();
-            if (onClose) onClose();
-        } catch (error) {
-            console.error('Delivery confirmation failed:', error);
-            alert(error.response?.data?.detail || 'Failed to confirm delivery. Please try again.');
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
+  if (loading) {
     return (
-        <div className="modal-overlay">
-            <div className="modal-content order-details-modal">
-                <div className="modal-header">
-                    <h3>Order Details</h3>
-                    <button className="close-button" onClick={onClose}>&times;</button>
-                </div>
-
-                <div className="modal-body">
-                    {/* Order Info */}
-                    <div className="order-info-section">
-                        <div className="info-row">
-                            <span className="label">Order ID:</span>
-                            <span className="value">{order.order_id}</span>
-                        </div>
-                        <div className="info-row">
-                            <span className="label">Status:</span>
-                            <span className={`status-badge status-${order.status}`}>
-                                {order.status.replace(/_/g, ' ').toUpperCase()}
-                            </span>
-                        </div>
-                        <div className="info-row">
-                            <span className="label">Payment Method:</span>
-                            <span className="value">{order.payment_method}</span>
-                        </div>
-                        <div className="info-row">
-                            <span className="label">Total Amount:</span>
-                            <span className="value total-amount">₦{order.total_amount.toLocaleString()}</span>
-                        </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    {canModifyOrder() && (
-                        <div className="order-actions">
-                            {/* Logic for Multi-item vs Single Item Cancellation */}
-                            {order.items && (
-                                <button
-                                    className="btn-select-all"
-                                    onClick={handleSelectAll}
-                                    disabled={actionLoading}
-                                >
-                                    {selectedItems.length === orderItems.length ? '☑️ Deselect All' : '☐ Select All'}
-                                </button>
-                            )}
-
-                            {order.items && selectedItems.length > 0 && (
-                                <button
-                                    className="btn-remove-items"
-                                    onClick={handleRemoveItems}
-                                    disabled={actionLoading}
-                                >
-                                    {actionLoading ? '⏳ Processing...' : `🗑️ Remove ${selectedItems.length} Item(s) (₦${calculateSelectedTotal().toLocaleString()})`}
-                                </button>
-                            )}
-
-                            {(selectedItems.length === 0 || !order.items) && (
-                                <button
-                                    className="btn-cancel-order"
-                                    onClick={handleCancelOrder}
-                                    disabled={actionLoading}
-                                >
-                                    {actionLoading ? '⏳ Cancelling...' : '❌ Cancel Entire Order'}
-                                </button>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Items List */}
-                    <div className="order-items-section">
-                        <h4>Order Items</h4>
-                        {orderItems.map((item, index) => (
-                            <div key={index} className="order-item">
-                                {canModifyOrder() && order.items && (
-                                    <input
-                                        type="checkbox"
-                                        className="item-checkbox"
-                                        checked={selectedItems.includes(item.product_id)}
-                                        onChange={() => handleSelectItem(item.product_id)}
-                                        disabled={actionLoading}
-                                    />
-                                )}
-                                <div className="item-details">
-                                    <h5>{item.title}</h5>
-                                    <p className="item-meta">
-                                        Quantity: {item.quantity} × ₦{(item.price_per_unit || 0).toLocaleString()}
-                                    </p>
-                                </div>
-                                <div className="item-total">
-                                    ₦{(item.total || (item.quantity * item.price_per_unit) || 0).toLocaleString()}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Refund Preview */}
-                    {selectedItems.length > 0 && canModifyOrder() && (
-                        <div className="refund-preview">
-                            <div className="preview-row">
-                                <span>Items to Remove:</span>
-                                <span>{selectedItems.length}</span>
-                            </div>
-                            <div className="preview-row">
-                                <span>Refund Amount:</span>
-                                <span className="refund-amount">₦{calculateSelectedTotal().toLocaleString()}</span>
-                            </div>
-                            {selectedItems.length < orderItems.length && (
-                                <div className="preview-row">
-                                    <span>New Order Total:</span>
-                                    <span className="new-total">₦{(order.total_amount - calculateSelectedTotal()).toLocaleString()}</span>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Delivery Address */}
-                    <div className="delivery-section">
-                        <h4>Delivery Address</h4>
-                        <p>{order.delivery_address || 'Not specified'}</p>
-                    </div>
-
-                    {/* Status Message */}
-                    {!canModifyOrder() && (
-                        <div className="status-message">
-                            <p>ℹ️ This order cannot be modified in its current status.</p>
-                            {order.status === 'delivered' && (
-                                <div className="delivery-confirm-action" style={{ marginTop: '10px', textAlign: 'center' }}>
-                                    <p>Please confirm delivery to complete the order.</p>
-                                    <button
-                                        className="btn-confirm-delivery"
-                                        onClick={handleConfirmDelivery}
-                                        disabled={actionLoading}
-                                        style={{
-                                            backgroundColor: '#00b894',
-                                            color: 'white',
-                                            padding: '10px 20px',
-                                            borderRadius: '5px',
-                                            border: 'none',
-                                            cursor: 'pointer',
-                                            marginTop: '10px',
-                                            fontWeight: 'bold'
-                                        }}
-                                    >
-                                        {actionLoading ? 'Processing...' : '✅ Confirm Delivery'}
-                                    </button>
-                                </div>
-                            )}
-                            {order.status === 'completed' && <p>This order has been completed.</p>}
-                            {order.status === 'cancelled' && <p>This order was cancelled.</p>}
-                        </div>
-                    )}
-                </div>
-            </div>
+      <div className="od-overlay">
+        <div className="od-modal">
+          <div className="od-loading">
+            <div className="od-spinner od-spinner--lg" />
+            <p>Loading order details…</p>
+          </div>
         </div>
+      </div>
     );
+  }
+
+  if (!order) return null;
+
+  const meta    = statusMeta(order.status);
+  const modifiable = canModify(order.status);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  return (
+    <div className="od-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="od-modal">
+        <Toast toast={toast} />
+
+        {/* ── Delivery prompt banner — shown prominently when delivered ── */}
+        {order.status === 'delivered' && !pendingAction && (
+          <div className="od-delivery-banner">
+            <div className="od-delivery-banner__icon">📦</div>
+            <div className="od-delivery-banner__body">
+              <p className="od-delivery-banner__title">Your order has arrived!</p>
+              <p className="od-delivery-banner__sub">
+                Confirm receipt to release payment from escrow to the seller.
+              </p>
+            </div>
+            <button
+              className="od-delivery-banner__cta"
+              onClick={() => setPendingAction('delivery')}
+            >
+              Confirm Delivery
+            </button>
+          </div>
+        )}
+
+        {/* ── Header ── */}
+        <div className="od-header">
+          <div>
+            <p className="od-order-id">Order #{order.order_id}</p>
+            <span className={`od-status-badge ${meta.cls}`}>{meta.label}</span>
+          </div>
+          <button className="od-close" onClick={onClose} aria-label="Close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* ── Body ── */}
+        <div className="od-body">
+
+          {/* Inline confirm panel replaces window.confirm() */}
+          {pendingAction ? (
+            <ConfirmPanel
+              action={pendingAction}
+              order={order}
+              selectedItemCount={selectedItems.length}
+              selectedTotal={selectedTotal}
+              onConfirm={executeAction}
+              onCancel={() => setPendingAction(null)}
+              loading={actionLoading}
+            />
+          ) : (
+            <>
+              {/* ── Order meta ── */}
+              <section className="od-section">
+                <div className="od-meta-grid">
+                  <div className="od-meta-row">
+                    <span className="od-meta-label">Payment</span>
+                    <span className="od-meta-value">{order.payment_method ?? '—'}</span>
+                  </div>
+                  <div className="od-meta-row">
+                    <span className="od-meta-label">Total</span>
+                    <span className="od-meta-value od-meta-value--total">
+                      ₦{order.total_amount?.toLocaleString()}
+                    </span>
+                  </div>
+                  {order.created_at && (
+                    <div className="od-meta-row">
+                      <span className="od-meta-label">Placed</span>
+                      <span className="od-meta-value">
+                        {new Date(order.created_at).toLocaleDateString('en-NG', {
+                          day: 'numeric', month: 'short', year: 'numeric'
+                        })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* ── Items ── */}
+              <section className="od-section">
+                <div className="od-section-header">
+                  <h4 className="od-section-title">Items</h4>
+                  {modifiable && order.items && (
+                    <button className="od-select-all" onClick={toggleAll}>
+                      {selectedItems.length === orderItems.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                  )}
+                </div>
+
+                <div className="od-items-list">
+                  {orderItems.map((item, i) => (
+                    <div
+                      key={i}
+                      className={`od-item ${selectedItems.includes(item.product_id) ? 'od-item--selected' : ''}`}
+                      onClick={() => modifiable && order.items && toggleItem(item.product_id)}
+                    >
+                      {modifiable && order.items && (
+                        <input
+                          type="checkbox"
+                          className="od-checkbox"
+                          checked={selectedItems.includes(item.product_id)}
+                          onChange={() => toggleItem(item.product_id)}
+                          onClick={e => e.stopPropagation()}
+                        />
+                      )}
+                      <div className="od-item__info">
+                        <p className="od-item__title">{item.title}</p>
+                        <p className="od-item__meta">
+                          {item.quantity} × ₦{(item.price_per_unit || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <span className="od-item__total">
+                        ₦{(item.total || (item.quantity * item.price_per_unit) || 0).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Refund preview when items selected */}
+                {selectedItems.length > 0 && modifiable && (
+                  <div className="od-refund-preview">
+                    <div className="od-refund-row">
+                      <span>Items selected</span><span>{selectedItems.length}</span>
+                    </div>
+                    <div className="od-refund-row od-refund-row--highlight">
+                      <span>Refund amount</span>
+                      <span>₦{selectedTotal.toLocaleString()}</span>
+                    </div>
+                    {selectedItems.length < orderItems.length && (
+                      <div className="od-refund-row">
+                        <span>Remaining total</span>
+                        <span>₦{(order.total_amount - selectedTotal).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+
+              {/* ── Delivery address ── */}
+              <section className="od-section">
+                <h4 className="od-section-title">Delivery Address</h4>
+                <p className="od-address">{order.delivery_address || 'Not specified'}</p>
+              </section>
+
+              {/* ── Action footer ── */}
+              {modifiable && (
+                <section className="od-section od-actions">
+                  {order.items && selectedItems.length > 0 ? (
+                    <button
+                      className="od-btn od-btn--amber"
+                      onClick={() => setPendingAction('remove')}
+                      disabled={actionLoading}
+                    >
+                      🗑️ Remove {selectedItems.length} Item{selectedItems.length !== 1 ? 's' : ''}
+                    </button>
+                  ) : (
+                    <button
+                      className="od-btn od-btn--red"
+                      onClick={() => setPendingAction('cancel')}
+                      disabled={actionLoading}
+                    >
+                      Cancel Order
+                    </button>
+                  )}
+                </section>
+              )}
+
+              {/* ── Status info for non-modifiable states ── */}
+              {!modifiable && order.status !== 'delivered' && (
+                <section className="od-section">
+                  <div className={`od-status-info od-status-info--${order.status}`}>
+                    {order.status === 'completed' && '🎉 This order has been completed successfully.'}
+                    {order.status === 'cancelled' && '🚫 This order was cancelled and refunded.'}
+                    {!['completed', 'cancelled', 'delivered'].includes(order.status) &&
+                      'ℹ️ This order is currently being processed and cannot be modified.'
+                    }
+                  </div>
+                </section>
+              )}
+
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default OrderDetails;

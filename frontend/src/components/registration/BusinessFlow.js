@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import VerificationStep from './VerificationStep';
+import AddressFields from '../common/AddressFields';
 
 const BusinessFlow = ({ step, formData, updateFormData, setStep, onRegister }) => {
     // 1: Info, 2: Status/Docs Info, 3: Verification Upgrade
@@ -165,17 +166,24 @@ const BusinessFlow = ({ step, formData, updateFormData, setStep, onRegister }) =
                 />
             </div>
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Business Address *</label>
-                <textarea
-                    value={formData.business_info?.address || ''}
-                    onChange={(e) => updateFormData({ business_info: { ...formData.business_info, address: e.target.value } })}
-                    placeholder="Full business address"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                    rows="3"
-                    required
-                />
-            </div>
+            <AddressFields
+                label="Business Address"
+                values={{
+                    street: formData.business_info?.address_street || '',
+                    city: formData.business_info?.city || '',
+                    state: formData.business_info?.state || '',
+                    country: formData.business_info?.country || 'Nigeria',
+                }}
+                onChange={patch => {
+                    const update = {};
+                    if ('street'  in patch) update.address_street = patch.street;
+                    if ('city'    in patch) update.city    = patch.city;
+                    if ('state'   in patch) update.state   = patch.state;
+                    if ('country' in patch) update.country = patch.country;
+                    updateFormData({ business_info: { ...formData.business_info, ...update } });
+                }}
+                accentColor="purple"
+            />
 
             <button
                 type="submit"

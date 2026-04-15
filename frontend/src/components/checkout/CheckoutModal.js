@@ -81,12 +81,19 @@ const CheckoutModal = ({
         }
     }, [isOpen]);
 
+    // Inline form error — replaces all four alert() dialogs
+    const [formError, setFormError] = React.useState('');
+    const showFormError = (msg) => {
+        setFormError(msg);
+        setTimeout(() => setFormError(''), 5000);
+    };
+
     if (!isOpen) return null;
 
     const validateAddress = () => {
         if (addressMode === 'pickup') {
             if (!selectedPickupLocation) {
-                alert('Please select a pickup location');
+                showFormError('Please select a pickup location before continuing.');
                 return false;
             }
             return true;
@@ -96,12 +103,12 @@ const CheckoutModal = ({
         const missing = required.filter(field => !shippingAddress[field]?.trim());
 
         if (missing.length > 0) {
-            alert(`Please fill in the following required fields: ${missing.join(', ')}`);
+            showFormError(`Please fill in: ${missing.map(f => f.replace(/_/g, ' ')).join(', ')}.`);
             return false;
         }
 
         if (!/^\+?[\d\s-()]+$/.test(shippingAddress.phone)) {
-            alert('Please enter a valid phone number');
+            showFormError('Please enter a valid phone number (digits only).');
             return false;
         }
 
@@ -172,7 +179,7 @@ const CheckoutModal = ({
 
         } catch (error) {
             console.error("Payment/Order failed", error);
-            alert(`Failed: ${error.response?.data?.detail || error.message}`);
+            showFormError(error.response?.data?.detail || error.message || 'Payment failed. Please try again.');
             setPaymentProcessing(false);
         } finally {
             if (paymentMethod === 'wallet') {
@@ -187,6 +194,15 @@ const CheckoutModal = ({
 
                 {/* Main Content Area */}
                 <div className="flex-1 overflow-y-auto p-6 lg:p-8">
+                    {/* ── Inline form error banner ── */}
+                    {formError && (
+                        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800 flex items-start gap-2">
+                            <span className="flex-shrink-0 text-base">⚠️</span>
+                            <span>{formError}</span>
+                            <button onClick={() => setFormError('')} className="ml-auto text-red-400 hover:text-red-700 text-lg leading-none flex-shrink-0">×</button>
+                        </div>
+                    )}
+
                     {paymentStatus === 'success' ? (
                         <div className="flex flex-col items-center justify-center p-8 h-full">
                             <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6 animate-bounce">

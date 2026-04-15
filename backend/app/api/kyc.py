@@ -11,6 +11,88 @@ from app.api.notifications import create_notification
 
 router = APIRouter()
 
+
+# ---------------------------------------------------------------------------
+# POST /kyc/submit-documents
+# Called from the partner dashboard when a user who registered without docs
+# is now ready to submit them for admin review.
+# ---------------------------------------------------------------------------
+
+@router.post("/submit-documents")
+async def submit_documents(
+    documents: dict,  # { docKey: publicUrl, ... }
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Partner submits verification documents from their dashboard.
+    Transitions kyc_status: documents_pending → pending_review
+    and alerts admin.
+    """
+    if current_user.get('role') not in ('farmer', 'agent', 'business', 'cooperative'):
+        raise HTTPException(status_code=403, detail="Only partners can submit verification documents")
+
+    current_status = current_user.get('kyc_status')
+    if current_status == 'approved':
+        raise HTTPException(status_code=400, detail="Your account is already verified.")
+    if current_status == 'pending_review':
+        raise HTTPException(status_code=400, detail="Documents already submitted and under review.")
+
+    if not documents:
+        raise HTTPException(status_code=400, detail="No documents provided.")
+
+    db = get_db()
+    db.users.update_one(
+        {"id": current_user['id']},
+        {"$set": {
+            "documents_submitted": documents,
+            "documents_verified": False,
+            "documents_verified_at": None,
+            "kyc_status": "pending_review",
+            "kyc_submitted_at": datetime.utcnow()
+        }}
+    )
+
+    # Notify admin
+    import os
+    from app.core.config import settings
+    admin_email = os.environ.get("ADMIN_EMAIL")
+    if admin_email and settings.ZEPTOMAIL_TOKEN:
+        try:
+            from app.utils.email import send_zeptomail
+            doc_keys = list(documents.keys())
+            frontend_url = os.environ.get("FRONTEND_URL", "https://pyramydhub.com")
+            admin_html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                <h2 style="color: #059669;">&#x1F4C4; Partner Documents Submitted for Review</h2>
+                <p>A registered partner has now uploaded their verification documents.</p>
+                <table style="width:100%; border-collapse:collapse; margin-top:12px;">
+                    <tr><td style="padding:6px 0; color:#666;">Name</td><td style="padding:6px 0; font-weight:600;">{current_user.get('first_name')} {current_user.get('last_name')}</td></tr>
+                    <tr><td style="padding:6px 0; color:#666;">Username</td><td style="padding:6px 0;">@{current_user.get('username')}</td></tr>
+                    <tr><td style="padding:6px 0; color:#666;">Role</td><td style="padding:6px 0;">{current_user.get('role')}</td></tr>
+                    <tr><td style="padding:6px 0; color:#666;">Documents</td><td style="padding:6px 0;">{', '.join(doc_keys)}</td></tr>
+                    <tr><td style="padding:6px 0; color:#666;">User ID</td><td style="padding:6px 0; font-family:monospace; font-size:12px;">{current_user.get('id')}</td></tr>
+                </table>
+                <div style="margin-top:24px; text-align:center;">
+                    <a href="{frontend_url}/pyadmin?tab=kyc&user={current_user.get('id')}" style="display:inline-block; padding:12px 28px; background:#059669; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">Review in Admin Panel &rarr;</a>
+                </div>
+                <p style="color:#999; font-size:12px; margin-top:16px;">This is an automated alert from Pyramyd Hub.</p>
+            </div>
+            """
+            send_zeptomail(
+                to_email=admin_email,
+                subject=f"[Pyramyd] Documents Submitted — {current_user.get('first_name')} {current_user.get('last_name')} ({current_user.get('role').title()})",
+                html_content=admin_html,
+                to_name="Pyramyd Admin"
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to send admin notification: {str(e)}")
+
+    return {
+        "message": "Documents submitted successfully. Your account is now under admin review.",
+        "kyc_status": "pending_review"
+    }
+
 # --- Helper to process file upload ---
 async def process_file_upload(file: UploadFile) -> dict:
     allowed_types = ["image/jpeg", "image/png", "application/pdf"]

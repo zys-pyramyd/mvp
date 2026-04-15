@@ -114,7 +114,7 @@ const MyOrders = () => {
                             <div className="order-card-body">
                                 <div className="order-info">
                                     <p className="order-items">
-                                        {order.items.length} item(s)
+                                        {order.items?.length ?? (order.product_details ? 1 : 0)} item(s)
                                     </p>
                                     <p className="order-date">
                                         {new Date(order.created_at).toLocaleDateString('en-US', {

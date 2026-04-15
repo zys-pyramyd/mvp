@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 const LoginStep = ({ formData, updateFormData, onLogin, switchToRegister, onCancel }) => {
     const [loading, setLoading] = useState(false);
+    const [loginError, setLoginError] = useState(''); // inline error, no alert()
     const [view, setView] = useState('login'); // login, forgot, reset
     const [resetEmail, setResetEmail] = useState('');
     const [otp, setOtp] = useState('');
@@ -11,10 +12,11 @@ const LoginStep = ({ formData, updateFormData, onLogin, switchToRegister, onCanc
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setLoginError('');
         try {
             await onLogin(formData.email_or_phone, formData.password);
         } catch (error) {
-            // Error handling is likely in parent, but safety verify
+            setLoginError(error?.message || 'Login failed. Please check your credentials.');
         } finally {
             setLoading(false);
         }
@@ -147,6 +149,14 @@ const LoginStep = ({ formData, updateFormData, onLogin, switchToRegister, onCanc
     return (
         <div className="space-y-4">
             {message && <div className="text-center text-sm p-2 rounded bg-green-100 text-green-700 mb-2">{message}</div>}
+            {/* Login error banner — replaces alert() */}
+            {loginError && (
+                <div className="flex items-start gap-2 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+                    <span>⚠️</span>
+                    <span>{loginError}</span>
+                    <button onClick={() => setLoginError('')} className="ml-auto text-red-400 hover:text-red-700 text-lg leading-none">&times;</button>
+                </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Email or Phone</label>

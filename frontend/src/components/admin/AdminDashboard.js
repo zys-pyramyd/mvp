@@ -1,12 +1,82 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
-const AdminDashboard = () => {
-    const { user, token } = useAuth();
-    const [activeTab, setActiveTab] = useState('overview'); // overview, users, kyc, orders
+// ---------------------------------------------------------------------------
+// Micro-components (inline — no extra files needed)
+// ---------------------------------------------------------------------------
+
+/** Simple toast — auto-hides after 4 s */
+function AdminToast({ toast, onDismiss }) {
+  if (!toast) return null;
+  const bg = toast.type === 'success' ? 'bg-emerald-700' : toast.type === 'error' ? 'bg-red-700' : 'bg-gray-800';
+  return (
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-5 py-3 rounded-xl shadow-2xl text-white text-sm font-medium flex items-center gap-3 ${bg}`}>
+      <span>{toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}</span>
+      <span>{toast.message}</span>
+      <button onClick={onDismiss} className="ml-2 opacity-70 hover:opacity-100 text-lg leading-none">&times;</button>
+    </div>
+  );
+}
+
+/** Inline confirm modal — replaces window.confirm() and prompt() */
+function ConfirmModal({ config, onConfirm, onCancel }) {
+  const [reason, setReason] = React.useState('');
+  if (!config) return null;
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
+        <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl ${config.iconBg || 'bg-amber-100'}`}>
+          {config.icon || '⚠️'}
+        </div>
+        <h3 className="text-lg font-bold text-gray-900 mb-2">{config.title}</h3>
+        <p className="text-sm text-gray-500 mb-4">{config.description}</p>
+        {config.requireReason && (
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            placeholder="Enter reason (required)"
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-400 outline-none resize-none mb-4"
+          />
+        )}
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50">Cancel</button>
+          <button
+            onClick={() => onConfirm(reason)}
+            disabled={config.requireReason && !reason.trim()}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40 ${config.confirmCls || 'bg-amber-500 hover:bg-amber-600'}`}
+          >
+            {config.confirmLabel || 'Confirm'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+const AdminDashboard = ({ onClose, initialTab = 'overview', highlightUserId = null }) => {
+    const { user } = useAuth();
+    const [activeTab, setActiveTab] = useState(initialTab);
     const [loading, setLoading] = useState(false);
     const [stats, setStats] = useState(null);
+    const [toast, setToast] = useState(null);
+    const [confirm, setConfirm] = useState(null); // { title, description, icon, iconBg, confirmLabel, confirmCls, requireReason, onConfirm }
+    const highlightRef = useRef(null);
+
+    const showToast = (type, message) => {
+        setToast({ type, message });
+        setTimeout(() => setToast(null), 4000);
+    };
+
+    const askConfirm = (config) => new Promise((resolve) => {
+        setConfirm({ ...config, _resolve: resolve });
+    });
+    const handleConfirm = (reason) => { const r = confirm._resolve; setConfirm(null); r({ confirmed: true, reason }); };
+    const handleCancel  = ()       => { const r = confirm._resolve; setConfirm(null); r({ confirmed: false }); };
 
     // Data States
     const [usersList, setUsersList] = useState([]);
@@ -26,6 +96,13 @@ const AdminDashboard = () => {
         if (activeTab === 'orders') fetchOrders();
         if (activeTab === 'reconciliations') fetchReconciliations();
     }, [activeTab]);
+
+    // Scroll to highlighted user after KYC tab loads
+    useEffect(() => {
+        if (highlightUserId && activeTab === 'kyc' && highlightRef.current) {
+            setTimeout(() => highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+        }
+    }, [highlightUserId, activeTab, pendingKyc]);
 
     const fetchAdminStats = async () => {
         try {
@@ -92,127 +169,128 @@ const AdminDashboard = () => {
     };
 
     const handleHoldPayment = async (orderId) => {
-        if (!window.confirm("⚠️ Are you sure you want to HOLD payment for this order? This will prevent auto-release.")) return;
+        const { confirmed } = await askConfirm({
+            title: 'Hold Payment?',
+            description: 'This will prevent automatic fund release for this order.',
+            icon: '⚠️', iconBg: 'bg-amber-100',
+            confirmLabel: 'Hold Payment', confirmCls: 'bg-amber-500 hover:bg-amber-600',
+        });
+        if (!confirmed) return;
         try {
             const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/admin/orders/${orderId}/halt-payout`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
-            if (response.ok) {
-                alert("Payment placed on HOLD.");
-                fetchOrders();
-            } else {
-                alert("Failed to hold payment.");
-            }
-        } catch (err) { console.error(err); alert("Error holding payment."); }
+            if (response.ok) { showToast('success', 'Payment placed on HOLD.'); fetchOrders(); }
+            else showToast('error', 'Failed to hold payment.');
+        } catch (err) { console.error(err); showToast('error', 'Error holding payment.'); }
     };
 
     const handleReleasePayment = async (orderId) => {
-        if (!window.confirm("✅ Are you sure you want to RELEASE payment manually? This will transfer funds immediately.")) return;
+        const { confirmed } = await askConfirm({
+            title: 'Release Payment?',
+            description: 'This will transfer funds to the seller immediately. Only proceed when delivery is confirmed.',
+            icon: '✅', iconBg: 'bg-emerald-100',
+            confirmLabel: 'Release Now', confirmCls: 'bg-emerald-600 hover:bg-emerald-700',
+        });
+        if (!confirmed) return;
         try {
             const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/admin/orders/${orderId}/manual-release`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
-            if (response.ok) {
-                alert("Payment released successfully.");
-                fetchOrders();
-            } else {
-                alert("Failed to release payment.");
-            }
-        } catch (err) { console.error(err); alert("Error releasing payment."); }
+            if (response.ok) { showToast('success', 'Payment released successfully.'); fetchOrders(); }
+            else showToast('error', 'Failed to release payment.');
+        } catch (err) { console.error(err); showToast('error', 'Error releasing payment.'); }
     };
 
     // Actions
     const toggleBlockUser = async (userId, isBlocked) => {
         const action = isBlocked ? 'unblock' : 'block';
-        if (!window.confirm(`Are you sure you want to ${action} this user?`)) return;
-
+        const { confirmed } = await askConfirm({
+            title: `${isBlocked ? 'Unblock' : 'Block'} User?`,
+            description: isBlocked
+                ? 'This user will be able to log in and use the platform again.'
+                : 'This user will be immediately locked out of the platform.',
+            icon: isBlocked ? '✅' : '🚫',
+            iconBg: isBlocked ? 'bg-emerald-100' : 'bg-red-100',
+            confirmLabel: isBlocked ? 'Unblock' : 'Block',
+            confirmCls: isBlocked ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700',
+        });
+        if (!confirmed) return;
         try {
             const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/admin/users/${userId}/${action}`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
-            if (response.ok) {
-                alert(`User ${action}ed successfully`);
-                fetchUsers();
-            }
-        } catch (err) { alert('Action failed'); }
+            if (response.ok) { showToast('success', `User ${action}ed successfully.`); fetchUsers(); }
+            else showToast('error', 'Action failed.');
+        } catch (err) { showToast('error', 'Action failed.'); }
     };
 
-    const handleKycAction = async (userId, action) => { // action = approve or reject
-        const reason = action === 'reject' ? prompt("Enter rejection reason:") : null;
-        if (action === 'reject' && !reason) return;
+    const handleKycAction = async (userId, action) => {
+        const isReject = action === 'reject';
+        const { confirmed, reason } = await askConfirm({
+            title: isReject ? 'Reject Verification?' : 'Approve Verification?',
+            description: isReject
+                ? 'The applicant will be notified with your reason. Their account stays inactive.'
+                : 'The applicant will be verified and can immediately use all partner features.',
+            icon: isReject ? '❌' : '✅',
+            iconBg: isReject ? 'bg-red-100' : 'bg-emerald-100',
+            confirmLabel: isReject ? 'Reject' : 'Approve',
+            confirmCls: isReject ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700',
+            requireReason: isReject,
+        });
+        if (!confirmed) return;
 
         try {
             const url = `${process.env.REACT_APP_BACKEND_URL}/api/kyc/admin/${action}/${userId}`;
-            const body = action === 'reject' ? JSON.stringify({ reason }) : null;
-
+            const body = isReject ? JSON.stringify({ reason }) : null;
             const response = await fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
-                },
-                body: body
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' },
+                body,
             });
-
-            if (response.ok) {
-                alert(`KYC ${action}ed!`);
-                fetchPendingKyc();
-            }
-        } catch (err) { alert('Action failed'); }
+            if (response.ok) { showToast('success', `KYC ${action}d successfully.`); fetchPendingKyc(); }
+            else showToast('error', `KYC ${action} failed.`);
+        } catch (err) { showToast('error', 'Action failed.'); }
     };
 
     const updateOrderStatus = async (orderId, newStatus) => {
         if (newStatus === 'delivered') {
-            if (!window.confirm("⚠️ WARNING: Marking as DELIVERED will release funds to the seller. Use this only when delivery is confirmed. Proceed?")) {
-                return;
-            }
+            const { confirmed } = await askConfirm({
+                title: 'Mark as Delivered?',
+                description: 'This will release funds to the seller. Only confirm when physical delivery is confirmed.',
+                icon: '📦', iconBg: 'bg-amber-100',
+                confirmLabel: 'Yes, Mark Delivered', confirmCls: 'bg-amber-500 hover:bg-amber-600',
+            });
+            if (!confirmed) return;
         }
-
         try {
             const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/admin/orders/${orderId}/status`, {
                 method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus })
             });
-
-            if (response.ok) {
-                const data = await response.json();
-                alert(data.message);
-                fetchOrders();
-            } else {
-                const error = await response.json();
-                alert(`Failed: ${error.detail}`);
-            }
-        } catch (err) { alert('Update failed'); }
+            if (response.ok) { const d = await response.json(); showToast('success', d.message); fetchOrders(); }
+            else { const e = await response.json(); showToast('error', `Failed: ${e.detail}`); }
+        } catch (err) { showToast('error', 'Update failed.'); }
     };
 
     const viewDocument = async (docId) => {
-        // Create a temporary window/tab to show document
-        // In a real app we might fetch the blob and show in a modal
         try {
             const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/kyc/admin/document/${docId}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             if (response.ok) {
                 const data = await response.json();
-                // Data has file_data base64
                 const byteCharacters = atob(data.file_data);
                 const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: data.mime_type });
-                const blobUrl = URL.createObjectURL(blob);
-                window.open(blobUrl, '_blank');
-            }
-        } catch (err) { alert("Failed to load document"); }
+                for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+                const blob = new Blob([new Uint8Array(byteNumbers)], { type: data.mime_type });
+                window.open(URL.createObjectURL(blob), '_blank');
+            } else showToast('error', 'Failed to load document.');
+        } catch (err) { showToast('error', 'Failed to load document.'); }
     };
 
     if (!user || user.role !== 'admin') {
@@ -230,6 +308,8 @@ const AdminDashboard = () => {
 
     return (
         <div className="min-h-screen bg-gray-100">
+            <AdminToast toast={toast} onDismiss={() => setToast(null)} />
+            <ConfirmModal config={confirm} onConfirm={handleConfirm} onCancel={handleCancel} />
             {/* Top Navbar */}
             <div className="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
                 <div className="flex items-center gap-2">
@@ -237,8 +317,12 @@ const AdminDashboard = () => {
                     <h1 className="text-xl font-bold text-gray-800">Pyramyd Admin</h1>
                 </div>
                 <div className="flex items-center gap-4">
-                    <span className="text-sm font-medium">Logged in as {user.username}</span>
-                    <img src={user.profile_picture || "https://via.placeholder.com/40"} className="w-8 h-8 rounded-full border border-gray-300" alt="Admin" />
+                    <span className="text-sm font-medium">Logged in as {user?.username}</span>
+                    {onClose && (
+                        <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" title="Close">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -369,8 +453,16 @@ const AdminDashboard = () => {
                                 </div>
                             ) : (
                                 <div className="grid gap-6">
-                                    {pendingKyc.map(kyc => (
-                                        <div key={kyc.user.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                                    {pendingKyc.map(kyc => {
+                                        const isHighlighted = highlightUserId && kyc.user.id === highlightUserId;
+                                        return (
+                                        <div
+                                            key={kyc.user.id}
+                                            ref={isHighlighted ? highlightRef : null}
+                                            className={`bg-white rounded-lg shadow-sm border p-6 transition-all ${
+                                                isHighlighted ? 'border-emerald-400 ring-2 ring-emerald-300' : 'border-gray-200'
+                                            }`}
+                                        >
                                             <div className="flex justify-between items-start mb-4">
                                                 <div className="flex items-center gap-4">
                                                     <img src={kyc.user.profile_picture || "https://via.placeholder.com/50"} className="w-12 h-12 rounded-full" alt="" />
@@ -418,7 +510,8 @@ const AdminDashboard = () => {
                                                 </pre>
                                             </div>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -567,7 +660,10 @@ const AdminDashboard = () => {
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                         {rec.status === 'pending' && (
-                                                            <button className="text-emerald-600 hover:text-emerald-900 bg-emerald-50 px-3 py-1 rounded border border-emerald-200" onClick={() => alert('Direct user to provide bank details first, then use Wallet payout API to release.')}>
+                                                            <button
+                                                                className="text-emerald-600 hover:text-emerald-900 bg-emerald-50 px-3 py-1 rounded border border-emerald-200"
+                                                                onClick={() => showToast('info', 'Ask user to provide bank details first, then use Wallet payout API to release.')}
+                                                            >
                                                                 Resolve Vault
                                                             </button>
                                                         )}

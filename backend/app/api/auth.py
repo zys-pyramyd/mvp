@@ -156,13 +156,19 @@ async def complete_registration(registration_data: CompleteRegistration):
     logging.getLogger(__name__).debug(f"Registration: Path={registration_data.user_path}, Type={registration_data.partner_type}")
     logging.getLogger(__name__).debug(f"Assigned UserRole={user_role}")
 
+    # Determine whether email_or_phone is an email address or phone number
+    raw_id = registration_data.email_or_phone
+    is_email = '@' in raw_id
+    resolved_email = raw_id if is_email else None
+    resolved_phone = (registration_data.phone or raw_id) if not is_email else registration_data.phone
+
     # Create user with complete information
     user = User(
         first_name=registration_data.first_name,
         last_name=registration_data.last_name,
         username=registration_data.username,
-        email=registration_data.email_or_phone,  # Store as email for compatibility
-        phone=registration_data.phone,
+        email=resolved_email or f"{registration_data.username}@pyramyd.local",  # placeholder avoids null
+        phone=resolved_phone,
         role=user_role
     )
     
@@ -177,43 +183,72 @@ async def complete_registration(registration_data: CompleteRegistration):
         user_dict['business_category'] = registration_data.business_category
     user_dict['verification_info'] = registration_data.verification_info or {}
     
-    # Save document metadata (secure - only keys, not URLs)
-    if registration_data.documents_submitted:
+    # Save document metadata
+    has_docs = bool(registration_data.documents_submitted)
+    if has_docs:
         user_dict['documents_submitted'] = registration_data.documents_submitted
         user_dict['documents_verified'] = False
         user_dict['documents_verified_at'] = None
-    
-    user_dict['is_verified'] = False  # Will be updated after verification process
+
+    # Buyers — active immediately (no verification needed).
+    # Partners — status depends on whether they uploaded docs during registration:
+    #   • documents_pending  → created account, hasn't uploaded docs yet
+    #   • pending_review     → docs uploaded, awaiting admin decision
+    is_partner = registration_data.user_path == 'partner'
+    if is_partner:
+        user_dict['is_verified'] = False
+        user_dict['kyc_status'] = 'pending_review' if has_docs else 'documents_pending'
+    else:
+        user_dict['is_verified'] = True
+
+    # Store the real email separately so we can always email them
+    user_dict['email_or_phone'] = raw_id  # keep original identifier for login lookup
+    if is_email:
+        user_dict['email'] = raw_id
 
     # Handle BVN for Partners (Store only, Verify later)
-    if registration_data.user_path == 'partner' and registration_data.bvn:
+    if is_partner and registration_data.bvn:
         # Encrypt BVN (never store plain)
         user_dict['bvn'] = encrypt_data(registration_data.bvn)
         user_dict['wallet_balance'] = 0.0
-    
+
     db.users.insert_one(user_dict)
-    
+
+
     # Generate token
     token = create_token(user.id)
     
-    # Send Welcome Email via ZeptoMail
-    if settings.ZEPTOMAIL_TOKEN and user.email:
+    # -----------------------------------------------------------------
+    # Send welcome email to user (only if we have a real email address)
+    # -----------------------------------------------------------------
+    user_email_for_send = resolved_email  # None if they registered with phone
+    if settings.ZEPTOMAIL_TOKEN and user_email_for_send:
         try:
             from app.utils.email import send_zeptomail
+            if is_partner:
+                body_line = (
+                    "Your application has been received and our team will review your verification "
+                    "documents within 1–2 business days. You'll be notified once approved."
+                )
+            else:
+                body_line = (
+                    "You can now browse products, manage your profile, and connect with verified "
+                    "buyers and sellers seamlessly."
+                )
             welcome_html = f"""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
                 <div style="text-align: center; margin-bottom: 20px;">
                     <h1 style="color: #059669; margin: 0;">Welcome to Pyramyd!</h1>
                 </div>
                 <p style="font-size: 16px;">Hello {user.first_name},</p>
-                <p style="font-size: 16px;">Your account has been successfully created. We're thrilled to have you connected to our premier agricultural marketplace.</p>
-                <p style="font-size: 16px;">You can now browse products, manage your profile, and connect with verified buyers and sellers seamlessly.</p>
+                <p style="font-size: 16px;">Your account has been successfully created. We&#39;re thrilled to have you on our premier agricultural marketplace.</p>
+                <p style="font-size: 16px;">{body_line}</p>
                 <br/>
                 <p style="color: #666; font-size: 14px;">Best Regards,<br/><strong>The Pyramyd Team</strong></p>
             </div>
             """
             send_zeptomail(
-                to_email=user.email,
+                to_email=user_email_for_send,
                 subject="Welcome to Pyramyd!",
                 html_content=welcome_html,
                 to_name=f"{user.first_name} {user.last_name}"
@@ -221,7 +256,45 @@ async def complete_registration(registration_data: CompleteRegistration):
         except Exception as e:
             import logging
             logging.getLogger(__name__).error(f"Failed to send welcome email: {str(e)}")
-            pass
+
+    # -----------------------------------------------------------------
+    # Notify admin when a partner submits documents for verification
+    # Only fires if docs were actually uploaded during registration.
+    # If partner skipped docs, admin is notified later via /api/kyc/submit-documents.
+    # -----------------------------------------------------------------
+    if is_partner and has_docs and settings.ZEPTOMAIL_TOKEN:
+        try:
+            from app.utils.email import send_zeptomail
+            admin_email = os.environ.get("ADMIN_EMAIL")
+            if admin_email:
+                doc_keys = list((registration_data.documents_submitted or {}).keys())
+                admin_html = f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                    <h2 style="color: #059669;">&#x1F514; New Partner Verification Request</h2>
+                    <p>A new partner has registered and is awaiting identity verification.</p>
+                    <table style="width:100%; border-collapse:collapse; margin-top:12px;">
+                        <tr><td style="padding:6px 0; color:#666;">Name</td><td style="padding:6px 0; font-weight:600;">{user.first_name} {user.last_name}</td></tr>
+                        <tr><td style="padding:6px 0; color:#666;">Username</td><td style="padding:6px 0;">{user.username}</td></tr>
+                        <tr><td style="padding:6px 0; color:#666;">Role</td><td style="padding:6px 0;">{user_role}</td></tr>
+                        <tr><td style="padding:6px 0; color:#666;">Contact</td><td style="padding:6px 0;">{raw_id}</td></tr>
+                        <tr><td style="padding:6px 0; color:#666;">Documents</td><td style="padding:6px 0;">{', '.join(doc_keys) if doc_keys else 'None uploaded'}</td></tr>
+                        <tr><td style="padding:6px 0; color:#666;">User ID</td><td style="padding:6px 0; font-family:monospace; font-size:12px;">{user.id}</td></tr>
+                    </table>
+                    <div style="margin-top:24px; text-align:center;">
+                        <a href="{os.environ.get('FRONTEND_URL', 'https://pyramydhub.com')}/pyadmin?tab=kyc&user={user.id}" style="display:inline-block; padding:12px 28px; background:#059669; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">Review in Admin Panel &rarr;</a>
+                    </div>
+                    <p style="color:#999; font-size:12px; margin-top:16px;">This is an automated alert from Pyramyd Hub.</p>
+                </div>
+                """
+                send_zeptomail(
+                    to_email=admin_email,
+                    subject=f"[Pyramyd] New {user_role.title()} Verification Request — {user.first_name} {user.last_name}",
+                    html_content=admin_html,
+                    to_name="Pyramyd Admin"
+                )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to send admin notification: {str(e)}")
     
     return {
         "message": "Registration completed successfully",

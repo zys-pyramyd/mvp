@@ -5,6 +5,7 @@ import PrivacyPolicyModal from '../legal/PrivacyPolicyModal';
 
 const VerificationStep = ({ formData, updateFormData, onRegister, onBack, role, requiredDocs, docLabels, isSubmitting }) => {
     const [uploading, setUploading] = useState({}); // { docKey: boolean }
+    const [uploadError, setUploadError] = useState(''); // inline error, replaces alert()
     const [previewUrls, setPreviewUrls] = useState({}); // { docKey: url } (blob urls)
     const [fileTypes, setFileTypes] = useState({}); // { docKey: 'image' | 'pdf' }
     const [activeCamera, setActiveCamera] = useState(null); // docKey of active camera
@@ -37,7 +38,7 @@ const VerificationStep = ({ formData, updateFormData, onRegister, onBack, role, 
         } catch (err) {
             console.error("Camera access denied:", err);
             setCameraError(prev => ({ ...prev, [key]: true }));
-            alert("Could not access camera. Please allow camera permissions or use upload fallback.");
+            // No alert() — cameraError state shows a fallback upload link below
         }
     };
 
@@ -118,7 +119,8 @@ const VerificationStep = ({ formData, updateFormData, onRegister, onBack, role, 
 
         } catch (err) {
             console.error("Upload error:", err);
-            alert("Upload failed. Please try again.");
+            setUploadError('Document upload failed. Please check your connection and try again.');
+            setTimeout(() => setUploadError(''), 6000);
         } finally {
             setUploading(prev => ({ ...prev, [docKey]: false }));
         }
@@ -157,10 +159,33 @@ const VerificationStep = ({ formData, updateFormData, onRegister, onBack, role, 
 
     return (
         <div className="space-y-6">
-            <h3 className="text-lg font-bold text-center">Identity Verification</h3>
-            <p className="text-sm text-gray-500 text-center">
-                Please provide the required documents (JPG, PNG, PDF accepted).
-            </p>
+            <div className="text-center">
+                <h3 className="text-lg font-bold">Identity Verification</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                    Upload your documents now, or skip and complete later from your dashboard.
+                </p>
+            </div>
+
+            {/* Soft info banner — replaces the hard blocker */}
+            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+                <span className="text-lg mt-0.5">🔔</span>
+                <div>
+                    <p className="font-semibold">Verification unlocks selling on Pyramyd</p>
+                    <p className="text-amber-700 text-xs mt-0.5">
+                        You can complete registration without documents — your account will be created immediately.
+                        Head to your dashboard anytime to upload the missing documents and submit for admin review.
+                    </p>
+                </div>
+            </div>
+
+            {/* Upload / camera error banner */}
+            {uploadError && (
+                <div className="flex items-start gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+                    <span className="flex-shrink-0">⚠️</span>
+                    <span>{uploadError}</span>
+                    <button onClick={() => setUploadError('')} className="ml-auto text-red-400 hover:text-red-700 text-lg leading-none">&times;</button>
+                </div>
+            )}
 
             <div className="space-y-4">
                 {requiredDocs.map(key => {
@@ -304,13 +329,24 @@ const VerificationStep = ({ formData, updateFormData, onRegister, onBack, role, 
                         Back
                     </button>
                 )}
-                <button
-                    onClick={() => onRegister(formData)}
-                    disabled={!isComplete || !formData.agreedToTerms || isSubmitting}
-                    className={`bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium flex-1 ml-4 disabled:bg-gray-300 disabled:cursor-not-allowed ${!onBack ? 'w-full' : ''}`}
-                >
-                    {isSubmitting ? 'Submitting...' : 'Complete Registration'}
-                </button>
+                <div className="flex-1 ml-4 space-y-2">
+                    {Object.keys(formData.documents || {}).length === 0 && (
+                        <p className="text-xs text-center text-gray-400">
+                            No documents? You can upload them later from your dashboard.
+                        </p>
+                    )}
+                    <button
+                        onClick={() => onRegister(formData)}
+                        disabled={!formData.agreedToTerms || isSubmitting}
+                        className="w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                        {isSubmitting
+                            ? 'Creating your account…'
+                            : Object.keys(formData.documents || {}).length > 0
+                                ? 'Submit'
+                                : 'Continue'}
+                    </button>
+                </div>
                 {showTerms && <TermsOfUseModal onClose={() => setShowTerms(false)} zIndex={60} />}
                 {showPrivacy && <PrivacyPolicyModal onClose={() => setShowPrivacy(false)} zIndex={60} />}
             </div>

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import AddressFields from '../common/AddressFields';
 import { Plus, Trash2 } from 'lucide-react';
 import VerificationStep from './VerificationStep';
 
 const FarmerFlow = ({ step, formData, updateFormData, setStep, onRegister }) => {
     const [showAddFarm, setShowAddFarm] = useState(false);
+    const [farmError, setFarmError] = useState(''); // inline error replaces alert()
     const [newFarm, setNewFarm] = useState({
         size: '',
         size_unit: 'acres',
@@ -54,17 +56,19 @@ const FarmerFlow = ({ step, formData, updateFormData, setStep, onRegister }) => 
 
     const handleFarm = () => {
         if ((formData.farm_details || []).length === 0) {
-            alert("Please add at least one farm.");
+            setFarmError('Please add at least one farm before continuing.');
             return;
         }
+        setFarmError('');
         setStep('verification');
     };
 
     const addFarm = () => {
         if (!newFarm.size || !newFarm.address || newFarm.products.length === 0) {
-            alert("Please fill all farm details and add at least one product.");
+            setFarmError('Please fill in all farm fields and add at least one product.');
             return;
         }
+        setFarmError('');
         updateFormData({
             farm_details: [...(formData.farm_details || []), newFarm]
         });
@@ -250,6 +254,9 @@ const FarmerFlow = ({ step, formData, updateFormData, setStep, onRegister }) => 
                 )}
 
                 <div className="flex justify-between pt-4">
+                    {farmError && (
+                        <p className="text-xs text-red-600 mb-2 w-full">{farmError}</p>
+                    )}
                     <button onClick={() => setInternalStep(1)} className="text-gray-500 hover:text-gray-700">Back</button>
                     <button
                         onClick={handleFarm}
@@ -294,17 +301,25 @@ const FarmerFlow = ({ step, formData, updateFormData, setStep, onRegister }) => 
                 </div>
             </div>
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Residential Address *</label>
-                <textarea
-                    value={formData.address}
-                    onChange={(e) => updateFormData({ address: e.target.value })}
-                    placeholder="Enter your home address"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                    rows="3"
-                    required
-                />
-            </div>
+            <AddressFields
+                label="Residential Address"
+                values={{
+                    street: formData.address_street || '',
+                    city: formData.city || '',
+                    state: formData.state || '',
+                    country: formData.country || 'Nigeria',
+                }}
+                onChange={patch => {
+                    const map = {};
+                    if ('street'  in patch) map.address_street = patch.street;
+                    if ('city'    in patch) map.city    = patch.city;
+                    if ('state'   in patch) map.state   = patch.state;
+                    if ('country' in patch) map.country = patch.country;
+                    updateFormData(map);
+                }}
+                accentColor="emerald"
+            />
+
 
             <button
                 type="submit"

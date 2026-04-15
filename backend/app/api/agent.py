@@ -147,6 +147,126 @@ async def lookup_farmer(identifier: str, current_user: dict = Depends(get_curren
         "farmer_id": farmer.get("id") or str(farmer.get("_id"))
     }
 
+
+# ---------------------------------------------------------------------------
+# Agent-side verification for self-registered farmers
+# ---------------------------------------------------------------------------
+# When a farmer self-registers and provides an agent's username/ID as their
+# sponsor, they land in a "pending_agent_review" state. The agent (not admin)
+# can then approve or reject them from their own dashboard.
+
+@router.get("/farmers/pending-review")
+async def get_farmers_pending_agent_review(current_user: dict = Depends(get_current_user)):
+    """
+    Farmers who self-registered, linked this agent as sponsor, and are
+    awaiting the agent's identity confirmation (not yet admin-verified).
+    """
+    if current_user.get('role') != 'agent':
+        raise HTTPException(status_code=403, detail="Only agents access this")
+
+    db = get_db()
+    farmers = list(db.users.find({
+        "role": "farmer",
+        "agent_id": current_user['id'],
+        "agent_review_status": "pending"
+    }))
+
+    for f in farmers:
+        f.pop('_id', None)
+        f.pop('password', None)
+        f.pop('bvn', None)
+
+    return {"farmers": farmers}
+
+
+class AgentFarmerDecision(BaseModel):
+    reason: str = ""  # Optional — required for reject
+
+
+@router.post("/farmers/{farmer_id}/agent-verify")
+async def agent_verify_farmer(
+    farmer_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Agent confirms they have met this self-registered farmer in person and
+    vouches for their identity. Marks them as agent-verified.
+    Admin still makes the final is_verified decision via /pyadmin.
+    """
+    if current_user.get('role') != 'agent':
+        raise HTTPException(status_code=403, detail="Only agents can verify farmers")
+
+    db = get_db()
+    farmer = db.users.find_one({"id": farmer_id, "agent_id": current_user['id']})
+    if not farmer:
+        raise HTTPException(status_code=404, detail="Farmer not found or not managed by you")
+
+    db.users.update_one(
+        {"id": farmer_id},
+        {"$set": {
+            "agent_review_status": "approved",
+            "agent_verified_by": current_user['id'],
+            "agent_verified_at": datetime.utcnow(),
+            "kyc_status": "pending_review",   # Escalate to admin queue
+            "verification_note": f"Field-confirmed by Agent @{current_user['username']}"
+        }}
+    )
+
+    # In-app notification to the farmer
+    from app.api.notifications import create_notification
+    create_notification(
+        user_id=farmer_id,
+        title="Agent Verification Approved",
+        message=f"Your agent @{current_user['username']} has confirmed your registration. Your documents are now under admin review.",
+        type="kyc",
+        action_link="/profile"
+    )
+
+    return {"message": f"Farmer {farmer_id} confirmed by agent. Sent to admin for final verification."}
+
+
+@router.post("/farmers/{farmer_id}/agent-reject")
+async def agent_reject_farmer(
+    farmer_id: str,
+    body: AgentFarmerDecision,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Agent indicates they cannot confirm this farmer's identity.
+    Account remains inactive until resubmission.
+    """
+    if current_user.get('role') != 'agent':
+        raise HTTPException(status_code=403, detail="Only agents can reject farmers")
+
+    db = get_db()
+    farmer = db.users.find_one({"id": farmer_id, "agent_id": current_user['id']})
+    if not farmer:
+        raise HTTPException(status_code=404, detail="Farmer not found or not managed by you")
+
+    db.users.update_one(
+        {"id": farmer_id},
+        {"$set": {
+            "agent_review_status": "rejected",
+            "agent_verified_by": current_user['id'],
+            "agent_verified_at": datetime.utcnow(),
+            "kyc_status": "rejected",
+            "is_verified": False,
+            "verification_note": f"Rejected by Agent @{current_user['username']}. Reason: {body.reason}"
+        }}
+    )
+
+    from app.api.notifications import create_notification
+    create_notification(
+        user_id=farmer_id,
+        title="Agent Verification Declined",
+        message=f"Your agent could not confirm your identity. Reason: {body.reason or 'Not specified'}. Please contact your agent or re-register.",
+        type="kyc",
+        action_link="/profile"
+    )
+
+    return {"message": f"Farmer {farmer_id} rejected by agent."}
+
+
 class RegisterFarmerRequest(BaseModel):
     first_name: str
     last_name: str

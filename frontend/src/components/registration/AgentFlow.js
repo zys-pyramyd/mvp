@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import VerificationStep from './VerificationStep'; // We will create this reusable component next
+import VerificationStep from './VerificationStep';
+import AddressFields from '../common/AddressFields';
 
 const AgentFlow = ({ step, formData, updateFormData, setStep, onRegister }) => {
 
@@ -56,17 +57,24 @@ const AgentFlow = ({ step, formData, updateFormData, setStep, onRegister }) => {
                 </div>
             </div>
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Residential Address *</label>
-                <textarea
-                    value={formData.address} // Ensure text area maps to a field in formData (might need to add 'address' to initial state in Modal)
-                    onChange={(e) => updateFormData({ address: e.target.value })}
-                    placeholder="Enter your full residential address"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                    rows="3"
-                    required
-                />
-            </div>
+            <AddressFields
+                label="Residential Address"
+                values={{
+                    street: formData.address_street || '',
+                    city: formData.city || '',
+                    state: formData.state || '',
+                    country: formData.country || 'Nigeria',
+                }}
+                onChange={patch => {
+                    const map = {};
+                    if ('street'  in patch) map.address_street = patch.street;
+                    if ('city'    in patch) map.city    = patch.city;
+                    if ('state'   in patch) map.state   = patch.state;
+                    if ('country' in patch) map.country = patch.country;
+                    updateFormData(map);
+                }}
+                accentColor="blue"
+            />
 
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Bio / About You *</label>

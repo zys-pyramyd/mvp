@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { NIGERIAN_STATES } from './nigerianStates';
 import MyRequests from './components/rfq/MyRequests';
+import VerificationBanner from './components/common/VerificationBanner';
 
-const SellerDashboard = ({ user, token, onOpenChat }) => {
+const SellerDashboard = ({ user, token, onOpenChat, onGoHome }) => {
     const [activeTab, setActiveTab] = useState('overview'); // overview, farmers, deliveries, inventory, requests, quotations
     const [stats, setStats] = useState(null);
     const [farmers, setFarmers] = useState([]);
@@ -14,6 +15,8 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
     const [deliveryCode, setDeliveryCode] = useState(null);
     const [deliveryBuyer, setDeliveryBuyer] = useState(null);
     const [showDeliveryCodeModal, setShowDeliveryCodeModal] = useState(false);
+    const [dashboardUser, setDashboardUser] = useState(user); // local copy so we can update kyc_status after doc submit
+    const [toastMsg, setToastMsg] = useState('');
 
     useEffect(() => {
         fetchInitialData();
@@ -81,6 +84,11 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
         }
     };
 
+    const showToast = (msg) => {
+        setToastMsg(msg);
+        setTimeout(() => setToastMsg(''), 3500);
+    };
+
     const updateDeliveryStatus = async (orderId, newStatus, notes, buyerUsername) => {
         try {
             const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/delivery/status`, {
@@ -103,21 +111,19 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
                     setDeliveryCode(data.delivery_code);
                     setDeliveryBuyer(buyerUsername);
                     setShowDeliveryCodeModal(true);
-                    // Standard alert logic moved to after modal close or separate notice
                 } else {
-                    alert('Status updated!');
+                    showToast('Delivery status updated.');
                 }
 
-                // Refresh deliveries
                 const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/agent/deliveries`, { headers: { 'Authorization': `Bearer ${token}` } });
                 const updatedData = await res.json();
                 setDeliveries(updatedData.orders || []);
             } else {
-                alert('Failed to update status');
+                showToast('Failed to update status. Please try again.');
             }
         } catch (error) {
             console.error(error);
-            alert('Error updating status');
+            showToast('Error updating delivery status.');
         }
     };
 
@@ -131,8 +137,12 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-                        <p className="text-gray-500 capitalize">{user.role} Control Center • @{user.username}</p>
+                        <h1 className="text-3xl font-bold text-gray-900">
+                            {user.role === 'business' ? 'Business Portal' : user.role === 'agent' ? 'Agent Console' : 'Farmer Dashboard'}
+                        </h1>
+                        <p className="text-gray-500 capitalize">
+                            {user.role === 'business' ? 'B2B & Wholesale Operations' : `${user.role} Control Center`} • @{user.username}
+                        </p>
                     </div>
                     <div className="flex gap-2">
                         {user.role === 'agent' && activeTab === 'farmers' && (
@@ -159,8 +169,8 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
                     {user.role === 'agent' && (
                         <TabButton active={activeTab === 'farmers'} onClick={() => setActiveTab('farmers')} label="👨‍🌾 My Farmers" />
                     )}
-                    <TabButton active={activeTab === 'deliveries'} onClick={() => setActiveTab('deliveries')} label="📦 Deliveries" />
-                    <TabButton active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} label="📋 Inventory" />
+                    <TabButton active={activeTab === 'deliveries'} onClick={() => setActiveTab('deliveries')} label={user.role === 'business' ? "📦 Fulfillment" : "📦 Deliveries"} />
+                    <TabButton active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} label={user.role === 'business' ? "🏭 Warehouse" : "📋 Inventory"} />
                     <TabButton active={activeTab === 'requests'} onClick={() => setActiveTab('requests')} label="📋 My Requests" />
                     <TabButton active={activeTab === 'quotations'} onClick={() => setActiveTab('quotations')} label="🤝 Sent Quotations" />
                     <TabButton active={activeTab === 'wallet'} onClick={() => setActiveTab('wallet')} label="💰 My Earnings" />
@@ -171,49 +181,25 @@ const SellerDashboard = ({ user, token, onOpenChat }) => {
                 <div className="bg-white rounded-b-lg shadow-sm p-6 min-h-[500px]">
                     {loading && <div className="text-center py-12 text-gray-500">Loading data...</div>}
 
-                    {!loading && activeTab === 'overview' && stats && (
+                    {/* Toast */}
+                {toastMsg && (
+                    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-sm px-5 py-3 rounded-xl shadow-lg z-50 animate-fade-in">
+                        {toastMsg}
+                    </div>
+                )}
+
+                {/* Verification Banner — shown at top of overview for unverified partners */}
+                {activeTab === 'overview' && (
+                    <VerificationBanner
+                        user={dashboardUser}
+                        onStatusChange={(newStatus) => setDashboardUser(prev => ({ ...prev, kyc_status: newStatus }))}
+                        onGoHome={onGoHome}
+                    />
+                )}
+
+                {!loading && activeTab === 'overview' && stats && (
                         <div className="space-y-8">
-                            {/* Verification Status Badge */}
-                            <div className={`p-4 rounded-lg flex justify-between items-center ${user.verification_status === 'verified' ? 'bg-emerald-50 border border-emerald-200' :
-                                user.verification_status === 'pending' ? 'bg-yellow-50 border border-yellow-200' :
-                                    user.verification_status === 'rejected' ? 'bg-red-50 border border-red-200' :
-                                        'bg-gray-50 border border-gray-200'
-                                }`}>
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${user.verification_status === 'verified' ? 'bg-emerald-100 text-emerald-600' :
-                                        user.verification_status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
-                                            user.verification_status === 'rejected' ? 'bg-red-100 text-red-600' :
-                                                'bg-gray-200 text-gray-500'
-                                        }`}>
-                                        {user.verification_status === 'verified' ? '✓' :
-                                            user.verification_status === 'pending' ? '⏳' :
-                                                user.verification_status === 'rejected' ? '✕' : '?'}
-                                    </div>
-                                    <div>
-                                        <h3 className={`font-bold ${user.verification_status === 'verified' ? 'text-emerald-900' :
-                                            user.verification_status === 'pending' ? 'text-yellow-900' :
-                                                user.verification_status === 'rejected' ? 'text-red-900' :
-                                                    'text-gray-900'
-                                            }`}>
-                                            Account Status: {user.verification_status ? user.verification_status.charAt(0).toUpperCase() + user.verification_status.slice(1) : 'Unverified'}
-                                        </h3>
-                                        {user.verification_status === 'rejected' && user.verification_note && (
-                                            <p className="text-sm text-red-700 mt-1">Reason: {user.verification_note}</p>
-                                        )}
-                                        {user.verification_status === 'pending' && (
-                                            <p className="text-sm text-yellow-700">Your documents are currently under review. This usually takes 24-48 hours.</p>
-                                        )}
-                                    </div>
-                                </div>
-                                {user.verification_status === 'rejected' && (
-                                    <button
-                                        onClick={() => window.location.href = '/register?mode=resubmit'} // Simple redirect to registration for re-submission
-                                        className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-700"
-                                    >
-                                        Resubmit KYC
-                                    </button>
-                                )}
-                            </div>
+    
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <StatCard title="Total Revenue" value={`₦${stats.revenue?.total_revenue?.toLocaleString() || 0}`} subtitle="Lifetime Earnings" icon="💰" color="bg-emerald-100 text-emerald-800" />
