@@ -14,12 +14,6 @@ class AgentPurchaseOption(BaseModel):
     customer_id: str
     delivery_address: str
 
-class GroupBuyingRequest(BaseModel):
-    produce: str
-    category: str
-    quantity: int
-    location: str
-
 AGENT_COMMISSION_RATES = {'purchase': 0.05, 'sales': 0.05}
 
 router = APIRouter()
@@ -100,41 +94,7 @@ async def agent_purchase(
         "commission_amount": commission_amount
     }
 
-@router.post("/group-buying/recommendations")
-async def get_price_recommendations(
-    request: GroupBuyingRequest, 
-    current_user: dict = Depends(get_current_user)
-):
-    # ... (existing code)
-    if current_user.get('role') != 'agent':
-        raise HTTPException(status_code=403, detail="Only agents can access group buying")
-    
-    db = get_db()
-    query = {
-        "$or": [
-            {"title": {"$regex": request.produce, "$options": "i"}},
-            {"description": {"$regex": request.produce, "$options": "i"}}
-        ],
-        "category": request.category,
-        "quantity_available": {"$gte": 1}
-    }
-    
-    if request.location:
-        query["location"] = {"$regex": request.location, "$options": "i"}
-    
-    matching_products = list(db.products.find(query))
-    
-    recommendations = []
-    for product in matching_products:
-        match_percentage = min(100, (product['quantity_available'] / request.quantity) * 100)
-        recommendations.append({
-            "product": product,
-            "match_percentage": match_percentage
-        })
-        
-    return recommendations
-
-# --- Missing Endpoints Implementation ---
+# --- Agent Farmer & Delivery Endpoints ---
 
 @router.get("/farmers")
 async def get_managed_farmers(current_user: dict = Depends(get_current_user)):
@@ -199,6 +159,8 @@ class RegisterFarmerRequest(BaseModel):
     farm_location: str
     farm_size: str
     crops: str
+    bank_account_number: str
+    bank_code: str
 
 @router.post("/farmers/register")
 async def register_farmer(
@@ -220,6 +182,30 @@ async def register_farmer(
     if db.users.find_one({"phone": data.phone}):
          raise HTTPException(status_code=400, detail="Farmer with this phone already exists")
          
+    # Verify Bank Details
+    from app.services.paystack import resolve_account_number
+    bank_resolution = resolve_account_number(data.bank_account_number, data.bank_code)
+    
+    if not bank_resolution.get("status"):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid bank details. Paystack error: {bank_resolution.get('message', 'Unknown error')}"
+        )
+        
+    resolved_name = bank_resolution["data"]["account_name"]
+    
+    # Simple name match validation
+    first_name_lower = data.first_name.strip().lower()
+    last_name_lower = data.last_name.strip().lower()
+    resolved_name_lower = resolved_name.strip().lower()
+    
+    # We require either the first name or last name to be present in the bank account name
+    if first_name_lower not in resolved_name_lower and last_name_lower not in resolved_name_lower:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Bank name mismatch. The resolved account name '{resolved_name}' does not match the farmer's name '{data.first_name} {data.last_name}'."
+        )
+        
     # Create Farmer User
     farmer_id = str(uuid.uuid4())
     username = f"{data.first_name.lower()}{data.last_name.lower()}{data.phone[-4:]}"
@@ -245,6 +231,11 @@ async def register_farmer(
             "location": data.farm_location,
             "size": data.farm_size,
             "crops": data.crops
+        },
+        "bank_details": {
+            "account_number": data.bank_account_number,
+            "bank_code": data.bank_code,
+            "account_name": resolved_name
         },
         "password": hash_password("123456"), # Default password, should change
         "created_at": datetime.utcnow()

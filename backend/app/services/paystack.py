@@ -131,3 +131,18 @@ def verify_transaction(reference: str) -> dict:
     Returns the full Paystack response; check data['status'] == 'success'.
     """
     return paystack_request("GET", f"/transaction/verify/{reference}")
+
+def refund_transaction(transaction_reference: str, amount_kobo: int = None, customer_note: str = None) -> dict:
+    """
+    Refund a transaction back to the customer's card/bank.
+    Amount in kobo is optional. If not provided, it refunds the full sum.
+    """
+    data = {
+        "transaction": transaction_reference
+    }
+    if amount_kobo:
+        data["amount"] = amount_kobo
+    if customer_note:
+        data["customer_note"] = customer_note
+        
+    return paystack_request("POST", "/refund", data)

@@ -1,26 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import DealBoard from './components/rfq/DealBoard';
-import RequestWizard from './components/rfq/RequestWizard';
-import RequestFeed from './components/rfq/RequestFeed';
-import RequestsPage from './components/rfq/RequestsPage';
-import WalletModal from './components/wallet/WalletModal';
 
-import CommunitySearch from './components/community/CommunitySearch';
-import MyCommunities from './components/community/MyCommunities';
-import CommunityFeed from './components/community/CommunityFeed';
-import RecommendedCommunities from './components/community/RecommendedCommunities';
-import GlobalFeed from './components/community/GlobalFeed';
-import TrendingProducts from './components/community/TrendingProducts';
-import AdminDashboard from './components/admin/AdminDashboard';
+// Eagerly loaded components (Critical Path)
+import WalletModal from './components/wallet/WalletModal';
 import RegistrationModal from './components/registration/RegistrationModal';
 import DVAPromptModal from './components/profile/DVAPromptModal';
 import MyOrdersModal from './components/profile/MyOrdersModal';
-import MyRequests from './components/rfq/MyRequests';
-import PersonalDashboard from './components/dashboard/PersonalDashboard';
-import SellerDashboard from './SellerDashboard';
-import AgentDeliveryDashboard from './AgentDeliveryDashboard';
-import ChatModal from './components/chat/ChatModal';
+import './App.css';
+
+// Lazy loaded heavy components
+const DealBoard = lazy(() => import('./components/rfq/DealBoard'));
+const RequestWizard = lazy(() => import('./components/rfq/RequestWizard'));
+const RequestFeed = lazy(() => import('./components/rfq/RequestFeed'));
+const RequestsPage = lazy(() => import('./components/rfq/RequestsPage'));
+const MyRequests = lazy(() => import('./components/rfq/MyRequests'));
+
+const CommunitySearch = lazy(() => import('./components/community/CommunitySearch'));
+const MyCommunities = lazy(() => import('./components/community/MyCommunities'));
+const CommunityFeed = lazy(() => import('./components/community/CommunityFeed'));
+const RecommendedCommunities = lazy(() => import('./components/community/RecommendedCommunities'));
+const GlobalFeed = lazy(() => import('./components/community/GlobalFeed'));
+const TrendingProducts = lazy(() => import('./components/community/TrendingProducts'));
+
+const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard'));
+const PersonalDashboard = lazy(() => import('./components/dashboard/PersonalDashboard'));
+const SellerDashboard = lazy(() => import('./SellerDashboard'));
+const AgentDeliveryDashboard = lazy(() => import('./AgentDeliveryDashboard'));
+const ChatModal = lazy(() => import('./components/chat/ChatModal'));
+
 import './App.css';
 
 // Helper function to map backend order statuses to user-friendly display labels
@@ -3805,8 +3812,13 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* KYC Notification Banner - Only for non-personal accounts who need KYC */}
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    }>
+      <div className="min-h-screen bg-gray-50">
+        {/* KYC Notification Banner - Only for non-personal accounts who need KYC */}
       {user && user.role !== 'personal' && kycStatus && kycStatus.status !== 'approved' && (
         <div className={`${kycStatus.status === 'not_started'
           ? 'bg-red-500'
@@ -8486,7 +8498,7 @@ function App() {
       }
 
     </div >
-
+    </Suspense>
 
   );
 }

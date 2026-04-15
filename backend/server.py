@@ -287,8 +287,6 @@ from app.api.agent import router as agent_router
 from app.api.logistics import router as logistics_router
 from app.api.messages import router as messages_router
 from app.api.preorders import router as preorders_router
-from app.api.group_buying import router as group_buying_router
-
 app.include_router(kyc_router, prefix="/api/kyc", tags=["kyc"])
 app.include_router(rfq_router, prefix="/api/requests", tags=["rfq"])
 app.include_router(communities_router, prefix="/api/communities", tags=["communities"])
@@ -302,8 +300,6 @@ app.include_router(agent_router, prefix="/api/agent", tags=["agent"])
 app.include_router(logistics_router, prefix="", tags=["logistics"])
 app.include_router(messages_router, prefix="", tags=["messages"])
 app.include_router(preorders_router, prefix="", tags=["preorders"])
-app.include_router(group_buying_router, prefix="", tags=["group-buying"])
-
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -725,7 +721,6 @@ community_members_collection = db.community_members
 community_products_collection = db.community_products
 community_product_likes_collection = db.community_product_likes
 community_product_comments_collection = db.community_product_comments
-group_buy_participants_collection = db.group_buy_participants
 farmland_records_collection = db.farmland_records
 agent_farmers_collection = db.agent_farmers
 audit_logs_collection = db.audit_logs
@@ -1827,9 +1822,6 @@ class CommunityProduct(BaseModel):
     likes_count: int = 0
     comments_count: int = 0
     shares_count: int = 0
-    group_buy_enabled: bool = False
-    group_buy_min_quantity: Optional[int] = None
-    group_buy_participants: List[str] = []  # User IDs in group buy
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class CommunityProductLike(BaseModel):
@@ -1848,13 +1840,6 @@ class CommunityProductComment(BaseModel):
     reply_to: Optional[str] = None  # ID of comment being replied to
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class GroupBuyParticipant(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    product_id: str
-    user_id: str
-    username: str
-    quantity_requested: int
-    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class FarmlandRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -2393,110 +2378,6 @@ class AgentPurchaseOption(BaseModel):
     commission_type: str  # "percentage" or "collect_after_delivery"
     customer_id: str
     delivery_address: str
-
-class GroupBuyingRequest(BaseModel):
-    produce: str
-    category: str
-    quantity: int
-    location: str
-
-class GroupOrder(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    agent_id: str
-    produce: str
-    category: str
-    location: str
-    total_quantity: int
-    buyers: List[dict]
-    selected_farm: dict
-    commission_type: str  # "pyramyd" or "after_delivery"
-    total_amount: float
-    agent_commission: float
-    status: str = "pending"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-class OutsourcedOrder(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    requester_id: str  # Agent or Processor who outsourced
-    produce: str
-    category: str
-    quantity: int
-    expected_price: float
-    location: str
-    status: str = "open"  # "open", "accepted", "completed", "cancelled"
-    accepting_agent_id: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-class CommunityPledge(BaseModel):
-    product_id: str
-    quantity: int
-
-@app.post("/api/community/pledge")
-async def pledge_to_community(pledge: CommunityPledge, current_user: dict = Depends(get_current_user)):
-    """Pledge/Commit to a Community Group Order"""
-    # Verify Product
-    product = db.products.find_one({"id": pledge.product_id})
-    if not product:
-         raise HTTPException(status_code=404, detail="Product not found")
-    
-    # Check simple validity
-    if pledge.quantity <= 0:
-         raise HTTPException(status_code=400, detail="Quantity must be positive")
-
-    # Check Target (if applicable)
-    current_committed = product.get('committed_quantity', 0)
-    target = product.get('target_quantity')
-    
-    if target and (current_committed + pledge.quantity > target):
-         raise HTTPException(status_code=400, detail=f"Target quantity exceeded. Max remaining: {target - current_committed}")
-
-    # Add to participants
-    participant = {
-        "user_id": current_user["id"],
-        "username": current_user["username"],
-        "product_id": pledge.product_id,
-        "quantity": pledge.quantity,
-        "pledged_at": datetime.utcnow(),
-        "status": "pledged" # Can be 'paid' if we integrated payment
-    }
-    db.group_buy_participants.insert_one(participant)
-
-    # Update Product Commitments
-    db.products.update_one(
-        {"id": pledge.product_id},
-        {"$inc": {"committed_quantity": pledge.quantity}}
-    )
-
-    return {
-        "message": "You have successfully pledged to this order!", 
-        "new_total": current_committed + pledge.quantity,
-        "target": target
-    }
-
-@app.get("/api/users/search")
-async def search_users(username: str, current_user: dict = Depends(get_current_user)):
-    """Search users by username for group buying"""
-    if not username:
-        return []
-    
-    users = list(db.users.find({
-        "username": {"$regex": username, "$options": "i"},
-        "role": {"$in": ["general_buyer", "retailer", "hotel", "restaurant", "cafe"]}
-    }).limit(10))
-    
-    # Clean up response and add NIN verification status
-    for user in users:
-        user.pop('_id', None)
-        user.pop('password', None)
-        # Check if user has NIN for group buying eligibility
-        user['is_nin_verified'] = bool(user.get('verification_info', {}).get('nin'))
-    
-    return users
-
-
-
-
 
 
 @app.get("/api/users/search-messaging")

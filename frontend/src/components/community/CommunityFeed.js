@@ -15,6 +15,10 @@ const CommunityFeed = ({ community, onBack, onOpenProduct }) => {
     const [activeCommentProduct, setActiveCommentProduct] = useState(null);
     const [submitting, setSubmitting] = useState(false);
 
+    // Live Purchase Notification
+    const [livePurchaseNotif, setLivePurchaseNotif] = useState(null);
+    const [notifVisible, setNotifVisible] = useState(false);
+
     // Mention States
     const [mentionQuery, setMentionQuery] = useState(null);
     const [mentionResults, setMentionResults] = useState([]);
@@ -85,6 +89,31 @@ const CommunityFeed = ({ community, onBack, onOpenProduct }) => {
     useEffect(() => {
         fetchItems();
     }, [activeTab, community]);
+
+    // Live purchase notification polling (every 30s)
+    useEffect(() => {
+        if (activeTab !== 'products') return;
+        let isMounted = true;
+
+        const fetchRecentPurchases = async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/communities/${community.id}/recent-purchases?limit=1`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (isMounted && data.length > 0) {
+                        setLivePurchaseNotif(data[0]);
+                        setNotifVisible(true);
+                        // Auto-hide after 5 seconds
+                        setTimeout(() => isMounted && setNotifVisible(false), 5000);
+                    }
+                }
+            } catch (err) { /* silent fail */ }
+        };
+
+        fetchRecentPurchases();
+        const intervalId = setInterval(fetchRecentPurchases, 30000);
+        return () => { isMounted = false; clearInterval(intervalId); };
+    }, [activeTab, community.id]);
 
     const handleCreatePost = async (e) => {
         e.preventDefault();
@@ -213,6 +242,29 @@ const CommunityFeed = ({ community, onBack, onOpenProduct }) => {
 
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full flex flex-col relative">
+            {/* Live Purchase Notification Toast */}
+            {notifVisible && livePurchaseNotif && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        bottom: '80px',
+                        left: '16px',
+                        zIndex: 100,
+                        animation: 'slideUp 0.4s ease-out'
+                    }}
+                    className="bg-white border border-emerald-200 shadow-lg rounded-xl px-4 py-3 flex items-center gap-3 max-w-xs"
+                >
+                    <span className="text-2xl">🛒</span>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{livePurchaseNotif.message}</p>
+                        <p className="text-xs text-gray-400">Just now in this community</p>
+                    </div>
+                    <button
+                        onClick={() => setNotifVisible(false)}
+                        className="text-gray-300 hover:text-gray-500 text-lg leading-none flex-shrink-0"
+                    >×</button>
+                </div>
+            )}
             {/* Header */}
             <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-emerald-50">
                 <div className="flex items-center gap-3">

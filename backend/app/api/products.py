@@ -330,11 +330,17 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
         seller_profile_picture = farmer.get('profile_picture')
         seller_is_verified = farmer.get('is_verified', False)
         business_name = farmer.get('business_name')
-        
         agent_id = current_user['id']
         agent_name = current_user['username']
         agent_profile_picture = current_user.get('profile_picture')
         listed_by_agent = True
+        
+        # --- PHASE 4: Overwrite Payout Details With Farmer's Verifiable Bank Info ---
+        farmer_bank = farmer.get('bank_details', {})
+        if farmer_bank and farmer_bank.get('account_number'):
+            product_data.payout_account_number = farmer_bank.get('account_number')
+            product_data.payout_bank_code = farmer_bank.get('bank_code')
+            product_data.payout_account_name = farmer_bank.get('account_name')
 
     product_dict_payload = product_data.dict()
     product_dict_payload.pop('platform', None)

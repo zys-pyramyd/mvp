@@ -175,6 +175,17 @@ async def paystack_webhook(request: Request, x_paystack_signature: str = Header(
                             }}
                         )
                         logger.info(f"✅ Order payment verified and held in escrow. Ref: {reference}, Order: {order_id}")
+                        
+                        # --- DUMMY OFFLINE LOGISTICS DISPATCH ---
+                        from app.services.logistics_dispatcher import dispatch_order_to_external_logistics
+                        import threading
+                        
+                        # Fetch the full order details for the dispatcher payload
+                        completed_order = db.orders.find_one({"order_id": order_id})
+                        if completed_order:
+                            t = threading.Thread(target=dispatch_order_to_external_logistics, args=(completed_order, False))
+                            t.start()
+                            
                     else:
                         # Fallback for legacy support
                         db.orders.update_one(

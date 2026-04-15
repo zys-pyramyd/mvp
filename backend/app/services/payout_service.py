@@ -60,8 +60,11 @@ async def process_order_payout(order_id: str, db):
         
     # Ensure seller has payout destination (DVA or Bank)
     seller_dva = seller.get("dva_account_number")
-    bank_details = seller.get("bank_details")
     
+    # --- Check for assigned Product Payout Account first ---
+    bank_details = order.get("product_payout_account") or seller.get("bank_details")
+    
+
     if not seller_dva and not (bank_details and bank_details.get("account_number") and bank_details.get("bank_code")):
         # Route to manual_reconciliations
         db.manual_reconciliations.insert_one({
@@ -191,11 +194,11 @@ async def process_order_payout(order_id: str, db):
     # db.platform_revenue.insert(...)
     
     # 5. Real Money Transfer (Paystack)
-    # Check if seller has bank details
+    # Check if seller/product has explicit bank details
     transfer_status = "skipped"
     transfer_ref = None
     
-    bank_details = seller.get("bank_details")
+    bank_details = order.get("product_payout_account") or seller.get("bank_details")
     if bank_details and bank_details.get("account_number") and bank_details.get("bank_code"):
         try:
             # Create Recipient

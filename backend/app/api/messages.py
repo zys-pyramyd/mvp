@@ -26,7 +26,7 @@ async def send_message(
             raise HTTPException(status_code=400, detail="Message content or audio data is required")
         
         # Check if recipient exists
-        recipient = users_collection.find_one({"username": message_data["recipient_username"]})
+        recipient = db.users.find_one({"username": message_data["recipient_username"]})
         if not recipient:
             raise HTTPException(status_code=404, detail="Recipient not found")
         
@@ -44,7 +44,7 @@ async def send_message(
         }
         
         # Store message in database
-        messages_collection.insert_one(message)
+        db.messages.insert_one(message)
         
         return {"message": "Message sent successfully", "message_id": message["id"]}
         
@@ -59,7 +59,7 @@ async def get_unread_messages_count(current_user: dict = Depends(get_current_use
     """Count unread messages for current user"""
     db = get_db()
     try:
-        count = messages_collection.count_documents({
+        count = db.messages.count_documents({
             "recipient_username": current_user["username"],
             "read": False
         })
@@ -74,13 +74,22 @@ async def get_conversations(current_user: dict = Depends(get_current_user)):
     db = get_db()
     try:
         # Get all messages where user is sender or recipient
-        messages = list(messages_collection.find({
+        messages = list(db.messages.find({
             "$or": [
                 {"sender_username": current_user["username"]},
                 {"recipient_username": current_user["username"]}
             ]
         }).sort("timestamp", -1))
         
+        # Extract unique other users to fetch in bulk
+        other_users_set = set()
+        for message in messages:
+            other_user = message["recipient_username"] if message["sender_username"] == current_user["username"] else message["sender_username"]
+            other_users_set.add(other_user)
+            
+        # Bulk fetch user details
+        other_user_profiles = {u["username"]: u for u in db.users.find({"username": {"$in": list(other_users_set)}}, {"password": 0})}
+
         # Group by conversation_id and get latest message for each
         conversations = {}
         for message in messages:
@@ -88,7 +97,7 @@ async def get_conversations(current_user: dict = Depends(get_current_user)):
             if conv_id and conv_id not in conversations:
                 # Get the other participant
                 other_user = message["recipient_username"] if message["sender_username"] == current_user["username"] else message["sender_username"]
-                other_user_data = users_collection.find_one({"username": other_user}, {"password": 0})
+                other_user_data = other_user_profiles.get(other_user)
                 
                 if other_user_data:
                     # Clean up other_user_data
@@ -126,7 +135,7 @@ async def get_messages(
     db = get_db()
     try:
         # Get all messages for this conversation
-        messages = list(messages_collection.find({
+        messages = list(db.messages.find({
             "conversation_id": conversation_id,
             "$or": [
                 {"sender_username": current_user["username"]},
@@ -140,7 +149,7 @@ async def get_messages(
             message["timestamp"] = message["timestamp"].isoformat()
         
         # Mark messages as read
-        messages_collection.update_many(
+        db.messages.update_many(
             {
                 "conversation_id": conversation_id,
                 "recipient_username": current_user["username"],

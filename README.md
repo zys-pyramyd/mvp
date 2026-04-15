@@ -56,11 +56,27 @@ Pyramyd is a comprehensive agricultural trading platform that connects farmers, 
 - **Enhanced Messaging**: Text and audio messages between users
 - **Responsive Design**: Mobile-first approach with desktop optimization
 
-## 🏗️ Architecture
+## 🚀 Production Deployment Readiness
 
-### Backend
-- **Framework**: FastAPI (Python)
-- **Database**: MongoDB
+Pyramyd has been rigorously optimized for production environments (e.g., Render, Vercel). The application incorporates essential structural safeguards to prevent scaling crashes.
+
+### 1. Database Indexing
+Prior to launching in a live environment, you **must run** the indexing script directly against the live MongoDB host (e.g., Atlas). Without this, the Feed and DealBoard will cause severe iteration bottlenecks as data grows.
+```bash
+python backend/create_indexes.py
+```
+
+### 2. Eliminating DB N+1 Queries
+All iterative `find_one` loops across the `communities.py`, `orders.py`, and `rfq.py` feeds have been eliminated. Pyramyd computes relationships using hashed `$in` bulk queries.
+
+### 3. Frontend Bundle Splitting
+The Vercel deployment utilizes **React Lazy Loading** coupled with a `<Suspense>` wrapper. Massive proprietary dashboard components (`AdminDashboard`, `SellerDashboard`) are completely decoupled from initial user page loads, speeding up organic Time To Interactive (TTI).
+
+### 4. True Escrow Handlers & Offline Dispatch
+- The platform is plugged directly into the `https://api.paystack.co/refund` system. If an administrator cancels a pending RFQ, or a buyer cancels an escrowed PyExpress delivery, full debit reversals automatically trigger to restore maximum client trust.
+- The `logistics_dispatcher.py` handles backend dummy deliveries asynchronously, ready for integration with third-party logistics firms without overloading core thread traffic.
+
+## 🏗️ Architecture
 - **Authentication**: JWT with bcrypt password hashing
 - **API Design**: RESTful endpoints with comprehensive validation
 

@@ -568,6 +568,9 @@ async def get_global_community_feed(limit: int = 20):
     public_comms = list(db.communities.find({"is_private": False}))
     public_comm_ids = [c["id"] for c in public_comms]
     
+    # Create a community map for quick lookups
+    comm_map = {c["id"]: c.get("name") for c in public_comms}
+    
     if not public_comm_ids:
         return []
         
@@ -575,27 +578,33 @@ async def get_global_community_feed(limit: int = 20):
     posts_cursor = db.community_posts.find({"community_id": {"$in": public_comm_ids}}).sort("created_at", -1).limit(limit)
     posts = list(posts_cursor)
     
+    # Get recent products from these communities
+    products_cursor = db.products.find({
+        "community_id": {"$in": public_comm_ids}
+    }).sort("created_at", -1).limit(limit)
+    products = list(products_cursor)
+    
+    # Batch-load authors for posts to avoid N+1
+    user_ids = list(set(p.get("user_id") for p in posts if p.get("user_id")))
+    users_map = {}
+    if user_ids:
+        users_cursor = db.users.find({"id": {"$in": user_ids}}, {"id": 1, "first_name": 1, "last_name": 1})
+        users_map = {u["id"]: u for u in users_cursor}
+    
     # Enrich posts
     for p in posts:
         p.pop('_id', None)
         p["feed_type"] = "post"
-        user = db.users.find_one({"id": p.get("user_id")})
+        user = users_map.get(p.get("user_id"))
         p["author"] = f"{user.get('first_name', '')} {user.get('last_name', '')}" if user else "Unknown"
         if isinstance(p.get("created_at"), datetime):
             p["date"] = p.get("created_at").strftime("%Y-%m-%d %H:%M")
         else:
             p["date"] = str(p.get("created_at", ""))
             
-        comm = db.communities.find_one({"id": p.get("community_id")})
-        if comm:
-            p["community_name"] = comm.get("name")
+        p["community_name"] = comm_map.get(p.get("community_id"), "Unknown Community")
             
-    # Get recent products from these communities
-    products_cursor = db.products.find({
-        "community_id": {"$in": public_comm_ids}
-    }).sort("created_at", -1).limit(limit)
-    
-    products = list(products_cursor)
+    # Enrich products
     for p in products:
         p.pop('_id', None)
         p["feed_type"] = "product"
@@ -604,9 +613,7 @@ async def get_global_community_feed(limit: int = 20):
         else:
             p["date"] = str(p.get("created_at", ""))
             
-        comm = db.communities.find_one({"id": p.get("community_id")})
-        if comm:
-            p["community_name"] = comm.get("name")
+        p["community_name"] = comm_map.get(p.get("community_id"), "Unknown Community")
             
     # Combine and sort by date descending
     combined_feed = posts + products
@@ -614,3 +621,78 @@ async def get_global_community_feed(limit: int = 20):
     combined_feed.sort(key=lambda x: x.get("created_at", x.get("date", "")), reverse=True)
     
     return combined_feed[:limit]
+
+@router.get("/{community_id}/recent-purchases")
+async def get_recent_purchases(community_id: str, limit: int = 5):
+    """
+    Get recent completed purchases of products in a community.
+    Used to display live social-proof notifications to build buyer trust.
+    Returns purchases from the last 48 hours.
+    """
+    from datetime import timedelta
+    db = get_db()
+
+    # 1. Get all product IDs in this community
+    community_product_ids = [
+        p["id"] for p in db.products.find(
+            {"community_id": community_id},
+            {"id": 1}
+        )
+    ]
+
+    if not community_product_ids:
+        return []
+
+    # 2. Scope to last 48 hours
+    cutoff = datetime.utcnow() - timedelta(hours=48)
+
+    # 3. Query completed orders that contain any of these products
+    pipeline = [
+        {
+            "$match": {
+                "status": {"$in": ["completed", "held_in_escrow", "delivered"]},
+                "created_at": {"$gte": cutoff},
+                "items.product_id": {"$in": community_product_ids}
+            }
+        },
+        {"$sort": {"created_at": -1}},
+        {"$limit": limit * 3},  # Fetch more to account for multi-item orders
+        {
+            "$project": {
+                "_id": 0,
+                "order_id": 1,
+                "buyer_username": 1,
+                "items": 1,
+                "created_at": 1
+            }
+        }
+    ]
+
+    orders = list(db.orders.aggregate(pipeline))
+
+    # 4. Flatten into per-item notifications, only for community products
+    notifications = []
+    seen_ids = set()
+    for order in orders:
+        for item in order.get("items", []):
+            if item["product_id"] in community_product_ids:
+                key = f"{order['order_id']}_{item['product_id']}"
+                if key not in seen_ids:
+                    seen_ids.add(key)
+                    # Partially mask buyer username for privacy
+                    buyer = order.get("buyer_username", "Someone")
+                    masked = buyer[:2] + "***" if len(buyer) > 2 else buyer
+
+                    notifications.append({
+                        "message": f"{masked} just bought {item['quantity']} {item.get('title', 'item')}",
+                        "product_id": item["product_id"],
+                        "product_title": item.get("title"),
+                        "quantity": item["quantity"],
+                        "created_at": order["created_at"].isoformat() if isinstance(order["created_at"], datetime) else str(order["created_at"])
+                    })
+                    if len(notifications) >= limit:
+                        break
+        if len(notifications) >= limit:
+            break
+
+    return notifications

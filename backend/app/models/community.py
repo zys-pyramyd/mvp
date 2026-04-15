@@ -51,9 +51,6 @@ class CommunityProduct(BaseModel):
     likes_count: int = 0
     comments_count: int = 0
     shares_count: int = 0
-    group_buy_enabled: bool = False
-    group_buy_min_quantity: Optional[int] = None
-    group_buy_participants: List[str] = []  # User IDs in group buy
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class CommunityProductLike(BaseModel):
@@ -72,13 +69,6 @@ class CommunityProductComment(BaseModel):
     reply_to: Optional[str] = None  # ID of comment being replied to
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class GroupBuyParticipant(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    product_id: str
-    user_id: str
-    username: str
-    quantity_requested: int
-    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class FarmlandRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))

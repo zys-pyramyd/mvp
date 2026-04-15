@@ -41,6 +41,12 @@ class Product(BaseModel):
     # Community logic
     community_id: Optional[str] = None
     community_name: Optional[str] = None
+    
+    # Specific Payout Details
+    payout_account_number: Optional[str] = None
+    payout_bank_code: Optional[str] = None
+    payout_account_name: Optional[str] = None
+    
     # Logistics Management
     logistics_managed_by: str = "pyramyd"  # "pyramyd" or "seller"
     seller_delivery_fee: Optional[float] = None  # If seller manages logistics, their delivery fee (0 = free)
@@ -91,6 +97,12 @@ class ProductCreate(BaseModel):
     platform: str = "pyhub"
     # Community logic
     community_id: Optional[str] = None
+    
+    # Specific Payout Details
+    payout_account_number: Optional[str] = None
+    payout_bank_code: Optional[str] = None
+    payout_account_name: Optional[str] = None
+    
     # Logistics Management
     logistics_managed_by: str = "pyramyd"  # "pyramyd" or "seller"
     seller_delivery_fee: Optional[float] = Field(None, ge=0)  # If seller manages logistics

@@ -1,6 +1,6 @@
 
 from fastapi import APIRouter
-from app.api import auth, users, products, orders, admin, agent, paystack, upload
+from app.api import auth, users, products, orders, admin, agent, paystack, upload, setup
 import app.api.admin_documents as admin_documents
 
 api_router = APIRouter()
@@ -15,6 +15,7 @@ api_router.include_router(admin_documents.router, prefix="/admin", tags=["admin-
 api_router.include_router(agent.router, prefix="/agent", tags=["agent"])
 api_router.include_router(paystack.router, prefix="/paystack", tags=["paystack"])
 api_router.include_router(upload.router, prefix="/upload", tags=["upload"])
+api_router.include_router(setup.router, prefix="/setup", tags=["setup"])
 import app.api.rfq as rfq
 import app.api.communities as communities
 

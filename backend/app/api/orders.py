@@ -87,8 +87,15 @@ async def create_order(
     seller_id = None
     seller_name = None
     
+    # Bulk fetch products to avoid N+1 DB roundtrips
+    product_ids = [item.product_id for item in items]
+    products = list(db.products.find({"id": {"$in": product_ids}}))
+    product_map = {p["id"]: p for p in products}
+
+    product_payout_account = None
+
     for item in items:
-        product = db.products.find_one({"id": item.product_id})
+        product = product_map.get(item.product_id)
         if not product:
             raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
         
@@ -109,6 +116,14 @@ async def create_order(
         if seller_id is None:
             seller_id = product['seller_id']
             seller_name = product['seller_name']
+            
+            # Phase 4: Capture specific product payout details if available
+            if product.get("payout_account_number"):
+                product_payout_account = {
+                    "account_number": product.get("payout_account_number"),
+                    "bank_code": product.get("payout_bank_code"),
+                    "account_name": product.get("payout_account_name")
+                }
         elif seller_id != product['seller_id']:
             raise HTTPException(status_code=400, detail="All items must be from the same seller")
             
@@ -118,11 +133,11 @@ async def create_order(
     logistics_managed_by = "pyramyd" # Default
     
     # Check if Seller manages logistics for the first product
-    first_product = db.products.find_one({"id": items[0].product_id})
+    first_product = product_map.get(items[0].product_id)
     if first_product and first_product.get('logistics_managed_by') == 'seller':
         logistics_managed_by = 'seller'
         for item in items:
-            p = db.products.find_one({"id": item.product_id})
+            p = product_map.get(item.product_id)
             total_delivery_fee += float(p.get('seller_delivery_fee', 0.0) or 0.0)
     else:
         # Pyramyd manages logistics: Dynamic Geoapify Distance
@@ -146,6 +161,35 @@ async def create_order(
     # Build final cart total
     total_amount = product_cost_total + total_delivery_fee + agent_service_charge
     
+    # --- GHOST STOCK PREVENTION: Reserve Stock First ---
+    reserved_items = []
+    try:
+        for item in items:
+            result = db.products.update_one(
+                {
+                    "id": item.product_id,
+                    "quantity_available": {"$gte": item.quantity}  # Atomic stock check
+                },
+                {"$inc": {"quantity_available": -item.quantity}}
+            )
+            if result.modified_count == 0:
+                raise Exception(f"Insufficient stock for product {item.product_id}")
+            reserved_items.append(item)
+    except Exception as e:
+        # Rollback stock for previously reserved items in this order
+        for r_item in reserved_items:
+            db.products.update_one(
+                {"id": r_item.product_id},
+                {"$inc": {"quantity_available": r_item.quantity}}
+            )
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Order creation failed prior to payment due to stock: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient stock for product. {str(e)}"
+        )
+        
     # Payment Handling
     order_status = "pending"
     
@@ -165,7 +209,13 @@ async def create_order(
         )
         
         if result.modified_count == 0:
-            # Either user not found or insufficient balance
+            # Rollback stock because wallet failed
+            for r_item in reserved_items:
+                db.products.update_one(
+                    {"id": r_item.product_id},
+                    {"$inc": {"quantity_available": r_item.quantity}}
+                )
+                
             current_balance = db.users.find_one({"id": current_user["id"]}, {"wallet_balance": 1})
             if current_balance:
                 raise HTTPException(
@@ -199,23 +249,16 @@ async def create_order(
         logger.info(f"Wallet payment successful for order {order_id}. Amount: ₦{total_amount}, User: {current_user['id']}")
         
     elif order_req.payment_method == "paystack":
-        # Paystack Payment Flow:
-        # 1. Create pending order first
-        # 2. Initialize Paystack transaction
-        # 3. Return payment URL to frontend
-        # 4. Webhook will update order status after payment
-        
-        # Order stays pending until payment is confirmed via webhook
+        # Paystack Payment Flow
         order_status = "pending"
 
-    
     # Store explicit items list in order dict
     order_dict = {
         "order_id": order_id,
         "buyer_id": current_user['id'],
         "buyer_username": current_user['username'],
         "buyer_email": current_user.get('email'),
-        "buyer_agent_id": current_user.get('agent_id'),  # Record the buying agent for their 4% payout
+        "buyer_agent_id": current_user.get('agent_id'),
         "seller_id": seller_id,
         "seller_username": seller_name,
         "items": order_items,
@@ -230,58 +273,32 @@ async def create_order(
         "payment_status": "pending" if order_req.payment_method == "paystack" else "paid",
         "status_history": [{"status": order_status, "date": datetime.utcnow()}],
         "status": order_status,
+        "product_payout_account": product_payout_account, # Safe isolation of payout 
         "created_at": datetime.utcnow()
     }
-    
     
     import logging
     logging.getLogger(__name__).debug(f"Inserting Order: {order_dict.get('order_id')}")
     try:
         db.orders.insert_one(order_dict)
     except Exception as e:
-        # If order creation fails and wallet was debited, refund
+        # If order creation fails, refund wallet AND stock
         if order_req.payment_method == "wallet":
             db.users.update_one(
                 {"id": current_user["id"]},
                 {"$inc": {"wallet_balance": total_amount}}
             )
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Order creation failed, wallet refunded. Error: {str(e)}")
+            
+        for r_item in reserved_items:
+            db.products.update_one(
+                {"id": r_item.product_id},
+                {"$inc": {"quantity_available": r_item.quantity}}
+            )
+            
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Order creation failed, wallet refunded and stock restored. Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create order: {str(e)}")
-    
-    # Update product quantities atomically
-    # This prevents overselling by checking stock availability
-    for item in items:
-        result = db.products.update_one(
-            {
-                "id": item.product_id,
-                "quantity_available": {"$gte": item.quantity}  # Atomic stock check
-            },
-            {"$inc": {"quantity_available": -item.quantity}}
-        )
-        
-        if result.modified_count == 0:
-            # Stock insufficient or product not found - rollback order
-            db.orders.update_one(
-                {"order_id": order_id},
-                {"$set": {"status": "cancelled", "cancellation_reason": f"Insufficient stock for product {item.product_id}"}}
-            )
-            
-            # Refund wallet if applicable
-            if order_req.payment_method == "wallet":
-                db.users.update_one(
-                    {"id": current_user["id"]},
-                    {"$inc": {"wallet_balance": total_amount}}
-                )
-            
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Order {order_id} cancelled due to insufficient stock for product {item.product_id}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"Insufficient stock for product. Order has been cancelled and payment refunded."
-            )
     
     # If Paystack payment, initialize transaction and return payment URL
     if order_req.payment_method == "paystack":
@@ -820,3 +837,71 @@ def get_payment_status_message(order: dict) -> str:
         return "Order completed successfully."
     else:
         return f"Order status: {status}"
+
+@router.post("/{order_id}/cancel")
+async def cancel_order(order_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Cancel an order and refund the buyer using Paystack Reversal API.
+    Only orders that are 'pending' or 'held_in_escrow' can be cancelled by the buyer.
+    """
+    db = get_db()
+    order = db.orders.find_one({"order_id": order_id})
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    if order['buyer_id'] != current_user['id']:
+        raise HTTPException(status_code=403, detail="Only the buyer can cancel this order")
+        
+    if order['status'] not in ['pending', 'held_in_escrow']:
+        raise HTTPException(status_code=400, detail="Order cannot be cancelled at this stage")
+        
+    # 1. Reverse "Ghost Stock"
+    for item in order.get("items", []):
+        db.products.update_one(
+            {"id": item["product_id"]},
+            {"$inc": {"quantity_available": item["quantity"]}}
+        )
+        
+    # 2. Refund Escrow via Paystack if Paid
+    if order['status'] == 'held_in_escrow' and order.get('payment_reference'):
+        try:
+            from app.services.paystack import refund_transaction
+            # Trigger full refund
+            refund_transaction(order['payment_reference'], customer_note=f"Cancelled Order {order_id}")
+            
+            # Log refund
+            refund_txn = {
+                "user_id": current_user['id'],
+                "type": "credit",
+                "category": "refund",
+                "amount": order.get('total_amount'),
+                "reference": f"refund_api_{order['payment_reference']}",
+                "description": f"Card Reversal for Order {order_id}",
+                "status": "success",
+                "created_at": datetime.utcnow()
+            }
+            db.wallet_transactions.insert_one(refund_txn)
+            
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Paystack Refund Failed for {order_id}: {str(e)}")
+            order['refund_failed_reason'] = str(e)
+            
+    # 3. Update Status
+    update_data = {
+        "status": "cancelled",
+        "cancelled_at": datetime.utcnow()
+    }
+    if 'refund_failed_reason' in order:
+        update_data["refund_status"] = "failed"
+        update_data["refund_failed_reason"] = order["refund_failed_reason"]
+    elif order['status'] == 'held_in_escrow':
+        update_data["refund_status"] = "processing"
+        
+    db.orders.update_one({"order_id": order_id}, {"$set": update_data})
+    
+    return {
+        "message": "Order cancelled successfully. If paid, your card refund is processing.",
+        "status": "cancelled"
+    }

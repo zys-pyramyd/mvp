@@ -413,12 +413,22 @@ async def get_my_requests(
     requests_cursor = db.requests.find({"buyer_id": current_user['id']}).sort("created_at", -1)
     requests = list(requests_cursor)
     
+    # Batch fetch offers to eliminate N+1 queries
+    request_ids = [req['id'] for req in requests]
+    offers_cursor = db.offers.find({"request_id": {"$in": request_ids}}).sort("created_at", -1)
+    offers_list = list(offers_cursor)
+    
+    offers_by_request = {}
+    for offer in offers_list:
+        offer['_id'] = str(offer['_id'])
+        req_id = offer['request_id']
+        if req_id not in offers_by_request:
+            offers_by_request[req_id] = []
+        offers_by_request[req_id].append(offer)
+    
     for req in requests:
         req['_id'] = str(req['_id'])
-        offers = list(db.offers.find({"request_id": req['id']}).sort("created_at", -1))
-        for offer in offers:
-            offer['_id'] = str(offer['_id'])
-        req['offers'] = offers
+        req['offers'] = offers_by_request.get(req['id'], [])
         
     return requests
 
@@ -570,11 +580,16 @@ async def confirm_offer_terms(
 
     db.rfq_orders.insert_one(order_data)
 
-    # Update offer status
     db.offers.update_one(
         {"id": offer_id},
         {"$set": {"status": "accepted", "order_id": tracking_id, "terms_confirmed_at": datetime.utcnow()}}
     )
+
+    # --- DUMMY OFFLINE LOGISTICS DISPATCH ---
+    from app.services.logistics_dispatcher import dispatch_order_to_external_logistics
+    import threading
+    t = threading.Thread(target=dispatch_order_to_external_logistics, args=(order_data, True))
+    t.start()
 
     return {
         "message": "Terms confirmed! Order created.",
@@ -693,6 +708,13 @@ async def list_my_offers(current_user: dict = Depends(get_current_user)):
     # Find offers where seller_id is current user
     offers = list(db.offers.find({"seller_id": current_user['id']}).sort("created_at", -1))
     
+    # Bulk fetch Requests and Orders to eliminate N+1 queries
+    request_ids = list(set([off['request_id'] for off in offers]))
+    offer_ids = [off['id'] for off in offers]
+    
+    requests_map = {req['id']: req for req in db.requests.find({"id": {"$in": request_ids}})}
+    orders_map = {o['origin_offer_id']: o for o in db.rfq_orders.find({"origin_offer_id": {"$in": offer_ids}})}
+    
     results = []
     for offer in offers:
         offer_data = {
@@ -710,14 +732,13 @@ async def list_my_offers(current_user: dict = Depends(get_current_user)):
             "created_at": offer['created_at']
         }
         
-        # Should we include Request Title? Maybe useful for UI
-        req = db.requests.find_one({"id": offer['request_id']})
+        req = requests_map.get(offer['request_id'])
         if req:
             offer_data['request_title'] = req.get('items', [{}])[0].get('name', 'Unknown Request')
         
         # If Accepted/Delivered, include Tracking ID from Order
         if offer['status'] in ['accepted', 'delivered', 'completed']:
-            order = db.rfq_orders.find_one({"origin_offer_id": offer['id']})
+            order = orders_map.get(offer['id'])
             if order:
                 offer_data['tracking_id'] = order['order_id']
                 offer_data['delivery_otp'] = order['order_id'] 
@@ -875,6 +896,12 @@ async def take_instant_request(
     db.offers.insert_one(offer)
     
     db.rfq_orders.update_one({"order_id": tracking_id}, {"$set": {"origin_offer_id": offer_id}})
+
+    # --- DUMMY OFFLINE LOGISTICS DISPATCH ---
+    from app.services.logistics_dispatcher import dispatch_order_to_external_logistics
+    import threading
+    t = threading.Thread(target=dispatch_order_to_external_logistics, args=(order_data, True))
+    t.start()
 
     return {
         "message": "Job Taken Successfully!",

@@ -340,10 +340,81 @@ async def manual_withdrawal(
         "created_at": datetime.utcnow()
     }
     
+    
     db.wallet_transactions.insert_one(transaction)
     
     return {
         "message": f"Successfully deducted NGN {request.amount} from user wallet.",
         "new_balance": current_balance - request.amount,
         "reference": transaction["reference"]
+    }
+
+@router.post("/rfq/{order_id}/cancel")
+async def admin_cancel_rfq_order(order_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Cancel an RFQ order. Exclusively for Admins.
+    Reverses the transaction and triggers Paystack refund.
+    """
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Only Pyramyd Admins can cancel RFQ orders")
+
+    db = get_db()
+    order = db.rfq_orders.find_one({"order_id": order_id})
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="RFQ Order not found")
+        
+    if order['status'] in ['cancelled', 'completed']:
+        raise HTTPException(status_code=400, detail="Order cannot be cancelled at this stage")
+    
+    refund_details = "Cancelled by Admin. Standard Refund Rules applied."
+    from datetime import datetime
+    
+    if order.get('payment_reference'):
+        try:
+            from app.services.paystack import refund_transaction
+            # Trigger full refund via Paystack directly to card
+            refund_transaction(order['payment_reference'], customer_note=f"Cancelled RFQ Deal {order_id} by Platform Admin")
+            
+            refund_txn = {
+                "user_id": order.get('buyer_id'),
+                "type": "credit",
+                "category": "refund",
+                "amount": order.get('total_amount'),
+                "reference": f"refund_api_rfq_{order['payment_reference']}",
+                "description": f"Admin Cancellation Card Reversal for RFQ {order_id}",
+                "status": "success",
+                "created_at": datetime.utcnow()
+            }
+            db.wallet_transactions.insert_one(refund_txn)
+            refund_details = "Paystack Reversal Initiated."
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Paystack Refund Failed for RFQ {order_id}: {str(e)}")
+            order['refund_failed_reason'] = str(e)
+            refund_details = f"Reversal Failed: {str(e)}"
+            
+    # Update Status
+    update_data = {
+        "status": "cancelled",
+        "cancelled_by_admin": current_user['username'],
+        "cancelled_at": datetime.utcnow()
+    }
+    
+    # Also update the base offer so it shows as cancelled
+    if order.get("origin_offer_id"):
+        db.offers.update_one(
+            {"id": order["origin_offer_id"]},
+            {"$set": {"status": "cancelled", "cancelled_at": datetime.utcnow()}}
+        )
+        
+    if 'refund_failed_reason' in order:
+        update_data["refund_status"] = "failed"
+        update_data["refund_failed_reason"] = order["refund_failed_reason"]
+        
+    db.rfq_orders.update_one({"order_id": order_id}, {"$set": update_data})
+    
+    return {
+        "message": f"RFQ Order cancelled successfully. {refund_details}",
+        "status": "cancelled"
     }
