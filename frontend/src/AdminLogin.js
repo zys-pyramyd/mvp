@@ -32,8 +32,8 @@ const AdminLogin = () => {
             localStorage.setItem('token', token);
             localStorage.setItem('user', JSON.stringify(user));
 
-            // Redirect to main app which should load Admin Dashboard
-            window.location.href = '/';
+            // Redirect to main app with param to auto-load Admin Dashboard
+            window.location.href = '/?open_admin=true';
 
         } catch (err) {
             setError(err.response?.data?.detail || 'Login failed. Please check credentials.');

@@ -173,7 +173,7 @@ function App() {
   const [pendingAdminRoute, setPendingAdminRoute] = useState(false);
 
   useEffect(() => {
-    if (window.location.pathname === '/pyadmin') {
+    if (window.location.pathname === '/pyadmin' || window.location.search.includes('open_admin=true')) {
       const params = new URLSearchParams(window.location.search);
       const tab  = params.get('tab') || 'overview';
       const uid  = params.get('user') || null;
@@ -183,6 +183,10 @@ function App() {
       if (user && user.role === 'admin') {
         // Already logged in as admin — open dashboard directly
         setShowAdminDashboard(true);
+        // Clear the query param so it doesn't stay in the URL
+        if (window.location.search.includes('open_admin=true')) {
+          window.history.replaceState({}, document.title, '/');
+        }
       } else if (!user) {
         // Not logged in — save intent and open the login modal
         setPendingAdminRoute(true);
