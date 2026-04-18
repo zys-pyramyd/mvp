@@ -8,6 +8,7 @@ import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import { AuthProvider } from "./context/AuthContext";
 import AdminLogin from "./AdminLogin";
 import ErrorBoundary from "./components/ErrorBoundary";
+import CreateAdmin from "./components/admin/CreateAdmin";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
@@ -18,6 +19,7 @@ root.render(
           <Routes>
             <Route path="/pyadmin" element={<AdminLogin />} />
             <Route path="/product/:id" element={<ProductPage />} />
+            <Route path="/setup/create-admin" element={<CreateAdmin />} />
             <Route path="*" element={<App />} />
           </Routes>
         </BrowserRouter>
