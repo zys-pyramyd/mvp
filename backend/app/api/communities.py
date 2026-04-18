@@ -59,7 +59,8 @@ async def search_communities(
                         {"name": {"$regex": safe_q, "$options": "i"}},
                         {"description": {"$regex": safe_q, "$options": "i"}},
                         {"category": {"$regex": safe_q, "$options": "i"}}
-                    ]
+                    ],
+                    "is_active": {"$ne": False}
                 }
             
             # Sort by member count descending (popular first)
@@ -109,9 +110,9 @@ async def get_recommended_communities(limit: int = 5, current_user: dict = Depen
     user_memberships = list(db.community_members.find({"user_id": current_user['id']}))
     joined_ids = [m['community_id'] for m in user_memberships]
     
-    # Find popular communities not in joined_ids
+    # Find popular communities not in joined_ids and active
     pipeline = [
-        {"$match": {"id": {"$nin": joined_ids}}},
+        {"$match": {"id": {"$nin": joined_ids}, "is_active": {"$ne": False}}},
         {"$sample": {"size": limit}}  # Random selection
     ]
     
@@ -564,8 +565,8 @@ async def get_global_community_feed(limit: int = 20):
     """Get aggregated posts and products from public communities"""
     db = get_db()
     
-    # Get public communities
-    public_comms = list(db.communities.find({"is_private": False}))
+    # Get public and active communities
+    public_comms = list(db.communities.find({"is_private": False, "is_active": {"$ne": False}}))
     public_comm_ids = [c["id"] for c in public_comms]
     
     # Create a community map for quick lookups

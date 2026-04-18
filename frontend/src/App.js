@@ -166,48 +166,7 @@ function App() {
   const [myOffers, setMyOffers] = useState([]);
   const [showMyRequestsPage, setShowMyRequestsPage] = useState(false);
 
-  // Handle /pyadmin route — supports ?tab=kyc&user=<userId> deep-links from email
-  const [adminInitialTab, setAdminInitialTab] = useState('overview');
-  const [adminHighlightUser, setAdminHighlightUser] = useState(null);
-  // Flag: user landed on /pyadmin without being logged in — show login first
-  const [pendingAdminRoute, setPendingAdminRoute] = useState(false);
-
-  useEffect(() => {
-    if (window.location.pathname === '/pyadmin' || window.location.search.includes('open_admin=true')) {
-      const params = new URLSearchParams(window.location.search);
-      const tab  = params.get('tab') || 'overview';
-      const uid  = params.get('user') || null;
-      setAdminInitialTab(tab);
-      setAdminHighlightUser(uid);
-
-      if (user && user.role === 'admin') {
-        // Already logged in as admin — open dashboard directly
-        setShowAdminDashboard(true);
-        // Clear the query param so it doesn't stay in the URL
-        if (window.location.search.includes('open_admin=true')) {
-          window.history.replaceState({}, document.title, '/');
-        }
-      } else if (!user) {
-        // Not logged in — save intent and open the login modal
-        setPendingAdminRoute(true);
-        setShowAuthModal(true);
-      }
-      // If logged in but not admin — silently ignore (dashboard handles access denied)
-    }
-  }, [user]);
-
-  // After login: if they came from a /pyadmin link, open admin dashboard
-  // This fires whenever `user` resolves from null to a real user
-  useEffect(() => {
-    if (pendingAdminRoute && user) {
-      setPendingAdminRoute(false);
-      setShowAuthModal(false);
-      if (user.role === 'admin') {
-        setShowAdminDashboard(true);
-      }
-      // Non-admin who landed on /pyadmin: access denied handled inside AdminDashboard
-    }
-  }, [pendingAdminRoute, user]);
+    // /pyadmin route interception successfully migrated to dedicated page route.
 
   // Enhanced messaging state
   const [showMessaging, setShowMessaging] = useState(false);
@@ -335,7 +294,6 @@ function App() {
   // Dashboard and trading platform state
   const [showFarmerDashboard, setShowFarmerDashboard] = useState(false);
   const [showAgentDashboard, setShowAgentDashboard] = useState(false);
-  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [farmerDashboardData, setFarmerDashboardData] = useState(null);
   const [agentDashboardData, setAgentDashboardData] = useState(null);
   const [showMarketChart, setShowMarketChart] = useState(false);
@@ -7887,21 +7845,6 @@ function App() {
           </div>
         )
       }
-
-      {/* Admin Dashboard — full-screen overlay, supports ?tab=kyc&user=<id> deep-link */}
-      {
-        showAdminDashboard && user && user.role === 'admin' && (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-100">
-            <AdminDashboard
-              onClose={() => setShowAdminDashboard(false)}
-              initialTab={adminInitialTab}
-              highlightUserId={adminHighlightUser}
-            />
-          </div>
-        )
-      }
-
-
       {/* Market Prices Chart */}
       {
         showMarketChart && (

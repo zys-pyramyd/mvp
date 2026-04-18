@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 // ---------------------------------------------------------------------------
@@ -58,8 +58,15 @@ function ConfirmModal({ config, onConfirm, onCancel }) {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-const AdminDashboard = ({ onClose, initialTab = 'overview', highlightUserId = null }) => {
+const AdminDashboard = () => {
     const { user } = useAuth();
+    const location = useLocation();
+    
+    // Parse query params
+    const queryParams = new URLSearchParams(location.search);
+    const initialTab = queryParams.get('tab') || 'overview';
+    const highlightUserId = queryParams.get('user') || null;
+
     const [activeTab, setActiveTab] = useState(initialTab);
     const [loading, setLoading] = useState(false);
     const [stats, setStats] = useState(null);
@@ -82,7 +89,14 @@ const AdminDashboard = ({ onClose, initialTab = 'overview', highlightUserId = nu
     const [usersList, setUsersList] = useState([]);
     const [pendingKyc, setPendingKyc] = useState([]);
     const [ordersList, setOrdersList] = useState([]);
+    const [orderSearchTerm, setOrderSearchTerm] = useState(''); // Global Orders filter
     const [pendingReconciliations, setPendingReconciliations] = useState([]);
+    const [communitiesList, setCommunitiesList] = useState([]);
+    
+    // Messaging States
+    const [adminConversations, setAdminConversations] = useState([]);
+    const [adminMessageRecipient, setAdminMessageRecipient] = useState('');
+    const [adminMessageContent, setAdminMessageContent] = useState('');
 
     // Fetch Stats on Load
     useEffect(() => {
@@ -95,6 +109,8 @@ const AdminDashboard = ({ onClose, initialTab = 'overview', highlightUserId = nu
         if (activeTab === 'kyc') fetchPendingKyc();
         if (activeTab === 'orders') fetchOrders();
         if (activeTab === 'reconciliations') fetchReconciliations();
+        if (activeTab === 'communities') fetchCommunities();
+        if (activeTab === 'messaging') fetchConversations();
     }, [activeTab]);
 
     // Scroll to highlighted user after KYC tab loads
@@ -168,6 +184,56 @@ const AdminDashboard = ({ onClose, initialTab = 'overview', highlightUserId = nu
         setLoading(false);
     };
 
+    const fetchCommunities = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/admin/communities`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setCommunitiesList(data.communities);
+            }
+        } catch (err) { console.error(err); }
+        setLoading(false);
+    };
+
+    const fetchConversations = async () => {
+        try {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/messages/conversations`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setAdminConversations(data || []);
+            }
+        } catch (err) { console.error(err); }
+    };
+
+    const sendAdminMessage = async (e) => {
+        if (e) e.preventDefault();
+        if (!adminMessageRecipient.trim() || !adminMessageContent.trim()) return;
+        try {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/messages/send`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    recipient_username: adminMessageRecipient.trim(),
+                    content: adminMessageContent.trim(),
+                    type: 'text'
+                })
+            });
+            if (response.ok) {
+                showToast('success', 'Message dispatched successfully.');
+                setAdminMessageContent('');
+                fetchConversations();
+            } else {
+                const errorData = await response.json();
+                showToast('error', errorData.detail || 'Failed to send message.');
+            }
+        } catch (err) { console.error(err); showToast('error', 'Message dispatch failed.'); }
+    };
+
     const handleHoldPayment = async (orderId) => {
         const { confirmed } = await askConfirm({
             title: 'Hold Payment?',
@@ -224,6 +290,28 @@ const AdminDashboard = ({ onClose, initialTab = 'overview', highlightUserId = nu
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             if (response.ok) { showToast('success', `User ${action}ed successfully.`); fetchUsers(); }
+            else showToast('error', 'Action failed.');
+        } catch (err) { showToast('error', 'Action failed.'); }
+    };
+
+    const toggleCommunityStatus = async (communityId, isActive) => {
+        const { confirmed } = await askConfirm({
+            title: isActive ? 'Block Community?' : 'Unblock Community?',
+            description: isActive
+                ? 'This community will be immediately hidden from public search and feeds.'
+                : 'This community will be reinstated to public sections.',
+            icon: isActive ? '🚫' : '✅',
+            iconBg: isActive ? 'bg-red-100' : 'bg-emerald-100',
+            confirmLabel: isActive ? 'Block Community' : 'Unblock',
+            confirmCls: isActive ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700',
+        });
+        if (!confirmed) return;
+        try {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/admin/communities/${communityId}/toggle-status`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            if (response.ok) { showToast('success', 'Community status updated.'); fetchCommunities(); }
             else showToast('error', 'Action failed.');
         } catch (err) { showToast('error', 'Action failed.'); }
     };
@@ -306,6 +394,30 @@ const AdminDashboard = ({ onClose, initialTab = 'overview', highlightUserId = nu
         );
     }
 
+    // Process Orders Filtering
+    const filteredOrdersList = ordersList.filter(o => {
+        if (!orderSearchTerm) return true;
+        const term = orderSearchTerm.toLowerCase();
+        
+        // Search usernames
+        if (o.buyer_username?.toLowerCase().includes(term)) return true;
+        if (o.seller_username?.toLowerCase().includes(term)) return true;
+        if (o.order_id?.toLowerCase().includes(term)) return true;
+        
+        // Search dropoff location details
+        if (o.dropoff_location_details) {
+            if (o.dropoff_location_details.city?.toLowerCase().includes(term)) return true;
+            if (o.dropoff_location_details.state?.toLowerCase().includes(term)) return true;
+            if (o.dropoff_location_details.country?.toLowerCase().includes(term)) return true;
+            if (o.dropoff_location_details.name?.toLowerCase().includes(term)) return true;
+        }
+        
+        // Search raw shipping address string
+        if (o.shipping_address?.toLowerCase().includes(term)) return true;
+        
+        return false;
+    });
+
     return (
         <div className="min-h-screen bg-gray-100">
             <AdminToast toast={toast} onDismiss={() => setToast(null)} />
@@ -318,11 +430,9 @@ const AdminDashboard = ({ onClose, initialTab = 'overview', highlightUserId = nu
                 </div>
                 <div className="flex items-center gap-4">
                     <span className="text-sm font-medium">Logged in as {user?.username}</span>
-                    {onClose && (
-                        <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" title="Close">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                    )}
+                    <a href="/" className="px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors text-sm font-medium">
+                        Return to App
+                    </a>
                 </div>
             </div>
 
@@ -361,6 +471,18 @@ const AdminDashboard = ({ onClose, initialTab = 'overview', highlightUserId = nu
                         >
                             <span>🏦</span> Reconciliations
                             {pendingReconciliations.length > 0 && <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{pendingReconciliations.length}</span>}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('communities')}
+                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'communities' ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <span>🌍</span> Communities
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('messaging')}
+                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'messaging' ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <span>💬</span> Dispatches
                         </button>
                     </div>
                 </div>
@@ -519,7 +641,23 @@ const AdminDashboard = ({ onClose, initialTab = 'overview', highlightUserId = nu
 
                     {activeTab === 'orders' && (
                         <div className="space-y-6">
-                            <h2 className="text-2xl font-bold mb-4">Global Order Tracking</h2>
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                                <h2 className="text-2xl font-bold">Global Order Tracking</h2>
+                                <div className="relative w-full sm:w-96">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Filter by city, state, country or username..."
+                                        value={orderSearchTerm}
+                                        onChange={(e) => setOrderSearchTerm(e.target.value)}
+                                        className="pl-10 block w-full shadow-sm text-sm border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-500 min-h-[40px]"
+                                    />
+                                </div>
+                            </div>
                             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50">
@@ -535,7 +673,7 @@ const AdminDashboard = ({ onClose, initialTab = 'overview', highlightUserId = nu
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {ordersList.map(order => (
+                                        {filteredOrdersList.map(order => (
                                             <tr key={order.order_id} className="hover:bg-gray-50">
                                                 <td className="px-6 py-4 whitespace-nowrap font-mono text-sm text-blue-600">
                                                     {order.order_id}
@@ -672,6 +810,139 @@ const AdminDashboard = ({ onClose, initialTab = 'overview', highlightUserId = nu
                                             ))}
                                         </tbody>
                                     </table>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'communities' && (
+                        <div className="space-y-6">
+                            <h2 className="text-2xl font-bold mb-4">Platform Communities</h2>
+                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Group Name</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creator</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Members</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Privacy</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {communitiesList.map(comm => (
+                                            <tr key={comm.id} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="font-bold text-gray-900">{comm.name}</div>
+                                                    <div className="text-xs text-gray-500 max-w-[200px] truncate">{comm.description}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    @{comm.creator_username || 'Unknown'}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                                                    {comm.members_count || 1}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${comm.is_private ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                        {comm.is_private ? 'Private' : 'Public'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    {comm.is_active !== False ? (
+                                                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+                                                    ) : (
+                                                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Blocked</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                    <button
+                                                        onClick={() => toggleCommunityStatus(comm.id, comm.is_active !== false)}
+                                                        className={`text-${comm.is_active !== false ? 'red' : 'green'}-600 hover:text-${comm.is_active !== false ? 'red' : 'green'}-900 font-bold`}
+                                                    >
+                                                        {comm.is_active !== false ? 'Suspend / Block' : 'Unblock Group'}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {communitiesList.length === 0 && (
+                                            <tr><td colSpan="6" className="text-center py-8 text-gray-500">No communities on the platform yet.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'messaging' && (
+                        <div className="space-y-6">
+                            <div>
+                                <h2 className="text-2xl font-bold">Admin Dispatch 💬</h2>
+                                <p className="text-gray-500 text-sm mt-1">Send a direct message to any user. It will appear natively in their chat list as if sent by "@pyadmin".</p>
+                            </div>
+
+                            <form onSubmit={sendAdminMessage} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_auto] gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Recipient Username</label>
+                                        <input 
+                                            type="text" 
+                                            value={adminMessageRecipient}
+                                            onChange={e => setAdminMessageRecipient(e.target.value)}
+                                            placeholder="e.g. johndoe123"
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Message</label>
+                                        <input 
+                                            type="text" 
+                                            value={adminMessageContent}
+                                            onChange={e => setAdminMessageContent(e.target.value)}
+                                            placeholder="Type your official message here..."
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="flex items-end">
+                                        <button type="submit" className="h-[48px] px-6 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow-sm">
+                                            Send Dispatch
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+
+                            <div className="mt-8">
+                                <h3 className="text-lg font-bold mb-4">Recent Dispatches / Conversations</h3>
+                                {adminConversations.length === 0 ? (
+                                    <div className="bg-white p-8 rounded-xl border border-gray-100 text-center text-gray-500">
+                                        No recent dispatched messages.
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-4">
+                                        {adminConversations.map(conv => (
+                                            <div key={conv.id} className="bg-white p-4 rounded-xl border border-gray-200 flex justify-between items-center hover:border-purple-300">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold uppercase">
+                                                        {conv.other_user?.username?.charAt(0) || '?'}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold">@{conv.other_user?.username}</h4>
+                                                        <p className="text-sm text-gray-500 truncate max-w-[400px]">
+                                                            <span className="opacity-50">
+                                                                {conv.last_message?.sender_username === user?.username ? 'You: ' : ''}
+                                                            </span>
+                                                            {conv.last_message?.content || 'Audio Message'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-xs text-gray-400">
+                                                    {new Date(conv.timestamp).toLocaleDateString()}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 )}
                             </div>
                         </div>

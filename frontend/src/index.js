@@ -9,6 +9,7 @@ import { AuthProvider } from "./context/AuthContext";
 import AdminLogin from "./AdminLogin";
 import ErrorBoundary from "./components/ErrorBoundary";
 import CreateAdmin from "./components/admin/CreateAdmin";
+import AdminDashboard from "./components/admin/AdminDashboard";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
@@ -18,6 +19,7 @@ root.render(
         <BrowserRouter>
           <Routes>
             <Route path="/pyadmin" element={<AdminLogin />} />
+            <Route path="/admin-dashboard" element={<AdminDashboard />} />
             <Route path="/product/:id" element={<ProductPage />} />
             <Route path="/setup/create-admin" element={<CreateAdmin />} />
             <Route path="*" element={<App />} />

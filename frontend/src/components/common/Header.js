@@ -47,8 +47,7 @@ const Header = ({
     setShowWallet,
 
 
-    setShowEditProfile,
-    setShowAdminDashboard // Added prop
+    setShowEditProfile
 }) => {
     const { user, logout, setShowAuthModal } = useAuth();
     return (
@@ -243,7 +242,7 @@ const Header = ({
                                                     onClick={() => {
                                                         setShowProfileMenu(false);
                                                         if (user.role === 'admin') {
-                                                            window.location.href = '/pyadmin';
+                                                            window.location.href = '/admin-dashboard';
                                                         } else if (['farmer', 'business', 'supplier_food_produce'].includes(user.role)) {
                                                             setShowFarmerDashboard(true);
                                                         } else if (['agent', 'purchasing_agent'].includes(user.role)) {

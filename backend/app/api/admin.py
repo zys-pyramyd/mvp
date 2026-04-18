@@ -418,3 +418,51 @@ async def admin_cancel_rfq_order(order_id: str, current_user: dict = Depends(get
         "message": f"RFQ Order cancelled successfully. {refund_details}",
         "status": "cancelled"
     }
+
+# --- Community Management ---
+@router.get("/communities")
+async def admin_list_communities(current_user: dict = Depends(get_current_user)):
+    """List all communities for admin overview"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    db = get_db()
+    cursor = db.communities.find().sort("created_at", -1)
+    communities = list(cursor)
+    
+    # Enrich with creator info
+    creator_ids = list(set([c.get("creator_id") for c in communities if c.get("creator_id")]))
+    creators_map = {}
+    if creator_ids:
+        users = db.users.find({"id": {"$in": creator_ids}}, {"id": 1, "username": 1, "email": 1})
+        creators_map = {u["id"]: u for u in users}
+        
+    for comm in communities:
+        comm.pop('_id', None)
+        creator = creators_map.get(comm.get("creator_id"))
+        if creator:
+            comm["creator_username"] = creator.get("username")
+            comm["creator_email"] = creator.get("email")
+            
+    return {"communities": communities}
+
+@router.put("/communities/{community_id}/toggle-status")
+async def admin_toggle_community_status(community_id: str, current_user: dict = Depends(get_current_user)):
+    """Toggle the is_active status of a community (Block/Unblock)"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    db = get_db()
+    community = db.communities.find_one({"id": community_id})
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+        
+    new_status = not community.get("is_active", True)
+    
+    db.communities.update_one(
+        {"id": community_id},
+        {"$set": {"is_active": new_status, "updated_at": datetime.utcnow()}}
+    )
+    
+    action = "unblocked and activated" if new_status else "blocked and deactivated"
+    return {"message": f"Community {action} successfully", "is_active": new_status}
