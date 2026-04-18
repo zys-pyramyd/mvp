@@ -301,6 +301,10 @@ app.include_router(logistics_router, prefix="", tags=["logistics"])
 app.include_router(messages_router, prefix="", tags=["messages"])
 app.include_router(preorders_router, prefix="", tags=["preorders"])
 
+# Include Setup Router for Admin Creation
+from app.api.setup import router as setup_router
+app.include_router(setup_router, prefix="/api/setup", tags=["setup"])
+
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
