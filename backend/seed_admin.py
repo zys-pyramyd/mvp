@@ -1,7 +1,7 @@
 import os
 import sys
 from pydantic import EmailStr
-from passlib.context import CryptContext
+import bcrypt
 from pymongo import MongoClient
 import urllib.parse
 from dotenv import load_dotenv
@@ -9,11 +9,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Password hashing context (matching app/core/security.py)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    # Use raw bcrypt just like app/core/security.py
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def seed_admin():
     print("=======================================")
@@ -44,14 +42,14 @@ def seed_admin():
         client = MongoClient(mongo_url, serverSelectionTimeoutMS=5000)
         client.admin.command('ping')
         db = client[MONGO_DB_NAME]
-        print("✅ Connected successfully!")
+        print("Connected successfully!")
     except Exception as e:
-        print(f"❌ Connection failed: {e}")
+        print(f"Connection failed: {e}")
         sys.exit(1)
 
     # Check if admin already exists
     if db.users.find_one({"role": "admin"}):
-        print("⚠️ An admin user already exists in the database.")
+        print("An admin user already exists in the database.")
         choice = input("Do you want to create another one? (y/n): ")
         if choice.lower() != 'y':
             sys.exit(0)
@@ -64,12 +62,12 @@ def seed_admin():
     
     # Simple validation
     if not email or "@" not in email:
-        print("❌ Invalid email format.")
+        print("Invalid email format.")
         sys.exit(1)
         
     # Check if email exists
     if db.users.find_one({"email": email}):
-        print(f"❌ A user with email {email} already exists!")
+        print(f"A user with email {email} already exists!")
         sys.exit(1)
         
     password = input("Password (min 8 chars, 1 uppercase, 1 digit): ").strip()
@@ -79,16 +77,14 @@ def seed_admin():
     import uuid
     from datetime import datetime
     
-            # Use shared admin creation utility
-        try:
-            from app.db.admin_utils import create_admin_user
-            create_admin_user(email, hash_password(password), first_name, last_name)
-        except Exception as e:
-            print(f"❌ Error creating admin user: {str(e)}")
-            sys.exit(1)
+    # Use shared admin creation utility
+    try:
+        from app.db.admin_utils import create_admin_user
+        create_admin_user(email, hash_password(password), first_name, last_name, db_instance=db)
         print("Role: Admin")
     except Exception as e:
-        print(f"❌ Failed to insert admin: {e}")
+        print(f"Error creating admin user: {str(e)}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     seed_admin()
