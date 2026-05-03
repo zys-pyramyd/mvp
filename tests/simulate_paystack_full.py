@@ -17,7 +17,7 @@ client = TestClient(app)
 # --- Configuration ---
 # Ensure PAYSTACK_SECRET_KEY is set in your env before running this!
 # Test Keys (as provided in prompt)
-PAYSTACK_SECRET_KEY = "sk_test_9f563b9e8441550856f7eab813bd41fdab8f7437"
+PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY', 'sk_test_dummy_key_here')
 
 def generate_signature(payload: dict) -> str:
     """Generate Paystack HMAC SHA512 signature"""
