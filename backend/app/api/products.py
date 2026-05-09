@@ -228,9 +228,6 @@ async def get_products(
         logging.getLogger(__name__).error(f"Error getting products: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get products")
 
-@router.get("/categories")
-async def get_categories():
-    return [{"value": cat.value, "label": cat.value.replace("_", " ").title()} for cat in ProductCategory]
 
 @router.post("/")
 async def create_product(product_data: ProductCreate, current_user: dict = Depends(get_current_user)):

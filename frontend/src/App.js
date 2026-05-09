@@ -229,8 +229,8 @@ function App() {
   const [giftCardDetails, setGiftCardDetails] = useState(null);
 
   // Categories and business profile state
-  const [businessCategories, setBusinessCategories] = useState({});
   const [productCategories, setProductCategories] = useState({});
+
   const [processingLevels, setProcessingLevels] = useState([]);
   const [availableSellerTypes, setAvailableSellerTypes] = useState([]);
   const [availableLocations, setAvailableLocations] = useState([]);
@@ -624,7 +624,6 @@ function App() {
 
   // Load categories on app initialization
   useEffect(() => {
-    fetchBusinessCategories();
     fetchProductCategories();
     fetchCommunities();
     fetchFeaturedCommunityProducts();
@@ -900,7 +899,8 @@ function App() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/categories`);
+      const platform = currentPlatform === 'buy_from_farm' ? 'farm_deals' : 'home';
+      const response = await fetch(`${API_BASE_URL}/api/categories?platform=${platform}`);
       const data = await response.json();
       setCategories(data);
     } catch (error) {
@@ -1296,24 +1296,12 @@ function App() {
     }
   };
 
-  // Categories and business functions
-  const fetchBusinessCategories = async () => {
-    try {
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/categories/business`);
-      if (response.ok) {
-        const data = await response.json();
-        setBusinessCategories(data.categories || {});
-        return data;
-      }
-    } catch (error) {
-      console.error('Error fetching business categories:', error);
-    }
-    return null;
-  };
+
 
   const fetchProductCategories = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/categories/dynamic`, {
+      const platform = currentPlatform === 'buy_from_farm' ? 'farm_deals' : 'home';
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/categories/dynamic?platform=${platform}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('pyramyd_token')}`
         }
@@ -4791,8 +4779,15 @@ function App() {
                       <p className="text-xs text-center text-gray-700 font-medium">All Categories</p>
                     </div>
 
-                    {/* Category Cards */}
-                    {categoryData.map(category => (
+                    {/* Category Cards — farm deals hides processed consumer goods */}
+                    {categoryData
+                      .filter(category => {
+                        if (currentPlatform === 'buy_from_farm') {
+                          return !['drinks_beverage', 'snacks_confectionaries', 'sweets_sugar'].includes(category.value);
+                        }
+                        return true;
+                      })
+                      .map(category => (
                       <div
                         key={category.value}
                         onClick={() => setSelectedCategory(category.value)}

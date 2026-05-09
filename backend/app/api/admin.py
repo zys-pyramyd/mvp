@@ -79,6 +79,59 @@ async def unblock_user(user_id: str, current_user: dict = Depends(get_current_us
         
     return {"message": f"User {user_id} has been unblocked"}
 
+from pydantic import BaseModel
+class ChangeUserPasswordRequest(BaseModel):
+    new_password: str
+
+@router.put("/users/{user_id}/password")
+async def change_user_password(
+    user_id: str, 
+    request: ChangeUserPasswordRequest, 
+    current_user: dict = Depends(get_current_user)
+):
+    """Change the password of a user (Admin only)"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    db = get_db()
+    target_user = db.users.find_one({"id": user_id})
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    hashed_pwd = hash_password(request.new_password)
+    result = db.users.update_one({"id": user_id}, {"$set": {"password": hashed_pwd}})
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Send email if target user is an admin
+    if target_user.get("role") == "admin" and target_user.get("email"):
+        try:
+            from app.utils.email import send_zeptomail
+            admin_changer = current_user.get("email") or current_user.get("username", "Another admin")
+            
+            email_html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                <h2 style="color: #059669;">Security Alert: Password Changed</h2>
+                <p>Hello {target_user.get('first_name', 'Admin')},</p>
+                <p>Your Pyramyd Admin password was recently changed by <strong>{admin_changer}</strong>.</p>
+                <p>If you did not authorize this change, please contact the system administrators immediately to secure your account.</p>
+                <br/>
+                <p style="color: #666; font-size: 14px;">Best Regards,<br/><strong>The Pyramyd Team</strong></p>
+            </div>
+            """
+            send_zeptomail(
+                to_email=target_user["email"],
+                subject="Security Alert: Admin Password Changed",
+                html_content=email_html,
+                to_name=target_user.get("first_name", "Admin")
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to send password change notification email: {str(e)}")
+
+    return {"message": f"Password for user has been changed successfully"}
+
 @router.put("/users/{user_id}/verify")
 async def verify_user(user_id: str, current_user: dict = Depends(get_current_user)):
     """Manually verify a user (Admin only)"""

@@ -31,7 +31,7 @@ function ConfirmModal({ config, onConfirm, onCancel }) {
         </div>
         <h3 className="text-lg font-bold text-gray-900 mb-2">{config.title}</h3>
         <p className="text-sm text-gray-500 mb-4">{config.description}</p>
-        {config.requireReason && (
+        {config.requireReason && !config.requireInput && (
           <textarea
             value={reason}
             onChange={e => setReason(e.target.value)}
@@ -40,11 +40,20 @@ function ConfirmModal({ config, onConfirm, onCancel }) {
             className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-400 outline-none resize-none mb-4"
           />
         )}
+        {config.requireInput && (
+          <input
+            type={config.inputType || 'text'}
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            placeholder={config.inputPlaceholder || "Enter value"}
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400 outline-none mb-4"
+          />
+        )}
         <div className="flex gap-3">
           <button onClick={onCancel} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50">Cancel</button>
           <button
             onClick={() => onConfirm(reason)}
-            disabled={config.requireReason && !reason.trim()}
+            disabled={(config.requireReason || config.requireInput) && !reason.trim()}
             className={`flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40 ${config.confirmCls || 'bg-amber-500 hover:bg-amber-600'}`}
           >
             {config.confirmLabel || 'Confirm'}
@@ -291,6 +300,29 @@ const AdminDashboard = () => {
             });
             if (response.ok) { showToast('success', `User ${action}ed successfully.`); fetchUsers(); }
             else showToast('error', 'Action failed.');
+        } catch (err) { showToast('error', 'Action failed.'); }
+    };
+
+    const handleChangePassword = async (userId) => {
+        const { confirmed, reason: newPassword } = await askConfirm({
+            title: 'Change Admin Password',
+            description: 'Enter the new password for this admin. They will be notified via email.',
+            icon: '🔑', iconBg: 'bg-blue-100',
+            confirmLabel: 'Change Password', confirmCls: 'bg-blue-600 hover:bg-blue-700',
+            requireInput: true,
+            inputType: 'password',
+            inputPlaceholder: 'New Password'
+        });
+        if (!confirmed || !newPassword) return;
+        
+        try {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/admin/users/${userId}/password`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ new_password: newPassword })
+            });
+            if (response.ok) { showToast('success', `Password changed successfully.`); }
+            else { const err = await response.json(); showToast('error', err.detail || 'Action failed.'); }
         } catch (err) { showToast('error', 'Action failed.'); }
     };
 
@@ -550,6 +582,14 @@ const AdminDashboard = () => {
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                    {u.role === 'admin' && (
+                                                        <button
+                                                            onClick={() => handleChangePassword(u.id)}
+                                                            className="text-blue-600 hover:text-blue-900 mr-4"
+                                                        >
+                                                            Change Password
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => toggleBlockUser(u.id, u.is_blocked)}
                                                         className={`text-${u.is_blocked ? 'green' : 'red'}-600 hover:text-${u.is_blocked ? 'green' : 'red'}-900`}
