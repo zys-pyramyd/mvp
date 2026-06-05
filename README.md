@@ -23,8 +23,7 @@ Pyramyd is a comprehensive agricultural trading platform that connects farmers, 
   - Elite (10000+ farmers): 8% total (4% + 4% bonus)
 - **Smart Delivery System**: 
   - Vendor-managed logistics (FREE or custom fee)
-  - Kwik Delivery integration (Lagos, Oyo, FCT Abuja)
-  - 20% delivery fee for other states
+  - PyExpress and Farm Deals dynamic fee calculator
 - **Platform-Specific Checkout**: Separate flows for PyExpress and Farm Deals
 
 ### User Experience
@@ -218,8 +217,6 @@ PAYSTACK_SECRET_KEY=sk_test_your_paystack_secret_key
 PAYSTACK_PUBLIC_KEY=pk_test_your_paystack_public_key
 FARMHUB_SUBACCOUNT=ACCT_your_farmhub_subaccount
 FARMHUB_SPLIT_GROUP=SPL_your_split_group_code
-KWIK_API_KEY=your_kwik_api_key
-KWIK_API_URL=https://api.kwik.delivery/v1
 EOL
 
 # Create frontend .env file
@@ -403,9 +400,8 @@ curl http://localhost:8001/api/categories/products
 ✅ **Checkout Flow:**
 - [ ] Platform-specific colors throughout
 - [ ] Progress indicators color-coded
-- [ ] Vendor logistics badges display (FREE/custom fee)
 - [ ] Paystack payment initialization works
-- [ ] State-based delivery calculation applies
+- [ ] Dynamic distance/state-based delivery calculation applies
 
 ✅ **Communities:**
 - [ ] "Find Communities" opens modal
@@ -544,11 +540,9 @@ db.products.find().explain("executionStats")
 - `POST /api/agent/farmers/add` - Add farmer to agent network
 
 ### Smart Delivery & Logistics
-- `POST /api/delivery/calculate-fee` - Calculate smart delivery fee
-  - Body: `{"product_total": 5000, "buyer_state": "Lagos", "product_id": "optional"}`
-  - Returns: delivery_fee, delivery_method (vendor/kwik/20_percent_rule), vendor_managed
-- `POST /api/delivery/kwik/create` - Create Kwik delivery request
-- `GET /api/delivery/kwik/track/{id}` - Track Kwik delivery status
+- `POST /api/checkout/calculate-delivery` - Calculate smart delivery fee
+  - Body: `{"items": [...], "delivery_address": "...", "platform": "pyexpress"}`
+  - Returns: delivery_fee, is_interstate, seller_state, buyer_state
 
 ### Paystack Payment Integration
 - `POST /api/paystack/transaction/initialize` - Initialize payment with tier bonuses

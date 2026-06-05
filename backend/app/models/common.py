@@ -10,11 +10,14 @@ class UserRole(str, Enum):
 
 class BusinessCategory(str, Enum):
     FOOD_SERVICING = "food_servicing"
-    FOOD_PROCESSOR = "food_processor" 
-    FARM_INPUT = "farm_input"
+    HOSPITALITY = "hospitality"
+    PROCESSOR_AND_MANUFACTURING = "processor_and_manufacturing" 
+    LOGISTICS = "logistics"
+    TECHNOLOGY = "technology"
+    ENERGY = "energy"
+    CONSULTING = "consulting"
     FINTECH = "fintech"
     AGRICULTURE = "agriculture"
-    SUPPLIER = "supplier"
     OTHERS = "others"
 
 class BusinessRegistrationStatus(str, Enum):

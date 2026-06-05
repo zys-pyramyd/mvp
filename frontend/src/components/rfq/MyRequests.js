@@ -153,13 +153,43 @@ const MyRequests = ({ requests, myOffers = [], onRefresh }) => {
             alert("The confirmation code must be exactly 8 characters long (the last 8 characters of the Tracking ID).");
             return;
         }
+        
+        const ratingStr = prompt("Optional: Rate the seller from 1 to 5 (leave blank to skip):");
+        let rating = null;
+        if (ratingStr && !isNaN(parseInt(ratingStr))) {
+            rating = parseInt(ratingStr);
+            if (rating < 1 || rating > 5) {
+                alert("Rating must be between 1 and 5.");
+                return;
+            }
+        }
+        
+        let feedback = null;
+        if (rating) {
+            feedback = prompt("Optional: Leave a brief feedback/review for this seller:") || null;
+        }
 
         try {
-            await api.post(`/requests/offers/${offerId}/confirm-delivery`, { code: code.trim() });
+            await api.post(`/requests/offers/${offerId}/confirm-delivery`, { 
+                code: code.trim(),
+                rating: rating,
+                feedback: feedback
+            });
             alert("Delivery Confirmed! Funds released.");
             if (onRefresh) onRefresh();
         } catch (err) {
             alert(err.response?.data?.detail || "Confirmation failed");
+        }
+    };
+    
+    const handleFundEscrow = async (orderId) => {
+        try {
+            const res = await api.post(`/rfq-orders/${orderId}/fund-escrow`);
+            if (res.data && res.data.payment_url) {
+                window.location.href = res.data.payment_url;
+            }
+        } catch (err) {
+            alert(err.response?.data?.detail || "Failed to initialize payment");
         }
     };
 
@@ -211,8 +241,9 @@ const MyRequests = ({ requests, myOffers = [], onRefresh }) => {
                     RFQ Orders
                     {(() => {
                         // Count orders that need attention: accepted status
-                        const sellerOrders = myOffers.filter(o => ['accepted', 'delivered', 'completed'].includes(o.status)).length;
-                        const buyerOrders = requests.reduce((acc, r) => acc + (r.offers || []).filter(o => ['accepted', 'delivered', 'completed'].includes(o.status)).length, 0);
+                        const activeStatuses = ['awaiting_escrow', 'confirmed', 'shipped', 'accepted', 'delivered', 'completed'];
+                        const sellerOrders = myOffers.filter(o => activeStatuses.includes(o.status)).length;
+                        const buyerOrders = requests.reduce((acc, r) => acc + (r.offers || []).filter(o => activeStatuses.includes(o.status)).length, 0);
                         const total = sellerOrders + buyerOrders;
                         return total > 0 ? (
                             <span className="absolute -top-1 -right-4 bg-emerald-500 text-white rounded-full px-2 py-0.5 text-xs font-bold shadow-sm">{total}</span>
@@ -442,13 +473,14 @@ const MyRequests = ({ requests, myOffers = [], onRefresh }) => {
             ) : activeTab === 'orders' ? (
                 /* RFQ Orders - Both buyer and winning seller see orders here */
                 (() => {
+                    const activeStatuses = ['awaiting_escrow', 'confirmed', 'shipped', 'accepted', 'delivered', 'completed'];
                     const sellerOrders = myOffers
-                        .filter(o => ['accepted', 'delivered', 'completed'].includes(o.status))
+                        .filter(o => activeStatuses.includes(o.status))
                         .map(o => ({ ...o, viewAs: 'seller' }));
 
                     const buyerOrders = requests.flatMap(req =>
                         (req.offers || [])
-                            .filter(o => ['accepted', 'delivered', 'completed'].includes(o.status))
+                            .filter(o => activeStatuses.includes(o.status))
                             .map(o => ({ ...o, viewAs: 'buyer', request_title: req.items?.[0]?.name || req.title || req.id }))
                     );
 
@@ -516,10 +548,30 @@ const MyRequests = ({ requests, myOffers = [], onRefresh }) => {
                                         <p className="text-xs text-gray-500 mb-3">📅 Delivery: {new Date(order.confirmed_delivery_date).toLocaleDateString()}</p>
                                     )}
 
+                                    {order.status === 'awaiting_escrow' && order.viewAs === 'buyer' && (
+                                        <div className="mt-4 border-t pt-4">
+                                            <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded mb-3">
+                                                <strong>Security Note:</strong> In order to protect both buyer and seller, the funds will not be released until delivery is confirmed by the buyer. <a href="/refund-policy" target="_blank" className="underline text-blue-600">Check refund policy here</a>.
+                                            </p>
+                                            <button
+                                                onClick={() => handleFundEscrow(order.tracking_id || order.order_id || order.id)}
+                                                className="w-full py-3 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm"
+                                            >
+                                                💳 Pay Now
+                                            </button>
+                                        </div>
+                                    )}
+                                    
+                                    {order.status === 'awaiting_escrow' && order.viewAs === 'seller' && (
+                                        <div className="mt-4 bg-blue-50 p-3 rounded text-sm text-blue-800 font-medium">
+                                            ⏳ Waiting for Buyer to process payment (Escrow). Do not dispatch until payment is secured!
+                                        </div>
+                                    )}
+
                                     {order.status === 'delivered' && order.viewAs === 'buyer' && (
                                         <button
                                             onClick={() => handleConfirmDelivery(order.id)}
-                                            className="w-full py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors"
+                                            className="w-full py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors mt-3"
                                         >
                                             ✅ Confirm Receipt
                                         </button>

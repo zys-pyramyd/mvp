@@ -279,6 +279,29 @@ const AdminDashboard = () => {
         } catch (err) { console.error(err); showToast('error', 'Error releasing payment.'); }
     };
 
+    const handleOverrideConfirmDelivery = async (orderId) => {
+        const { confirmed } = await askConfirm({
+            title: 'Override Confirm Delivery?',
+            description: 'This will force confirm the delivery for this RFQ order and release funds to the seller. Use this only if the buyer is unreachable or disputes are resolved offline.',
+            icon: '🚨', iconBg: 'bg-red-100',
+            confirmLabel: 'Override & Confirm', confirmCls: 'bg-red-600 hover:bg-red-700',
+        });
+        if (!confirmed) return;
+        try {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/admin/rfq/${orderId}/admin-confirm-delivery`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            if (response.ok) { 
+                showToast('success', 'Delivery overridden and funds released.'); 
+                fetchOrders(); 
+            } else { 
+                const errData = await response.json();
+                showToast('error', errData.detail || 'Failed to override delivery.'); 
+            }
+        } catch (err) { console.error(err); showToast('error', 'Error overriding delivery.'); }
+    };
+
     // Actions
     const toggleBlockUser = async (userId, isBlocked) => {
         const action = isBlocked ? 'unblock' : 'block';
@@ -760,7 +783,7 @@ const AdminDashboard = () => {
                                                     {!order.payout_halted && order.status !== 'completed' && order.status !== 'cancelled' && (
                                                         <button
                                                             onClick={() => handleHoldPayment(order.order_id)}
-                                                            className="text-red-600 hover:text-red-900 mr-4"
+                                                            className="text-red-600 hover:text-red-900 mr-4 block mb-2"
                                                         >
                                                             Hold Payment
                                                         </button>
@@ -768,9 +791,17 @@ const AdminDashboard = () => {
                                                     {(order.payout_halted || (order.status !== 'completed' && order.status !== 'cancelled')) && (
                                                         <button
                                                             onClick={() => handleReleasePayment(order.order_id)}
-                                                            className="text-green-600 hover:text-green-900"
+                                                            className="text-green-600 hover:text-green-900 mr-4 block mb-2"
                                                         >
                                                             Release Payment
+                                                        </button>
+                                                    )}
+                                                    {order.status === 'delivered' && (
+                                                        <button
+                                                            onClick={() => handleOverrideConfirmDelivery(order.order_id)}
+                                                            className="text-orange-600 hover:text-orange-900 font-bold block"
+                                                        >
+                                                            Override Delivery
                                                         </button>
                                                     )}
                                                 </td>

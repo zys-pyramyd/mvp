@@ -254,8 +254,13 @@ async def paystack_webhook(request: Request, x_paystack_signature: str = Header(
         
         # Find order by transfer reference
         order = db.orders.find_one({"transfer_ref": reference})
+        collection = db.orders
+        if not order:
+            order = db.rfq_orders.find_one({"transfer_ref": reference})
+            collection = db.rfq_orders
+            
         if order:
-            db.orders.update_one(
+            collection.update_one(
                 {"order_id": order["order_id"]},
                 {"$set": {
                     "transfer_status": "success",
@@ -273,17 +278,24 @@ async def paystack_webhook(request: Request, x_paystack_signature: str = Header(
         reference = data.get("reference")
         
         order = db.orders.find_one({"transfer_ref": reference})
+        collection = db.orders
+        if not order:
+            order = db.rfq_orders.find_one({"transfer_ref": reference})
+            collection = db.rfq_orders
+            
         if order:
             # Refund to seller's wallet
             seller_id = order.get("seller_id")
-            amount = order.get("seller_amount", 0)
+            amount = order.get("seller_amount", 0)  # Make sure this exists, or use product_cost_total - fees
+            if not amount:
+                amount = order.get("product_cost_total", 0) * 0.95 # Fallback heuristic
             
             db.users.update_one(
                 {"id": seller_id},
                 {"$inc": {"wallet_balance": amount}}
             )
             
-            db.orders.update_one(
+            collection.update_one(
                 {"order_id": order["order_id"]},
                 {"$set": {"transfer_status": "failed"}}
             )
@@ -297,8 +309,13 @@ async def paystack_webhook(request: Request, x_paystack_signature: str = Header(
         reference = data.get("reference")
         
         order = db.orders.find_one({"transfer_ref": reference})
+        collection = db.orders
+        if not order:
+            order = db.rfq_orders.find_one({"transfer_ref": reference})
+            collection = db.rfq_orders
+            
         if order:
-            db.orders.update_one(
+            collection.update_one(
                 {"order_id": order["order_id"]},
                 {"$set": {"transfer_status": "reversed"}}
             )

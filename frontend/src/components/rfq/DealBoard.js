@@ -88,6 +88,12 @@ const DealBoard = ({ requests = [], onRefresh, userRole }) => {
   // Inline "Take Job" confirmation — avoids window.confirm()
   const [takeJobTarget,  setTakeJobTarget]  = useState(null); // { id, title }
   const [taking,         setTaking]         = useState(false);
+  
+  // Confirm Terms Modal
+  const [confirmTermsTarget, setConfirmTermsTarget] = useState(null); // { offerId, price }
+  const [bankDetails, setBankDetails] = useState({ account_number: '', bank_code: '', account_name: 'Checking...' });
+  const [confirmLimit, setConfirmLimit] = useState(false);
+  const [isConfirmingTerms, setIsConfirmingTerms] = useState(false);
 
   // Success/error notification
   const [toast, setToast] = useState(null);
@@ -146,15 +152,35 @@ const DealBoard = ({ requests = [], onRefresh, userRole }) => {
     }
   };
 
-  const handleConfirmTerms = async (offerId) => {
+  const handleConfirmTerms = async () => {
+    if (!confirmTermsTarget) return;
+    if (!bankDetails.account_number || !bankDetails.bank_code) {
+        showToast('error', 'Please provide your bank details.');
+        return;
+    }
+    if (!confirmLimit) {
+        showToast('error', 'You must confirm that your bank account can receive this amount.');
+        return;
+    }
+
+    setIsConfirmingTerms(true);
     try {
-      const { data } = await api.post(`/requests/offers/${offerId}/confirm-terms`);
+      const { data } = await api.post(`/requests/offers/${confirmTermsTarget.offerId}/confirm-terms`, {
+          bank_details: bankDetails
+      });
       showToast('success', `Terms accepted! Order created: ${data.order_id}`);
+      setConfirmTermsTarget(null);
       fetchMyOffers();
     } catch (err) {
       showToast('error', err.response?.data?.detail || 'Failed to confirm terms');
+    } finally {
+        setIsConfirmingTerms(false);
     }
   };
+
+  const handleBankCodeChange = (e) => setBankDetails({...bankDetails, bank_code: e.target.value});
+  const handleAccountNumberChange = (e) => setBankDetails({...bankDetails, account_number: e.target.value});
+
 
   const handleRejectTerms = async (offerId) => {
     try {
@@ -268,7 +294,7 @@ const DealBoard = ({ requests = [], onRefresh, userRole }) => {
               ✗ Reject
             </button>
             <button
-              onClick={() => handleConfirmTerms(offer.id)}
+              onClick={() => setConfirmTermsTarget({ offerId: offer.id, price: offer.price })}
               className="flex-1 py-2 bg-emerald-600 text-white text-sm rounded-lg font-medium hover:bg-emerald-700 transition-colors"
             >
               ✓ Accept & Create Order
@@ -403,6 +429,53 @@ const DealBoard = ({ requests = [], onRefresh, userRole }) => {
                   ? <><div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin flex-shrink-0" /> Confirming...</>
                   : '⚡ Confirm & Take'
                 }
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Confirm Terms Modal */}
+      {confirmTermsTarget && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl">🏦</div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Finalize Payout Details</h3>
+                <p className="text-sm text-gray-500">Provide bank details to receive ₦{confirmTermsTarget.price?.toLocaleString()}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Bank Code (e.g., 058 for GTB, 033 for UBA)</label>
+                    <input type="text" value={bankDetails.bank_code} onChange={handleBankCodeChange} className="w-full border rounded-lg p-2 text-sm" placeholder="Enter bank code" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
+                    <input type="text" value={bankDetails.account_number} onChange={handleAccountNumberChange} className="w-full border rounded-lg p-2 text-sm" placeholder="10 digit account number" />
+                </div>
+                <div className="flex items-start gap-2 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <input type="checkbox" id="limitCheck" checked={confirmLimit} onChange={(e) => setConfirmLimit(e.target.checked)} className="mt-1" />
+                    <label htmlFor="limitCheck" className="text-sm text-amber-900 font-medium cursor-pointer">
+                        I confirm that this bank account does not have a balance limit that would prevent receiving ₦{confirmTermsTarget.price?.toLocaleString()}. I understand that if the transfer fails due to account limits, it will be refunded to my Pyramyd wallet.
+                    </label>
+                </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmTermsTarget(null)}
+                className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmTerms}
+                disabled={isConfirmingTerms || !confirmLimit || !bankDetails.account_number || !bankDetails.bank_code}
+                className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              >
+                {isConfirmingTerms ? 'Confirming...' : 'Accept & Provide Bank'}
               </button>
             </div>
           </div>

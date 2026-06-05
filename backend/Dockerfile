@@ -47,14 +47,7 @@ COPY --from=builder /install /usr/local
 ENV PATH="/usr/local/bin:$PATH"
 
 # Copy application source code
-COPY server.py .
-COPY auth.py .
-COPY database.py .
-COPY geo_helper.py .
-COPY order ./order
-COPY payment ./payment
-COPY community ./community
-COPY messaging ./messaging
+COPY . .
 
 # Create a non-root user for security
 RUN useradd -m -u 1000 appuser && \

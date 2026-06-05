@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 FARMHUB_SERVICE_CHARGE = 0.05  # 5% (Reduced from 10%)
 AGENT_SALE_COMMISSION = 0.05   # 5%
 
-async def process_order_payout(order_id: str, db):
+async def process_order_payout(order_id: str, db, is_rfq: bool = False):
     """
     Process payout for a confirmed/delivered order.
     Splits funds between Platform, Agent (if any), and Seller.
@@ -17,12 +17,14 @@ async def process_order_payout(order_id: str, db):
     """
     logger.info(f"Processing payout for order: {order_id}")
     
+    collection = db.rfq_orders if is_rfq else db.orders
+    
     # 1. Fetch Order and Check Payout Status Atomically
     # This prevents duplicate payouts if confirm_delivery is called multiple times
-    order = db.orders.find_one_and_update(
+    order = collection.find_one_and_update(
         {
             "order_id": order_id,
-            "status": {"$in": ["held_in_escrow", "delivered"]},
+            "status": {"$in": ["held_in_escrow", "delivered", "confirmed"]}, # RFQ confirmed == funded in escrow
             "payout_status": {"$ne": "completed"}  # Ensure not already paid
         },
         {
@@ -36,7 +38,7 @@ async def process_order_payout(order_id: str, db):
     
     if not order:
         # Either order not found, wrong status, or already paid out
-        existing_order = db.orders.find_one({"order_id": order_id})
+        existing_order = collection.find_one({"order_id": order_id})
         if not existing_order:
             logger.error(f"Order {order_id} not found")
             return False, "Order not found"
@@ -62,7 +64,18 @@ async def process_order_payout(order_id: str, db):
     seller_dva = seller.get("dva_account_number")
     
     # --- Check for assigned Product Payout Account first ---
-    bank_details = order.get("product_payout_account") or seller.get("bank_details")
+    bank_details = None
+    
+    if is_rfq and order.get("seller_account_info"):
+        account_info = order.get("seller_account_info")
+        if not account_info.get("use_existing"):
+            bank_details = {
+                "account_number": account_info.get("account_number"),
+                "bank_code": account_info.get("bank_code")
+            }
+            
+    if not bank_details:
+        bank_details = order.get("product_payout_account") or seller.get("bank_details")
     
 
     if not seller_dva and not (bank_details and bank_details.get("account_number") and bank_details.get("bank_code")):
@@ -251,7 +264,7 @@ async def process_order_payout(order_id: str, db):
             transfer_status = f"error: {str(e)}"
     
     # 6. Update Order Status
-    db.orders.update_one(
+    collection.update_one(
         {"order_id": order_id},
         {
             "$set": {

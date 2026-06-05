@@ -16,6 +16,16 @@ class QuantityUnit(BaseModel):
             raise ValueError(f'Unit must be one of: {", ".join(allowed_units)}')
         return v
 
+class PyHubOrderDetails(BaseModel):
+    is_bulk_negotiation: bool = False
+    farm_deal_id: Optional[str] = None
+    logistics_partner: Optional[str] = None
+
+class PyExpressOrderDetails(BaseModel):
+    instant_delivery: bool = False
+    processor_notes: Optional[str] = None
+    delivery_sla_hours: Optional[int] = 24
+
 class Order(BaseModel):
     id: Optional[str] = None
     order_id: str
@@ -35,6 +45,9 @@ class Order(BaseModel):
     agent_fee_percentage: float = 0.05  # Updated agent fee (5%)
     payment_timing: str = "after_delivery"  # "after_delivery" for offline, "during_transit" for platform
     status: OrderStatus = OrderStatus.PENDING
+    platform: str = "pyhub"  # pyhub or pyexpress
+    pyhub_details: Optional[PyHubOrderDetails] = None
+    pyexpress_details: Optional[PyExpressOrderDetails] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
@@ -47,6 +60,9 @@ class OrderCreate(BaseModel):
     shipping_address: Optional[str] = None  # Optional when using drop-off
     delivery_method: str = "dropoff"  # "platform", "offline", or "dropoff"
     dropoff_location_id: Optional[str] = None  # Required when delivery_method is "dropoff"
+    platform: str = "pyhub"  # pyhub or pyexpress
+    pyhub_details: Optional[PyHubOrderDetails] = None
+    pyexpress_details: Optional[PyExpressOrderDetails] = None
     
     @validator('dropoff_location_id')
     def validate_dropoff_location(cls, v, values):

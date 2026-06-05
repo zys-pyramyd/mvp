@@ -444,12 +444,12 @@ function App() {
       }
     },
     {
-      title: 'Suppliers & Processors Welcome',
+      title: 'Business Partners Welcome',
       description: 'List your products and reach thousands of buyers. Expand your market reach with our platform.',
       bgGradient: 'from-purple-100 to-purple-50',
       cta: {
-        text: 'Become a Supplier',
-        action: 'supplier_register'
+        text: 'Become a Partner',
+        action: 'business_register'
       }
     },
     {
@@ -615,7 +615,7 @@ function App() {
       }, 30000);
 
       // Check for missing DVA (Partner only)
-      if (['farmer', 'agent', 'business', 'aggregator', 'processor'].includes(user.role) && !user.dva_account_number) {
+      if (['farmer', 'agent', 'business'].includes(user.role) && !user.dva_account_number) {
         setShowDVAPrompt(true);
       }
       return () => clearInterval(statusInterval);
@@ -2030,7 +2030,7 @@ function App() {
       const product = item.product;
       const isPyExpress = product.platform === 'pyexpress' ||
         product.seller_type === 'business' ||
-        product.seller_type === 'supplier';
+        product.seller_type === 'business';
       return isPyExpress;
     });
   };
@@ -2462,19 +2462,9 @@ function App() {
         platformServiceCharge += itemTotal * 0.03;
       }
 
-      // Calculate delivery fees based on method
-      if (item.delivery_method === 'platform') {
-        // Platform delivery fee calculation
-        const baseDeliveryFee = 500; // Base fee of ?500
-        const weightMultiplier = (item.product.weight_kg || 1) * 50; // ?50 per kg
-        deliveryTotal += baseDeliveryFee + weightMultiplier;
-      } else if (item.delivery_method === 'offline') {
-        // Offline delivery - minimal handling fee
-        deliveryTotal += 200;
-      } else if (item.product.logistics_managed_by === 'seller') {
-        // Seller manages logistics
-        deliveryTotal += item.product.seller_delivery_fee || 0;
-      }
+      // Delivery fees will be calculated dynamically in CheckoutModal based on the precise delivery address.
+      // We set to 0 here to prevent confusing/inaccurate numbers in the cart preview.
+      deliveryTotal = 0;
     });
 
     // Calculate agent commission if applicable (4% of product total)
@@ -3127,7 +3117,7 @@ function App() {
   // CTA Handlers for slides
   const handleSlideAction = (action) => {
     // Simply open the auth modal in register mode for all actions
-    if (['agent_register', 'supplier_register', 'business_register'].includes(action)) {
+    if (['agent_register', 'business_register'].includes(action)) {
       setAuthMode('register');
       setShowAuthModal(true);
     }
@@ -3700,8 +3690,7 @@ function App() {
                   {sellerDetails.role === 'farmer' && '? Farmer'}
                   {sellerDetails.role === 'agent' && ' Agent'}
                   {sellerDetails.role === 'business' && ' Business'}
-                  {sellerDetails.role === 'supplier' && ' Supplier'}
-                  {!['farmer', 'agent', 'business', 'supplier'].includes(sellerDetails.role) && sellerDetails.role}
+                  {!['farmer', 'agent', 'business'].includes(sellerDetails.role) && sellerDetails.role}
                 </span>
               </div>
 
@@ -4243,7 +4232,7 @@ function App() {
                         setShowProfileMenu(false);
                         if (user.role === 'admin') {
                           window.location.href = '/pyadmin';
-                        } else if (['farmer', 'business', 'supplier_food_produce'].includes(user.role)) {
+                        } else if (['farmer', 'business'].includes(user.role)) {
                           // Let's use a state for seller dashboard. Wait, App.js might need the state var first.
                           // ACTUALLY, we can reuse showFarmerDashboard to render SellerDashboard.
                           setShowFarmerDashboard(true);
@@ -4415,7 +4404,7 @@ function App() {
                     )}
 
                     {/* Seller Dashboard - For sellers to manage orders */}
-                    {user.role && ['agent', 'farmer', 'supplier', 'processor'].includes(user.role) && (
+                    {user.role && ['agent', 'farmer', 'business'].includes(user.role) && (
                       <button
                         onClick={() => {
                           setShowProfileMenu(false);
@@ -4429,7 +4418,7 @@ function App() {
                     )}
 
                     {/* Request Delivery - For sellers */}
-                    {user.role && ['agent', 'farmer', 'supplier', 'processor'].includes(user.role) && (
+                    {user.role && ['agent', 'farmer', 'business'].includes(user.role) && (
                       <button
                         onClick={() => {
                           setShowProfileMenu(false);
@@ -4749,7 +4738,7 @@ function App() {
                     )}
 
                     {/* Create Pre-order Button - Only for sellers */}
-                    {user && ['farmer', 'supplier', 'processor', 'agent'].includes(user.role) && (
+                    {user && ['farmer', 'business', 'agent'].includes(user.role) && (
                       <div className="mt-4 flex justify-end">
                         <button
                           disabled
@@ -4856,7 +4845,7 @@ function App() {
 
                           // Apply platform filtering for category counts
                           if (platform === 'home') {
-                            platformProducts = products.filter(p => ['business', 'supplier'].includes(p.seller_type));
+                            platformProducts = products.filter(p => ['business'].includes(p.seller_type));
                           } else {
                             platformProducts = products.filter(p => ['farmer', 'agent'].includes(p.seller_type));
                           }
@@ -5161,8 +5150,7 @@ function App() {
                                     {product.seller_type === 'farmer' && '? Farmer'}
                                     {product.seller_type === 'agent' && ' Agent'}
                                     {product.seller_type === 'business' && ' Business'}
-                                    {product.seller_type === 'supplier' && ' Supplier'}
-                                    {!['farmer', 'agent', 'business', 'supplier'].includes(product.seller_type) && product.seller_type}
+                                    {!['farmer', 'agent', 'business'].includes(product.seller_type) && product.seller_type}
                                   </div>
                                 )}
                               </div>
@@ -5303,7 +5291,7 @@ function App() {
                     </h2>
                     <p className="text-sm text-gray-600 mt-1">
                       {checkoutPlatform === 'pyexpress'
-                        ? 'Business & Supplier Products'
+                        ? 'Business Products'
                         : 'Farm Fresh Products with Fixed Split'}
                     </p>
                   </div>
@@ -5736,9 +5724,9 @@ function App() {
                           </div>
                         )}
 
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Delivery Fees</span>
-                          <span className="font-medium">₦{orderSummary.delivery_total?.toLocaleString() || 0}</span>
+                        <div className="flex justify-between items-center text-sm py-2">
+                          <span className="text-gray-600">Delivery</span>
+                          <span className="font-medium text-gray-500 italic">(Calculated at Checkout)</span>
                         </div>
 
                         {orderSummary.is_agent && orderSummary.agent_commission > 0 && (
@@ -7760,7 +7748,7 @@ function App() {
 
       {/* Farmer / Seller Dashboard */}
       {
-        showFarmerDashboard && user && ['farmer', 'business', 'supplier_food_produce'].includes(user.role) && (
+        showFarmerDashboard && user && ['farmer', 'business'].includes(user.role) && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg max-w-7xl w-full max-h-[90vh] overflow-y-auto relative">
               <button

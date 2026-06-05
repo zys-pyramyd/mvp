@@ -39,7 +39,7 @@ services:
         sync: false
       - key: SUPPORT_MAIL
         sync: false
-      - key: KWIK_ACCESS_TOKEN
+      - key: ZEPTOMAIL_TOKEN
         sync: false
     autoDeploy: true
 

@@ -146,12 +146,16 @@ const BusinessFlow = ({ step, formData, updateFormData, setStep, onRegister }) =
                     required
                 >
                     <option value="">Select Category</option>
-                    <option value="processor">Processor / Manufacturer</option>
-                    <option value="wholesaler">Wholesaler / Supplier</option>
-                    <option value="retailer">Retailer</option>
-                    <option value="hospitality">Hotel / Cafe / Restaurant</option>
-                    <option value="logistics">Logistics / Transport</option>
-                    <option value="other">Other</option>
+                    <option value="food_servicing">Food Servicing (Restaurant/Cafe/Caterer)</option>
+                    <option value="hospitality">Hospitality (Hotel/Resort)</option>
+                    <option value="processor_and_manufacturing">Processor & Manufacturing</option>
+                    <option value="logistics">Logistics</option>
+                    <option value="technology">Technology</option>
+                    <option value="energy">Energy</option>
+                    <option value="consulting">Consulting</option>
+                    <option value="fintech">Fintech</option>
+                    <option value="agriculture">General Agriculture</option>
+                    <option value="others">Others</option>
                 </select>
             </div>
 
@@ -169,14 +173,14 @@ const BusinessFlow = ({ step, formData, updateFormData, setStep, onRegister }) =
             <AddressFields
                 label="Business Address"
                 values={{
-                    street: formData.business_info?.address_street || '',
+                    street: formData.business_info?.address || '',
                     city: formData.business_info?.city || '',
                     state: formData.business_info?.state || '',
                     country: formData.business_info?.country || 'Nigeria',
                 }}
                 onChange={patch => {
                     const update = {};
-                    if ('street'  in patch) update.address_street = patch.street;
+                    if ('street'  in patch) update.address = patch.street;
                     if ('city'    in patch) update.city    = patch.city;
                     if ('state'   in patch) update.state   = patch.state;
                     if ('country' in patch) update.country = patch.country;

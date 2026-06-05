@@ -47,9 +47,6 @@ class Settings:
     TWILIO_SID: str = os.environ.get("TWILIO_ACCOUNT_SID", "")
     TWILIO_TOKEN: str = os.environ.get("TWILIO_AUTH_TOKEN", "")
     
-    KWIK_API_KEY: str = os.environ.get("KWIK_API_KEY", "")
-    KWIK_API_URL: str = "https://api.kwik.delivery/v1"
-    
     # Business Logic — must be set via env in production
     pass
     

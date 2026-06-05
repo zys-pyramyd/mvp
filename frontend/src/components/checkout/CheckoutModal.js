@@ -38,8 +38,17 @@ const CheckoutModal = ({
     const [paymentStatus, setPaymentStatus] = useState(null); // 'success', 'failed', null
     const [orderConfirmation, setOrderConfirmation] = useState(null);
     const [paymentMethod, setPaymentMethod] = useState('wallet'); // 'wallet' or 'paystack'
-    const walletBalance = user?.wallet_balance || 0;
-    const canPayWithWallet = walletBalance >= (orderSummary.total || 0);
+    
+    // Delivery State
+    const [calculatingDelivery, setCalculatingDelivery] = useState(false);
+    const [localDeliveryFee, setLocalDeliveryFee] = useState(0);
+    const [payOnDelivery, setPayOnDelivery] = useState(false);
+    const [isInterstate, setIsInterstate] = useState(false);
+
+    // Derived Summary
+    const finalDeliveryDisplay = localDeliveryFee;
+    const finalTotal = (orderSummary.product_total || 0) + (orderSummary.platform_service_charge || 0) + (orderSummary.platform_commission || 0) + (payOnDelivery ? 0 : localDeliveryFee);
+    const canPayWithWallet = walletBalance >= finalTotal;
 
     // Initialize address from user profile if available
     useEffect(() => {
@@ -140,11 +149,13 @@ const CheckoutModal = ({
             const payload = {
                 items: orderItems,
                 delivery_address: shippingAddressStr,
-                payment_method: paymentMethod
+                payment_method: paymentMethod,
+                platform: checkoutPlatform,
+                pay_delivery_on_arrival: payOnDelivery
             };
 
             // 2. Create Order (Pending Payment)
-            const response = await api.post('/orders', payload);
+            const response = await api.post('/checkout/unified', payload);
             const result = response.data;
             const orderId = result.order_id;
             const createdOrders = result.order_ids || (orderId ? [orderId] : []);
@@ -162,7 +173,7 @@ const CheckoutModal = ({
                 // Initialize Paystack with Order ID
                 const paymentData = {
                     email: user.email,
-                    amount: orderSummary.total, // Backend expects Naira, converts to Kobo
+                    amount: finalTotal, // Backend expects Naira, converts to Kobo
                     callback_url: `${window.location.origin}/payment-callback`,
                     metadata: {
                         order_id: orderId, // Critical for Webhook to link payment to order
@@ -447,12 +458,58 @@ const CheckoutModal = ({
                                             Back
                                         </button>
                                         <button
-                                            onClick={() => {
-                                                if (validateAddress()) setCheckoutStep('payment');
+                                            onClick={async () => {
+                                                if (!validateAddress()) return;
+
+                                                if (checkoutPlatform === 'pyexpress' && orderSummary.product_total < 15000) {
+                                                    showFormError('PyExpress orders must have a minimum value of ₦15,000.');
+                                                    return;
+                                                }
+
+                                                setCalculatingDelivery(true);
+                                                try {
+                                                    const orderItems = cart.map(item => ({
+                                                        product_id: item.product.id || item.product._id,
+                                                        quantity: item.quantity
+                                                    }));
+                                                    
+                                                    let shippingAddressStr = '';
+                                                    if (addressMode === 'pickup') {
+                                                        shippingAddressStr = `PICKUP: ${selectedPickupLocation}`;
+                                                    } else {
+                                                        shippingAddressStr = `${shippingAddress.full_name}, ${shippingAddress.address_line_1}, ${shippingAddress.address_line_2 ? shippingAddress.address_line_2 + ', ' : ''}${shippingAddress.city}, ${shippingAddress.state}, ${shippingAddress.country}`;
+                                                    }
+
+                                                    const payload = {
+                                                        items: orderItems,
+                                                        delivery_address: shippingAddressStr,
+                                                        delivery_state: shippingAddress.state,
+                                                        delivery_city: shippingAddress.city,
+                                                        platform: checkoutPlatform
+                                                    };
+
+                                                    const res = await api.post('/checkout/calculate-delivery', payload);
+                                                    setLocalDeliveryFee(res.data.delivery_fee);
+                                                    setIsInterstate(res.data.is_interstate);
+                                                    
+                                                    if (res.data.is_interstate) {
+                                                        setPayOnDelivery(true);
+                                                    } else {
+                                                        setPayOnDelivery(false); 
+                                                    }
+
+                                                    setCheckoutStep('payment');
+                                                } catch (err) {
+                                                    console.error("Failed to calculate delivery", err);
+                                                    showFormError(err.response?.data?.detail || "Failed to calculate delivery. Please check your address.");
+                                                } finally {
+                                                    setCalculatingDelivery(false);
+                                                }
                                             }}
-                                            className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
+                                            disabled={calculatingDelivery}
+                                            className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50"
                                         >
-                                            Continue to Payment
+                                            {calculatingDelivery ? 'Calculating...' : 'Continue to Payment'}
                                         </button>
                                     </div>
                                 </div>
@@ -516,10 +573,27 @@ const CheckoutModal = ({
 
                                     <div className="bg-blue-50 border-l-4 border-blue-500 p-4">
                                         <div className="flex">
-                                            <div className="ml-3">
+                                            <div className="ml-3 w-full">
                                                 <p className="text-sm text-blue-700">
-                                                    Total to Pay: <strong>₦{orderSummary.total?.toLocaleString()}</strong>
+                                                    Total to Pay Now: <strong>₦{finalTotal?.toLocaleString()}</strong>
                                                 </p>
+                                                
+                                                <div className="mt-4 flex items-start gap-2 pt-4 border-t border-blue-200">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        id="payOnDelivery" 
+                                                        checked={payOnDelivery}
+                                                        disabled={isInterstate || localDeliveryFee === 0}
+                                                        onChange={(e) => setPayOnDelivery(e.target.checked)}
+                                                        className="mt-1"
+                                                    />
+                                                    <label htmlFor="payOnDelivery" className="text-sm text-blue-900 cursor-pointer">
+                                                        <span className="font-semibold block">Pay Delivery Fee on Arrival (₦{finalDeliveryDisplay.toLocaleString()})</span>
+                                                        <span className="text-xs block mb-1">Pay the driver directly when they arrive. {isInterstate && "(Required for Interstate)"}</span>
+                                                        <span className="text-xs font-semibold text-amber-600">Note: Paying on delivery might be cheaper than our platform estimation.</span>
+                                                    </label>
+                                                </div>
+
                                                 {/* Savings Display */}
                                                 {orderSummary.you_saved > 0 && (
                                                     <p className="text-xs text-emerald-600 font-bold mt-1">
@@ -562,7 +636,7 @@ const CheckoutModal = ({
                                             disabled={paymentProcessing || (paymentMethod === 'wallet' && !canPayWithWallet)}
                                             className="px-8 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            {paymentProcessing ? 'Processing...' : `Pay ₦{orderSummary.total?.toLocaleString()}`}
+                                            {paymentProcessing ? 'Processing...' : `Pay ₦${finalTotal?.toLocaleString()}`}
                                         </button>
                                     </div>
                                     <p className="text-xs text-center text-gray-500 mt-4">
@@ -590,7 +664,12 @@ const CheckoutModal = ({
                         )}
                         <div className="flex justify-between">
                             <span className="text-gray-600">Delivery</span>
-                            <span className="font-medium text-gray-900">₦{orderSummary.delivery_total?.toLocaleString()}</span>
+                            <span className="font-medium text-gray-900">
+                                {checkoutStep === 'review' || checkoutStep === 'address' 
+                                    ? <span className="italic text-gray-500 text-xs">(Calculated Next)</span> 
+                                    : `₦${finalDeliveryDisplay.toLocaleString()}`
+                                }
+                            </span>
                         </div>
                         {orderSummary.you_saved > 0 && (
                             <div className="flex justify-between text-emerald-600 font-medium py-2 border-t border-dashed border-emerald-200 mt-2">
@@ -608,8 +687,13 @@ const CheckoutModal = ({
 
                         <div className="pt-4 border-t border-gray-200">
                             <div className="flex justify-between text-lg font-bold">
-                                <span className="text-gray-900">Total</span>
-                                <span className="text-emerald-600">₦{orderSummary.total?.toLocaleString()}</span>
+                                <span className="text-gray-900">Total to Pay Now</span>
+                                <span className="text-emerald-600">
+                                    {checkoutStep === 'review' || checkoutStep === 'address' 
+                                        ? "..."
+                                        : `₦${finalTotal.toLocaleString()}`
+                                    }
+                                </span>
                             </div>
                         </div>
                     </div>

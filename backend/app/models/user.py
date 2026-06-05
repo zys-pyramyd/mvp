@@ -17,6 +17,11 @@ class User(BaseModel):
     is_verified: bool = False
     wallet_balance: float = 0.0
     profile_picture: Optional[str] = None  # Base64 encoded image or URL
+    # Location Information
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = "Nigeria"
     # Financial Information
     bvn: Optional[str] = None
     dva_account_number: Optional[str] = None
@@ -87,6 +92,11 @@ class CompleteRegistration(BaseModel):
     verification_info: Optional[dict] = None
     documents_submitted: Optional[dict] = None  # Dict[str, DocumentMetadata]
     bvn: Optional[str] = None
+    # Normalized address fields
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = "Nigeria"
 
 class SecureAccountDetails(BaseModel):
     """Encrypted storage for sensitive financial information"""

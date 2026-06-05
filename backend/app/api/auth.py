@@ -181,6 +181,12 @@ async def complete_registration(registration_data: CompleteRegistration):
     user_dict['gender'] = registration_data.gender
     user_dict['date_of_birth'] = registration_data.date_of_birth
     user_dict['user_path'] = registration_data.user_path
+    
+    # Store normalized address directly on the user object
+    user_dict['address'] = registration_data.address
+    user_dict['city'] = registration_data.city
+    user_dict['state'] = registration_data.state
+    user_dict['country'] = registration_data.country or "Nigeria"
     user_dict['business_info'] = registration_data.business_info or {}
     if registration_data.business_category:
         user_dict['business_category'] = registration_data.business_category
@@ -222,22 +228,17 @@ async def complete_registration(registration_data: CompleteRegistration):
     token = create_token(user.id)
     
     # -----------------------------------------------------------------
-    # Send welcome email to user (only if we have a real email address)
+    # Send welcome email to user (only if we have a real email address AND they are a personal buyer)
+    # Partners will receive their welcome email after KYC verification.
     # -----------------------------------------------------------------
     user_email_for_send = resolved_email  # None if they registered with phone
-    if settings.ZEPTOMAIL_TOKEN and user_email_for_send:
+    if settings.ZEPTOMAIL_TOKEN and user_email_for_send and not is_partner:
         try:
             from app.utils.email import send_zeptomail
-            if is_partner:
-                body_line = (
-                    "Your application has been received and our team will review your verification "
-                    "documents within 1–2 business days. You'll be notified once approved."
-                )
-            else:
-                body_line = (
-                    "You can now browse products, manage your profile, and connect with verified "
-                    "buyers and sellers seamlessly."
-                )
+            body_line = (
+                "You can now browse products, manage your profile, and connect with verified "
+                "buyers and sellers seamlessly."
+            )
             welcome_html = f"""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
                 <div style="text-align: center; margin-bottom: 20px;">
@@ -261,43 +262,31 @@ async def complete_registration(registration_data: CompleteRegistration):
             logging.getLogger(__name__).error(f"Failed to send welcome email: {str(e)}")
 
     # -----------------------------------------------------------------
-    # Notify admin when a partner submits documents for verification
-    # Only fires if docs were actually uploaded during registration.
-    # If partner skipped docs, admin is notified later via /api/kyc/submit-documents.
+    # Notify admin when any user registers
+    # Uses in-app notification system
     # -----------------------------------------------------------------
-    if is_partner and has_docs and settings.ZEPTOMAIL_TOKEN:
-        try:
-            from app.utils.email import send_zeptomail
-            admin_email = os.environ.get("ADMIN_EMAIL")
-            if admin_email:
-                doc_keys = list((registration_data.documents_submitted or {}).keys())
-                admin_html = f"""
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-                    <h2 style="color: #059669;">&#x1F514; New Partner Verification Request</h2>
-                    <p>A new partner has registered and is awaiting identity verification.</p>
-                    <table style="width:100%; border-collapse:collapse; margin-top:12px;">
-                        <tr><td style="padding:6px 0; color:#666;">Name</td><td style="padding:6px 0; font-weight:600;">{user.first_name} {user.last_name}</td></tr>
-                        <tr><td style="padding:6px 0; color:#666;">Username</td><td style="padding:6px 0;">{user.username}</td></tr>
-                        <tr><td style="padding:6px 0; color:#666;">Role</td><td style="padding:6px 0;">{user_role}</td></tr>
-                        <tr><td style="padding:6px 0; color:#666;">Contact</td><td style="padding:6px 0;">{raw_id}</td></tr>
-                        <tr><td style="padding:6px 0; color:#666;">Documents</td><td style="padding:6px 0;">{', '.join(doc_keys) if doc_keys else 'None uploaded'}</td></tr>
-                        <tr><td style="padding:6px 0; color:#666;">User ID</td><td style="padding:6px 0; font-family:monospace; font-size:12px;">{user.id}</td></tr>
-                    </table>
-                    <div style="margin-top:24px; text-align:center;">
-                        <a href="{os.environ.get('FRONTEND_URL', 'https://pyramydhub.com')}/pyadmin?tab=kyc&user={user.id}" style="display:inline-block; padding:12px 28px; background:#059669; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">Review in Admin Panel &rarr;</a>
-                    </div>
-                    <p style="color:#999; font-size:12px; margin-top:16px;">This is an automated alert from Pyramyd Hub.</p>
-                </div>
-                """
-                send_zeptomail(
-                    to_email=admin_email,
-                    subject=f"[Pyramyd] New {user_role.title()} Verification Request — {user.first_name} {user.last_name}",
-                    html_content=admin_html,
-                    to_name="Pyramyd Admin"
-                )
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Failed to send admin notification: {str(e)}")
+    try:
+        import uuid
+        notification_title = "New Registration"
+        notification_message = f"New user {user.first_name} {user.last_name} ({user.username}) registered as {user_role}."
+        if is_partner and has_docs:
+            notification_title = "New Partner Verification Request"
+            notification_message = f"Partner {user.first_name} {user.last_name} ({user_role}) submitted KYC documents for review."
+            
+        admin_notification = {
+            "id": str(uuid.uuid4()),
+            "recipient_role": "admin", # Using a general role-based notification for all admins
+            "title": notification_title,
+            "message": notification_message,
+            "type": "registration" if not (is_partner and has_docs) else "verification_request",
+            "is_read": False,
+            "created_at": datetime.utcnow(),
+            "related_user_id": user.id
+        }
+        db.notifications.insert_one(admin_notification)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to insert admin notification: {str(e)}")
     
     return {
         "message": "Registration completed successfully",

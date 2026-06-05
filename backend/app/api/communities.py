@@ -165,7 +165,8 @@ async def join_community(community_id: str, current_user: dict = Depends(get_cur
         "community_id": community_id,
         "user_id": current_user['id'],
         "joined_at": datetime.utcnow(),
-        "role": "member"
+        "role": "member",
+        "can_post": False
     })
     
     # Update member count
@@ -228,9 +229,9 @@ async def create_community_post(community_id: str, post: dict, current_user: dic
     if not member:
         raise HTTPException(status_code=403, detail="Must be a member to post")
         
-    # Restrict to Admins/Moderators only (Creators are usually Admins)
-    if member.get('role') not in ['admin', 'moderator', 'creator']:
-         raise HTTPException(status_code=403, detail="Only community admins can create posts")
+    # Restrict to Admins/Moderators/Creators or members with can_post flag
+    if member.get('role') not in ['admin', 'moderator', 'creator'] and not member.get('can_post'):
+         raise HTTPException(status_code=403, detail="Only community admins or approved members can create posts")
         
     new_post = {
         "id": f"post_{datetime.utcnow().timestamp()}",
@@ -440,6 +441,37 @@ async def update_member_role(
         
     return {"message": "Role updated successfully"}
 
+@router.put("/{community_id}/members/{user_id}/post-permission")
+async def toggle_member_post_permission(
+    community_id: str,
+    user_id: str,
+    payload: dict, # {"can_post": bool}
+    current_user: dict = Depends(get_current_user)
+):
+    """Toggle a member's ability to post/list products (Admin only)"""
+    db = get_db()
+    
+    requester = db.community_members.find_one({
+        "community_id": community_id,
+        "user_id": current_user["id"],
+        "role": {"$in": ["admin", "creator"]}
+    })
+    
+    if not requester:
+        raise HTTPException(status_code=403, detail="Only admins can manage permissions")
+        
+    can_post = payload.get("can_post", False)
+    
+    result = db.community_members.update_one(
+        {"community_id": community_id, "user_id": user_id},
+        {"$set": {"can_post": can_post}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Member not found")
+        
+    return {"message": f"Post permission set to {can_post}"}
+
 @router.get("/{community_id}/members")
 async def get_community_members(community_id: str, current_user: dict = Depends(get_current_user)):
     """Get list of community members"""
@@ -469,6 +501,7 @@ async def get_community_members(community_id: str, current_user: dict = Depends(
                 "last_name": user.get("last_name"),
                 "profile_picture": user.get("profile_picture"),
                 "role": m.get("role", "member"),
+                "can_post": m.get("can_post", False),
                 "joined_at": m.get("joined_at")
             })
             
@@ -508,6 +541,7 @@ async def add_community_member(
         "user_id": target_user_id,
         "joined_at": datetime.utcnow(),
         "role": "member",
+        "can_post": False,
         "added_by": current_user['id']
     })
     
@@ -531,8 +565,9 @@ async def delete_community(community_id: str, current_user: dict = Depends(get_c
     db.communities.delete_one({"id": community_id})
     db.community_members.delete_many({"community_id": community_id})
     db.community_posts.delete_many({"community_id": community_id})
-    # Optional: Delete products or flag them? 
-    # For now, let's leave products but they won't show in community feed.
+    
+    # Unlink products
+    db.products.update_many({"community_id": community_id}, {"$unset": {"community_id": "", "community_name": ""}})
     
     return {"message": "Community deleted successfully"}
 

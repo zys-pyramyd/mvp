@@ -106,6 +106,28 @@ async def search_users(q: str = Query(..., min_length=1), current_user: dict = D
     
     return results
 
+@router.get("/search-messaging")
+async def search_users_messaging(username: str, current_user: dict = Depends(get_current_user)):
+    """Search users by username for messaging"""
+    if len(username) < 2:
+        raise HTTPException(status_code=400, detail="Search term must be at least 2 characters")
+    
+    db = get_db()
+    
+    # Search for users with username containing the search term, excluding current user
+    users = list(db.users.find({
+        "$and": [
+            {"username": {"$regex": username, "$options": "i"}},
+            {"username": {"$ne": current_user["username"]}}
+        ]
+    }, {"password": 0}))  # Exclude password field
+    
+    # Clean up response
+    for user in users:
+        user.pop('_id', None)
+    
+    return users[:10]  # Limit to 10 results
+
 # --- Bank Account Management ---
 from app.models.user import BankAccountCreate
 from app.utils.security import encrypt_data

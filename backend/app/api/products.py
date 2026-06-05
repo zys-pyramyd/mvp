@@ -252,7 +252,7 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
     
     # Enforce platform restrictions
     if user_role == 'farmer':
-        product_platform = 'pyhub'
+        product_platform = 'farm_deals'
     elif user_role == 'business':
         # Businesses can list Farm Inputs, Food, etc. across platforms (PyExpress or PyHub)
         # We respect the platform sent from the frontend, default to pyexpress
@@ -260,7 +260,7 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
             
     elif user_role == 'agent':
         # Agents can list on behalf of farmers effectively
-        product_platform = 'pyhub'
+        product_platform = 'farm_deals'
     
     # Enforce Pre-order Role Restrictions
     if product_data.is_preorder:
@@ -283,9 +283,9 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
         if not member:
             raise HTTPException(status_code=403, detail="You must be a member of the community to list products there")
             
-        # Restrict to Admins/Creators only
-        if member.get('role') not in ['admin', 'creator']:
-             raise HTTPException(status_code=403, detail="Only community admins can list products")
+        # Restrict to Admins/Creators or members with can_post flag
+        if member.get('role') not in ['admin', 'creator', 'moderator'] and not member.get('can_post'):
+             raise HTTPException(status_code=403, detail="Only community admins or approved members can list products")
             
         # Optional: Fetch community name for denormalization
         community = db.communities.find_one({"id": product_data.community_id})
@@ -363,7 +363,7 @@ async def create_product(product_data: ProductCreate, current_user: dict = Depen
     # Apply service charges based on role
     if current_user.get('role') == 'farmer':
         product.price_per_unit = product_data.price_per_unit * 1.30
-    elif current_user.get('role') in ['supplier_food_produce', 'processor']:
+    elif current_user.get('role') == 'business':
         product.price_per_unit = product_data.price_per_unit * 0.90
     
     # Calculate discount if applicable
@@ -481,3 +481,85 @@ async def get_product_comments(product_id: str, limit: int = 20):
     for c in comments:
         c.pop("_id", None)
     return comments
+
+@router.get("/{product_id}/delivery-options")
+async def get_product_delivery_options(product_id: str):
+    """Get delivery options for a specific product"""
+    db = get_db()
+    try:
+        product = db.products.find_one({"id": product_id}) or db.preorders.find_one({"id": product_id})
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        delivery_options = {
+            "product_id": product_id,
+            "supports_dropoff_delivery": product.get("supports_dropoff_delivery", True),
+            "supports_shipping_delivery": product.get("supports_shipping_delivery", True),
+            "delivery_costs": {
+                "dropoff": {
+                    "cost": product.get("delivery_cost_dropoff", 0.0),
+                    "is_free": product.get("delivery_cost_dropoff", 0.0) == 0.0
+                },
+                "shipping": {
+                    "cost": product.get("delivery_cost_shipping", 0.0),
+                    "is_free": product.get("delivery_cost_shipping", 0.0) == 0.0
+                }
+            },
+            "delivery_notes": product.get("delivery_notes")
+        }
+        
+        return delivery_options
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error getting delivery options: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get delivery options")
+
+@router.put("/{product_id}/delivery-options")
+async def update_product_delivery_options(
+    product_id: str,
+    delivery_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update delivery options for a product (suppliers only)"""
+    db = get_db()
+    try:
+        # Check if product exists and user owns it
+        product = db.products.find_one({"id": product_id})
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        if product.get("seller_id") != current_user["id"]:
+            raise HTTPException(status_code=403, detail="You can only update delivery options for your own products")
+        
+        # Validate at least one delivery method is supported
+        supports_dropoff = delivery_data.get("supports_dropoff_delivery", True)
+        supports_shipping = delivery_data.get("supports_shipping_delivery", True)
+        
+        if not supports_dropoff and not supports_shipping:
+            raise HTTPException(status_code=400, detail="At least one delivery method must be supported")
+        
+        # Update product delivery options
+        from datetime import datetime
+        update_data = {
+            "supports_dropoff_delivery": supports_dropoff,
+            "supports_shipping_delivery": supports_shipping,
+            "delivery_cost_dropoff": max(0.0, delivery_data.get("delivery_cost_dropoff", 0.0)),
+            "delivery_cost_shipping": max(0.0, delivery_data.get("delivery_cost_shipping", 0.0)),
+            "delivery_notes": delivery_data.get("delivery_notes", "").strip() or None,
+            "updated_at": datetime.utcnow()
+        }
+        
+        db.products.update_one({"id": product_id}, {"$set": update_data})
+        
+        return {"message": "Delivery options updated successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error updating delivery options: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update delivery options")
+

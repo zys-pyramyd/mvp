@@ -623,9 +623,9 @@ const AuthModal = () => {
                                     <form onSubmit={(e) => { e.preventDefault(); handleCompleteRegistration(); }} className="space-y-4">
                                         <input
                                             type="text"
-                                            placeholder="Home Address"
-                                            value={businessInfo.home_address}
-                                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, home_address: e.target.value }))}
+                                            placeholder="Address"
+                                            value={businessInfo.address || ''}
+                                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, address: e.target.value }))}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                             required
                                         />
@@ -715,7 +715,7 @@ const AuthModal = () => {
                                             className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
                                         >
                                             <div className="font-medium">Business</div>
-                                            <div className="text-sm text-gray-600">Supplier, Processor, or Logistics Business</div>
+                                            <div className="text-sm text-gray-600">Enterprise buyer/seller (Food Servicing, Hospitality, Processor, etc.)</div>
                                         </button>
                                     </div>
                                 </div>
@@ -739,27 +739,83 @@ const AuthModal = () => {
                                 <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-2xl">
                                     <div className="space-y-3">
                                         <button
-                                            onClick={() => handleBusinessCategory('supplier')}
+                                            onClick={() => handleBusinessCategory('food_servicing')}
                                             className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
                                         >
-                                            <div className="font-medium">Supplier</div>
-                                            <div className="text-sm text-gray-600">Supply agricultural products</div>
+                                            <div className="font-medium">Food Servicing</div>
+                                            <div className="text-sm text-gray-600">Restaurants, Cafes, Caterers</div>
                                         </button>
 
                                         <button
-                                            onClick={() => handleBusinessCategory('processor')}
+                                            onClick={() => handleBusinessCategory('hospitality')}
                                             className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
                                         >
-                                            <div className="font-medium">Processor</div>
+                                            <div className="font-medium">Hospitality</div>
+                                            <div className="text-sm text-gray-600">Hotels, Resorts, etc.</div>
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleBusinessCategory('processor_and_manufacturing')}
+                                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
+                                        >
+                                            <div className="font-medium">Processor & Manufacturing</div>
                                             <div className="text-sm text-gray-600">Process raw materials into finished goods</div>
                                         </button>
-
+                                        
                                         <button
-                                            onClick={() => handleBusinessCategory('logistics_business')}
+                                            onClick={() => handleBusinessCategory('logistics')}
                                             className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
                                         >
-                                            <div className="font-medium">Logistics Business</div>
+                                            <div className="font-medium">Logistics</div>
                                             <div className="text-sm text-gray-600">Transport and logistics services</div>
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleBusinessCategory('technology')}
+                                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
+                                        >
+                                            <div className="font-medium">Technology</div>
+                                            <div className="text-sm text-gray-600">Technology and software services</div>
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleBusinessCategory('energy')}
+                                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
+                                        >
+                                            <div className="font-medium">Energy</div>
+                                            <div className="text-sm text-gray-600">Energy and power solutions</div>
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleBusinessCategory('consulting')}
+                                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
+                                        >
+                                            <div className="font-medium">Consulting</div>
+                                            <div className="text-sm text-gray-600">Professional consulting services</div>
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleBusinessCategory('fintech')}
+                                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
+                                        >
+                                            <div className="font-medium">Fintech</div>
+                                            <div className="text-sm text-gray-600">Financial technology services</div>
+                                        </button>
+                                        
+                                        <button
+                                            onClick={() => handleBusinessCategory('agriculture')}
+                                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
+                                        >
+                                            <div className="font-medium">Agriculture</div>
+                                            <div className="text-sm text-gray-600">General agriculture services</div>
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleBusinessCategory('others')}
+                                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all"
+                                        >
+                                            <div className="font-medium">Others</div>
+                                            <div className="text-sm text-gray-600">Specify other category</div>
                                         </button>
                                     </div>
                                 </div>
@@ -886,7 +942,7 @@ const AuthModal = () => {
                                             </>
                                         )}
 
-                                        {(businessCategory === 'processor' || businessCategory === 'logistics_business' || (partnerType === 'business' && businessCategory)) && (
+                                        {(partnerType === 'business' && businessCategory) && (
                                             <>
                                                 <div className="mb-4 p-3 bg-purple-100 rounded-lg">
                                                     <p className="text-sm text-purple-800 font-medium">Required: CAC Number, Business Name, and Address</p>
@@ -894,7 +950,7 @@ const AuthModal = () => {
                                                 <input
                                                     type="text"
                                                     placeholder="CAC Registration Number"
-                                                    value={verificationInfo.cac_number}
+                                                    value={verificationInfo.cac_number || ''}
                                                     onChange={(e) => setVerificationInfo(prev => ({ ...prev, cac_number: e.target.value }))}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                                     required
@@ -902,91 +958,47 @@ const AuthModal = () => {
                                                 <input
                                                     type="text"
                                                     placeholder="Business Name"
-                                                    value={businessInfo.business_name}
+                                                    value={businessInfo.business_name || ''}
                                                     onChange={(e) => setBusinessInfo(prev => ({ ...prev, business_name: e.target.value }))}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                                     required
                                                 />
                                                 <input
                                                     type="text"
-                                                    placeholder="Business Address"
-                                                    value={businessInfo.business_address}
-                                                    onChange={(e) => setBusinessInfo(prev => ({ ...prev, business_address: e.target.value }))}
+                                                    placeholder="Address"
+                                                    value={businessInfo.address || ''}
+                                                    onChange={(e) => setBusinessInfo(prev => ({ ...prev, address: e.target.value }))}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                                     required
                                                 />
-                                            </>
-                                        )}
-
-                                        {businessCategory === 'supplier' && (
-                                            <>
-                                                <div className="mb-4 p-3 bg-orange-100 rounded-lg">
-                                                    <p className="text-sm text-orange-800 font-medium">Suppliers can submit either NIN or CAC Number</p>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    <label className="flex items-center">
-                                                        <input
-                                                            type="radio"
-                                                            name="supplier_verification"
-                                                            value="nin"
-                                                            onChange={(e) => setVerificationInfo(prev => ({ ...prev, verification_type: e.target.value }))}
-                                                            className="mr-2"
-                                                        />
-                                                        Use NIN (Individual/Unregistered Business)
-                                                    </label>
-                                                    <label className="flex items-center">
-                                                        <input
-                                                            type="radio"
-                                                            name="supplier_verification"
-                                                            value="cac"
-                                                            onChange={(e) => setVerificationInfo(prev => ({ ...prev, verification_type: e.target.value }))}
-                                                            className="mr-2"
-                                                        />
-                                                        Use CAC (Registered Business)
-                                                    </label>
-                                                </div>
-
-                                                {verificationInfo.verification_type === 'nin' && (
+                                                <div className="grid grid-cols-3 gap-3 mt-3">
                                                     <input
                                                         type="text"
-                                                        placeholder="National Identification Number (NIN)"
-                                                        value={verificationInfo.nin}
-                                                        onChange={(e) => setVerificationInfo(prev => ({ ...prev, nin: e.target.value }))}
+                                                        placeholder="City"
+                                                        value={businessInfo.city || ''}
+                                                        onChange={(e) => setBusinessInfo(prev => ({ ...prev, city: e.target.value }))}
                                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                                         required
                                                     />
-                                                )}
-
-                                                {verificationInfo.verification_type === 'cac' && (
-                                                    <>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="CAC Registration Number"
-                                                            value={verificationInfo.cac_number}
-                                                            onChange={(e) => setVerificationInfo(prev => ({ ...prev, cac_number: e.target.value }))}
-                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                                            required
-                                                        />
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Business Name"
-                                                            value={businessInfo.business_name}
-                                                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, business_name: e.target.value }))}
-                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                                            required
-                                                        />
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Business Address"
-                                                            value={businessInfo.business_address}
-                                                            onChange={(e) => setBusinessInfo(prev => ({ ...prev, business_address: e.target.value }))}
-                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                                            required
-                                                        />
-                                                    </>
-                                                )}
+                                                    <input
+                                                        type="text"
+                                                        placeholder="State"
+                                                        value={businessInfo.state || ''}
+                                                        onChange={(e) => setBusinessInfo(prev => ({ ...prev, state: e.target.value }))}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                                        required
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Country"
+                                                        value={businessInfo.country || 'Nigeria'}
+                                                        onChange={(e) => setBusinessInfo(prev => ({ ...prev, country: e.target.value }))}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                                        required
+                                                    />
+                                                </div>
                                             </>
-                                        )}
+                                            )}
 
                                         <button
                                             type="submit"

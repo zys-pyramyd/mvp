@@ -52,41 +52,14 @@ async def submit_documents(
         }}
     )
 
-    # Notify admin
-    import os
-    from app.core.config import settings
-    admin_email = os.environ.get("ADMIN_EMAIL")
-    if admin_email and settings.ZEPTOMAIL_TOKEN:
-        try:
-            from app.utils.email import send_zeptomail
-            doc_keys = list(documents.keys())
-            frontend_url = os.environ.get("FRONTEND_URL", "https://pyramydhub.com")
-            admin_html = f"""
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-                <h2 style="color: #059669;">&#x1F4C4; Partner Documents Submitted for Review</h2>
-                <p>A registered partner has now uploaded their verification documents.</p>
-                <table style="width:100%; border-collapse:collapse; margin-top:12px;">
-                    <tr><td style="padding:6px 0; color:#666;">Name</td><td style="padding:6px 0; font-weight:600;">{current_user.get('first_name')} {current_user.get('last_name')}</td></tr>
-                    <tr><td style="padding:6px 0; color:#666;">Username</td><td style="padding:6px 0;">@{current_user.get('username')}</td></tr>
-                    <tr><td style="padding:6px 0; color:#666;">Role</td><td style="padding:6px 0;">{current_user.get('role')}</td></tr>
-                    <tr><td style="padding:6px 0; color:#666;">Documents</td><td style="padding:6px 0;">{', '.join(doc_keys)}</td></tr>
-                    <tr><td style="padding:6px 0; color:#666;">User ID</td><td style="padding:6px 0; font-family:monospace; font-size:12px;">{current_user.get('id')}</td></tr>
-                </table>
-                <div style="margin-top:24px; text-align:center;">
-                    <a href="{frontend_url}/pyadmin?tab=kyc&user={current_user.get('id')}" style="display:inline-block; padding:12px 28px; background:#059669; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">Review in Admin Panel &rarr;</a>
-                </div>
-                <p style="color:#999; font-size:12px; margin-top:16px;">This is an automated alert from Pyramyd Hub.</p>
-            </div>
-            """
-            send_zeptomail(
-                to_email=admin_email,
-                subject=f"[Pyramyd] Documents Submitted — {current_user.get('first_name')} {current_user.get('last_name')} ({current_user.get('role').title()})",
-                html_content=admin_html,
-                to_name="Pyramyd Admin"
-            )
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Failed to send admin notification: {str(e)}")
+    # Notify admin via in-app notification
+    create_notification(
+        user_id="admin",
+        title="New KYC Document Submitted",
+        message=f"{current_user.get('first_name')} {current_user.get('last_name')} ({current_user.get('role')}) has submitted verification documents for review.",
+        type="kyc_submission",
+        action_link=f"/pyadmin?tab=kyc&user={current_user.get('id')}"
+    )
 
     return {
         "message": "Documents submitted successfully. Your account is now under admin review.",
@@ -196,6 +169,15 @@ async def submit_agent_kyc(
         {"$set": {"kyc_status": KYCStatus.PENDING, "kyc_submitted_at": datetime.utcnow()}}
     )
     
+    # Notify admin via in-app notification
+    create_notification(
+        user_id="admin",
+        title="Agent KYC Submitted",
+        message=f"{current_user.get('first_name')} {current_user.get('last_name')} has submitted Agent KYC for review.",
+        type="kyc_submission",
+        action_link=f"/pyadmin?tab=kyc&user={current_user.get('id')}"
+    )
+    
     return {"message": "Agent KYC submitted successfully. Pending Admin Review."}
 
 @router.post("/submit/farmer")
@@ -227,6 +209,15 @@ async def submit_farmer_kyc(
     db.users.update_one(
         {"id": current_user['id']},
         {"$set": {"kyc_status": KYCStatus.PENDING, "kyc_submitted_at": datetime.utcnow()}}
+    )
+    
+    # Notify admin via in-app notification
+    create_notification(
+        user_id="admin",
+        title="Farmer KYC Submitted",
+        message=f"{current_user.get('first_name')} {current_user.get('last_name')} has submitted Farmer KYC for review.",
+        type="kyc_submission",
+        action_link=f"/pyadmin?tab=kyc&user={current_user.get('id')}"
     )
     
     return {"message": "Farmer KYC submitted successfully. Pending Admin Review."}
@@ -327,8 +318,42 @@ async def approve_kyc(user_id: str, current_user: dict = Depends(get_current_use
     
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
+        
+    user = db.users.find_one({"id": user_id})
     
-    # Notify User
+    # Send welcome email via ZeptoMail
+    import os
+    from app.core.config import settings
+    if settings.ZEPTOMAIL_TOKEN and user and user.get('email'):
+        try:
+            from app.utils.email import send_zeptomail
+            body_line = (
+                "Your account verification has been approved! You can now access your partner "
+                "dashboard, manage your listings, and connect with verified buyers seamlessly."
+            )
+            welcome_html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h1 style="color: #059669; margin: 0;">Welcome to Pyramyd!</h1>
+                </div>
+                <p style="font-size: 16px;">Hello {user.get('first_name', 'Partner')},</p>
+                <p style="font-size: 16px;">We are thrilled to welcome you to our premier agricultural marketplace.</p>
+                <p style="font-size: 16px;">{body_line}</p>
+                <br/>
+                <p style="color: #666; font-size: 14px;">Best Regards,<br/><strong>The Pyramyd Team</strong></p>
+            </div>
+            """
+            send_zeptomail(
+                to_email=user['email'],
+                subject="Welcome to Pyramyd! Account Approved",
+                html_content=welcome_html,
+                to_name=f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to send welcome email on KYC approval: {str(e)}")
+    
+    # Notify User in-app
     create_notification(
         user_id=user_id,
         title="KYC Approved",

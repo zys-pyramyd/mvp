@@ -58,337 +58,6 @@ async def update_order_status(order_id: str, status_update: OrderStatusUpdate, c
     
     return {"message": "Order status updated successfully", "order_id": order_id, "status": status_update.status}
 
-class CreateOrderRequest(BaseModel):
-    items: List[CartItem]
-    delivery_address: str
-    payment_method: Optional[str] = "paystack" # wallet, paystack
-    payment_reference: Optional[str] = None
-
-@router.post("/")
-async def create_order(
-    order_req: CreateOrderRequest, 
-    current_user: dict = Depends(get_current_user)
-):
-    import logging
-    logging.getLogger(__name__).debug("ENTERING CREATE_ORDER")
-    items = order_req.items
-    delivery_address = order_req.delivery_address
-    
-    if not items:
-        raise HTTPException(status_code=400, detail="No items in order")
-    
-    # Exclude personal buyers from KYC, but enforce it for business buyers
-    if current_user.get('role') == 'business' and current_user.get('kyc_status') != 'approved':
-        raise HTTPException(status_code=403, detail="Business buyers must have approved KYC to place orders.")
-    
-    db = get_db()
-    order_items = []
-    total_amount = 0.0
-    seller_id = None
-    seller_name = None
-    
-    # Bulk fetch products to avoid N+1 DB roundtrips
-    product_ids = [item.product_id for item in items]
-    products = list(db.products.find({"id": {"$in": product_ids}}))
-    product_map = {p["id"]: p for p in products}
-
-    product_payout_account = None
-
-    for item in items:
-        product = product_map.get(item.product_id)
-        if not product:
-            raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
-        
-        if item.quantity > product['quantity_available']:
-            raise HTTPException(status_code=400, detail=f"Insufficient quantity for {product['title']}")
-        
-        item_total = product['price_per_unit'] * item.quantity
-        total_amount += item_total
-        
-        order_items.append({
-            "product_id": product['id'],
-            "title": product['title'],
-            "price_per_unit": product['price_per_unit'],
-            "quantity": item.quantity,
-            "total": item_total
-        })
-        
-        if seller_id is None:
-            seller_id = product['seller_id']
-            seller_name = product['seller_name']
-            
-            # Phase 4: Capture specific product payout details if available
-            if product.get("payout_account_number"):
-                product_payout_account = {
-                    "account_number": product.get("payout_account_number"),
-                    "bank_code": product.get("payout_bank_code"),
-                    "account_name": product.get("payout_account_name")
-                }
-        elif seller_id != product['seller_id']:
-            raise HTTPException(status_code=400, detail="All items must be from the same seller")
-            
-    # Calculate Delivery Fee & Agent Buying Service Charge
-    product_cost_total = total_amount
-    total_delivery_fee = 0.0
-    logistics_managed_by = "pyramyd" # Default
-    
-    # Check if Seller manages logistics for the first product
-    first_product = product_map.get(items[0].product_id)
-    if first_product and first_product.get('logistics_managed_by') == 'seller':
-        logistics_managed_by = 'seller'
-        for item in items:
-            p = product_map.get(item.product_id)
-            total_delivery_fee += float(p.get('seller_delivery_fee', 0.0) or 0.0)
-    else:
-        # Pyramyd manages logistics: Dynamic Geoapify Distance
-        from app.utils.geo import get_distance_km
-        seller = db.users.find_one({"id": seller_id})
-        seller_address = seller.get("address", "") if seller else ""
-        
-        distance = get_distance_km(seller_address, delivery_address)
-        platform_type = first_product.get('platform', 'pyhub') if first_product else 'pyhub'
-        
-        delivery_base_fee = 0.0
-        delivery_per_km = 100.0 if platform_type == 'pyexpress' else 2.0
-        total_delivery_fee = delivery_base_fee + (delivery_per_km * distance)
-
-    # Calculate 4% Agent Buying Service Charge
-    agent_service_charge = 0.0
-    # Apply if the user is linked to an agent, or explicitly buying via agent
-    if current_user.get('agent_id'):
-        agent_service_charge = product_cost_total * 0.04
-
-    # Build final cart total
-    total_amount = product_cost_total + total_delivery_fee + agent_service_charge
-    
-    # --- GHOST STOCK PREVENTION: Reserve Stock First ---
-    reserved_items = []
-    try:
-        for item in items:
-            result = db.products.update_one(
-                {
-                    "id": item.product_id,
-                    "quantity_available": {"$gte": item.quantity}  # Atomic stock check
-                },
-                {"$inc": {"quantity_available": -item.quantity}}
-            )
-            if result.modified_count == 0:
-                raise Exception(f"Insufficient stock for product {item.product_id}")
-            reserved_items.append(item)
-    except Exception as e:
-        # Rollback stock for previously reserved items in this order
-        for r_item in reserved_items:
-            db.products.update_one(
-                {"id": r_item.product_id},
-                {"$inc": {"quantity_available": r_item.quantity}}
-            )
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Order creation failed prior to payment due to stock: {str(e)}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Insufficient stock for product. {str(e)}"
-        )
-        
-    # Payment Handling
-    order_status = "pending"
-    
-    # Generate order ID early for transaction tracking
-    from app.utils.id_generator import generate_tracking_id
-    order_id = generate_tracking_id()
-    
-    if order_req.payment_method == "wallet":
-        # Atomic wallet deduction with balance check
-        # This prevents race conditions where multiple requests could overdraw
-        result = db.users.update_one(
-            {
-                "id": current_user["id"],
-                "wallet_balance": {"$gte": total_amount}  # Atomic check
-            },
-            {"$inc": {"wallet_balance": -total_amount}}
-        )
-        
-        if result.modified_count == 0:
-            # Rollback stock because wallet failed
-            for r_item in reserved_items:
-                db.products.update_one(
-                    {"id": r_item.product_id},
-                    {"$inc": {"quantity_available": r_item.quantity}}
-                )
-                
-            current_balance = db.users.find_one({"id": current_user["id"]}, {"wallet_balance": 1})
-            if current_balance:
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"Insufficient wallet balance. Available: ₦{current_balance.get('wallet_balance', 0):.2f}, Required: ₦{total_amount:.2f}"
-                )
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        # Log Transaction with order reference
-        transaction = {
-            "user_id": current_user["id"],
-            "email": current_user.get("email"),
-            "type": "debit",
-            "category": "order_payment",
-            "amount": total_amount,
-            "reference": f"order_{order_id}",  # Link to order
-            "description": f"Payment for Order {order_id}",
-            "status": "success",
-            "metadata": {
-                "order_id": order_id,
-                "seller_id": seller_id,
-                "item_count": len(order_items)
-            },
-            "created_at": datetime.utcnow()
-        }
-        db.wallet_transactions.insert_one(transaction)
-        order_status = "held_in_escrow"  # Funds held in escrow until delivery confirmation
-        
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"Wallet payment successful for order {order_id}. Amount: ₦{total_amount}, User: {current_user['id']}")
-        
-    elif order_req.payment_method == "paystack":
-        # Paystack Payment Flow
-        order_status = "pending"
-
-    # Store explicit items list in order dict
-    order_dict = {
-        "order_id": order_id,
-        "buyer_id": current_user['id'],
-        "buyer_username": current_user['username'],
-        "buyer_email": current_user.get('email'),
-        "buyer_agent_id": current_user.get('agent_id'),
-        "seller_id": seller_id,
-        "seller_username": seller_name,
-        "items": order_items,
-        "total_amount": total_amount,
-        "product_cost_total": product_cost_total,
-        "total_delivery_fee": total_delivery_fee,
-        "agent_service_charge": agent_service_charge,
-        "logistics_managed_by": logistics_managed_by,
-        "delivery_address": delivery_address,
-        "payment_method": order_req.payment_method,
-        "payment_reference": order_req.payment_reference,
-        "payment_status": "pending" if order_req.payment_method == "paystack" else "paid",
-        "status_history": [{"status": order_status, "date": datetime.utcnow()}],
-        "status": order_status,
-        "product_payout_account": product_payout_account, # Safe isolation of payout 
-        "created_at": datetime.utcnow()
-    }
-    
-    import logging
-    logging.getLogger(__name__).debug(f"Inserting Order: {order_dict.get('order_id')}")
-    try:
-        db.orders.insert_one(order_dict)
-    except Exception as e:
-        # If order creation fails, refund wallet AND stock
-        if order_req.payment_method == "wallet":
-            db.users.update_one(
-                {"id": current_user["id"]},
-                {"$inc": {"wallet_balance": total_amount}}
-            )
-            
-        for r_item in reserved_items:
-            db.products.update_one(
-                {"id": r_item.product_id},
-                {"$inc": {"quantity_available": r_item.quantity}}
-            )
-            
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Order creation failed, wallet refunded and stock restored. Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to create order: {str(e)}")
-    
-    # If Paystack payment, initialize transaction and return payment URL
-    if order_req.payment_method == "paystack":
-        from app.services.paystack import initialize_transaction
-        
-        try:
-            # Initialize Paystack transaction
-            amount_kobo = int(total_amount * 100)
-            
-            # Prepare metadata
-            metadata = {
-                "order_id": order_id,
-                "buyer_id": current_user['id'],
-                "seller_id": seller_id,
-                "item_count": len(order_items)
-            }
-            
-            # Get callback URL from environment or use default
-            import os
-            frontend_url = os.getenv("FRONTEND_URL", "https://pyramydhub.com")
-            callback_url = f"{frontend_url}/orders/{order_id}/payment-callback"
-            
-            result = initialize_transaction(
-                email=current_user.get('email'),
-                amount=amount_kobo,
-                callback_url=callback_url,
-                metadata=metadata
-            )
-            
-            payment_reference = result["data"]["reference"]
-            authorization_url = result["data"]["authorization_url"]
-            
-            # Update order with payment reference
-            db.orders.update_one(
-                {"order_id": order_id},
-                {"$set": {"payment_reference": payment_reference}}
-            )
-            
-            # Create pending transaction record
-            transaction = {
-                "user_id": current_user["id"],
-                "email": current_user.get("email"),
-                "type": "debit",
-                "category": "order_payment",
-                "amount": total_amount,
-                "reference": payment_reference,
-                "description": f"Payment for Order {order_id}",
-                "status": "pending",
-                "metadata": metadata,
-                "created_at": datetime.utcnow()
-            }
-            db.wallet_transactions.insert_one(transaction)
-            
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"Paystack payment initialized for order {order_id}. Amount: ₦{total_amount}, Reference: {payment_reference}, User: {current_user['id']}")
-            
-            return {
-                "message": "Order created. Please complete payment.",
-                "order_id": order_id,
-                "total_amount": total_amount,
-                "status": order_status,
-                "payment_url": authorization_url,
-                "payment_reference": payment_reference
-            }
-            
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Paystack payment initialization failed for order {order_id}. Error: {str(e)}")
-            
-            # Mark order as failed
-            db.orders.update_one(
-                {"order_id": order_id},
-                {"$set": {"status": "payment_failed", "payment_error": str(e)}}
-            )
-            
-            # Rollback product quantities
-            for item in items:
-                db.products.update_one(
-                    {"id": item.product_id},
-                    {"$inc": {"quantity_available": item.quantity}}  # Add back
-                )
-            
-            raise HTTPException(
-                status_code=400,
-                detail=f"Payment initialization failed: {str(e)}"
-            )
-    
-    return {"message": "Order created successfully", "order_id": order_dict["order_id"], "total_amount": total_amount, "status": order_status}
 
 @router.get("/")
 async def get_orders(current_user: dict = Depends(get_current_user)):
@@ -602,8 +271,6 @@ async def cancel_order(order_id: str, current_user: dict = Depends(get_current_u
         "refund_method": "wallet" if refund_processed else "none"
     }
 
-from pydantic import BaseModel
-from typing import List
 
 class RemoveItemsRequest(BaseModel):
     product_ids: List[str]  # List of product IDs to remove
@@ -838,70 +505,68 @@ def get_payment_status_message(order: dict) -> str:
     else:
         return f"Order status: {status}"
 
-@router.post("/{order_id}/cancel")
-async def cancel_order(order_id: str, current_user: dict = Depends(get_current_user)):
-    """
-    Cancel an order and refund the buyer using Paystack Reversal API.
-    Only orders that are 'pending' or 'held_in_escrow' can be cancelled by the buyer.
-    """
+
+
+@router.get("/units")
+async def get_available_units():
+    """Get all available units with examples"""
+    return {
+        "units": [
+            {"value": "kg", "label": "Kilograms", "examples": ["50kg", "100kg"]},
+            {"value": "g", "label": "Grams", "examples": ["500g", "1000g"]},
+            {"value": "ton", "label": "Tons", "examples": ["1 ton", "5 tons"]},
+            {"value": "pieces", "label": "Pieces", "examples": ["10 pieces", "50 pieces"]},
+            {"value": "liters", "label": "Liters", "examples": ["5 liters", "20 liters"]},
+            {"value": "bags", "label": "Bags", "examples": ["100kg per bag", "50kg per bag"]},
+            {"value": "crates", "label": "Crates", "examples": ["24 bottles per crate", "50 pieces per crate"]},
+            {"value": "gallons", "label": "Gallons", "examples": ["5 litres per gallon", "4 litres per gallon"]}
+        ]
+    }
+
+class DisputeCreate(BaseModel):
+    reason: str
+    description: str
+
+@router.post("/{order_id}/dispute", tags=["Orders"])
+async def report_dispute(
+    order_id: str,
+    dispute_data: DisputeCreate,
+    current_user: dict = Depends(get_current_user)
+):
     db = get_db()
+    # Retrieve Order
     order = db.orders.find_one({"order_id": order_id})
-    
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-        
-    if order['buyer_id'] != current_user['id']:
-        raise HTTPException(status_code=403, detail="Only the buyer can cancel this order")
-        
-    if order['status'] not in ['pending', 'held_in_escrow']:
-        raise HTTPException(status_code=400, detail="Order cannot be cancelled at this stage")
-        
-    # 1. Reverse "Ghost Stock"
-    for item in order.get("items", []):
-        db.products.update_one(
-            {"id": item["product_id"]},
-            {"$inc": {"quantity_available": item["quantity"]}}
-        )
-        
-    # 2. Refund Escrow via Paystack if Paid
-    if order['status'] == 'held_in_escrow' and order.get('payment_reference'):
-        try:
-            from app.services.paystack import refund_transaction
-            # Trigger full refund
-            refund_transaction(order['payment_reference'], customer_note=f"Cancelled Order {order_id}")
-            
-            # Log refund
-            refund_txn = {
-                "user_id": current_user['id'],
-                "type": "credit",
-                "category": "refund",
-                "amount": order.get('total_amount'),
-                "reference": f"refund_api_{order['payment_reference']}",
-                "description": f"Card Reversal for Order {order_id}",
-                "status": "success",
-                "created_at": datetime.utcnow()
-            }
-            db.wallet_transactions.insert_one(refund_txn)
-            
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Paystack Refund Failed for {order_id}: {str(e)}")
-            order['refund_failed_reason'] = str(e)
-            
-    # 3. Update Status
-    update_data = {
-        "status": "cancelled",
-        "cancelled_at": datetime.utcnow()
+
+    # Verify Participant
+    user_id = current_user["id"]
+    if user_id != order.get("buyer_id") and user_id != order.get("seller_id"):
+        raise HTTPException(status_code=403, detail="Not a participant in this order")
+
+    # Verify Status
+    if order.get("status") in ["cancelled", "pending"]:
+         raise HTTPException(status_code=400, detail="Cannot dispute an order in this state.")
+
+    # Create Dispute
+    import uuid
+    from datetime import datetime
+    dispute = {
+        "id": str(uuid.uuid4()),
+        "order_id": order_id,
+        "reporter_id": user_id,
+        "reporter_role": "buyer" if user_id == order.get("buyer_id") else "seller",
+        "reason": dispute_data.reason,
+        "description": dispute_data.description,
+        "status": "open",
+        "created_at": datetime.utcnow()
     }
-    if 'refund_failed_reason' in order:
-        update_data["refund_status"] = "failed"
-        update_data["refund_failed_reason"] = order["refund_failed_reason"]
-    elif order['status'] == 'held_in_escrow':
-        update_data["refund_status"] = "processing"
-        
-    db.orders.update_one({"order_id": order_id}, {"$set": update_data})
-    
-    return {
-        "message": "Order cancelled successfully. If paid, your card refund is processing.",
-        "status": "cancelled"
-    }
+    db.disputes.insert_one(dispute)
+
+    # Update Order Status
+    db.orders.update_one(
+        {"order_id": order_id},
+        {"$set": {"status": "disputed", "updated_at": datetime.utcnow()}}
+    )
+
+    return {"status": "success", "message": "Dispute opened successfully", "dispute_id": dispute["id"]}

@@ -1,7 +1,8 @@
 
 from fastapi import APIRouter
-from app.api import auth, users, products, orders, admin, agent, paystack, upload, setup, categories
+from app.api import auth, users, products, orders, admin, agent, paystack, upload, setup, categories, checkout, wallet, tracking
 import app.api.admin_documents as admin_documents
+import app.api.dropoff_locations as dropoff_locations
 
 api_router = APIRouter()
 
@@ -10,6 +11,10 @@ api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(users.user_router, prefix="/user", tags=["user"])
 api_router.include_router(products.router, prefix="/products", tags=["products"])
 api_router.include_router(orders.router, prefix="/orders", tags=["orders"])
+api_router.include_router(checkout.router, prefix="/checkout", tags=["checkout"])
+api_router.include_router(wallet.router, prefix="/wallet", tags=["wallet"])
+api_router.include_router(tracking.router, prefix="/tracking", tags=["tracking"])
+api_router.include_router(dropoff_locations.router, prefix="/dropoff-locations", tags=["dropoff-locations"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_documents.router, prefix="/admin", tags=["admin-documents"])
 api_router.include_router(agent.router, prefix="/agent", tags=["agent"])

@@ -395,3 +395,95 @@ async def get_agent_deliveries(current_user: dict = Depends(get_current_user)):
         order['_id'] = str(order['_id'])
         
     return {"orders": orders}
+
+class BankAccountUpdate(BaseModel):
+    account_number: str
+    bank_code: str
+    bank_name: str
+    account_name: str
+
+@router.post("/farmers/{farmer_id}/bank-details")
+async def save_farmer_bank_details(
+    farmer_id: str,
+    account_data: BankAccountUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Agent saves bank details for an offline farmer"""
+    try:
+        if current_user.get("role") != "agent":
+             raise HTTPException(status_code=403, detail="Only agents can perform this action")
+             
+        db = get_db()
+        
+        # Verify ownership/link - check both id (record id) and farmer_id (user id)
+        # Note: in modular agent logic, we query the users table for the farmer
+        farmer = db.users.find_one({
+            "role": "farmer",
+            "agent_id": current_user["id"],
+            "$or": [
+                {"id": farmer_id},
+                {"_id": farmer_id}
+            ]
+        })
+        
+        # Also check agent_farmers collection if it exists
+        agent_farmer = db.agent_farmers.find_one({
+            "agent_id": current_user["id"],
+            "$or": [
+                {"id": farmer_id},
+                {"farmer_id": farmer_id}
+            ]
+        })
+        
+        if not farmer and not agent_farmer:
+            raise HTTPException(status_code=404, detail="Farmer not linked to this agent")
+            
+        from app.services.paystack import create_transfer_recipient
+        # Create Paystack Recipient
+        recipient = create_transfer_recipient(
+            name=account_data.account_name,
+            account_number=account_data.account_number,
+            bank_code=account_data.bank_code
+        )
+        recipient_code = recipient['data']['recipient_code']
+        
+        from app.utils.security import encrypt_data
+        # Encrypt Encrypt Encrypt
+        encrypted_acc_num = encrypt_data(account_data.account_number)
+        
+        if agent_farmer:
+            # Update AgentFarmer Record
+            db.agent_farmers.update_one(
+                {"_id": agent_farmer["_id"]},
+                {"$set": {
+                    "bank_name": account_data.bank_name,
+                    "bank_code": account_data.bank_code,
+                    "bank_account_number": encrypted_acc_num,
+                    "paystack_recipient_code": recipient_code
+                }}
+            )
+            
+        if farmer:
+            # Update User Record
+            db.users.update_one(
+                {"_id": farmer["_id"]},
+                {"$set": {
+                    "bank_details": {
+                        "bank_name": account_data.bank_name,
+                        "bank_code": account_data.bank_code,
+                        "account_name": account_data.account_name,
+                        "account_number": encrypted_acc_num,
+                        "paystack_recipient_code": recipient_code,
+                        "is_primary": True
+                    }
+                }}
+            )
+        
+        return {"message": "Farmer bank details updated successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error saving farmer bank details: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save farmer bank details")

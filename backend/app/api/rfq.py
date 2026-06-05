@@ -43,6 +43,7 @@ class BuyerRequestCreate(BaseModel):
     payment_reference: Optional[str] = None
     amount_paid: Optional[float] = 0.0
     estimated_budget: Optional[float] = 0.0
+    refund_policy_agreed: bool = Field(True, description="Buyer agrees to the Pyramyd refund policy")
     
     @validator('type')
     def validate_type(cls, v):
@@ -88,6 +89,14 @@ class AcceptOfferRequest(BaseModel):
 
 class RequestStatusUpdate(BaseModel):
     status: str = Field(..., description="'active', 'on_hold', or 'closed'")
+
+class ConfirmTermsRequest(BaseModel):
+    phone: str
+    email: str
+    use_existing_account: bool = True
+    new_account_number: Optional[str] = None
+    new_bank_code: Optional[str] = None
+    account_limit_acknowledged: bool = Field(True, description="Seller confirmed account can receive the escrow amount")
 
 # --- Endpoints ---
 
@@ -443,7 +452,7 @@ async def make_offer(
     """
     # Authorization checks
     role = current_user.get('role')
-    if role not in ['agent', 'farmer', 'business', 'supplier_food_produce']:
+    if role not in ['agent', 'farmer', 'business']:
         raise HTTPException(status_code=403, detail="Not authorized to make offers")
         
     # Enforce verification for sellers
@@ -537,6 +546,7 @@ async def accept_offer(
 @router.post("/offers/{offer_id}/confirm-terms")
 async def confirm_offer_terms(
     offer_id: str,
+    confirm_data: ConfirmTermsRequest,
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -573,8 +583,16 @@ async def confirm_offer_terms(
         "acknowledgment_note": terms.get("acknowledgment_note"),
         "acknowledgment_files": terms.get("acknowledgment_files", []),
         "platform": "farm_deals",
-        "is_rfq_order": True, # Tag to indicate this is a non-escrow standard request order
-        "status": "confirmed",
+        "is_rfq_order": True, 
+        "status": "awaiting_escrow", # Changed: Buyer must fund escrow next
+        "seller_contact_phone": confirm_data.phone,
+        "seller_contact_email": confirm_data.email,
+        "seller_account_info": {
+             "use_existing": confirm_data.use_existing_account,
+             "account_number": confirm_data.new_account_number,
+             "bank_code": confirm_data.new_bank_code,
+             "limit_acknowledged": confirm_data.account_limit_acknowledged
+        },
         "created_at": datetime.utcnow()
     }
 
@@ -585,18 +603,97 @@ async def confirm_offer_terms(
         {"$set": {"status": "accepted", "order_id": tracking_id, "terms_confirmed_at": datetime.utcnow()}}
     )
 
-    # --- DUMMY OFFLINE LOGISTICS DISPATCH ---
-    from app.services.logistics_dispatcher import dispatch_order_to_external_logistics
-    import threading
-    t = threading.Thread(target=dispatch_order_to_external_logistics, args=(order_data, True))
-    t.start()
+    # We DO NOT dispatch logistics here anymore. Waiting for Escrow funding.
+    return {"message": "Terms confirmed. Awaiting buyer escrow funding.", "order_id": tracking_id, "status": "accepted"}
 
-    return {
-        "message": "Terms confirmed! Order created.",
-        "offer_id": offer_id,
-        "order_id": tracking_id,
-        "status": "accepted"
+@router.post("/rfq-orders/{order_id}/fund-escrow")
+async def fund_rfq_escrow(order_id: str, current_user: dict = Depends(get_current_user)):
+    """Buyer initiates Paystack payment to fund the RFQ Escrow"""
+    db = get_db()
+    order = db.rfq_orders.find_one({"order_id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    if order["buyer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the buyer can fund this escrow")
+        
+    if order["status"] != "awaiting_escrow":
+        raise HTTPException(status_code=400, detail=f"Order status is {order['status']}, cannot fund escrow.")
+        
+    total_amount = order["total_amount"]
+    amount_kobo = int(total_amount * 100)
+    
+    frontend_url = os.environ.get("FRONTEND_URL", "https://pyramydhub.com")
+    callback_url = f"{frontend_url}/dashboard/rfq/orders/{order_id}/verify-payment"
+    
+    metadata = {
+        "order_id": order_id,
+        "type": "rfq_escrow_funding",
+        "user_id": current_user["id"]
     }
+    
+    from app.services.paystack import initialize_transaction
+    try:
+        result = initialize_transaction(
+            email=current_user.get('email'),
+            amount=amount_kobo,
+            callback_url=callback_url,
+            metadata=metadata
+        )
+        
+        payment_reference = result["data"]["reference"]
+        authorization_url = result["data"]["authorization_url"]
+        
+        db.rfq_orders.update_one(
+            {"order_id": order_id},
+            {"$set": {"payment_reference": payment_reference}}
+        )
+        
+        return {
+            "message": "Payment initialized",
+            "payment_url": authorization_url,
+            "reference": payment_reference
+        }
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to init escrow: {str(e)}")
+        raise HTTPException(status_code=400, detail="Failed to initialize payment")
+
+@router.get("/rfq-orders/{order_id}/verify-escrow")
+async def verify_rfq_escrow(order_id: str, reference: str, current_user: dict = Depends(get_current_user)):
+    """Verify escrow funding payment and dispatch order"""
+    db = get_db()
+    order = db.rfq_orders.find_one({"order_id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    from app.services.paystack import verify_transaction
+    try:
+        verify_data = verify_transaction(reference)
+        if verify_data["data"]["status"] == "success":
+            # Update order status
+            db.rfq_orders.update_one(
+                {"order_id": order_id},
+                {"$set": {
+                    "status": "confirmed", 
+                    "escrow_funded_at": datetime.utcnow(),
+                    "payment_status": "escrowed"
+                }}
+            )
+            
+            # --- OFFLINE LOGISTICS DISPATCH ---
+            # Dispatch now that escrow is funded
+            order["status"] = "confirmed"
+            from app.services.logistics_dispatcher import dispatch_order_to_external_logistics
+            import threading
+            t = threading.Thread(target=dispatch_order_to_external_logistics, args=(order, True))
+            t.start()
+            
+            return {"message": "Escrow funded successfully. Order confirmed and dispatched.", "status": "confirmed"}
+        else:
+            raise HTTPException(status_code=400, detail="Payment verification failed")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/offers/{offer_id}/reject-terms")
 async def reject_offer_terms(
@@ -759,6 +856,9 @@ async def confirm_delivery(
     Releases funds.
     """
     code = confirmation_data.get('code')
+    rating = confirmation_data.get('rating')
+    feedback = confirmation_data.get('feedback')
+    
     if not code:
         raise HTTPException(status_code=400, detail="Confirmation code required")
 
@@ -789,23 +889,40 @@ async def confirm_delivery(
         
     # 4. Complete Process
     # Update Order
+    update_fields = {"status": "delivered", "confirmed_by_buyer": True, "completed_at": datetime.utcnow()}
+    if rating is not None:
+        update_fields["rating"] = rating
+    if feedback is not None:
+        update_fields["feedback"] = feedback
+        
     db.rfq_orders.update_one(
         {"order_id": tracking_id},
-        {"$set": {"status": "delivered", "confirmed_by_buyer": True, "completed_at": datetime.utcnow()}}
+        {"$set": update_fields}
     )
+    
+    # Update Seller Rating if provided
+    if rating is not None and isinstance(rating, (int, float)) and 1 <= rating <= 5:
+        seller_id = order.get("seller_id")
+        seller = db.users.find_one({"id": seller_id})
+        if seller:
+            current_total = seller.get("total_ratings", 0)
+            current_avg = seller.get("average_rating", 0.0)
+            new_total = current_total + 1
+            new_avg = ((current_avg * current_total) + rating) / new_total
+            db.users.update_one(
+                {"id": seller_id},
+                {"$set": {"average_rating": round(new_avg, 2), "total_ratings": new_total}}
+            )
+
     # Update Offer
     db.offers.update_one(
         {"id": offer_id},
         {"$set": {"status": "completed"}}
     )
     
-    # 5. Check if it's a non-escrow RFQ Order
-    if order.get("is_rfq_order"):
-        return {"message": "Delivery confirmed! As a standard RFQ order, please ensure direct payment is settled as per your negotiated terms."}
-    
-    # 6. Trigger Payout for Escrow Orders
+    # 5. Trigger Payout for Escrow Orders
     from app.services.payout_service import process_order_payout
-    success, msg = await process_order_payout(tracking_id, db)
+    success, msg = await process_order_payout(tracking_id, db, is_rfq=True)
     
     if not success:
         # Log error but don't fail the request user-side 

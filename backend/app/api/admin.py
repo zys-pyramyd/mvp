@@ -402,6 +402,130 @@ async def manual_withdrawal(
         "reference": transaction["reference"]
     }
 
+@router.get("/documents/{doc_id}")
+async def get_admin_document(
+    doc_id: str,
+    token: str
+):
+    """View KYC document (Admin Only)"""
+    try:
+        from app.core.config import settings
+        import jwt
+        # Manually verify token since it's a query param for direct link access
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        username = payload.get("sub")
+        if not username:
+             raise HTTPException(status_code=401, detail="Invalid token")
+             
+        db = get_db()
+        user = db.users.find_one({"username": username})
+        if not user or user["role"] != "admin":
+             raise HTTPException(status_code=403, detail="Admin access required")
+             
+        doc = db.kyc_documents.find_one({"id": doc_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+            
+        # Return file content
+        import base64
+        from fastapi.responses import Response
+        
+        file_content = doc["file_data"]
+        if isinstance(file_content, str):
+            try:
+                if "base64," in file_content:
+                    file_content = file_content.split("base64,")[1]
+                file_content = base64.b64decode(file_content)
+            except:
+                pass
+                
+        return Response(content=file_content, media_type=doc.get("mime_type", "application/pdf"))
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error serving document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to serve document")
+
+from pydantic import Field
+
+class DisputeResolutionRequest(BaseModel):
+    action: str = Field(..., pattern="^(refund_buyer|release_to_seller|dismiss)$")
+    reason: str
+
+@router.post("/orders/{order_id}/resolve")
+async def resolve_dispute(
+    order_id: str,
+    resolution: DisputeResolutionRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Resolve an order dispute (Admin Only)"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    db = get_db()
+    order = db.orders.find_one({"order_id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    action = resolution.action
+    import uuid
+    
+    if action == "refund_buyer":
+        # Process Refund
+        buyer_id = order["buyer_id"]
+        amount = order["total_amount"]
+        
+        # Credit Wallet
+        db.users.update_one(
+            {"id": buyer_id},
+            {
+                "$inc": {"wallet_balance": amount},
+                "$push": {
+                    "wallet_history": {
+                        "id": str(uuid.uuid4()),
+                        "type": "refund",
+                        "amount": amount,
+                        "description": f"Admin Refund for Order {order_id}",
+                        "status": "success",
+                        "created_at": datetime.utcnow()
+                    }
+                }
+            }
+        )
+        
+        # Update Order
+        db.orders.update_one(
+            {"order_id": order_id},
+            {"$set": {"status": "cancelled", "updated_at": datetime.utcnow()}}
+        )
+        
+        # Close Dispute if exists
+        db.disputes.update_many(
+            {"order_id": order_id, "status": "open"},
+            {"$set": {"status": "resolved", "resolution": "refund_buyer", "resolved_by": current_user["id"], "resolved_at": datetime.utcnow()}}
+        )
+        
+    elif action == "release_to_seller":
+        # Process Payout
+        from app.services.payout_service import process_order_payout
+        success, message = await process_order_payout(order_id, db)
+        
+        if not success:
+            raise HTTPException(status_code=400, detail=f"Payout failed: {message}")
+        
+        # Close Dispute if exists
+        db.disputes.update_many(
+            {"order_id": order_id, "status": "open"},
+            {"$set": {"status": "resolved", "resolution": "release_to_seller", "resolved_by": current_user["id"], "resolved_at": datetime.utcnow()}}
+        )
+        
+    return {"status": "success", "message": f"Order resolved: {action}"}
+
+
 @router.post("/rfq/{order_id}/cancel")
 async def admin_cancel_rfq_order(order_id: str, current_user: dict = Depends(get_current_user)):
     """
@@ -471,6 +595,46 @@ async def admin_cancel_rfq_order(order_id: str, current_user: dict = Depends(get
         "message": f"RFQ Order cancelled successfully. {refund_details}",
         "status": "cancelled"
     }
+
+@router.post("/rfq/{order_id}/admin-confirm-delivery")
+async def admin_confirm_rfq_delivery(order_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Admin confirms delivery on behalf of the buyer (e.g., if tracked externally).
+    Triggers the payout to the seller immediately.
+    """
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Only Admins can force-confirm delivery")
+
+    db = get_db()
+    order = db.rfq_orders.find_one({"order_id": order_id})
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="RFQ Order not found")
+        
+    if order['status'] not in ['confirmed', 'shipped']:
+        raise HTTPException(status_code=400, detail=f"Order cannot be confirmed from status: {order['status']}")
+        
+    # Update Order
+    db.rfq_orders.update_one(
+        {"order_id": order_id},
+        {"$set": {"status": "delivered", "confirmed_by_admin": current_user['username'], "completed_at": datetime.utcnow()}}
+    )
+    
+    # Update Offer
+    if order.get("origin_offer_id"):
+        db.offers.update_one(
+            {"id": order["origin_offer_id"]},
+            {"$set": {"status": "completed"}}
+        )
+        
+    # Trigger Payout
+    from app.services.payout_service import process_order_payout
+    success, msg = await process_order_payout(order_id, db, is_rfq=True)
+    
+    if not success:
+        return {"message": f"Delivery confirmed by Admin, but Payout failed: {msg}. Please check manual reconciliations.", "status": "delivered"}
+
+    return {"message": "Delivery confirmed by Admin and funds released to seller.", "status": "delivered"}
 
 # --- Community Management ---
 @router.get("/communities")
