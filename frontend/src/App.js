@@ -30,6 +30,7 @@ const SellerDashboard = lazy(() => import('./SellerDashboard'));
 const AgentDeliveryDashboard = lazy(() => import('./AgentDeliveryDashboard'));
 const ChatModal = lazy(() => import('./components/chat/ChatModal'));
 
+import naija from 'naija-state-local-government';
 import './App.css';
 
 // Helper function to map backend order statuses to user-friendly display labels
@@ -4592,7 +4593,7 @@ function App() {
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               >
                                 <option value="">All States</option>
-                                {availableLocations.map(location => (
+                                {NIGERIAN_STATES.map(location => (
                                   <option key={location} value={location}>{location}</option>
                                 ))}
                               </select>
@@ -4601,11 +4602,29 @@ function App() {
                               <label className="block text-sm font-medium text-gray-700 mb-1">City / L.G.A.</label>
                               <input
                                 type="text"
-                                placeholder="Specific city..."
+                                list="city-suggestions"
+                                placeholder={filters.location ? "Select or type city..." : "Specific city..."}
                                 value={filters.city || ''}
-                                onChange={(e) => setFilters(prev => ({ ...prev, city: e.target.value }))}
+                                onChange={(e) => {
+                                  // Capitalize first letter of each word for normalization
+                                  const normalized = e.target.value.replace(/\b\w/g, c => c.toUpperCase());
+                                  setFilters(prev => ({ ...prev, city: normalized }));
+                                }}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               />
+                              <datalist id="city-suggestions">
+                                {(() => {
+                                  if (!filters.location) return null;
+                                  try {
+                                    // FCT - Abuja requires mapping to "Federal Capital Territory" for the package
+                                    let stateLookup = filters.location === 'FCT - Abuja' ? 'Federal Capital Territory' : filters.location;
+                                    const lgas = naija.lgas(stateLookup).lgas;
+                                    return lgas.map(lga => <option key={lga} value={lga} />);
+                                  } catch (err) {
+                                    return null;
+                                  }
+                                })()}
+                              </datalist>
                             </div>
                             <div className="md:col-span-2">
                               <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
@@ -4615,7 +4634,7 @@ function App() {
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               >
                                 <option value="">All Categories</option>
-                                {categories.map((cat, idx) => (
+                                {(Array.isArray(categories) ? categories : []).map((cat, idx) => (
                                   <option key={idx} value={cat.name}>{cat.name}</option>
                                 ))}
                               </select>

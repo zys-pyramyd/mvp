@@ -1,742 +1,151 @@
-# Pyramyd - Agricultural Trading Platform
+# Product Requirements Document (PRD) & Engineering Guide: Pyramyd
 
-Pyramyd is a comprehensive agricultural trading platform that connects farmers, agents, businesses, and buyers in a secure, efficient marketplace. The platform features role-based access, KYC verification, digital wallets, rating systems, and advanced trading capabilities.
+## 1. Executive Summary & Product Vision
+**Pyramyd** is a comprehensive B2B/B2C agricultural trading platform that connects farmers, agents, businesses, and end-consumers in a secure, efficient marketplace. Our vision is to eliminate friction in the agricultural supply chain by offering role-based access, automated logistics, true escrow payments, and community-driven commerce.
 
-## 🌟 Key Features
+---
 
-### Core Marketplace
-- **Multi-Platform Trading**: 
-  - **PyExpress (Home)**: Business marketplace for processed goods
-  - **Farm Deals**: Bulk trading platform for farmers and agents
-  - **Communities**: Group buying and social features for agricultural communities
-- **Role-Based Access Control**: Farmer, Agent, Business, Personal, and Logistics accounts
-- **Advanced Product Filtering**: Category, location, price range, seller type
-- **Nigerian States Support**: All 36 states + FCT Abuja
+## 2. Problem Statement & Pain Points
+The current agricultural supply chain in Nigeria is fragmented and opaque, leading to the following key pain points:
+- **Lack of Trust & Fraud Risk**: Buyers and sellers hesitate to trade remotely due to payment fraud or failure to deliver goods.
+- **Logistics Bottlenecks**: Finding reliable, transparently-priced freight for bulk farm produce is extremely difficult.
+- **Middleman Exploitation**: Farmers lack direct access to broader markets and are forced to accept lowgate prices.
+- **Market Invisibility**: Procurement managers and businesses struggle to source raw materials predictably and at scale.
 
-### Payment & Commission System
-- **Paystack Integration**: Secure payment gateway with split payments
-- **Agent Gamification System**: 5-tier commission structure
-  - Starter (< 100 farmers): 4% base commission
-  - Pro (100-999 farmers): 4.5% total (4% + 0.5% bonus)
-  - Expert (1000-4999 farmers): 5% total (4% + 1% bonus)
-  - Master (5000-9999 farmers): 6% total (4% + 2% bonus)
-  - Elite (10000+ farmers): 8% total (4% + 4% bonus)
-- **Smart Delivery System**: 
-  - Vendor-managed logistics (FREE or custom fee)
-  - PyExpress and Farm Deals dynamic fee calculator
-- **Platform-Specific Checkout**: Separate flows for PyExpress and Farm Deals
+---
 
-### User Experience
-- **Cart Tab System**: Separate PyExpress and Farm Deals carts with color coding
-- **Communities Search**: Real-time filtering across name, description, category, location
-- **Profile Pictures**: User and product seller profile images
-- **Discount System**: Fixed or percentage discounts with visual badges
-- **Seller Transparency**: Clickable seller profiles with detailed information
+## 3. Target Audience & Personas
 
-### Progressive Web App (PWA)
-- **Offline Functionality**: Browse products and communities without internet
-- **Service Worker**: Smart caching for optimal performance
-- **Background Sync**: Auto-sync vendor posts when connection returns
-- **Install to Home Screen**: Native app-like experience
-- **Offline Indicator**: Clear status when browsing cached content
+- **Farmers**: Primary producers. Can list bulk produce on "Farm Deals", manage farmland, track revenue, and bid on active procurement requests.
+- **Agents**: Facilitators who manage farmer networks, aggregate produce, and earn commissions by matching supply to demand.
+- **Businesses**: Buyers and sellers of processed agricultural goods on "PyExpress". They can also operate as logistics providers.
+- **Personal Users**: End-consumers who browse and purchase agricultural goods but cannot sell.
 
-### Security & Compliance
-- **KYC Verification System**: Comprehensive compliance for all seller types
-- **Enhanced Agent Validation**: Strict KYC requirements with 24-hour verification
-- **Secure Account Storage**: Encrypted payment details
-- **JWT Authentication**: Token-based security with bcrypt hashing
+---
 
-### Other Features
-- **Digital Wallet**: Mock wallet system with transaction history and gift cards
-- **Rating & Review System**: 5-star ratings for users, products, and drivers
-- **Driver Management**: Uber-like driver platform for logistics businesses
-- **Real-Time Market Prices**: Agricultural commodity price tracking
-- **Pre-order System**: Future delivery with partial payments
-- **Enhanced Messaging**: Text and audio messages between users
-- **Responsive Design**: Mobile-first approach with desktop optimization
+## 4. Key User Journeys
 
-## 🚀 Production Deployment Readiness
+### Journey 1: Bulk Procurement (Buyer)
+1. Buyer navigates to the Deal Board and posts an RFQ (Request for Quote) specifying quantity, budget, and delivery state.
+2. Buyer receives bids from verified Farmers and Agents.
+3. Buyer reviews profiles, accepts a bid, and funds the Paystack Escrow account.
+4. Goods are delivered. Buyer confirms receipt on the platform, releasing the escrowed funds to the seller.
 
-Pyramyd has been rigorously optimized for production environments (e.g., Render, Vercel). The application incorporates essential structural safeguards to prevent scaling crashes.
+### Journey 2: Instant Retail Trade (Seller)
+1. A registered Business lists processed goods (e.g., packaged rice) on PyExpress.
+2. A Consumer adds the item to their cart and checks out via the Smart Delivery Calculator.
+3. Payment is escrowed, and the Business is notified to dispatch the item.
+4. Upon delivery confirmation, funds are credited to the Business's wallet/subaccount.
 
-### 1. Database Indexing
-Prior to launching in a live environment, you **must run** the indexing script directly against the live MongoDB host (e.g., Atlas). Without this, the Feed and DealBoard will cause severe iteration bottlenecks as data grows.
-```bash
-python backend/create_indexes.py
-```
+---
 
-### 2. Eliminating DB N+1 Queries
-All iterative `find_one` loops across the `communities.py`, `orders.py`, and `rfq.py` feeds have been eliminated. Pyramyd computes relationships using hashed `$in` bulk queries.
+## 5. Core Features & Scope
 
-### 3. Frontend Bundle Splitting
-The Vercel deployment utilizes **React Lazy Loading** coupled with a `<Suspense>` wrapper. Massive proprietary dashboard components (`AdminDashboard`, `SellerDashboard`) are completely decoupled from initial user page loads, speeding up organic Time To Interactive (TTI).
+### 5.1 Dual-Marketplace Architecture
+- **PyExpress (Instant Commerce)**: Fast-moving marketplace for processed or retail-ready goods. Features its own dedicated shopping cart and instant delivery workflows.
+- **Farm Deals (Bulk Commerce)**: Wholesale platform for bulk agricultural produce requiring standard or freight delivery. Features an independent shopping cart to prevent mixed logistics.
 
-### 4. True Escrow Handlers & Offline Dispatch
-- The platform is plugged directly into the `https://api.paystack.co/refund` system. If an administrator cancels a pending RFQ, or a buyer cancels an escrowed PyExpress delivery, full debit reversals automatically trigger to restore maximum client trust.
-- The `logistics_dispatcher.py` handles backend dummy deliveries asynchronously, ready for integration with third-party logistics firms without overloading core thread traffic.
+### 5.2 The Deal Board (RFQ System)
+- **Live Requests**: Buyers post their procurement needs (e.g., "Need 500kg of Maize").
+- **Bidding Workflow**: Sellers (Agents/Farmers/Businesses) submit competitive quotes to buyers.
+- **Offer Management**: Buyers can review incoming offers, view seller ratings, and accept the best bid.
 
-## 🏗️ Architecture
-- **Authentication**: JWT with bcrypt password hashing
-- **API Design**: RESTful endpoints with comprehensive validation
+### 5.3 Automated Logistics & Escrow Payments
+- **Smart Delivery Calculator**: Dynamically calculates intra-city and inter-state logistics fees based on buyer and seller state mappings.
+- **True Escrow Handling**: Powered by Paystack. Funds are held securely in escrow and only released to the vendor subaccount upon confirmed delivery.
+- **Automated Refunds**: Full debit reversals automatically trigger if an administrator cancels a pending RFQ or a buyer cancels an escrowed delivery.
+- **Async Dispatch**: Backend `logistics_dispatcher.py` handles dummy deliveries asynchronously to avoid overloading core thread traffic.
 
-### Frontend
-- **Framework**: React 19 with hooks
-- **Styling**: Tailwind CSS + Custom CSS
-- **Build Tool**: CRACO (Create React App Configuration Override)
-- **State Management**: React hooks (useState, useEffect)
+### 5.4 Community & Social Commerce
+- **Community Hubs**: Users can join geographical or topical agricultural groups.
+- **Localized Listings**: Products can be scoped exclusively to community members.
+- **Messaging**: Built-in real-time text and audio messaging between users.
 
-## 📋 Prerequisites
+### 5.5 Security & Compliance (KYC)
+- **Registered Businesses**: Requires Business Registration Number, Tax Identification Number (TIN), Certificate of Incorporation, and Utility Bill.
+- **Unregistered Entities (Farmers/Agents)**: Requires NIN/BVN validation, live headshot capture, and National ID document uploads.
 
-Before running the application, ensure you have the following installed:
+---
 
+## 6. System Architecture & Tech Stack
+
+### 6.1 Technology Stack
+- **Frontend**: React 19, Tailwind CSS, CRACO.
+- **Backend**: Python 3.8+, FastAPI.
+- **Database**: MongoDB (NoSQL).
+- **Payment & Escrow**: Paystack API (Subaccounts, Escrow, Refunds).
+- **Communication**: ZeptoMail (Email notifications).
+
+### 6.2 Progressive Web App (PWA)
+- **Offline Functionality**: Users can browse cached products without an internet connection.
+- **Background Sync**: Auto-syncs vendor posts when the network connection is restored.
+- **Service Worker**: Smart caching for optimal rural performance.
+
+### 6.3 Database Optimization
+- **N+1 Query Elimination**: All iterative `find_one` loops across feeds have been eliminated. Pyramyd computes relationships using hashed `$in` bulk queries.
+- **Mandatory Indexing**: A dedicated `create_indexes.py` script enforces strict document indexing to prevent iteration bottlenecks on live MongoDB hosts.
+
+---
+
+## 7. Developer Setup & Deployment Guide
+
+### 7.1 Prerequisites
 - **Python 3.8+** (for backend)
 - **Node.js 16+** (for frontend)
 - **Yarn** package manager
 - **MongoDB** (local instance or connection)
-- **Git** (for version control)
 
-## 🚀 Quick Start
-
-### 1. Clone the Repository
-```bash
-git clone <repository-url>
-cd pyramyd
-```
-
-### 2. Environment Setup
-
-#### Backend Environment
-Create `/app/backend/.env` file:
+### 7.2 Environment Setup
+Create `/app/backend/.env`:
 ```env
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=pyramyd_db
 JWT_SECRET_KEY=your-secret-key-here
+PAYSTACK_SECRET_KEY=sk_test_your_paystack_secret_key
+PAYSTACK_PUBLIC_KEY=pk_test_your_paystack_public_key
+ZEPTOMAIL_TOKEN=your_zeptomail_token
 ```
 
-#### Frontend Environment
-Create `/app/frontend/.env` file:
+Create `/app/frontend/.env`:
 ```env
 REACT_APP_BACKEND_URL=http://localhost:8001
 WDS_SOCKET_PORT=3000
 ```
 
-### 3. Backend Setup
-
+### 7.3 Local Startup
+**Backend**:
 ```bash
-# Navigate to backend directory
 cd /app/backend
-
-# Install Python dependencies
 pip install -r requirements.txt
-
-# Start MongoDB (if not running)
 sudo service mongod start
-
-# Run the FastAPI server
 python server.py
+# Available at: http://localhost:8001
 ```
 
-The backend will be available at: `http://localhost:8001`
-
-### 4. Frontend Setup
-
+**Frontend**:
 ```bash
-# Navigate to frontend directory
 cd /app/frontend
-
-# Install dependencies using Yarn
 yarn install
-
-# Start the React development server
 yarn start
+# Available at: http://localhost:3000
 ```
 
-The frontend will be available at: `http://localhost:3000`
-
-## 🐳 Docker/Production Setup
-
-If you're running in a containerized environment (like this one), the application is managed by supervisor:
-
-### Check Service Status
+### 7.4 Docker/Production Deployment
+To run using Docker Compose:
 ```bash
-sudo supervisorctl status
+docker-compose up --build -d
 ```
-
-### Restart Services
-```bash
-# Restart individual services
-sudo supervisorctl restart backend
-sudo supervisorctl restart frontend
-
-# Restart all services
-sudo supervisorctl restart all
-```
-
-### View Logs
-```bash
-# Frontend logs
-tail -f /var/log/supervisor/frontend.out.log
-tail -f /var/log/supervisor/frontend.err.log
-
-# Backend logs
-tail -f /var/log/supervisor/backend.out.log
-tail -f /var/log/supervisor/backend.err.log
-```
-
-## 🧪 Local Testing Guide
-
-### Prerequisites Check
-Before testing locally, ensure you have:
-```bash
-# Check Python version (3.8+)
-python --version
-
-# Check Node.js version (16+)
-node --version
-
-# Check Yarn
-yarn --version
-
-# Check MongoDB status
-sudo service mongod status
-```
-
-### Step 1: Clone and Setup Environment
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd pyramyd
-
-# Create backend .env file
-cat > backend/.env << EOL
-MONGO_URL=mongodb://localhost:27017
-DB_NAME=pyramyd_local_test
-JWT_SECRET_KEY=$(openssl rand -hex 32)
-PAYSTACK_SECRET_KEY=sk_test_your_paystack_secret_key
-PAYSTACK_PUBLIC_KEY=pk_test_your_paystack_public_key
-FARMHUB_SUBACCOUNT=ACCT_your_farmhub_subaccount
-FARMHUB_SPLIT_GROUP=SPL_your_split_group_code
-EOL
-
-# Create frontend .env file
-cat > frontend/.env << EOL
-REACT_APP_BACKEND_URL=http://localhost:8001
-WDS_SOCKET_PORT=3000
-EOL
-```
-
-### Step 2: Install Dependencies
-
-```bash
-# Backend dependencies
-cd backend
-pip install -r requirements.txt
-cd ..
-
-# Frontend dependencies
-cd frontend
-yarn install
-cd ..
-```
-
-### Step 3: Start MongoDB
-
-```bash
-# Start MongoDB service
-sudo service mongod start
-
-# Verify MongoDB is running
-sudo service mongod status
-
-# Optional: Connect to MongoDB shell to verify
-mongosh
-# In mongo shell:
-# show dbs
-# use pyramyd_local_test
-# exit
-```
-
-### Step 4: Start Backend Server
-
-```bash
-# Open a new terminal window/tab
-cd backend
-python server.py
-
-# You should see:
-# "INFO:     Uvicorn running on http://0.0.0.0:8001"
-# "INFO:     Application startup complete"
-
-# Test backend is running:
-curl http://localhost:8001/api/health
-# Expected: {"status": "healthy"}
-```
-
-### Step 5: Start Frontend Server
-
-```bash
-# Open another terminal window/tab
-cd frontend
-yarn start
-
-# The app will automatically open at http://localhost:3000
-# You should see the Pyramyd homepage with:
-# - Header with navigation
-# - Slide shows
-# - Product categories
-# - Featured products
-```
-
-### Step 6: Test Core Functionality
-
-#### A. User Registration & Authentication
-1. Click "Sign In" in the header
-2. Click "Don't have an account? Sign up"
-3. Fill registration form:
-   - First Name: Test
-   - Last Name: User
-   - Email: testuser@pyramyd.com
-   - Password: password123
-   - Select role (Personal, Farmer, Agent, or Business)
-4. Complete registration
-5. Login with credentials
-
-#### B. Browse Products
-1. Scroll through homepage
-2. Click on category to filter products
-3. Use location filter dropdown (top right)
-4. Click on a product to view details
-5. Verify product information displays correctly
-
-#### C. Cart & Checkout System
-1. Add products to cart (click "Add to Cart" button)
-2. Click cart icon in header
-3. **Verify Cart Tabs:**
-   - See "PyExpress" tab (emerald/green)
-   - See "Farm Deals" tab (orange)
-   - Each tab shows correct item count
-   - Switch between tabs
-4. **Test Checkout:**
-   - Click "Checkout PyExpress" or "Checkout Farm Deals"
-   - Verify platform-specific colors:
-     - PyExpress: Emerald green theme
-     - Farm Deals: Orange theme
-   - Fill shipping address (include a Nigerian state)
-   - Proceed to payment step
-   - See Paystack payment options
-
-#### D. Communities Search
-1. Click "Find Communities" in header
-2. See communities browser modal
-3. **Test Search:**
-   - Type in search bar (e.g., "farm", "rice")
-   - Verify results filter in real-time
-   - See result count update
-   - Click "X" button to clear search
-4. Click on a community to view details
-5. Join a community
-
-#### E. Agent Features (Agent users only)
-1. Login as agent user
-2. Click profile icon → "Agent Dashboard"
-3. **Verify Agent Tier System:**
-   - See tier badge (Starter, Pro, Expert, Master, or Elite)
-   - See farmer count
-   - See bonus commission rate
-   - See progression to next tier
-4. Test agent-specific features
-
-#### F. PWA Features
-1. Open Chrome DevTools (F12)
-2. Go to "Application" tab
-3. **Verify Service Worker:**
-   - Click "Service Workers" in left sidebar
-   - See service-worker.js registered and activated
-4. **Test Offline Mode:**
-   - Open Network tab in DevTools
-   - Select "Offline" from throttling dropdown
-   - Refresh page
-   - See offline indicator banner (gray with WiFi-off icon)
-   - Verify you can still browse cached products
-   - Go back online
-   - Offline indicator should disappear
-5. **Test Install Prompt:**
-   - Look for emerald install banner at top
-   - Click "Install Now" to install as PWA
-   - Or use Chrome menu → "Install Pyramyd..."
-
-### Step 7: Test API Endpoints (Optional)
-
-```bash
-# Test agent tier endpoint (requires agent user token)
-curl -X GET http://localhost:8001/api/agent/tier \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-
-# Test delivery fee calculator
-curl -X POST http://localhost:8001/api/delivery/calculate-fee \
-  -H "Content-Type: application/json" \
-  -d '{
-    "product_total": 5000,
-    "buyer_state": "Lagos"
-  }'
-
-# Test communities search
-curl http://localhost:8001/api/communities
-
-# Test product categories
-curl http://localhost:8001/api/categories/products
-```
-
-### Step 8: Verify Key Features
-
-✅ **Cart System:**
-- [ ] Cart icon shows item count
-- [ ] Two tabs: PyExpress (green) and Farm Deals (orange)
-- [ ] Tab switching works
-- [ ] Items correctly filtered by platform
-- [ ] Totals calculated independently per tab
-
-✅ **Checkout Flow:**
-- [ ] Platform-specific colors throughout
-- [ ] Progress indicators color-coded
-- [ ] Paystack payment initialization works
-- [ ] Dynamic distance/state-based delivery calculation applies
-
-✅ **Communities:**
-- [ ] "Find Communities" opens modal
-- [ ] Search bar filters results
-- [ ] Result count updates
-- [ ] Clear button works
-- [ ] Community cards display correctly
-
-✅ **PWA:**
-- [ ] Service worker registers successfully
-- [ ] Offline indicator appears when offline
-- [ ] Install prompt shows (on supported browsers)
-- [ ] Can browse cached content offline
-
-✅ **Agent Gamification:**
-- [ ] Agent tier displays in dashboard
-- [ ] Commission rates show (base + bonus)
-- [ ] Farmer count visible
-- [ ] Next tier progression info shown
-
-### Troubleshooting Local Testing
-
-#### Issue: Backend won't start
-```bash
-# Check if port 8001 is already in use
-lsof -i :8001
-# Kill the process if needed
-kill -9 <PID>
-
-# Check MongoDB is running
-sudo service mongod status
-sudo service mongod restart
-
-# Check Python dependencies
-pip list | grep fastapi
-pip list | grep pymongo
-```
-
-#### Issue: Frontend won't compile
-```bash
-# Clear node modules and reinstall
-rm -rf node_modules package-lock.json
-yarn install
-
-# Clear cache
-yarn cache clean
-
-# Check for syntax errors in App.js
-cat frontend/src/App.js | head -50
-```
-
-#### Issue: Can't see products
-- Ensure backend is running (http://localhost:8001)
-- Check backend logs for errors
-- Verify REACT_APP_BACKEND_URL in frontend/.env
-- Try creating a test product via API or UI
-
-#### Issue: Service Worker not registering
-- Must use HTTPS or localhost
-- Check browser console for errors
-- Clear browser cache and hard reload (Ctrl+Shift+R)
-- Ensure service-worker.js is in /public folder
-
-#### Issue: Paystack payments failing
-- This is expected with dummy API keys
-- For testing, use Paystack test keys from your account
-- Calculation logic should still work even with dummy keys
-
-### Performance Testing
-
-```bash
-# Check backend response times
-time curl http://localhost:8001/api/products
-
-# Check frontend build size
-cd frontend
-yarn build
-ls -lh build/static/js/
-
-# Check MongoDB query performance
-mongosh
-use pyramyd_local_test
-db.products.find().explain("executionStats")
-```
-
-## 📁 Project Structure
-
-```
-/app/
-├── backend/
-│   ├── server.py              # FastAPI application
-│   ├── requirements.txt       # Python dependencies
-│   └── .env                   # Backend environment variables
-├── frontend/
-│   ├── src/
-│   │   ├── App.js            # Main React component
-│   │   ├── App.css           # Custom styles
-│   │   └── index.js          # React entry point
-│   ├── public/               # Static assets
-│   ├── package.json          # Node.js dependencies
-│   ├── tailwind.config.js    # Tailwind CSS configuration
-│   └── .env                  # Frontend environment variables
-├── tests/                    # Test files
-└── README.md                # This file
-```
-
-## 🔑 API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/complete-registration` - Complete multi-step registration
-- `POST /api/auth/login` - User login
-- `GET /api/user/profile` - Get current user profile
-- `GET /api/auth/me` - Get authenticated user details
-
-### Products & Trading
-- `GET /api/products` - List products with advanced filtering
-  - Query params: `category`, `location`, `min_price`, `max_price`, `only_preorders`, `seller_type`, `platform`, `global_search`
-- `POST /api/products` - Create new product (authenticated)
-- `GET /api/categories/products` - Get product categories with subcategories
-- `GET /api/categories/business` - Get business categories
-- `GET /api/states/nigerian` - Get all 36 Nigerian states + FCT
-
-### Communities
-- `GET /api/communities` - List all communities
-- `POST /api/communities` - Create new community (authenticated)
-- `GET /api/communities/{id}` - Get community details
-- `POST /api/communities/{id}/join` - Join a community
-- `GET /api/communities/{id}/products` - Get community products
-- `POST /api/communities/{id}/products` - Add product to community
-
-### Agent Gamification System
-- `GET /api/agent/tier` - Get agent tier information (Starter/Pro/Expert/Master/Elite)
-  - Returns: tier name, farmer count, commission rates, next tier progression
-- `GET /api/agent/dashboard` - Enhanced agent dashboard with tier info
-- `POST /api/agent/farmers/add` - Add farmer to agent network
-
-### Smart Delivery & Logistics
-- `POST /api/checkout/calculate-delivery` - Calculate smart delivery fee
-  - Body: `{"items": [...], "delivery_address": "...", "platform": "pyexpress"}`
-  - Returns: delivery_fee, is_interstate, seller_state, buyer_state
-
-### Paystack Payment Integration
-- `POST /api/paystack/transaction/initialize` - Initialize payment with tier bonuses
-  - Body: `{"product_total": 10000, "customer_state": "Lagos", "platform_type": "home"}`
-  - Returns: authorization_url, breakdown (includes agent tier bonus)
-- `GET /api/paystack/transaction/verify/{reference}` - Verify payment transaction
-- `POST /api/paystack/subaccounts` - Create vendor subaccount
-- `GET /api/paystack/banks` - Get list of Nigerian banks
-
-### Secure Account Management
-- `POST /api/users/account-details` - Store encrypted account details
-- `GET /api/users/account-details` - Retrieve account details (decrypted)
-- `DELETE /api/users/account-details` - Delete account details
-
-### KYC System
-- `GET /api/users/kyc/status` - Get KYC status with trade restrictions
-- `POST /api/kyc/documents/upload` - Upload KYC documents
-- `POST /api/kyc/registered-business/submit` - Submit business KYC
-- `POST /api/kyc/agent/submit` - Submit agent KYC
-- `POST /api/kyc/farmer/submit` - Submit farmer KYC
-
-### Pre-Orders
-- `GET /api/preorders` - List pre-orders with filtering
-- `POST /api/preorders/create` - Create pre-order
-- `POST /api/preorders/{id}/publish` - Publish pre-order
-- `GET /api/preorders/{id}` - Get pre-order details
-- `POST /api/preorders/{id}/order` - Place order on pre-order
-- `GET /api/my-preorders` - Get user's created pre-orders
-- `GET /api/my-preorder-orders` - Get user's pre-order purchases
-
-### Enhanced Messaging
-- `GET /api/users/search-messaging` - Search users for messaging (min 2 chars)
-- `POST /api/messages/send` - Send text or audio message
-- `GET /api/messages/conversations` - Get user's conversations
-- `GET /api/messages/{conversation_id}` - Get messages for conversation
-
-### Digital Wallet
-- `GET /api/wallet/summary` - Wallet balance and statistics
-- `POST /api/wallet/fund` - Fund wallet (mock)
-- `POST /api/wallet/gift-cards` - Create gift cards
-- `POST /api/wallet/gift-cards/redeem` - Redeem gift cards
-
-### Dashboards
-- `GET /api/farmer/dashboard` - Farmer business metrics
-- `GET /api/agent/dashboard` - Agent performance data with tier info
-- `POST /api/farmer/farmland` - Add farmland records
-
-### Profile Management
-- `POST /api/users/profile-picture` - Upload profile picture (base64)
-- `GET /api/users/{user_id}/profile` - Get user profile with picture
-
-## 👥 User Roles & Permissions
-
-### Personal Account
-- ✅ Can browse and purchase products
-- ❌ Cannot sell products
-- ❌ KYC not required
-
-### Farmer Account
-- ✅ Can buy and sell products
-- ✅ Can post on "Buy from Farm" page
-- ✅ Access to Farmer Dashboard
-- ⚠️ KYC required for payments
-
-### Agent Account
-- ✅ Can buy and sell products
-- ✅ Can post on "Buy from Farm" page
-- ✅ Can manage farmer networks
-- ✅ Access to Agent Dashboard
-- ⚠️ KYC required for payments
-
-### Business Account
-- ✅ Can buy and sell products
-- ✅ Can post on Home page (business marketplace)
-- ✅ Driver management (if logistics business)
-- ⚠️ KYC required for payments
-
-## 🔐 KYC Requirements
-
-### Registered Businesses
-- Business Registration Number
-- Tax Identification Number (TIN)
-- Certificate of Incorporation (upload)
-- TIN Certificate (upload)
-- Utility Bill (upload)
-- Business address and contact information
-
-### Unregistered Entities (Farmers/Agents/Unregistered Businesses)
-- NIN or BVN (11-digit validation)
-- Headshot photo (camera capture)
-- National ID document (upload)
-- Utility Bill (upload)
-
-## 🛠️ Development
-
-### Adding New Features
-1. Backend: Add API endpoints in `server.py`
-2. Frontend: Update `App.js` with new components
-3. Update this README with new features
-4. Test both frontend and backend functionality
-
-### Code Style
-- Backend: Follow PEP 8 Python style guidelines
-- Frontend: Use functional components with hooks
-- Use Tailwind CSS for styling
-- Maintain responsive design principles
-
-## 🐛 Troubleshooting
-
-### App Not Loading
-1. **Check Services Status**:
-   ```bash
-   sudo supervisorctl status
-   ```
-
-2. **Check Logs**:
-   ```bash
-   tail -f /var/log/supervisor/frontend.err.log
-   tail -f /var/log/supervisor/backend.err.log
-   ```
-
-3. **Restart Services**:
-   ```bash
-   sudo supervisorctl restart all
-   ```
-
-### Common Issues
-
-#### Frontend Issues
-- **Compilation Errors**: Check for syntax errors in React components
-- **API Connection**: Verify `REACT_APP_BACKEND_URL` in frontend `.env`
-- **Dependencies**: Run `yarn install` to ensure all packages are installed
-
-#### Backend Issues
-- **MongoDB Connection**: Ensure MongoDB is running and `MONGO_URL` is correct
-- **Python Dependencies**: Install missing packages with `pip install -r requirements.txt`
-- **Port Conflicts**: Ensure port 8001 is available
-
-#### Environment Issues
-- **Missing .env Files**: Create both frontend and backend `.env` files
-- **Incorrect URLs**: Verify backend URL matches between services
-- **Permission Errors**: Check file permissions and supervisor configuration
-
-### Database Reset
-If you need to reset the database:
-```bash
-# Connect to MongoDB
-mongosh
-
-# Drop the database
-use pyramyd_db
-db.dropDatabase()
-```
-
-## 📊 Features Overview
-
-### Trading Platforms
-- **Home Page**: Business-to-business marketplace for processed goods and services
-- **Buy from Farm**: Bulk trading platform for farmers and agents to sell agricultural produce
-
-### Digital Commerce
-- **Multi-Unit Support**: kg, pieces, bags, tins, crates, liters
-- **Location Filtering**: Find products by geographic location
-- **Category Navigation**: Swipe-friendly category browsing
-- **Market Prices**: Real-time agricultural commodity pricing
-
-### User Management
-- **Role-Based Access**: Different permissions for different account types
-- **KYC Verification**: Compliance system for payment eligibility
-- **Rating System**: 5-star ratings for users, products, and services
-- **Digital Wallets**: Mock payment system with transaction history
-
-### Business Intelligence
-- **Farmer Dashboard**: Revenue tracking, farmland management, order history
-- **Agent Dashboard**: Network management, commission tracking, performance metrics
-- **Market Analytics**: Price trends and market insights
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/new-feature`)
-3. Create a Pull Request
-
-## 📄 License
-
-This project is proprietary software developed for agricultural marketplace purposes.
-
-## 📞 Support
-
-For technical support or questions:
-- Check the troubleshooting section above
-- Review the logs for error messages
-- Ensure all prerequisites are installed correctly
 
 ---
 
-**Happy Trading! 🌾📈**
+## 8. API Architecture Reference
+
+### Core Domains
+- `POST /api/auth/*` - Registration, Login, Profile Management
+- `GET /api/products/*` - Feed fetching, filtered searches, categorical mappings
+- `POST /api/paystack/*` - Subaccount creation, transaction init, escrow verification
+- `POST /api/checkout/*` - Smart delivery calculation, distance matrices
+- `GET /api/requests/*` - RFQ Deal Board management
+- `POST /api/kyc/*` - Compliance document ingestion
+
+**Note**: See Swagger UI (`http://localhost:8001/docs`) for full payload schemas during local execution.

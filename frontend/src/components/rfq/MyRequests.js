@@ -196,10 +196,8 @@ const MyRequests = ({ requests, myOffers = [], onRefresh }) => {
     const handleStatusUpdate = async (reqId, currentStatus, newStatus) => {
         if (newStatus === 'closed') {
             if (!window.confirm("Close this request? Bidders will no longer be able to submit quotes.")) return;
-        } else if (newStatus === 'on_hold') {
-            if (!window.confirm("Put this request on hold? It will be hidden from bidders and the timer will pause.")) return;
-        } else if (newStatus === 'active') {
-            if (!window.confirm("Open this request? It will be visible to bidders again.")) return;
+        } else if (newStatus === 'cancelled') {
+            if (!window.confirm("Cancel this request?")) return;
         }
 
         try {
@@ -274,7 +272,6 @@ const MyRequests = ({ requests, myOffers = [], onRefresh }) => {
                                                     {req.status}
                                                 </span>
                                                 {req.region_state && <span> • 📍 {req.region_state}</span>}
-                                                {req.status === 'on_hold' && <span style={{ color: '#dc3545', fontWeight: 'bold' }}> • ⏸ On Hold</span>}
                                                 {req.status === 'closed' && <span style={{ color: '#6c757d', fontWeight: 'bold' }}> • 🔒 Closed</span>}
                                                 {req.status === 'active' && req.expiry_date && <span style={{ color: '#e67e22' }}> • ⏳ <CountdownTimer publishDate={req.publish_date} expiryDate={req.expiry_date} /></span>}
                                             </span>
@@ -313,7 +310,7 @@ const MyRequests = ({ requests, myOffers = [], onRefresh }) => {
                                             </table>
 
                                             {/* Action Buttons */}
-                                            {(req.status === 'active' || req.status === 'on_hold') && (
+                                            {req.status === 'active' && (
                                                 <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', alignItems: 'center' }}>
                                                     <button
                                                         onClick={() => setEditRequestModal(req)}
@@ -328,7 +325,7 @@ const MyRequests = ({ requests, myOffers = [], onRefresh }) => {
                                                         style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc' }}
                                                     >
                                                         <option value="active">Open (Active)</option>
-                                                        <option value="on_hold">Hold (Paused)</option>
+                                                        <option value="cancelled">Cancel Request</option>
                                                         <option value="closed">Close (End Request)</option>
                                                     </select>
                                                 </div>

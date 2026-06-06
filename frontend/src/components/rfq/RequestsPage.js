@@ -130,7 +130,6 @@ const RequestsPage = ({ userRole, onClose }) => {
             {[
               { key: 'active',    label: 'Live Requests' },
               { key: 'completed', label: 'Delivered'     },
-              { key: 'on_hold',   label: 'On Hold'       },
             ].map(tab => (
               <button
                 key={tab.key}
