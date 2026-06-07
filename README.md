@@ -67,23 +67,55 @@ The current agricultural supply chain in Nigeria is fragmented and opaque, leadi
 
 ---
 
-## 6. System Architecture & Tech Stack
+## 6. Platform Architecture & Tech Stack
 
-### 6.1 Technology Stack
-- **Frontend**: React 19, Tailwind CSS, CRACO.
-- **Backend**: Python 3.8+, FastAPI.
-- **Database**: MongoDB (NoSQL).
-- **Payment & Escrow**: Paystack API (Subaccounts, Escrow, Refunds).
-- **Communication**: ZeptoMail (Email notifications).
+### 6.1 High-Level Architecture Diagram
+The platform follows a decoupled client-server architecture. The Progressive Web App (PWA) client communicates with a stateless FastAPI backend, which handles business logic and orchestrates third-party services.
 
-### 6.2 Progressive Web App (PWA)
-- **Offline Functionality**: Users can browse cached products without an internet connection.
-- **Background Sync**: Auto-syncs vendor posts when the network connection is restored.
-- **Service Worker**: Smart caching for optimal rural performance.
+```mermaid
+graph TD
+    Client[React PWA Frontend]
+    API[FastAPI Backend Server]
+    DB[(MongoDB Database)]
+    Paystack[Paystack API]
+    ZeptoMail[ZeptoMail API]
+    Geocoding[Geoapify API]
 
-### 6.3 Database Optimization
-- **N+1 Query Elimination**: All iterative `find_one` loops across feeds have been eliminated. Pyramyd computes relationships using hashed `$in` bulk queries.
-- **Mandatory Indexing**: A dedicated `create_indexes.py` script enforces strict document indexing to prevent iteration bottlenecks on live MongoDB hosts.
+    Client <-->|REST / JSON| API
+    API <-->|Motor Async| DB
+    API -->|Escrow/Subaccounts| Paystack
+    API -->|Transactional Emails| ZeptoMail
+    API -->|Distance Matrix| Geocoding
+
+    subgraph "Frontend Layer"
+    Client
+    end
+
+    subgraph "Application Layer"
+    API
+    end
+
+    subgraph "Data & External Layer"
+    DB
+    Paystack
+    ZeptoMail
+    Geocoding
+    end
+```
+
+### 6.2 Technology Stack
+- **Frontend Layer**: React 19 SPA (Single Page Application), Tailwind CSS, CRACO. Hosted via static CDN.
+- **Application Layer**: Python 3.8+, FastAPI. Stateless execution allowing horizontal scaling.
+- **Data Layer**: MongoDB (NoSQL) for flexible schema storage of products, user profiles, and RFQs.
+- **External Services**: Paystack (Payment Gateway & Escrow), ZeptoMail (Communication), Geoapify (Logistics Distance Matrix).
+
+### 6.3 Progressive Web App (PWA) Architecture
+- **Service Worker Cache**: Implements a strict "Network-First, Fallback to Cache" strategy.
+- **Background Sync**: Queues API mutations (like creating a product) locally if the device loses connection, syncing seamlessly when connectivity is restored.
+
+### 6.4 Database Optimization Strategy
+- **N+1 Query Elimination**: Iterative `find_one` loops across feeds have been eliminated. Relationships are computed using hashed `$in` bulk queries to maintain constant time complexity (O(1) database hits per feed load).
+- **Mandatory Indexing**: Strict document indexing (`create_indexes.py`) prevents iteration bottlenecks on live MongoDB hosts.
 
 ---
 
