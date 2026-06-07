@@ -4642,14 +4642,7 @@ function App() {
                           </div>
 
                           <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                            <label className="flex items-center space-x-2 opacity-50">
-                              <input
-                                type="checkbox"
-                                disabled
-                                className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 cursor-not-allowed"
-                              />
-                              <span className="text-sm font-medium text-gray-700">Pre-orders (Coming Soon)</span>
-                            </label>
+
 
                             <div className="flex space-x-2 justify-end">
                               <button
@@ -4756,18 +4749,7 @@ function App() {
                       </div>
                     )}
 
-                    {/* Create Pre-order Button - Only for sellers */}
-                    {user && ['farmer', 'business', 'agent'].includes(user.role) && (
-                      <div className="mt-4 flex justify-end">
-                        <button
-                          disabled
-                          className="px-4 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed font-medium text-sm shadow-sm"
-                          title="This feature is coming soon"
-                        >
-                          + Create Pre-order (Coming Soon)
-                        </button>
-                      </div>
-                    )}
+
                   </div>
                 </div>
 
@@ -4821,31 +4803,7 @@ function App() {
 
                 {/* Enhanced Category Navigation & Filters */}
                 <div className="mb-6 space-y-4">
-                  {/* Pre-Order Filter for Farm Deals */}
-                  {currentPlatform === 'buy_from_farm' && (
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-orange-600"></span>
-                          <span className="text-sm font-medium text-orange-800">Filter by Pre-Orders:</span>
-                        </div>
-                        <label className="flex items-center space-x-2 opacity-50 cursor-not-allowed">
-                          <input
-                            type="checkbox"
-                            checked={false}
-                            disabled
-                            className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500 cursor-not-allowed"
-                          />
-                          <span className="text-sm text-orange-700">Pre-orders (Coming Soon)</span>
-                        </label>
-                      </div>
-                      {filters.only_preorders && (
-                        <div className="mt-2 text-xs text-orange-600">
-                          Showing products available for advance booking with future delivery dates
-                        </div>
-                      )}
-                    </div>
-                  )}
+
 
                   {/* Enhanced Category Navigation */}
                   <div className="relative">

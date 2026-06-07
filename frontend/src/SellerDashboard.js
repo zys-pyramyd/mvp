@@ -952,20 +952,7 @@ const AddProductModal = ({ user, onClose, onSuccess, token }) => {
                         </div>
                     </div>
 
-                    {/* Pre-order Section */}
-                    <div className="bg-orange-50 p-4 rounded-lg border border-orange-200 opacity-50" title="This feature is coming soon">
-                        <div className="flex items-center gap-2 mb-1">
-                            <input
-                                type="checkbox"
-                                id="is_preorder"
-                                checked={false}
-                                disabled
-                                className="w-4 h-4 text-orange-600 rounded cursor-not-allowed"
-                            />
-                            <label htmlFor="is_preorder" className="font-bold text-orange-800 cursor-not-allowed">Enable Pre-order / Group Buy (Coming Soon)</label>
-                        </div>
-                        <p className="text-xs text-orange-700 mt-1 ml-6">Advance booking capabilities are temporarily disabled.</p>
-                    </div>
+
 
                     <div className="border border-gray-200 p-4 rounded-lg">
                         <label className="block text-sm font-bold text-gray-700 mb-2">Available Colors (Optional)</label>

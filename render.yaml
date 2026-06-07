@@ -43,10 +43,9 @@ services:
         sync: false
     autoDeploy: true
 
-  # Frontend Service
-  - type: web
+  # Frontend Service (Static CDN)
+  - type: static
     name: pyramyd-frontend
-    runtime: node
     region: frankfurt
     plan: starter
     rootDir: frontend
@@ -75,19 +74,12 @@ services:
           property: url
     autoDeploy: true
 
-# Database
-databases:
-  - name: pyramyd-mongodb
-    plan: starter  # free (limited), starter, standard
-    region: frankfurt
-    ipAllowList: []  # Empty = accessible from all Render services
-
 # Notes for deployment:
 # 1. Fork/push this repository to GitHub
 # 2. Connect your GitHub repo to Render
 # 3. Render will automatically detect this render.yaml
 # 4. Set required environment variables in Render dashboard:
-#    - MONGO_URL (get from database service)
+#    - MONGO_URL (get from external MongoDB Atlas)
 #    - PAYSTACK_SECRET_KEY
 #    - TWILIO_ACCOUNT_SID
 #    - TWILIO_AUTH_TOKEN
