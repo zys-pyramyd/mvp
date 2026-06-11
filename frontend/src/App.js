@@ -145,6 +145,7 @@ function App() {
   const [activeCartTab, setActiveCartTab] = useState('pyexpress'); // 'pyexpress' or 'farmdeals'
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const location = useLocation();
 
@@ -558,6 +559,7 @@ function App() {
     }
   ];
 
+  // 1. Initial/Static loads on component mount
   useEffect(() => {
     // Warmup backend
     fetch("/api/health").catch(() => { });
@@ -568,17 +570,25 @@ function App() {
       fetchUserProfile(token);
     }
 
-    fetchProducts();
-    fetchCategories();
     fetchDropOffLocations();
     fetchMarketPrices();
     fetchBulkListings();
-    fetchCommunities();
 
     // Migrate existing cart items to ensure proper structure
     if (cart.length > 0) {
       migrateCartItems();
     }
+  }, []);
+
+  // 2. Fetch categories and communities when platform changes
+  useEffect(() => {
+    fetchCategories();
+    fetchCommunities();
+  }, [currentPlatform]);
+
+  // 3. Fetch products when filter or search changes
+  useEffect(() => {
+    fetchProducts();
   }, [currentPlatform, selectedCategory, searchTerm]);
 
   // Update available locations when products change
@@ -868,11 +878,7 @@ function App() {
         if (data.products && Array.isArray(data.products)) {
           allProducts = [...allProducts, ...data.products];
         }
-        if (data.preorders && Array.isArray(data.preorders)) {
-          // Ensure pre-orders have type='preorder' for filtering
-          const preordersWithType = data.preorders.map(preorder => ({ ...preorder, type: 'preorder' }));
-          allProducts = [...allProducts, ...preordersWithType];
-        }
+
 
         // Fallback for legacy API response
         if (Array.isArray(data)) {
@@ -3953,8 +3959,20 @@ function App() {
                       className="nav-button icon-button relative flex items-center gap-1 sm:gap-2 p-1 sm:p-1.5 md:p-2 text-gray-600 hover:text-emerald-600 transition-colors rounded-lg border border-gray-200 hover:border-emerald-500"
                       title="Profile Menu"
                     >
-                      <div className="w-5 h-5 flex-shrink-0 relative">
-                        <ProfileIcon />
+                      <div className="flex-shrink-0 relative">
+                        {user.profile_picture ? (
+                          <img
+                            className="h-6 w-6 rounded-full object-cover border border-emerald-500"
+                            src={user.profile_picture}
+                            alt=""
+                          />
+                        ) : (
+                          <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center border border-emerald-500">
+                            <span className="text-emerald-800 font-medium text-[10px]">
+                              {user.first_name ? user.first_name.charAt(0).toUpperCase() : 'U'}
+                            </span>
+                          </div>
+                        )}
                         {pendingOffersCount > 0 && (
                           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] sm:text-[10px] rounded-full h-3 w-3 sm:h-4 sm:w-4 flex items-center justify-center font-bold border-2 border-white">
                             {pendingOffersCount}
@@ -4555,11 +4573,26 @@ function App() {
                       <input
                         type="text"
                         placeholder="Search products..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        value={searchQuery}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSearchQuery(val);
+                          if (val === '') {
+                            setSearchTerm('');
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            setSearchTerm(searchQuery);
+                          }
+                        }}
                         className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
                       />
-                      <button className="absolute right-3 top-3 text-emerald-600 hover:text-emerald-700">
+                      <button 
+                        onClick={() => setSearchTerm(searchQuery)}
+                        className="absolute right-3 top-3 text-emerald-600 hover:text-emerald-700"
+                        title="Search"
+                      >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>

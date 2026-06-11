@@ -1,24 +1,22 @@
 import React, { useState, useCallback, lazy, Suspense } from 'react';
-import debounce from 'lodash.debounce';
 import { X, ArrowLeft } from 'lucide-react';
 import LoginStep from './LoginStep';
 import BasicDetailsStep from './BasicDetailsStep';
 import PathSelectionStep from './PathSelectionStep';
 import PartnerTypeSelectionStep from './PartnerTypeSelectionStep';
-// Flow components are lazy-loaded below
 
+// Lazy load heavy flows at module scope to prevent component unmounting on parent re-renders
+const LazyBuyerFlow = lazy(() => import('./BuyerFlow'));
+const LazyAgentFlow = lazy(() => import('./AgentFlow'));
+const LazyFarmerFlow = lazy(() => import('./FarmerFlow'));
+const LazyBusinessFlow = lazy(() => import('./BusinessFlow'));
+const LazyVerificationStep = lazy(() => import('./VerificationStep'));
 
 const RegistrationModal = ({ onClose, onLogin, onRegister }) => {
   const [globalLoading, setGlobalLoading] = useState(false);
-  // Debounced form data updater to reduce re-renders
-  const debouncedUpdate = useCallback(
-    debounce((updates) => {
-      setFormData(prev => ({ ...prev, ...updates }));
-    }, 200),
-    []
-  );
+
   const updateFormData = (updates) => {
-    debouncedUpdate(updates);
+    setFormData(prev => ({ ...prev, ...updates }));
   };
 
   // Wrapper for registration submission to manage global loading state
@@ -155,12 +153,6 @@ const RegistrationModal = ({ onClose, onLogin, onRegister }) => {
                 );
             case 'details':
             case 'verification':
-                // Lazy load heavy flows
-                const LazyBuyerFlow = lazy(() => import('./BuyerFlow'));
-                const LazyAgentFlow = lazy(() => import('./AgentFlow'));
-                const LazyFarmerFlow = lazy(() => import('./FarmerFlow'));
-                const LazyBusinessFlow = lazy(() => import('./BusinessFlow'));
-                const LazyVerificationStep = lazy(() => import('./VerificationStep'));
                 if (formData.user_path === 'buyer') {
                     return (
                         <Suspense fallback={<div className="text-center py-4">Loading...</div>}>

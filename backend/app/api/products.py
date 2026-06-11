@@ -124,12 +124,23 @@ async def get_products(
                     products_query["seller_type"] = {"$in": ["farmer", "agent"]}
                 
             if search_term:
-                safe_term = sanitize_regex(search_term)
-                products_query["$or"] = [
-                    {"crop_type": {"$regex": safe_term, "$options": "i"}},
-                    {"location": {"$regex": safe_term, "$options": "i"}},
-                    {"farm_name": {"$regex": safe_term, "$options": "i"}}
-                ]
+                words = [w.strip() for w in search_term.split() if w.strip()]
+                if words:
+                    word_queries = []
+                    for word in words:
+                        safe_word = sanitize_regex(word)
+                        word_queries.append({
+                            "$or": [
+                                {"title": {"$regex": safe_word, "$options": "i"}},
+                                {"description": {"$regex": safe_word, "$options": "i"}},
+                                {"category": {"$regex": safe_word, "$options": "i"}},
+                                {"subcategory": {"$regex": safe_word, "$options": "i"}},
+                                {"location": {"$regex": safe_word, "$options": "i"}},
+                                {"farm_name": {"$regex": safe_word, "$options": "i"}},
+                                {"business_name": {"$regex": safe_word, "$options": "i"}}
+                            ]
+                        })
+                    products_query["$and"] = word_queries
             
             # Get products
             skip = (page - 1) * limit
@@ -143,81 +154,7 @@ async def get_products(
                 product["type"] = "regular"
             
             results["products"] = products
-            results["total_count"] += db.products.count_documents(products_query)
-        
-        # Pre-orders query (if not filtering out pre-orders)
-        if only_preorders or only_preorders is None:
-            preorders_query = {"status": PreOrderStatus.PUBLISHED, "is_preorder": True}
-            
-            if category:
-                preorders_query["product_category"] = category
-                
-            if location:
-                preorders_query["location"] = {"$regex": location, "$options": "i"}
-                
-            if city:
-                preorders_query["city"] = {"$regex": city, "$options": "i"}
-                
-            if min_price is not None or max_price is not None:
-                price_filter = {}
-                if min_price is not None:
-                    price_filter["$gte"] = min_price
-                if max_price is not None:
-                    price_filter["$lte"] = max_price
-                preorders_query["price_per_unit"] = price_filter
-                
-            if search_term:
-                preorders_query["$or"] = [
-                    {"product_name": {"$regex": search_term, "$options": "i"}},
-                    {"description": {"$regex": search_term, "$options": "i"}},
-                    {"business_name": {"$regex": search_term, "$options": "i"}},
-                    {"farm_name": {"$regex": search_term, "$options": "i"}}
-                ]
-                
-            if seller_type:
-                preorders_query["seller_type"] = seller_type
-            
-            # Platform-based filtering for preorders (skip if global search)
-            if not global_search:
-                if platform == "home":
-                    # Home page: Only business preorders
-                    preorders_query["seller_type"] = {"$in": ["business"]}
-                elif platform == "farm_deals":
-                    # Farm Deals page: Only farmer and agent preorders
-                    preorders_query["seller_type"] = {"$in": ["farmer", "agent"]}
-            
-            # Get pre-orders with improved pagination logic
-            skip = (page - 1) * limit if only_preorders else 0
-            
-            # Fix: Ensure pre-orders get a fair share of the response, not just leftovers
-            if only_preorders:
-                limit_preorders = limit
-            else:
-                # Allow pre-orders alongside products - increase effective limit or reserve space
-                max_products_for_mixed = max(1, int(limit * 0.75))  # Reserve 75% for products, 25% for pre-orders  
-                if len(results["products"]) > max_products_for_mixed:
-                    # Trim products to make space for pre-orders
-                    results["products"] = results["products"][:max_products_for_mixed]
-                
-                limit_preorders = limit - len(results["products"])
-                limit_preorders = max(limit_preorders, int(limit * 0.25))  # Always allow at least 25% for pre-orders
-            
-            if limit_preorders > 0:
-                preorders = list(db.products.find(preorders_query).sort("created_at", -1).skip(skip).limit(limit_preorders))
-                
-                # Clean up pre-orders
-                for preorder in preorders:
-                    preorder["_id"] = str(preorder["_id"])
-                    if "created_at" in preorder and isinstance(preorder["created_at"], datetime):
-                        preorder["created_at"] = preorder["created_at"].isoformat()
-                    if "updated_at" in preorder and isinstance(preorder["updated_at"], datetime):
-                        preorder["updated_at"] = preorder["updated_at"].isoformat()
-                    if "delivery_date" in preorder and isinstance(preorder["delivery_date"], datetime):
-                        preorder["delivery_date"] = preorder["delivery_date"].isoformat()
-                    preorder["type"] = "preorder"
-                
-                results["preorders"] = preorders
-                results["total_count"] += db.products.count_documents(preorders_query)
+            results["total_count"] = db.products.count_documents(products_query)
         
         results["total_pages"] = (results["total_count"] + limit - 1) // limit
         
@@ -402,42 +339,7 @@ async def get_product(product_id: str):
     product.pop('_id', None)
     return product
 
-@router.put("/{product_id}/preorder-time")
-async def update_preorder_time(
-    product_id: str,
-    time_data: dict,
-    current_user: dict = Depends(get_current_user)
-):
-    """Update pre-order availability time"""
-    if "available_date" not in time_data:
-         raise HTTPException(status_code=400, detail="available_date is required")
 
-    db = get_db()
-    product = db.products.find_one({"id": product_id, "seller_id": current_user["id"]})
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found or not owned by you")
-    
-    # Convert strings to datetime if necessary (simplified handling)
-    avail_date = time_data.get("available_date")
-    end_date = time_data.get("end_date")
-    
-    # Update
-    db.products.update_one(
-        {"id": product_id},
-        {"$set": {
-            "is_preorder": True,
-            "preorder_available_date": avail_date,
-            "preorder_end_date": end_date,
-            "preorder_target_quantity": time_data.get("target_quantity"), # New Field
-            # Also update about fields if passed
-            "about_product": time_data.get("about_product"),
-            "product_benefits": time_data.get("product_benefits", []),
-            "usage_instructions": time_data.get("usage_instructions")
-        }}
-    )
-    
-    
-    return {"message": "Pre-order settings updated"}
 
 @router.post("/{product_id}/comments")
 async def create_product_comment(

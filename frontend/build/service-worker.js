@@ -59,24 +59,8 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-<<<<<<< HEAD
-// Handle static asset requests (cache-first)
 // Handle static asset requests (Network-First with Cache Fallback)
 async function handleStaticRequest(request) {
-  const cache = await caches.open(CACHE_NAME);
-
-  try {
-    // Try network first (Always get latest version)
-    const response = await fetch(request);
-
-    // If successful, update the cache
-    if (response.status === 200) {
-      cache.put(request, response.clone());
-=======
-// Handle static asset requests
-// Handle static asset requests
-async function handleStaticRequest(request) {
-  // Strategy: Network-First for ALL static assets (HTML, CSS, JS, Images)
   // CRITICAL: Prevent SW from handling non-GET requests (e.g. POST uploads) in this fallback
   if (request.method !== 'GET') {
     return fetch(request);
@@ -90,23 +74,10 @@ async function handleStaticRequest(request) {
     if (networkResponse.status === 200) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, networkResponse.clone());
->>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
     }
 
     return networkResponse;
   } catch (error) {
-<<<<<<< HEAD
-    // Note: 'Only-if-cached' mode error handling?
-    // Network failed, try cache
-    console.log('[SW] Network failed for static asset, trying cache:', request.url);
-    const cached = await cache.match(request);
-    if (cached) {
-      return cached;
-    }
-
-    // Return offline page for navigation requests if both fail
-    if (request.destination === 'document') {
-=======
     // 2. If Network fails (offline), try Cache
     console.log('[SW] Network failed, checking cache:', request.url);
     const cache = await caches.open(CACHE_NAME);
@@ -118,7 +89,6 @@ async function handleStaticRequest(request) {
 
     // 3. Fallback for navigation requests
     if (request.mode === 'navigate') {
->>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
       return cache.match('/index.html');
     }
 
@@ -126,7 +96,6 @@ async function handleStaticRequest(request) {
   }
 }
 
-// Handle API requests (network-first with cache fallback)
 // Handle API requests (network-first with cache fallback)
 async function handleApiRequest(request) {
   const url = new URL(request.url);
@@ -147,13 +116,8 @@ async function handleApiRequest(request) {
     // Try network first
     const response = await fetch(request);
 
-<<<<<<< HEAD
-    // Cache successful GET requests
-    if (request.method === 'GET' && response.status === 200) {
-=======
     // Cache ONLY successful GET requests
     if (response.status === 200) {
->>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
       cache.put(request, response.clone());
     }
 
@@ -167,24 +131,6 @@ async function handleApiRequest(request) {
       return cached;
     }
 
-<<<<<<< HEAD
-    // If POST/PUT request (like product creation), queue it for later
-    if (request.method === 'POST' || request.method === 'PUT') {
-      await queueOfflineRequest(request);
-      return new Response(
-        JSON.stringify({
-          queued: true,
-          message: 'Request queued for sync when online'
-        }),
-        {
-          status: 202,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-=======
->>>>>>> 3c08bac4cdd6f65fe0f1b7cf2bb12556ec177a49
     // Return error for other cases
     return new Response(
       JSON.stringify({ error: 'No network connection', offline: true }),
