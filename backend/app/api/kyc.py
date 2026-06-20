@@ -7,7 +7,10 @@ from typing import List, Optional
 import base64
 import uuid
 from datetime import datetime
-from app.api.notifications import create_notification
+from app.api.notifications import create_notification, notify_platform_admins
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -52,14 +55,19 @@ async def submit_documents(
         }}
     )
 
-    # Notify admin via in-app notification
-    create_notification(
-        user_id="admin",
-        title="New KYC Document Submitted",
-        message=f"{current_user.get('first_name')} {current_user.get('last_name')} ({current_user.get('role')}) has submitted verification documents for review.",
+    user_name = f"{current_user.get('first_name')} {current_user.get('last_name')}"
+    user_role = current_user.get('role', 'partner')
+
+    # Notify all PLATFORM admins (not community admins)
+    notify_platform_admins(
+        title="📋 New KYC Document Submitted",
+        message=f"{user_name} ({user_role}) has submitted verification documents for review.",
         type="kyc_submission",
-        action_link=f"/pyadmin?tab=kyc&user={current_user.get('id')}"
+        action_link=f"/admin-dashboard?tab=kyc&user={current_user.get('id')}"
     )
+
+    # Email alert to platform admin
+    _send_admin_kyc_email_alert(user_name=user_name, user_role=user_role, user_id=current_user.get('id'))
 
     return {
         "message": "Documents submitted successfully. Your account is now under admin review.",
@@ -83,6 +91,43 @@ async def process_file_upload(file: UploadFile) -> dict:
         "data": encoded_file,
         "size": len(file_content)
     }
+
+
+def _send_admin_kyc_email_alert(user_name: str, user_role: str, user_id: str):
+    """Send an email alert to the platform admin email when KYC is submitted."""
+    try:
+        from app.core.config import settings
+        if not getattr(settings, 'ZEPTOMAIL_TOKEN', None):
+            return
+        admin_email = getattr(settings, 'ADMIN_EMAIL', None)
+        if not admin_email:
+            return
+        from app.utils.email import send_zeptomail
+        html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: #059669; color: white; padding: 16px 24px; border-radius: 8px 8px 0 0;">
+                <h2 style="margin:0;">📋 New KYC Verification Request</h2>
+            </div>
+            <div style="background: #f9fafb; padding: 24px; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px;">
+                <p style="font-size:16px; color:#111827;"><strong>{user_name}</strong> has submitted KYC documents.</p>
+                <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
+                    <tr><td style="padding:8px; color:#6b7280;">Role:</td><td style="padding:8px; font-weight:600; text-transform:capitalize;">{user_role}</td></tr>
+                    <tr><td style="padding:8px; color:#6b7280;">User ID:</td><td style="padding:8px; font-family:monospace;">{user_id}</td></tr>
+                </table>
+                <a href="https://pyramydhub.com/admin-dashboard?tab=kyc&user={user_id}"
+                   style="display:inline-block; background:#059669; color:white; padding:12px 24px;
+                          border-radius:8px; text-decoration:none; font-weight:bold;">Review KYC &rarr;</a>
+            </div>
+        </div>
+        """
+        send_zeptomail(
+            to_email=admin_email,
+            subject=f"[Pyramyd Admin] New KYC Submission — {user_name} ({user_role})",
+            html_content=html,
+            to_name="Pyramyd Admin"
+        )
+    except Exception as e:
+        logger.error(f"Failed to send admin KYC alert email: {e}")
 
 # --- User Endpoints ---
 
@@ -169,14 +214,15 @@ async def submit_agent_kyc(
         {"$set": {"kyc_status": KYCStatus.PENDING, "kyc_submitted_at": datetime.utcnow()}}
     )
     
-    # Notify admin via in-app notification
-    create_notification(
-        user_id="admin",
-        title="Agent KYC Submitted",
-        message=f"{current_user.get('first_name')} {current_user.get('last_name')} has submitted Agent KYC for review.",
+    user_name = f"{current_user.get('first_name')} {current_user.get('last_name')}"
+    # Notify all PLATFORM admins (not community admins)
+    notify_platform_admins(
+        title="🕵️ Agent KYC Submitted",
+        message=f"{user_name} has submitted Agent KYC for review.",
         type="kyc_submission",
-        action_link=f"/pyadmin?tab=kyc&user={current_user.get('id')}"
+        action_link=f"/admin-dashboard?tab=kyc&user={current_user.get('id')}"
     )
+    _send_admin_kyc_email_alert(user_name=user_name, user_role="agent", user_id=current_user.get('id'))
     
     return {"message": "Agent KYC submitted successfully. Pending Admin Review."}
 
@@ -211,14 +257,15 @@ async def submit_farmer_kyc(
         {"$set": {"kyc_status": KYCStatus.PENDING, "kyc_submitted_at": datetime.utcnow()}}
     )
     
-    # Notify admin via in-app notification
-    create_notification(
-        user_id="admin",
-        title="Farmer KYC Submitted",
-        message=f"{current_user.get('first_name')} {current_user.get('last_name')} has submitted Farmer KYC for review.",
+    user_name = f"{current_user.get('first_name')} {current_user.get('last_name')}"
+    # Notify all PLATFORM admins (not community admins)
+    notify_platform_admins(
+        title="🌾 Farmer KYC Submitted",
+        message=f"{user_name} has submitted Farmer KYC for review.",
         type="kyc_submission",
-        action_link=f"/pyadmin?tab=kyc&user={current_user.get('id')}"
+        action_link=f"/admin-dashboard?tab=kyc&user={current_user.get('id')}"
     )
+    _send_admin_kyc_email_alert(user_name=user_name, user_role="farmer", user_id=current_user.get('id'))
     
     return {"message": "Farmer KYC submitted successfully. Pending Admin Review."}
 

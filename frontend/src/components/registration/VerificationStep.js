@@ -86,8 +86,8 @@ const VerificationStep = ({ formData, updateFormData, onRegister, onBack, role, 
     const handleFileUpload = async (file, docKey) => {
         setUploading(prev => ({ ...prev, [docKey]: true }));
         try {
-            // 1. Get Presigned URL
-            const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/upload/sign-public`, {
+            // 1. Get Presigned URL — use the public endpoint (no token needed during registration)
+            const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/upload/sign-registration`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -97,7 +97,10 @@ const VerificationStep = ({ formData, updateFormData, onRegister, onBack, role, 
                 })
             });
 
-            if (!res.ok) throw new Error('Upload init failed');
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || 'Upload initialisation failed. Please try again.');
+            }
             const data = await res.json();
 
             // 2. Upload to R2

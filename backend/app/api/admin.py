@@ -683,3 +683,44 @@ async def admin_toggle_community_status(community_id: str, current_user: dict = 
     
     action = "unblocked and activated" if new_status else "blocked and deactivated"
     return {"message": f"Community {action} successfully", "is_active": new_status}
+
+
+# --- Manual Reconciliations ---
+@router.get("/reconciliations")
+async def admin_get_reconciliations(current_user: dict = Depends(get_current_user)):
+    """
+    Get orders that require manual fund reconciliation.
+    These are orders where payout could not be completed automatically
+    because the seller had missing/invalid bank details.
+    """
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    db = get_db()
+
+    # Find orders stuck in payout_failed or manual_required state
+    query = {
+        "$or": [
+            {"payout_status": "manual_required"},
+            {"payout_status": "failed"},
+            {"payout_status": "vault_hold"},
+        ]
+    }
+
+    orders = list(db.orders.find(query).sort("created_at", -1).limit(200))
+
+    reconciliations = []
+    for order in orders:
+        order.pop('_id', None)
+        reconciliations.append({
+            "order_id": order.get("order_id") or str(order.get("_id", "")),
+            "user_id": order.get("seller_id"),
+            "username": order.get("seller_username") or order.get("seller_name"),
+            "role": "seller",
+            "amount": order.get("seller_payout_amount") or order.get("total_amount", 0),
+            "status": order.get("payout_status", "pending"),
+            "reason": order.get("payout_failure_reason", "Unknown"),
+            "created_at": order.get("created_at", "").isoformat() if hasattr(order.get("created_at", ""), "isoformat") else str(order.get("created_at", "")),
+        })
+
+    return reconciliations

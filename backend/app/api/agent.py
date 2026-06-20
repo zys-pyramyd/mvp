@@ -329,17 +329,23 @@ async def register_farmer(
     # Create Farmer User
     farmer_id = str(uuid.uuid4())
     username = f"{data.first_name.lower()}{data.last_name.lower()}{data.phone[-4:]}"
-    
+
+    # Generate a secure temporary password (agent communicates this to farmer)
+    import secrets
+    import string
+    alphabet = string.ascii_letters + string.digits
+    temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+
     farmer_dict = {
         "id": farmer_id,
         "first_name": data.first_name,
         "last_name": data.last_name,
         "username": username,
-        "email": f"{username}@placeholder.com", # Placeholder if no email
+        "email": f"{username}@placeholder.com", # Placeholder until farmer provides real email
         "phone": data.phone,
         "role": "farmer",
         "agent_id": current_user['id'], # Link to Agent
-        "is_verified": True, # AUTO-VERIFY
+        "is_verified": True, # AUTO-VERIFY since agent vouches
         "verification_status": "verified",
         "verification_note": f"Verified by Agent {current_user['username']}",
         "gender": data.gender,
@@ -357,13 +363,20 @@ async def register_farmer(
             "bank_code": data.bank_code,
             "account_name": resolved_name
         },
-        "password": hash_password("123456"), # Default password, should change
+        "password": hash_password(temp_password),
+        "must_change_password": True,  # Flag so app can prompt on first login
         "created_at": datetime.utcnow()
     }
-    
+
     db.users.insert_one(farmer_dict)
-    
-    return {"message": "Farmer registered successfully", "farmer_id": farmer_id}
+
+    return {
+        "message": "Farmer registered successfully",
+        "farmer_id": farmer_id,
+        "username": username,
+        "temp_password": temp_password,  # Agent must communicate this to farmer securely
+        "note": "Share this temporary password with the farmer. They must change it on first login."
+    }
 
 @router.get("/deliveries")
 async def get_agent_deliveries(current_user: dict = Depends(get_current_user)):

@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import './OrderDetails.css';
 
@@ -122,6 +123,7 @@ function ConfirmPanel({ action, order, selectedItemCount, selectedTotal, onConfi
 // ---------------------------------------------------------------------------
 
 const OrderDetails = ({ orderId, onClose, onUpdate }) => {
+  const navigate = useNavigate();
   const [order,         setOrder]         = useState(null);
   const [loading,       setLoading]       = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -346,6 +348,16 @@ const OrderDetails = ({ orderId, onClose, onUpdate }) => {
                         <p className="od-item__meta">
                           {item.quantity} × ₦{(item.price_per_unit || 0).toLocaleString()}
                         </p>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onClose && onClose();
+                            navigate(`/product/${item.product_id}`);
+                          }}
+                          className="mt-2 text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center transition-colors bg-emerald-50 px-2 py-1 rounded w-max"
+                        >
+                          <span className="mr-1">🌱</span> View Product Journey ➔
+                        </button>
                       </div>
                       <span className="od-item__total">
                         ₦{(item.total || (item.quantity * item.price_per_unit) || 0).toLocaleString()}

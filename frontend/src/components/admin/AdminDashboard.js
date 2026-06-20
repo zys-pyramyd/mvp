@@ -497,45 +497,45 @@ const AdminDashboard = () => {
                     <div className="p-4 space-y-2">
                         <button
                             onClick={() => setActiveTab('overview')}
-                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'overview' ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'overview' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-emerald-600' : 'text-gray-600 hover:bg-gray-50 border-l-4 border-transparent'}`}
                         >
                             <span>📊</span> Overview
                         </button>
                         <button
                             onClick={() => setActiveTab('users')}
-                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'users' ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'users' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-emerald-600' : 'text-gray-600 hover:bg-gray-50 border-l-4 border-transparent'}`}
                         >
                             <span>👥</span> User Management
                         </button>
                         <button
                             onClick={() => setActiveTab('kyc')}
-                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'kyc' ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'kyc' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-emerald-600' : 'text-gray-600 hover:bg-gray-50 border-l-4 border-transparent'}`}
                         >
                             <span>🔐</span> KYC Verification
                             {pendingKyc.length > 0 && <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{pendingKyc.length}</span>}
                         </button>
                         <button
                             onClick={() => setActiveTab('orders')}
-                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'orders' ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'orders' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-emerald-600' : 'text-gray-600 hover:bg-gray-50 border-l-4 border-transparent'}`}
                         >
                             <span>📦</span> Global Orders
                         </button>
                         <button
                             onClick={() => setActiveTab('reconciliations')}
-                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'reconciliations' ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'reconciliations' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-emerald-600' : 'text-gray-600 hover:bg-gray-50 border-l-4 border-transparent'}`}
                         >
                             <span>🏦</span> Reconciliations
                             {pendingReconciliations.length > 0 && <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{pendingReconciliations.length}</span>}
                         </button>
                         <button
                             onClick={() => setActiveTab('communities')}
-                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'communities' ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'communities' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-emerald-600' : 'text-gray-600 hover:bg-gray-50 border-l-4 border-transparent'}`}
                         >
                             <span>🌍</span> Communities
                         </button>
                         <button
                             onClick={() => setActiveTab('messaging')}
-                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'messaging' ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'messaging' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-emerald-600' : 'text-gray-600 hover:bg-gray-50 border-l-4 border-transparent'}`}
                         >
                             <span>💬</span> Dispatches
                         </button>
@@ -961,7 +961,7 @@ const AdminDashboard = () => {
                                             value={adminMessageRecipient}
                                             onChange={e => setAdminMessageRecipient(e.target.value)}
                                             placeholder="e.g. johndoe123"
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                             required
                                         />
                                     </div>
@@ -972,12 +972,12 @@ const AdminDashboard = () => {
                                             value={adminMessageContent}
                                             onChange={e => setAdminMessageContent(e.target.value)}
                                             placeholder="Type your official message here..."
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                             required
                                         />
                                     </div>
                                     <div className="flex items-end">
-                                        <button type="submit" className="h-[48px] px-6 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow-sm">
+                                        <button type="submit" className="h-[48px] px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-sm transition-colors">
                                             Send Dispatch
                                         </button>
                                     </div>
@@ -993,9 +993,9 @@ const AdminDashboard = () => {
                                 ) : (
                                     <div className="grid gap-4">
                                         {adminConversations.map(conv => (
-                                            <div key={conv.id} className="bg-white p-4 rounded-xl border border-gray-200 flex justify-between items-center hover:border-purple-300">
+                                            <div key={conv.id} className="bg-white p-4 rounded-xl border border-gray-200 flex justify-between items-center hover:border-emerald-300 transition-colors">
                                                 <div className="flex items-center gap-4">
-                                                    <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold uppercase">
+                                                    <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold uppercase">
                                                         {conv.other_user?.username?.charAt(0) || '?'}
                                                     </div>
                                                     <div>

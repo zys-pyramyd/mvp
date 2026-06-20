@@ -33,6 +33,9 @@ const ChatModal = lazy(() => import('./components/chat/ChatModal'));
 import naija from 'naija-state-local-government';
 import './App.css';
 
+// Lazy-loaded — only loads when user views marketplace
+const SmartProductSearch = React.lazy(() => import('./components/product/SmartProductSearch'));
+
 // Helper function to map backend order statuses to user-friendly display labels
 const getOrderStatusDisplay = (status) => {
   const statusMap = {
@@ -4832,6 +4835,29 @@ function App() {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                {/* ════════════════════════════════════════════
+                    SMART LOCATION-AWARE SEARCH SECTIONS
+                    Two sections: Near You + Outside Location
+                  ════════════════════════════════════════════ */}
+                <div className="px-4 sm:px-6 mb-8">
+                  <Suspense fallback={
+                    <div className="animate-pulse space-y-3 py-4">
+                      <div className="h-14 bg-emerald-50 rounded-2xl"></div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        {[...Array(4)].map((_,i) => <div key={i} className="h-52 bg-gray-100 rounded-2xl"></div>)}
+                      </div>
+                    </div>
+                  }>
+                    <SmartProductSearch
+                      searchTerm={searchTerm}
+                      category={selectedCategory}
+                      platform={currentPlatform === 'buy_from_farm' ? 'farm_deals' : 'home'}
+                      onProductSelect={(product) => navigate(`/product/${product.id || product._id}`)}
+                      existingProducts={null}
+                    />
+                  </Suspense>
                 </div>
 
                 {/* Enhanced Category Navigation & Filters */}

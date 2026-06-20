@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../common/Header';
 import ProductCard from './ProductCard';
+import ProductStory from './ProductStory';
 
 const ProductPage = () => {
     const { id } = useParams();
@@ -277,6 +278,9 @@ const ProductPage = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Traceability Timeline component */}
+                <ProductStory product={product} />
 
                 {/* Similar Products Section */}
                 {similarProducts.length > 0 && (
