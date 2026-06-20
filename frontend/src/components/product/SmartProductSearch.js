@@ -30,7 +30,7 @@ const LOCAL_THRESHOLD = 4;
 // ─────────────────────────────────────────────
 // Helper: reverse geocode lat/lng → state + city
 // ─────────────────────────────────────────────
-async function reverseGeocode(lat, lng) {
+export async function reverseGeocode(lat, lng) {
   try {
     if (!GEOAPIFY_KEY) return null;
     const res = await fetch(
@@ -49,6 +49,54 @@ async function reverseGeocode(lat, lng) {
     return null;
   }
 }
+
+// ─────────────────────────────────────────────
+// Custom Hook for Location State
+// ─────────────────────────────────────────────
+export const useLocationDetector = () => {
+  const [detectedLocation, setDetectedLocation] = useState(null);
+  const [selectedState, setSelectedState] = useState('');
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [locationError, setLocationError] = useState('');
+
+  const handleDetectLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationError('Your browser does not support location detection.');
+      return;
+    }
+    setIsDetecting(true);
+    setLocationError('');
+    // Use high accuracy and longer timeout for laptops/desktops
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const geo = await reverseGeocode(latitude, longitude);
+        if (geo) {
+          setDetectedLocation(geo);
+          setSelectedState(geo.state || '');
+        } else {
+          setLocationError('Could not determine your address. Please select a state manually.');
+        }
+        setIsDetecting(false);
+      },
+      (err) => {
+        setIsDetecting(false);
+        if (err.code === 1) {
+          setLocationError('Location access denied. Please select your state using the dropdown.');
+        } else {
+          setLocationError('Could not get your location automatically. Please select your state manually.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
+  }, []);
+
+  return {
+    detectedLocation, setDetectedLocation,
+    selectedState, setSelectedState,
+    isDetecting, locationError, handleDetectLocation
+  };
+};
 
 // ─────────────────────────────────────────────
 // Helper: fetch products with optional state/city filter
@@ -173,9 +221,9 @@ const SectionHeader = ({ icon, title, subtitle, count, accentColor = 'emerald', 
 );
 
 // ─────────────────────────────────────────────
-// Location Bar Sub-component
+// Location Bar Sub-component (Exported for hoisting)
 // ─────────────────────────────────────────────
-const LocationBar = ({ detectedLocation, selectedState, onStateChange, onDetectLocation, isDetecting, locationError }) => {
+export const LocationBar = ({ detectedLocation, selectedState, onStateChange, onDetectLocation, isDetecting, locationError }) => {
   const displayLocation = detectedLocation?.city
     ? `${detectedLocation.city}, ${detectedLocation.state}`
     : selectedState || null;
@@ -246,14 +294,10 @@ const SmartProductSearch = ({
   category = '',
   platform = 'home',
   onProductSelect,
-  // Optional: pass in existing products from parent to avoid double-fetching
   existingProducts = null,
+  detectedLocation = null,
+  selectedState = '',
 }) => {
-  const [detectedLocation, setDetectedLocation] = useState(null); // { city, state }
-  const [selectedState, setSelectedState] = useState('');
-  const [isDetecting, setIsDetecting] = useState(false);
-  const [locationError, setLocationError] = useState('');
-
   const [localProducts, setLocalProducts] = useState([]);
   const [nationalProducts, setNationalProducts] = useState([]);
   const [loadingLocal, setLoadingLocal] = useState(false);
@@ -263,38 +307,6 @@ const SmartProductSearch = ({
   // Derive the active location from detector or dropdown
   const activeState = detectedLocation?.state || selectedState || '';
   const activeCity = detectedLocation?.city || '';
-
-  // ── Detect location via browser GPS ──
-  const handleDetectLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      setLocationError('Your browser does not support location detection.');
-      return;
-    }
-    setIsDetecting(true);
-    setLocationError('');
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const geo = await reverseGeocode(latitude, longitude);
-        if (geo) {
-          setDetectedLocation(geo);
-          setSelectedState(geo.state || '');
-        } else {
-          setLocationError('Could not determine your address. Please select a state manually.');
-        }
-        setIsDetecting(false);
-      },
-      (err) => {
-        setIsDetecting(false);
-        if (err.code === 1) {
-          setLocationError('Location access denied. Please select your state using the dropdown.');
-        } else {
-          setLocationError('Could not get your location. Please select your state manually.');
-        }
-      },
-      { timeout: 8000, maximumAge: 300000 }
-    );
-  }, []);
 
   // ── Fetch products when location or search changes ──
   useEffect(() => {
@@ -373,18 +385,7 @@ const SmartProductSearch = ({
 
   return (
     <div className="smart-product-search-container w-full">
-      {/* Location Bar */}
-      <LocationBar
-        detectedLocation={detectedLocation}
-        selectedState={selectedState}
-        onStateChange={(val) => {
-          setSelectedState(val);
-          setDetectedLocation(null);
-        }}
-        onDetectLocation={handleDetectLocation}
-        isDetecting={isDetecting}
-        locationError={locationError}
-      />
+      {/* Location Bar is hoisted to parent component */}
 
       {/* Loading skeleton */}
       {isLoading && (

@@ -31,6 +31,7 @@ const AgentDeliveryDashboard = lazy(() => import('./AgentDeliveryDashboard'));
 const ChatModal = lazy(() => import('./components/chat/ChatModal'));
 
 import naija from 'naija-state-local-government';
+import { LocationBar, useLocationDetector } from './components/product/SmartProductSearch';
 import './App.css';
 
 // Lazy-loaded — only loads when user views marketplace
@@ -258,6 +259,13 @@ function App() {
   const [communitySearchTerm, setCommunitySearchTerm] = useState('');
   const [communitySearchType, setCommunitySearchType] = useState('communities'); // 'communities' or 'products'
   const [refreshCommunities, setRefreshCommunities] = useState(0);
+
+  // --- Smart Location Detector Hook ---
+  const {
+    detectedLocation, setDetectedLocation,
+    selectedState, setSelectedState,
+    isDetecting, locationError, handleDetectLocation
+  } = useLocationDetector();
 
 
 
@@ -4571,146 +4579,50 @@ function App() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
                   {/* Left Column: Search & Filter (spans 5 cols on lg) */}
                   <div className="lg:col-span-5 flex flex-col gap-4">
-                    {/* Search Bar */}
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Search products..."
-                        value={searchQuery}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setSearchQuery(val);
-                          if (val === '') {
-                            setSearchTerm('');
-                          }
+                    {/* Location Bar & Search Bar Container */}
+                    <div className="flex flex-col gap-4">
+                      <LocationBar
+                        detectedLocation={detectedLocation}
+                        selectedState={selectedState}
+                        onStateChange={(val) => {
+                          setSelectedState(val);
+                          setDetectedLocation(null);
                         }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            setSearchTerm(searchQuery);
-                          }
-                        }}
-                        className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+                        onDetectLocation={handleDetectLocation}
+                        isDetecting={isDetecting}
+                        locationError={locationError}
                       />
-                      <button 
-                        onClick={() => setSearchTerm(searchQuery)}
-                        className="absolute right-3 top-3 text-emerald-600 hover:text-emerald-700"
-                        title="Search"
-                      >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                      </button>
-                    </div>
-
-                    {/* Advanced Filters Toggle & Panel */}
-                    <div>
-                      <button
-                        onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                        className="flex items-center space-x-2 text-sm text-gray-600 hover:text-emerald-600 font-medium my-1"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-                        </svg>
-                        <span>Advanced Filters</span>
-                        <svg className={`w-4 h-4 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-
-                      {showAdvancedFilters && (
-                        <div className="mt-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Advanced Location Filters */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-                              <select
-                                value={filters.location}
-                                onChange={(e) => setFilters(prev => ({ ...prev, location: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              >
-                                <option value="">All States</option>
-                                {NIGERIAN_STATES.map(location => (
-                                  <option key={location} value={location}>{location}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">City / L.G.A.</label>
-                              <input
-                                type="text"
-                                list="city-suggestions"
-                                placeholder={filters.location ? "Select or type city..." : "Specific city..."}
-                                value={filters.city || ''}
-                                onChange={(e) => {
-                                  // Capitalize first letter of each word for normalization
-                                  const normalized = e.target.value.replace(/\b\w/g, c => c.toUpperCase());
-                                  setFilters(prev => ({ ...prev, city: normalized }));
-                                }}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              />
-                              <datalist id="city-suggestions">
-                                {(() => {
-                                  if (!filters.location) return null;
-                                  try {
-                                    // FCT - Abuja requires mapping to "Federal Capital Territory" for the package
-                                    let stateLookup = filters.location === 'FCT - Abuja' ? 'Federal Capital Territory' : filters.location;
-                                    const lgas = naija.lgas(stateLookup).lgas;
-                                    return lgas.map(lga => <option key={lga} value={lga} />);
-                                  } catch (err) {
-                                    return null;
-                                  }
-                                })()}
-                              </datalist>
-                            </div>
-                            <div className="md:col-span-2">
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                              <select
-                                value={filters.category || ''}
-                                onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              >
-                                <option value="">All Categories</option>
-                                {(Array.isArray(categories) ? categories : []).map((cat, idx) => (
-                                  <option key={idx} value={cat.name}>{cat.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-
-                          <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-
-
-                            <div className="flex space-x-2 justify-end">
-                              <button
-                                onClick={() => {
-                                  setFilters({
-                                    category: '',
-                                    city: '',
-                                    location: '',
-                                    min_price: '',
-                                    max_price: '',
-                                    only_preorders: false,
-                                    seller_type: ''
-                                  });
-                                  setSelectedCategory('');
-                                }}
-                                className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
-                              >
-                                Clear All
-                              </button>
-                              <button
-                                onClick={() => {
-                                  fetchProducts();
-                                  setShowAdvancedFilters(false);
-                                }}
-                                className="px-4 py-1 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg"
-                              >
-                                Apply Filters
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      
+                      {/* Search Bar */}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search products..."
+                          value={searchQuery}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSearchQuery(val);
+                            if (val === '') {
+                              setSearchTerm('');
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setSearchTerm(searchQuery);
+                            }
+                          }}
+                          className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+                        />
+                        <button 
+                          onClick={() => setSearchTerm(searchQuery)}
+                          className="absolute right-3 top-3 text-emerald-600 hover:text-emerald-700"
+                          title="Search"
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -4856,6 +4768,8 @@ function App() {
                       platform={currentPlatform === 'buy_from_farm' ? 'farm_deals' : 'home'}
                       onProductSelect={(product) => navigate(`/product/${product.id || product._id}`)}
                       existingProducts={null}
+                      detectedLocation={detectedLocation}
+                      selectedState={selectedState}
                     />
                   </Suspense>
                 </div>

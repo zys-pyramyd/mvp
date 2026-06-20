@@ -268,8 +268,17 @@ async def get_community_products(community_id: str, limit: int = 50):
             
     return products
 
-# --- Community Creation ---
+# --- Community Creation & Listing ---
 
+@router.get("/")
+async def get_all_communities(limit: int = 50):
+    """Get all public active communities"""
+    db = get_db()
+    cursor = db.communities.find({"is_private": False, "is_active": {"$ne": False}}).sort("members_count", -1).limit(limit)
+    communities = list(cursor)
+    for c in communities:
+        c.pop('_id', None)
+    return {"communities": communities}
 @router.post("/")
 async def create_community(
     community_data: CommunityCreate,  # SECURITY: Validated input
