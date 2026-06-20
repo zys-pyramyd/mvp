@@ -34,7 +34,6 @@ def _generate_presigned_url(folder: str, filename: str, content_type: str, allow
         )
 
     folder_config = allowed_folders[folder]
-    bucket = folder_config['bucket'].replace('{private}', R2_PRIVATE_BUCKET).replace('{public}', R2_PUBLIC_BUCKET)
     # resolve actual bucket name
     bucket = R2_PRIVATE_BUCKET if folder_config['privacy'] == 'private' else R2_PUBLIC_BUCKET
 
